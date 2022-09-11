@@ -47,6 +47,7 @@ docker run \
    -p 9042:9042 -p 10000:10000 -p 5090:5090 -p 9180:9180 -p 9100:9100 \
    --volume /var/lib/scylla:/var/lib/scylla \
    --volume ${PWD}/scylla.cql:/tmp/scylla.cql \
+   --volume ${PWD}/scylla.yaml:/etc/scylla/scylla.yaml \
    --hostname ergo-scylla \
    -d scylladb/scylla:5.1 --overprovisioned 1 --developer-mode 1 --memory 11G --reserve-memory 3G --smp $SCYLLA_SMP
 
