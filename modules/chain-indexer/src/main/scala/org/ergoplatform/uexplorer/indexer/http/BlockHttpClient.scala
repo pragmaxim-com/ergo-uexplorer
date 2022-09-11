@@ -7,7 +7,7 @@ import akka.stream.scaladsl.Flow
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
-import org.ergoplatform.uexplorer.indexer.{Const, Resiliency}
+import org.ergoplatform.uexplorer.indexer.Resiliency
 import sttp.client3._
 import sttp.client3.circe._
 import sttp.model.Uri
@@ -63,7 +63,7 @@ class BlockHttpClient(metadataClient: MetadataHttpClient[_], masterPeer: Uri)(im
     Flow[Int]
       .mapAsync(1)(getBlockIdForHeight)
       .buffer(64, OverflowStrategy.backpressure)
-      .mapAsync(2)(getBlockForId)
+      .mapAsync(1)(getBlockForId)
       .buffer(32, OverflowStrategy.backpressure)
 
   def close(): Future[Unit] =

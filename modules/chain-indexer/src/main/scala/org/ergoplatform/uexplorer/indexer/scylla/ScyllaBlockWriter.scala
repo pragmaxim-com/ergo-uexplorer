@@ -48,6 +48,6 @@ class ScyllaBlockWriter(implicit
       .via(tokensWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
       .via(inputsWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
       .via(assetsWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
-      .via(outputsWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
+      .via(outputsWriteFlow(parallelism = 1))
       // format: on
 }

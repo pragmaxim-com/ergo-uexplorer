@@ -10,7 +10,7 @@ Chain indexer syncs with Ergo node and then keeps polling new blocks while disca
   - local/remote ScyllaDB, installation script expects :
       - `/var/lib/scylla` dir exists
       - `/proc/sys/fs/aio-max-nr` has value 1048576
-  - at least 32GB of ram (`scyllaDB = 25GB`, `ergo-node = 1GB`, `chain-indexer = 1GB`, `system = 5GB` to avoid OOM killer)
+  - at least 9GB of ram (`scyllaDB = 6GB`, `ergo-node = 1GB`, `chain-indexer = 512MB`, `system = 1.5GB` to avoid OOM killer)
   - at least 4vCPUs but the whole stack was tested only on 8vCPUs machine (half of the cores is allocated for scylla)
   - local fully synced Ergo Node is running if you are syncing from scratch, polling new blocks is done from peer network
 
@@ -43,7 +43,6 @@ $ nohup java -Xmx1g -jar ergo.jar --mainnet -c ergo.conf &
 
 $ cd ergo-uexplorer/dist/bin
 $ ./scylla-start.sh
-Do you want to start scylla for initial sync (s) or polling (p)? s
 4098518a35b0cdc74bf598dc52bcf032d952a2c30271a43064c1c353adb5fd6d
 Waiting for scylla to initialize...
 Loading db schema

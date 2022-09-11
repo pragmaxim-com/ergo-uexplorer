@@ -40,7 +40,7 @@ lazy val indexer =
       },
       scriptClasspath := Seq((assembly / assemblyJarName).value),
       Universal / javaOptions ++= Seq(
-        "-J-Xmx768m",
+        "-J-Xmx512m",
         "-J-Xms256m",
         "-J-Xss40m",
       )
