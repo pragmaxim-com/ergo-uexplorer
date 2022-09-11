@@ -1,0 +1,29 @@
+# IDE/Editor files
+.idea
+.bsp
+.ensime
+.ensime_cache/
+scorex.yaml
+
+# scala build folders
+target
+
+# logs
+*.log
+*.log.gz
+*.tmp
+
+# binary files
+*.gz
+
+# local build
+project/project/
+
+# metals, bloop, vscode
+.bloop/
+.metals/
+.vscode/
+project/metals.sbt
+
+# scala worksheets
+*.worksheet.sc
