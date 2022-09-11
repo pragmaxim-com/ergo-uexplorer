@@ -69,23 +69,27 @@ $ ./chain-indexer
 ```
 
 **Troubleshooting:**
-  1. ScyllaDB crashes :
-  
-    - reason : most likely OOM killer kicked in and killed scylla process
-    - solution : avoid running another memory intensive processes (Browser, IDE),
+
+-  ScyllaDB crashes :
+      - reason : most likely OOM killer kicked in and killed scylla process
+      - solution : avoid running another memory intensive processes (Browser, IDE),
                  chain-indexer is tested on a dedicated server (laptop is unstable environment)
         ```
         $ docker logs ergo-scylla 2>&1 | grep -i kill
         2022-09-10 09:08:51,142 INFO exited: scylla (terminated by SIGKILL; not expected)
         ```
-  2. Chain-indexer crashes :
-  
+    - docker version of scylla is not prod-ready, ie. OOM killer prone, etc. It is [covered](https://github.com/scylladb/scylladb/blob/60e8f5743cc777882c6b53fa04a0e82c8ae862b2/dist/common/systemd/scylla-server.service#L25)
+      in prod-ready [Debian](https://github.com/scylladb/scylladb/tree/60e8f5743cc777882c6b53fa04a0e82c8ae862b2/dist/debian) distro
+
+- Chain-indexer crashes :
     - reason: almost exclusively due to scylla connection problems if OOM killer kills it
     - solution :
         - nothing should happen during polling when chain-indexer recovers on its own
         - if scylla is killed during heavy initial sync by OOM killer,
           there might be data loss as it is eventually consistent database
           which requires proper shutdown. Please start syncing from scratch with empty DB.
+        - if indexing crashes but scylla logs do not contain `SIGKILL`,
+          run `./chain-indexer` and it will continue when it stopped (no data gets lost)
 
 **Cleanup:**
 ```
