@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.indexer
 
 import akka.NotUsed
-import akka.stream.scaladsl.{Balance, Broadcast, Flow, GraphDSL, Keep, Merge, RestartSource, Source, Zip}
+import akka.stream.scaladsl.{Balance, Flow, GraphDSL, Merge, RestartSource, Source}
 import akka.stream.{ActorAttributes, Attributes, FlowShape}
 
 trait AkkaStreamSupport {

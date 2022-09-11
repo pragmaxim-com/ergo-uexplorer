@@ -13,8 +13,7 @@ import sttp.model.Uri.{EmptyPath, QuerySegment}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.control.NonFatal
-import scala.util.{Failure, Right, Success, _}
+import scala.util.{Failure, Right, Success}
 
 class MetadataHttpClient[P](val masterPeerAddr: Uri)(implicit val underlyingB: SttpBackend[Future, P]) extends LazyLogging {
 

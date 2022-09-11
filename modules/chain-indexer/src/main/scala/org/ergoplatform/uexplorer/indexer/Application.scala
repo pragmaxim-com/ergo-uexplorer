@@ -24,9 +24,6 @@ object Application extends App with LazyLogging {
     case Right(conf) =>
       val guardian: Behavior[Nothing] =
         Behaviors.setup[Nothing] { implicit ctx =>
-          // val blockStorage = new InMemoryBlockStorage
-          // val syncer = new Syncer(blockStorage, httpClient, Const.MasterPeerAddress)
-
           Indexer.runWith(conf)
           Behaviors.same
         }

@@ -6,7 +6,6 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, P
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBlockWriter
 
-
 trait ScyllaInputsWriter { this: ScyllaBlockWriter =>
   import Inputs._
 
