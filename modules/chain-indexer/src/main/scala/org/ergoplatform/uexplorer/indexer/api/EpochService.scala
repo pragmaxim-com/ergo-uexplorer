@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
-import org.ergoplatform.uexplorer.indexer.progress.{Epoch, InvalidEpochCandidate, ProgressMonitor}
+import org.ergoplatform.uexplorer.indexer.progress.{Epoch, InvalidEpochCandidate}
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -26,7 +26,7 @@ trait EpochService extends LazyLogging {
   def updateProgressFromDB(progressMonitorRef: ActorRef[ProgressMonitorRequest])(implicit
     s: ActorSystem[Nothing],
     to: Timeout
-  ): Future[Progress] =
+  ): Future[ProgressState] =
     getLastBlockInfoByEpochIndex.flatMap { lastBlockInfoByEpochIndex =>
       progressMonitorRef
         .ask(ref => UpdateEpochIndexes(lastBlockInfoByEpochIndex, ref))
@@ -37,7 +37,7 @@ trait EpochService extends LazyLogging {
     to: Timeout
   ): Flow[FlatBlock, Either[Int, Epoch], NotUsed] =
     Flow[FlatBlock]
-      .filter(ProgressMonitor.atMaxForkPoint)
+      .filter(b => Epoch.heightAtFlushPoint(b.header.height))
       .mapAsync(1)(b => progressMonitorRef.ask(ref => BlockPersisted(b, ref)))
       .mapAsync(1) {
         case NewEpochCreated(epoch) =>

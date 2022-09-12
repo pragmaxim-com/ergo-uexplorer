@@ -12,10 +12,11 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.datastax.oss.driver.api.core.CqlSession
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.api.{BlockBuilder, BlockWriter, EpochService}
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ScyllaBackend, UnknownBackend}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, MetadataHttpClient}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{GetLastBlock, Progress, ProgressMonitorRequest}
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{GetLastBlock, ProgressMonitorRequest, ProgressState}
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor}
 import org.ergoplatform.uexplorer.indexer.scylla.{ScyllaBlockBuilder, ScyllaBlockWriter, ScyllaEpochService}
 import sttp.client3.{HttpClientFutureBackend, SttpBackend, SttpBackendOptions}
@@ -45,7 +46,7 @@ class Indexer(
       .via(epochService.writeEpochFlow(progressMonitorRef))
       .withAttributes(supervisionStrategy(Resiliency.decider))
 
-  def sync(blockHttpClient: BlockHttpClient): Future[Progress] = {
+  def sync(blockHttpClient: BlockHttpClient): Future[ProgressState] = {
     val bestBlockHeightF = blockHttpClient.getBestBlockHeight
     val progressF        = epochService.updateProgressFromDB(progressMonitorRef)
     bestBlockHeightF.flatMap { bestBlockHeight =>
@@ -71,7 +72,7 @@ class Indexer(
       .map(_.block.get.stats.height + 1)
       .flatMap(fromHeight => blockHttpClient.getBestBlockHeight.map(toHeight => (fromHeight to toHeight).toVector))
 
-  def keepPolling(blockHttpClient: BlockHttpClient): Future[Progress] =
+  def keepPolling(blockHttpClient: BlockHttpClient): Future[ProgressState] =
     restartSource {
       Source
         .tick(0.seconds, 5.seconds, ())
@@ -93,11 +94,11 @@ class Indexer(
 
 object Indexer extends LazyLogging {
 
-  def runWith(conf: ChainIndexerConf)(implicit ctx: ActorContext[Nothing]): Future[Progress] = {
+  def runWith(conf: ChainIndexerConf)(implicit ctx: ActorContext[Nothing]): Future[ProgressState] = {
     implicit val system: ActorSystem[Nothing] = ctx.system
     implicit val futureSttpBackend: SttpBackend[Future, _] =
       HttpClientFutureBackend(SttpBackendOptions.connectionTimeout(5.seconds))
-
+    implicit val protocol: ProtocolSettings = conf.protocol
     val indexer =
       conf.backendType match {
         case ScyllaBackend =>
@@ -106,9 +107,9 @@ object Indexer extends LazyLogging {
           implicit val cqlSession: CqlSession = Await.result(cassandraSession.underlying(), 5.seconds)
           new Indexer(
             new ScyllaBlockWriter,
-            new ScyllaBlockBuilder(conf.protocol),
+            new ScyllaBlockBuilder,
             new ScyllaEpochService(),
-            ctx.spawn(new ProgressMonitor(conf.protocol).initialBehavior, "ProgressMonitor")
+            ctx.spawn(new ProgressMonitor().initialBehavior, "ProgressMonitor")
           )
         case UnknownBackend =>
           throw new IllegalArgumentException(s"Unknown backend not supported yet.")
@@ -121,7 +122,10 @@ object Indexer extends LazyLogging {
     indexer
       .sync(initialSyncClient)
       .andThen { case Failure(ex) =>
-        logger.error(s"Initial syncing failed, there is no restart", ex)
+        logger.error(
+          s"Initial sync failed, there is no restart as DB could be corrupted if you find SIGKILL in scylla logs due to OOM error",
+          ex
+        )
         initialSyncClient
           .close()
           .flatMap(_ => pollingClient.close())

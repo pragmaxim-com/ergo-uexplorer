@@ -1,12 +1,12 @@
-package org.ergoplatform.uexplorer.indexer
+package org.ergoplatform.uexplorer.indexer.progress
 
 import org.ergoplatform.explorer.{BlockId, HexString}
-import org.ergoplatform.uexplorer.indexer.progress.{BlockRel, EpochCandidate}
+import org.ergoplatform.uexplorer.indexer.Resiliency.StopException
 import org.ergoplatform.uexplorer.indexer.commonGenerators._
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
-class EpochScannerSpec extends AnyFreeSpec with Matchers {
+class EpochSpec extends AnyFreeSpec with Matchers {
 
   val preGenesisBlockId = BlockId(
     HexString.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
@@ -19,6 +19,20 @@ class EpochScannerSpec extends AnyFreeSpec with Matchers {
       case (acc, height) =>
         acc :+ (height -> BlockRel(idGen.sample.get, acc.last._2.headerId))
     }
+
+  "height range should be deduced from epoch index" in {
+    Epoch.heightRangeForEpochIndex(0) should be(1 to 1024)
+    Epoch.heightRangeForEpochIndex(1) should be(1025 to 2048)
+    assertThrows[StopException](Epoch.heightRangeForEpochIndex(-1))
+  }
+
+  "epoch index should be deduced from height" in {
+    Epoch.epochIndexForHeight(1) shouldBe 0
+    Epoch.epochIndexForHeight(1024) shouldBe 0
+    Epoch.epochIndexForHeight(1025) shouldBe 1
+    assertThrows[StopException](Epoch.epochIndexForHeight(0))
+    assertThrows[StopException](Epoch.epochIndexForHeight(-1))
+  }
 
   "epoch constructor should" - {
 
@@ -33,8 +47,7 @@ class EpochScannerSpec extends AnyFreeSpec with Matchers {
 
     "fail with" - {
       "invalid epoch index" in {
-        val epoch = EpochCandidate(epochRelationsByHeight(-4 to 1019))
-        epoch.left.get.isComplete shouldBe false
+        assertThrows[StopException](EpochCandidate(epochRelationsByHeight(-4 to 1019)))
       }
       "invalid height range size" in {
         val epoch = EpochCandidate(epochRelationsByHeight(2 to 1024))

@@ -25,7 +25,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class ScyllaBlockBuilder(protocol: ProtocolSettings)(implicit cqlSession: CqlSession, s: ActorSystem[Nothing])
+class ScyllaBlockBuilder(implicit protocol: ProtocolSettings, cqlSession: CqlSession, s: ActorSystem[Nothing])
   extends BlockBuilder
   with LazyLogging {
 
@@ -121,7 +121,7 @@ object ScyllaBlockBuilder {
 
   protected[scylla] val updateMainChainStatements: List[(String, Option[String], SimpleStatement)] =
     List(
-      BlocksInfo.block_info_table           -> None,
+      BlocksInfo.block_info_table          -> None,
       Headers.node_headers_table           -> None,
       Transactions.node_transactions_table -> Some(Transactions.tx_id),
       Inputs.node_inputs_table             -> Some(Inputs.box_id),
