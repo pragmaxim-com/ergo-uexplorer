@@ -49,7 +49,7 @@ docker run \
    --volume ${PWD}/scylla.cql:/tmp/scylla.cql \
    --volume ${PWD}/scylla.yaml:/etc/scylla/scylla.yaml \
    --hostname ergo-scylla \
-   -d scylladb/scylla:5.1 --overprovisioned 1 --developer-mode 1 --memory 11G --reserve-memory 3G --smp $SCYLLA_SMP
+   -d scylladb/scylla:5.1 --overprovisioned 1 --developer-mode 1 --memory 11500M --reserve-memory 2500M --smp $SCYLLA_SMP
 
 echo "Waiting for scylla to initialize..."
 sleep 45;

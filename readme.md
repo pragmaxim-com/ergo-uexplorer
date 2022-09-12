@@ -14,7 +14,9 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
   - local/remote ScyllaDB, installation script expects :
       - `/var/lib/scylla` dir exists
       - `/proc/sys/fs/aio-max-nr` has value `1048576`
+      - we run `docker` distro which is for playing only, install [Debian](https://github.com/scylladb/scylladb/tree/60e8f5743cc777882c6b53fa04a0e82c8ae862b2/dist/debian) distro if you can
   - `14GB+` of RAM (`scyllaDB=11GB`, `ergo-node=1GB`, `chain-indexer=512MB`, `system = 1.5GB`)
+      - if you have more RAM, change `scylla-start.sh` script to avoid memory issues
   - `4vCPU+` but the whole stack was tested on `8vCPU` machine (1/2 cores allocated for scylla)
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks is done only from peer network
@@ -72,8 +74,8 @@ $ ./chain-indexer
 **Troubleshooting:**
 
 -  ScyllaDB crashes :
-      - reason : most likely OOM killer kicked in and killed scylla process
-      - solution : avoid running another memory intensive processes (Browser, IDE),
+    - reason : most likely OOM killer kicked in and killed scylla process
+    - solution : avoid running another memory intensive processes (Browser, IDE),
                  chain-indexer is tested on a dedicated server (laptop is unstable environment)
         ```
         $ docker logs ergo-scylla 2>&1 | grep -i kill
