@@ -10,7 +10,7 @@ Supplementary, lightweight Ergo explorer with ScyllaDB backend :
 Chain indexer syncs with Node and keeps polling blocks while discarding superseded forks.
 
 **Requirements:**
-  - `OpenJDK 11.x` is best for both `chain-indexer` and `ergo-node`
+  - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
   - local/remote ScyllaDB, installation script expects :
       - `/var/lib/scylla` dir exists
       - `/proc/sys/fs/aio-max-nr` has value `1048576`

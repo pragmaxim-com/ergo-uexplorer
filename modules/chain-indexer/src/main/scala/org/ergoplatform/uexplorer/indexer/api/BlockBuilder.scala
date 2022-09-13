@@ -15,7 +15,7 @@ import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.ProgressMonitorRequest
 import tofu.Context
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 trait BlockBuilder {
 
@@ -53,12 +53,18 @@ object BlockBuilder {
     )
   }
 
-  def buildBlock(slotData: SlotData, protocol: ProtocolSettings): FlatBlock = {
+  def buildBlock(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
+    protocol: ProtocolSettings
+  ): FlatBlock = {
     implicit val ctx = Context.const(protocol)(Applicative[Try])
-    slotData
+    SlotData(apiBlock, prevBlockInfo)
       .intoF[Try, FlatBlock]
-      .map(updateMainChain(_, mainChain = true))
-      .getOrElse(throw new StopException(s"Block $slotData is invalid", null))
+      .map(updateMainChain(_, mainChain = true)) match {
+      case Success(b) =>
+        b
+      case Failure(ex) =>
+        throw new StopException(s"Block $apiBlock with prevBlockInfo $prevBlockInfo is invalid", ex)
+    }
   }
 
 }

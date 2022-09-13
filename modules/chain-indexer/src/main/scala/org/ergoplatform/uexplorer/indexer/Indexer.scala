@@ -115,9 +115,9 @@ object Indexer extends LazyLogging {
           throw new IllegalArgumentException(s"Unknown backend not supported yet.")
       }
 
-    val metadataClient    = new MetadataHttpClient(conf.peerAddressToPollFrom)
-    val initialSyncClient = BlockHttpClient.local(conf.nodeAddressToInitFrom, metadataClient)
-    val pollingClient     = BlockHttpClient.remote(conf.peerAddressToPollFrom, metadataClient)
+    val metadataClient    = new MetadataHttpClient(conf.peerUriToPollFrom)
+    val initialSyncClient = BlockHttpClient.local(conf.nodeUriToInitFrom, metadataClient)
+    val pollingClient     = BlockHttpClient.remote(conf.peerUriToPollFrom, metadataClient)
 
     indexer
       .sync(initialSyncClient)

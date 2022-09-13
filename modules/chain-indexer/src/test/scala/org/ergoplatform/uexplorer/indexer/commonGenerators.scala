@@ -5,15 +5,6 @@ import eu.timepit.refined._
 import eu.timepit.refined.string.HexStringSpec
 import io.circe.Json
 import io.estatico.newtype.ops._
-import org.ergoplatform.explorer.constraints.Base58Spec
-import org.scalacheck.{Arbitrary, Gen}
-import scorex.crypto.hash.Blake2b256
-import scorex.util.Random
-import scorex.util.encode.{Base16, Base58}
-import eu.timepit.refined._
-import eu.timepit.refined.string.HexStringSpec
-import io.circe.Json
-import io.estatico.newtype.ops._
 import org.ergoplatform.explorer._
 import org.ergoplatform.explorer.constraints.Base58Spec
 import org.scalacheck.{Arbitrary, Gen}
@@ -33,6 +24,12 @@ object commonGenerators {
   implicit val arbBoxId: Arbitrary[BoxId]        = Arbitrary(boxIdGen)
   implicit val arbAssetId: Arbitrary[TokenId]    = Arbitrary(assetIdGen)
   implicit val registerId: Arbitrary[RegisterId] = Arbitrary(registerIdGen)
+
+  val MainNetMinerPk: HexString = HexString
+    .fromString[Try](
+      "0377d854c54490abc6c565d8e548d5fc92a6a6c2f4415ed96f0c340ece92e1ed2f"
+    )
+    .get
 
   def hexStringGen: Gen[String] =
     Gen

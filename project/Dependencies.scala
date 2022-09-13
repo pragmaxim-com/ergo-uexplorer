@@ -10,19 +10,21 @@ object Version {
 }
 
 object Dependencies {
-  lazy val akkaActor       = "com.typesafe.akka"          %% "akka-actor-typed"         % Version.akka
-  lazy val akkaStream      = "com.typesafe.akka"          %% "akka-stream-typed"        % Version.akka
-  lazy val akkaTest        = "com.typesafe.akka"          %% "akka-actor-testkit-typed" % Version.akka % Test
-  lazy val akkaSlf4j       = "com.typesafe.akka"          %% "akka-slf4j"               % Version.akka
-  lazy val scalaTest       = "org.scalatest"              %% "scalatest"                % "3.2.12"     % Test
-  lazy val scalaCheck      = "org.scalatestplus"          %% "scalacheck-1-15"          % "3.2.11.0"   % Test
-  lazy val scalaLogging    = "com.typesafe.scala-logging" %% "scala-logging"            % "3.9.5"
-  lazy val slf4jApi        = "org.slf4j"                   % "slf4j-api"                % "1.7.36"
-  lazy val logback         = "ch.qos.logback"              % "logback-classic"          % "1.2.11"
-  lazy val refined         = "eu.timepit"                 %% "refined"                  % "0.9.29"
-  lazy val derevo          = "org.manatki"                %% "derevo-circe"             % "0.11.6"
-  lazy val explorerGrabber = "org.ergoplatform"           %% "chain-grabber"            % "9.16.5"
-  lazy val pureConfig      = "com.github.pureconfig"      %% "pureconfig"               % "0.17.1"
+  lazy val akkaActor           = "com.typesafe.akka"          %% "akka-actor-typed"          % Version.akka
+  lazy val akkaStream          = "com.typesafe.akka"          %% "akka-stream-typed"         % Version.akka
+  lazy val akkaTest            = "com.typesafe.akka"          %% "akka-actor-testkit-typed"  % Version.akka % Test
+  lazy val akkaSlf4j           = "com.typesafe.akka"          %% "akka-slf4j"                % Version.akka
+  lazy val scalaTest           = "org.scalatest"              %% "scalatest"                 % "3.2.12"     % Test
+  lazy val scalaCheck          = "org.scalatestplus"          %% "scalacheck-1-15"           % "3.2.11.0"   % Test
+  lazy val scalaCheckShapeless = "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.5"      % Test
+  lazy val scalaLogging        = "com.typesafe.scala-logging" %% "scala-logging"             % "3.9.5"
+  lazy val slf4jApi            = "org.slf4j"                   % "slf4j-api"                 % "1.7.36"
+  lazy val logback             = "ch.qos.logback"              % "logback-classic"           % "1.2.11"
+  lazy val refined             = "eu.timepit"                 %% "refined"                   % "0.9.29"
+  lazy val derevo              = "org.manatki"                %% "derevo-circe"              % "0.11.6"
+  lazy val explorerGrabber     = "org.ergoplatform"           %% "chain-grabber"             % "9.16.5"
+  lazy val pureConfig          = "com.github.pureconfig"      %% "pureconfig"                % "0.17.1"
+  lazy val pureConfigHttp4s    = "com.github.pureconfig"      %% "pureconfig-http4s"         % "0.17.1"
 
   lazy val logging = Seq(slf4jApi, logback, scalaLogging)
   lazy val akka    = Seq(akkaActor, akkaStream, akkaSlf4j, akkaTest)

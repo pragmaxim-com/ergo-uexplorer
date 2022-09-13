@@ -5,7 +5,7 @@ import akka.actor.typed.{ActorRef, Behavior}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.db.models.BlockStats
-import org.ergoplatform.explorer.indexer.models.{FlatBlock, SlotData}
+import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.Const
@@ -107,8 +107,8 @@ object ProgressMonitor {
   }
 
   case class ProgressState(
-    lastBlockIdInEpoch: TreeMap[Int, BlockId],
-    invalidIndexes: TreeSet[Int],
+    lastBlockIdInEpoch: SortedMap[Int, BlockId],
+    invalidIndexes: SortedSet[Int],
     blockCache: BlockCache
   ) extends ProgressMonitorResponse {
 
@@ -165,24 +165,8 @@ object ProgressMonitor {
       }
     }
 
-    override def toString: String = {
-      val existingEpochs = persistedEpochIndexes
-      val cachedHeights  = blockCache.heights
-
-      def headStr(xs: SortedSet[Int]) = xs.headOption.map(h => s"[$h").getOrElse("")
-
-      def lastStr(xs: SortedSet[Int]) =
-        if (xs.isEmpty) ""
-        else xs.lastOption.filterNot(xs.headOption.contains).map(h => s" - $h]").getOrElse("]")
-
-      s"Persisted Epochs: ${existingEpochs.size}${headStr(existingEpochs)}${lastStr(existingEpochs)}, " +
-      s"Blocks cache size (heights): ${cachedHeights.size}${headStr(cachedHeights)}${lastStr(cachedHeights)}, " +
-      s"Invalid Epochs: ${invalidIndexes.size}${headStr(invalidIndexes)}${lastStr(invalidIndexes)}"
-    }
-
     def insertBestBlock(bestBlock: ApiFullBlock)(implicit protocol: ProtocolSettings): (BestBlockInserted, ProgressState) = {
-      val slotData     = SlotData(bestBlock, blockCache.byId.get(bestBlock.header.id).map(_.stats))
-      val flatBlock    = BlockBuilder.buildBlock(slotData, protocol)
+      val flatBlock    = BlockBuilder.buildBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId).map(_.stats))
       val newBlockInfo = BlockInfo(flatBlock.header.parentId, flatBlock.info)
       BestBlockInserted(flatBlock) -> copy(blockCache =
         BlockCache(
@@ -199,10 +183,7 @@ object ProgressMonitor {
         winningFork.foldLeft(ListBuffer.empty[FlatBlock], ListBuffer.empty[BlockInfo]) {
           case ((newBlocksAcc, toRemoveAcc), apiBlock) =>
             val newBlocks =
-              newBlocksAcc :+ buildBlock(
-                SlotData(apiBlock, blockCache.byId.get(apiBlock.header.id).map(_.stats)),
-                protocol
-              )
+              newBlocksAcc :+ buildBlock(apiBlock, blockCache.byId.get(apiBlock.header.id).map(_.stats))
             val toRemove =
               toRemoveAcc ++ blockCache.byHeight
                 .get(apiBlock.header.height)
@@ -221,8 +202,8 @@ object ProgressMonitor {
       val newEpochIndexes = lastBlockIdInEpoch ++ persistedEpochIndexes.mapValues(_.stats.headerId)
       val newBlockCache =
         BlockCache(
-          blockCache.byId ++ persistedEpochIndexes.lastOption.map(i => i._2.stats.headerId -> i._2),
-          blockCache.byHeight ++ persistedEpochIndexes.lastOption.map(i => i._2.stats.height -> i._2)
+          blockCache.byId ++ persistedEpochIndexes.map(i => i._2.stats.headerId -> i._2),
+          blockCache.byHeight ++ persistedEpochIndexes.map(i => i._2.stats.height -> i._2)
         )
       ProgressState(newEpochIndexes, invalidIndexes, newBlockCache)
     }
@@ -241,6 +222,21 @@ object ProgressMonitor {
       else
         TreeSet((lastBlockIdInEpoch.head._1 to lastBlockIdInEpoch.last._1): _*)
           .diff(lastBlockIdInEpoch.keySet)
+
+    override def toString: String = {
+      val existingEpochs = persistedEpochIndexes
+      val cachedHeights  = blockCache.heights
+
+      def headStr(xs: SortedSet[Int]) = xs.headOption.map(h => s"[$h").getOrElse("")
+
+      def lastStr(xs: SortedSet[Int]) =
+        if (xs.isEmpty) ""
+        else xs.lastOption.filterNot(xs.headOption.contains).map(h => s" - $h]").getOrElse("]")
+
+      s"Persisted Epochs: ${existingEpochs.size}${headStr(existingEpochs)}${lastStr(existingEpochs)}, " +
+      s"Blocks cache size (heights): ${cachedHeights.size}${headStr(cachedHeights)}${lastStr(cachedHeights)}, " +
+      s"Invalid Epochs: ${invalidIndexes.size}${headStr(invalidIndexes)}${lastStr(invalidIndexes)}"
+    }
 
   }
 

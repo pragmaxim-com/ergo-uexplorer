@@ -7,6 +7,7 @@ lazy val commonSettings = Seq(
   organization := "org.ergoplatform",
   version := "0.0.1",
   resolvers ++= Resolver.sonatypeOssRepos("public") ++ Resolver.sonatypeOssRepos("snapshots"),
+  scalacOptions += "-P:splain:implicits:true",
   ThisBuild / evictionErrorLevel := Level.Info
 )
 
@@ -48,6 +49,7 @@ lazy val indexer =
     .settings(
       libraryDependencies ++= akka ++ sttp ++ scyllaDb ++ monocle ++ logging ++ Seq(
         explorerGrabber, scalaTest, scalaCheck,
-        compilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full)
+        compilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full),
+        compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)
       ),
     )
