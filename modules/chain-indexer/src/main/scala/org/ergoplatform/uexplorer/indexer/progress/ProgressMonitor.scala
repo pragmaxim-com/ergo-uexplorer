@@ -8,9 +8,9 @@ import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.Const
+import org.ergoplatform.uexplorer.indexer.Resiliency.StopException
 import org.ergoplatform.uexplorer.indexer.api.BlockBuilder
-import org.ergoplatform.uexplorer.indexer.api.BlockBuilder.{buildBlock, BlockInfo}
-
+import org.ergoplatform.uexplorer.indexer.api.BlockBuilder._
 import scala.collection.immutable.{SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
 
@@ -25,11 +25,11 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
 
   def initialized(p: ProgressState): Behaviors.Receive[ProgressMonitorRequest] =
     Behaviors.receiveMessage[ProgressMonitorRequest] {
-      case InsertBestBlock(bestBlock, replyTo) if p.canByApplied(bestBlock) =>
+      case InsertBestBlock(bestBlock, replyTo) if p.hasParent(bestBlock) =>
         val (bestBlockInserted, newProgress) = p.insertBestBlock(bestBlock)
         replyTo ! bestBlockInserted
         initialized(newProgress)
-      case InsertWinningFork(winningFork, replyTo) if winningFork.nonEmpty && p.canByApplied(winningFork.head) =>
+      case InsertWinningFork(winningFork, replyTo) if p.hasParentAndIsChained(winningFork) =>
         val (winningForkInserted, newProgress) = p.insertWinningFork(winningFork)
         replyTo ! winningForkInserted
         initialized(newProgress)
@@ -96,7 +96,7 @@ object ProgressMonitor {
 
   case class BestBlockInserted(flatBlock: FlatBlock) extends Inserted
 
-  case class WinningForkInserted(newFork: List[FlatBlock], supersededFork: List[BlockInfo]) extends Inserted
+  case class ForkInserted(newFork: List[FlatBlock], supersededFork: List[BlockInfo]) extends Inserted
 
   sealed trait MaybeNewEpoch extends ProgressMonitorResponse
 
@@ -170,9 +170,15 @@ object ProgressMonitor {
     }
 
     def insertBestBlock(bestBlock: ApiFullBlock)(implicit protocol: ProtocolSettings): (BestBlockInserted, ProgressState) = {
+      if (!hasParent(bestBlock)) {
+        throw new StopException(
+          s"Inserting block ${bestBlock.header.id} at ${bestBlock.header.height} without parent being applied is not possible",
+          null
+        )
+      }
       val prevBlockStats = blockCache.byId.get(bestBlock.header.parentId).map(_.stats)
       val flatBlock      = BlockBuilder.buildBlock(bestBlock, prevBlockStats)
-      val newBlockInfo   = BlockInfo(flatBlock.header.parentId, flatBlock.info)
+      val newBlockInfo   = flatBlock.buildInfo
       BestBlockInserted(flatBlock) -> copy(blockCache =
         BlockCache(
           blockCache.byId.updated(flatBlock.header.id, newBlockInfo),
@@ -183,12 +189,25 @@ object ProgressMonitor {
 
     def insertWinningFork(
       winningFork: List[ApiFullBlock]
-    )(implicit protocol: ProtocolSettings): (WinningForkInserted, ProgressState) = {
+    )(implicit protocol: ProtocolSettings): (ForkInserted, ProgressState) = {
+      if (!hasParentAndIsChained(winningFork)) {
+        throw new StopException(
+          s"Inserting fork ${winningFork.map(_.header.id).mkString(",")} at height ${winningFork.map(_.header.height).mkString(",")} illegal",
+          null
+        )
+      }
       val (newBlocks, supersededBlocks) =
         winningFork.foldLeft(ListBuffer.empty[FlatBlock], ListBuffer.empty[BlockInfo]) {
           case ((newBlocksAcc, toRemoveAcc), apiBlock) =>
             val newBlocks =
-              newBlocksAcc :+ buildBlock(apiBlock, blockCache.byId.get(apiBlock.header.id).map(_.stats))
+              newBlocksAcc :+ buildBlock(
+                apiBlock,
+                Some(
+                  newBlocksAcc.lastOption
+                    .collect { case b if b.header.id == apiBlock.header.parentId => b.info }
+                    .getOrElse(blockCache.byId(apiBlock.header.parentId).stats)
+                )
+              )
             val toRemove =
               toRemoveAcc ++ blockCache.byHeight
                 .get(apiBlock.header.height)
@@ -197,10 +216,10 @@ object ProgressMonitor {
         }
       val newBlockCache =
         BlockCache(
-          blockCache.byId ++ newBlocks.map(b => b.header.id -> BlockInfo(b.header.parentId, b.info)),
-          blockCache.byHeight ++ newBlocks.map(b => b.header.height -> BlockInfo(b.header.parentId, b.info))
+          (blockCache.byId -- supersededBlocks.map(_.stats.headerId)) ++ newBlocks.map(b => b.header.id -> b.buildInfo),
+          blockCache.byHeight ++ newBlocks.map(b => b.header.height -> b.buildInfo)
         )
-      WinningForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(blockCache = newBlockCache)
+      ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(blockCache = newBlockCache)
     }
 
     def updateEpochIndexes(persistedEpochIndexes: TreeMap[Int, BlockInfo]): ProgressState = {
@@ -224,8 +243,18 @@ object ProgressMonitor {
     /** Genesis block is not part of a cache as it has no parent so
       * we assert that any block either has its parent cached or its a first block
       */
-    def canByApplied(block: ApiFullBlock): Boolean =
+    def hasParent(block: ApiFullBlock): Boolean =
       blockCache.byId.contains(block.header.parentId) || block.header.height == 1
+
+    def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
+      fork.size > 1 &&
+      blockCache.byId.contains(fork.head.header.parentId) &&
+      fork.sliding(2).forall {
+        case first :: second :: Nil =>
+          first.header.id == second.header.parentId
+        case _ =>
+          false
+      }
 
     def findMissingIndexes: TreeSet[Int] =
       if (lastBlockIdInEpoch.isEmpty || lastBlockIdInEpoch.size == 1)

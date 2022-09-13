@@ -25,6 +25,7 @@ object Dependencies {
   lazy val explorerGrabber     = "org.ergoplatform"           %% "chain-grabber"             % "9.16.5"
   lazy val pureConfig          = "com.github.pureconfig"      %% "pureconfig"                % "0.17.1"
   lazy val pureConfigHttp4s    = "com.github.pureconfig"      %% "pureconfig-http4s"         % "0.17.1"
+  lazy val diffx               = "com.softwaremill.diffx"     %% "diffx-scalatest-should"    % "0.7.1"      % Test
 
   lazy val logging = Seq(slf4jApi, logback, scalaLogging)
   lazy val akka    = Seq(akkaActor, akkaStream, akkaSlf4j, akkaTest)

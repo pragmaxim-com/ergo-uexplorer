@@ -6,7 +6,7 @@ import akka.stream.scaladsl.Flow
 import cats.Applicative
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.BuildFrom.syntax._
-import org.ergoplatform.explorer.db.models.{BlockStats, Header}
+import org.ergoplatform.explorer.db.models.BlockStats
 import org.ergoplatform.explorer.indexer.extractors._
 import org.ergoplatform.explorer.indexer.models.{FlatBlock, SlotData}
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
@@ -31,29 +31,20 @@ object BlockBuilder {
   case class BlockInfo(parentId: BlockId, stats: BlockStats)
 
   def updateMainChain(block: FlatBlock, mainChain: Boolean): FlatBlock = {
-    import monocle.macros.GenLens
-    val header          = GenLens[FlatBlock](_.header)
-    val headerMainChain = GenLens[Header](_.mainChain)
-    val info            = GenLens[FlatBlock](_.info)
-    val infoMainChain   = GenLens[BlockStats](_.mainChain)
-    val txs             = GenLens[FlatBlock](_.txs)
-    val inputs          = GenLens[FlatBlock](_.inputs)
-    val dataInputs      = GenLens[FlatBlock](_.dataInputs)
-    val outputs         = GenLens[FlatBlock](_.outputs)
-
-    (header composeLens headerMainChain).modify(_ => mainChain)(
-      (info composeLens infoMainChain).modify(_ => mainChain)(
-        txs.modify(_.map(_.copy(mainChain = mainChain)))(
-          inputs.modify(_.map(_.copy(mainChain = mainChain)))(
-            dataInputs.modify(_.map(_.copy(mainChain = mainChain)))(
-              outputs.modify(_.map(_.copy(mainChain = mainChain)))(
-                block
-              )
-            )
-          )
-        )
-      )
-    )
+    import monocle.macros.syntax.lens._
+    block
+      .lens(_.header.mainChain)
+      .modify(_ => mainChain)
+      .lens(_.info.mainChain)
+      .modify(_ => mainChain)
+      .lens(_.txs)
+      .modify(_.map(_.copy(mainChain = mainChain)))
+      .lens(_.inputs)
+      .modify(_.map(_.copy(mainChain = mainChain)))
+      .lens(_.dataInputs)
+      .modify(_.map(_.copy(mainChain = mainChain)))
+      .lens(_.outputs)
+      .modify(_.map(_.copy(mainChain = mainChain)))
   }
 
   def buildBlock(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
@@ -71,6 +62,6 @@ object BlockBuilder {
   }
 
   implicit class FlatBlockPimp(underlying: FlatBlock) {
-    def buildInfo = BlockInfo(underlying.header.parentId, underlying.info)
+    def buildInfo: BlockInfo = BlockInfo(underlying.header.parentId, underlying.info)
   }
 }

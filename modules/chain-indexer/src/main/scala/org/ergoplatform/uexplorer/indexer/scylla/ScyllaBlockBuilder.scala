@@ -103,7 +103,7 @@ class ScyllaBlockBuilder(implicit protocol: ProtocolSettings, cqlSession: CqlSes
       .mapAsync(1) {
         case BestBlockInserted(flatBlock) =>
           Future.successful(List(flatBlock))
-        case WinningForkInserted(newFlatBlocks, supersededFork) =>
+        case ForkInserted(newFlatBlocks, supersededFork) =>
           removeBlocksFromMainChain(supersededFork.map(_.stats.headerId))
             .map(_ => newFlatBlocks)
       }
