@@ -4,13 +4,12 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.BlockId
-import org.ergoplatform.explorer.db.models.BlockStats
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.api.BlockBuilder
-import org.ergoplatform.uexplorer.indexer.api.BlockBuilder.buildBlock
+import org.ergoplatform.uexplorer.indexer.api.BlockBuilder.{buildBlock, BlockInfo}
 
 import scala.collection.immutable.{SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
@@ -26,11 +25,11 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
 
   def initialized(p: ProgressState): Behaviors.Receive[ProgressMonitorRequest] =
     Behaviors.receiveMessage[ProgressMonitorRequest] {
-      case InsertBestBlock(bestBlock, replyTo) =>
+      case InsertBestBlock(bestBlock, replyTo) if p.canByApplied(bestBlock) =>
         val (bestBlockInserted, newProgress) = p.insertBestBlock(bestBlock)
         replyTo ! bestBlockInserted
         initialized(newProgress)
-      case InsertWinningFork(winningFork, replyTo) =>
+      case InsertWinningFork(winningFork, replyTo) if winningFork.nonEmpty && p.canByApplied(winningFork.head) =>
         val (winningForkInserted, newProgress) = p.insertWinningFork(winningFork)
         replyTo ! winningForkInserted
         initialized(newProgress)
@@ -53,15 +52,20 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
         logger.info(s"$newProgress")
         replyTo ! maybeNewEpoch
         initialized(newProgress)
-      case BlockPersisted(_, _) =>
-        logger.error(s"Received unexpected block, stopping...")
+      case BlockPersisted(b, _) =>
+        logger.error(s"Unexpected persisted block ${b.header.id} at ${b.header.height} ...")
+        Behaviors.stopped
+      case InsertBestBlock(b, _) =>
+        logger.error(s"Unexpected insert ${b.header.id} at ${b.header.height}, parent ${b.header.parentId} ...")
+        Behaviors.stopped
+      case InsertWinningFork(fork, _) =>
+        val h = fork.head.header
+        logger.error(s"Unexpected winningFork size ${fork.size} starting ${h.id} at ${h.height}, parent ${h.parentId} ...")
         Behaviors.stopped
     }
 }
 
 object ProgressMonitor {
-
-  case class BlockInfo(parentId: BlockId, stats: BlockStats)
 
   sealed trait ProgressMonitorRequest
 
@@ -166,8 +170,9 @@ object ProgressMonitor {
     }
 
     def insertBestBlock(bestBlock: ApiFullBlock)(implicit protocol: ProtocolSettings): (BestBlockInserted, ProgressState) = {
-      val flatBlock    = BlockBuilder.buildBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId).map(_.stats))
-      val newBlockInfo = BlockInfo(flatBlock.header.parentId, flatBlock.info)
+      val prevBlockStats = blockCache.byId.get(bestBlock.header.parentId).map(_.stats)
+      val flatBlock      = BlockBuilder.buildBlock(bestBlock, prevBlockStats)
+      val newBlockInfo   = BlockInfo(flatBlock.header.parentId, flatBlock.info)
       BestBlockInserted(flatBlock) -> copy(blockCache =
         BlockCache(
           blockCache.byId.updated(flatBlock.header.id, newBlockInfo),
@@ -215,6 +220,12 @@ object ProgressMonitor {
     }
 
     def persistedEpochIndexes: SortedSet[Int] = lastBlockIdInEpoch.keySet
+
+    /** Genesis block is not part of a cache as it has no parent so
+      * we assert that any block either has its parent cached or its a first block
+      */
+    def canByApplied(block: ApiFullBlock): Boolean =
+      blockCache.byId.contains(block.header.parentId) || block.header.height == 1
 
     def findMissingIndexes: TreeSet[Int] =
       if (lastBlockIdInEpoch.isEmpty || lastBlockIdInEpoch.size == 1)

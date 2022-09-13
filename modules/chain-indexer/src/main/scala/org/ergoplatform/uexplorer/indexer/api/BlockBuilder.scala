@@ -4,6 +4,7 @@ import akka.NotUsed
 import akka.actor.typed.ActorRef
 import akka.stream.scaladsl.Flow
 import cats.Applicative
+import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.BuildFrom.syntax._
 import org.ergoplatform.explorer.db.models.{BlockStats, Header}
 import org.ergoplatform.explorer.indexer.extractors._
@@ -26,6 +27,8 @@ trait BlockBuilder {
 }
 
 object BlockBuilder {
+
+  case class BlockInfo(parentId: BlockId, stats: BlockStats)
 
   def updateMainChain(block: FlatBlock, mainChain: Boolean): FlatBlock = {
     import monocle.macros.GenLens
@@ -67,4 +70,7 @@ object BlockBuilder {
     }
   }
 
+  implicit class FlatBlockPimp(underlying: FlatBlock) {
+    def buildInfo = BlockInfo(underlying.header.parentId, underlying.info)
+  }
 }

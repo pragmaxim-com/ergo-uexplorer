@@ -7,12 +7,12 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement, 
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.BlockId
+import org.ergoplatform.explorer.{Address, BlockId}
 import org.ergoplatform.explorer.db.models.BlockStats
 import org.ergoplatform.uexplorer.indexer.Const
+import org.ergoplatform.uexplorer.indexer.api.BlockBuilder.BlockInfo
 import org.ergoplatform.uexplorer.indexer.api.EpochService
 import org.ergoplatform.uexplorer.indexer.progress.Epoch
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.BlockInfo
 import org.ergoplatform.uexplorer.indexer.scylla.entity.BlocksInfo
 
 import scala.collection.immutable.TreeMap
@@ -20,7 +20,6 @@ import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
-import org.ergoplatform.explorer.Address
 
 class ScyllaEpochService(implicit session: CqlSession, s: ActorSystem[Nothing]) extends EpochService with LazyLogging {
   import ScyllaEpochService._
