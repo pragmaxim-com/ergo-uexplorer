@@ -78,12 +78,9 @@ class MetadataHttpClient[P](val masterPeerAddr: Uri)(implicit val underlyingB: S
 
   def getValidAndInvalidPeers(masterPeerInfo: PeerInfo): Future[(Set[Uri], Set[Uri])] =
     getConnectedPeers
-      .map {
-        case peers if peers.isEmpty =>
-          logger.warn("Unable to obtain any connected peers, using only master nodes")
-          masterPeerInfo.restApiUrl.toSet.flatMap { addr: PeerAddress => Uri.parse(addr).toOption.map(stripUri) }
-        case peers =>
-          peers.collect { case ConnectedPeer(_, Some(restApiUrl)) => Uri.parse(restApiUrl).toOption }.flatten[Uri]
+      .map { peers =>
+        masterPeerInfo.restApiUrl.toSet.flatMap { addr: PeerAddress => Uri.parse(addr).toOption.map(stripUri) } ++
+        peers.collect { case ConnectedPeer(_, Some(restApiUrl)) => Uri.parse(restApiUrl).toOption }.flatten[Uri]
       }
       .flatMap { openApiPeers =>
         Future

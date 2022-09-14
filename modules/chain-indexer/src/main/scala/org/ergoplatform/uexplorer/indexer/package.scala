@@ -14,6 +14,7 @@ import sttp.client3.ResponseException
 import sttp.model.Uri
 
 import scala.concurrent.duration.DurationInt
+import scala.util.Random
 import scala.util.control.NonFatal
 
 package object indexer {
@@ -35,6 +36,25 @@ package object indexer {
 
     val FeeContractAddress =
       "2iHkR7CWvD1R4j1yZg5bkeDRQavjAaVPeTDFGGLZduHyfWMuYpmhHocX8GJoaieTx78FntzJbCBVL6rf96ocJoZdmWBL2fci7NqWgAirppPQmZ7fN9V6z13Ay6brPriBKYqLp1bT2Fk4FkFLCfdPpe"
+
+  }
+
+  object Utils {
+
+    def shuffle[T](arr: Array[T]): Vector[T] = {
+      def swap(i1: Int, i2: Int): Unit = {
+        val tmp = arr(i1)
+        arr(i1) = arr(i2)
+        arr(i2) = tmp
+      }
+
+      for (n <- arr.length to 2 by -1) {
+        val k = Random.nextInt(n)
+        swap(n - 1, k)
+      }
+
+      arr.toVector
+    }
 
   }
 

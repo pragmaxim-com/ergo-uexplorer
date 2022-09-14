@@ -58,7 +58,7 @@ class NodePoolSttpBackendWrapper[P](nodePoolRef: ActorRef[NodePoolRequest], meta
 
     def sendProxyRequest(peerUri: Uri): Future[Response[T]] = metadataClient.underlyingB.send(origRequest.get(peerUri))
 
-    def invalidatePeers(invalidPeers: InvalidPeers): Future[AllBestPeers] =
+    def invalidatePeers(invalidPeers: InvalidPeers): Future[NodePoolState] =
       nodePoolRef.ask(ref => InvalidatePeers(invalidPeers.map(stripUri), ref))
 
     nodePoolRef
