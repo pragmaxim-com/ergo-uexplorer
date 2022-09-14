@@ -22,7 +22,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
     Behaviors.setup[NodePoolRequest] { implicit ctx =>
       implicit val s: ActorSystem[Nothing] = ctx.system
       nodePoolUpdateSource(ctx.self, metadataClient).run()
-      initialized(NodePoolState.empty(metadataClient.masterPeerAddr))
+      initialized(NodePoolState.empty(metadataClient.masterPeerAddress, metadataClient.localNodeAddress))
     }
 
   def initialized(state: NodePoolState)(implicit
@@ -94,18 +94,19 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
 
   case class AnyBestPeer(peerAddress: Uri) extends NodePoolResponse
 
-  case class NodePoolState(openApiPeers: Set[Uri], invalidPeers: Set[Uri], masterPeerAddr: Uri) {
+  case class NodePoolState(openApiPeers: Set[Uri], invalidPeers: Set[Uri], masterPeerAddr: Uri, localNodeAddress: Uri) {
 
     def invalidatePeers(invalidatedPeers: Set[Uri]): (Set[Uri], NodePoolState) = {
       val newInvalidPeers = (invalidPeers ++ invalidatedPeers) - masterPeerAddr
       val newOpenApiPeers = openApiPeers.diff(newInvalidPeers)
-      invalidatedPeers.diff(invalidPeers) -> NodePoolState(newOpenApiPeers, newInvalidPeers, masterPeerAddr)
+      invalidatedPeers
+        .diff(invalidPeers) -> NodePoolState(newOpenApiPeers, newInvalidPeers, masterPeerAddr, localNodeAddress)
     }
 
     def updatePeers(validPeers: Set[Uri], addedInvalidPeers: Set[Uri]): NodePoolState = {
-      val newInvalidPeers = (invalidPeers ++ addedInvalidPeers) - masterPeerAddr
+      val newInvalidPeers = ((invalidPeers ++ addedInvalidPeers) - masterPeerAddr) -- validPeers.find(_ == localNodeAddress)
       val newOpenApiPeers = (validPeers -- newInvalidPeers) + masterPeerAddr
-      NodePoolState(newOpenApiPeers, newInvalidPeers, masterPeerAddr)
+      NodePoolState(newOpenApiPeers, newInvalidPeers, masterPeerAddr, localNodeAddress)
     }
 
     override def toString: String = {
@@ -123,7 +124,9 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
   }
 
   object NodePoolState {
-    def empty(masterPeerAddr: Uri): NodePoolState = NodePoolState(Set.empty, Set.empty, masterPeerAddr)
+
+    def empty(masterPeerAddr: Uri, localNodeAddress: Uri): NodePoolState =
+      NodePoolState(Set.empty, Set.empty, masterPeerAddr, localNodeAddress)
   }
 
 }

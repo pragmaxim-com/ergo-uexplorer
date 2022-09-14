@@ -10,11 +10,14 @@ import io.circe.Decoder
 import org.ergoplatform.explorer.constraints.HexStringType
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
+import retry.Policy
 import sttp.client3.ResponseException
 import sttp.model.Uri
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 import scala.util.control.NonFatal
 
 package object indexer {
@@ -60,6 +63,29 @@ package object indexer {
 
   object Resiliency extends LazyLogging {
     class StopException(msg: String, cause: Throwable) extends RuntimeException(msg, cause)
+
+    def fallback[R](uris: List[Uri], retryPolicy: Policy)(req: Uri => Future[R]): Future[R] = {
+      def recursiveRetry(uris: List[Uri]): Future[R] =
+        uris match {
+          case head :: tail =>
+            req(head).transformWith {
+              case Success(result) =>
+                Future.successful(result)
+              case Failure(ex) =>
+                tail.headOption.foreach { next =>
+                  logger.warn(s"$head failed, retrying with another $next", ex)
+                }
+                recursiveRetry(tail)
+            }
+          case Nil =>
+            Future.failed(new Exception(s"None of ${uris.mkString(", ")} succeeded"))
+        }
+
+      retryPolicy
+        .apply { () =>
+          recursiveRetry(uris)
+        }(retry.Success.always, global)
+    }
 
     val restartSettings = RestartSettings(
       minBackoff   = 3.seconds,

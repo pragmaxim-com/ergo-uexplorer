@@ -7,27 +7,51 @@ import sttp.client3._
 
 class NodePoolSpec extends AnyFreeSpec with Matchers {
 
-  private val masterUri  = uri"http://master"
-  private val validUri   = uri"http://valid"
-  private val invalidUri = uri"http://invalid"
+  private val master = uri"http://master"
+  private val local  = uri"http://localhost"
+  private val peer   = uri"http://peer"
 
   "NodePool should" - {
 
-    "prevent master from getting removed" in {
-      val state = NodePoolState(Set(validUri, masterUri), Set.empty, masterUri)
-      state.updatePeers(Set.empty, Set(masterUri)) shouldBe NodePoolState(Set(masterUri), Set.empty, masterUri)
+    "prevent master from being invalidated" in {
+      val initialState  = NodePoolState(Set(peer, master), Set.empty, master, local)
+      val expectedState = NodePoolState(Set(master), Set.empty, master, local)
+      initialState.updatePeers(Set.empty, Set(master)) shouldBe expectedState
+    }
+    "allow local from being invalidated" in {
+      val initialState  = NodePoolState(Set(local, master), Set.empty, master, local)
+      val expectedState = NodePoolState(Set(master), Set(local), master, local)
+      initialState.updatePeers(Set.empty, Set(local)) shouldBe expectedState
     }
     "persist invalid peers" in {
-      val state = NodePoolState(Set.empty, Set(invalidUri), masterUri)
-      state.updatePeers(Set.empty, Set.empty) shouldBe NodePoolState(Set(masterUri), Set(invalidUri), masterUri)
+      val initialState  = NodePoolState(Set.empty, Set(peer), master, local)
+      val expectedState = NodePoolState(Set(master), Set(peer), master, local)
+      initialState.updatePeers(Set.empty, Set.empty) shouldBe expectedState
+    }
+    "persist invalid local node" in {
+      val initialState  = NodePoolState(Set.empty, Set(local), master, local)
+      val expectedState = NodePoolState(Set(master), Set(local), master, local)
+      initialState.updatePeers(Set.empty, Set.empty) shouldBe expectedState
     }
     "not persist valid peers" in {
-      val state = NodePoolState(Set(validUri), Set(invalidUri), masterUri)
-      state.updatePeers(Set.empty, Set.empty) shouldBe NodePoolState(Set(masterUri), Set(invalidUri), masterUri)
+      val initialState  = NodePoolState(Set(peer), Set.empty, master, local)
+      val expectedState = NodePoolState(Set(master), Set.empty, master, local)
+      initialState.updatePeers(Set.empty, Set.empty) shouldBe expectedState
     }
-    "not put new valid over existing invalid" in {
-      val state = NodePoolState(Set(validUri), Set(invalidUri), masterUri)
-      state.updatePeers(Set(invalidUri), Set.empty) shouldBe NodePoolState(Set(masterUri), Set(invalidUri), masterUri)
+    "not persist local node" in {
+      val initialState  = NodePoolState(Set(local), Set.empty, master, local)
+      val expectedState = NodePoolState(Set(master), Set.empty, master, local)
+      initialState.updatePeers(Set.empty, Set.empty) shouldBe expectedState
+    }
+    "not put new valid peer over existing invalid" in {
+      val initialState  = NodePoolState(Set.empty, Set(peer), master, local)
+      val expectedState = NodePoolState(Set(master), Set(peer), master, local)
+      initialState.updatePeers(Set(peer), Set.empty) shouldBe expectedState
+    }
+    "put new valid local node over existing invalid" in {
+      val initialState  = NodePoolState(Set.empty, Set(local), master, local)
+      val expectedState = NodePoolState(Set(local, master), Set.empty, master, local)
+      initialState.updatePeers(Set(local), Set.empty) shouldBe expectedState
     }
   }
 

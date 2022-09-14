@@ -15,47 +15,45 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Right, Success}
 
-class MetadataHttpClient[P](val masterPeerAddr: Uri)(implicit val underlyingB: SttpBackend[Future, P]) extends LazyLogging {
+class MetadataHttpClient[P](val masterPeerAddress: Uri, val localNodeAddress: Uri)(implicit
+  val underlyingB: SttpBackend[Future, P]
+) extends LazyLogging {
 
   def getMasterInfo: Future[PeerInfo] =
-    retry
-      .Backoff(3, 1.second)
-      .apply { () =>
-        basicRequest
-          .get(masterPeerAddr.addPath("info"))
-          .response(asJson[PeerInfo])
-          .responseGetRight
-          .readTimeout(1.seconds)
-          .send(underlyingB)
-          .map(_.body)
-          .transform {
-            case Failure(ex) =>
-              Failure(new Resiliency.StopException("Getting master info failed, retrying", ex))
-            case Success(peerInfo) if peerInfo.fullHeight.isEmpty =>
-              Failure(new Resiliency.StopException("Master peer full height is null", null))
-            case Success(peerInfo) =>
-              Success(peerInfo)
-          }
-      }(retry.Success.always, global)
+    Resiliency.fallback(List(masterPeerAddress, localNodeAddress), retry.Backoff(3, 1.second)) { uri =>
+      basicRequest
+        .get(uri.addPath("info"))
+        .response(asJson[PeerInfo])
+        .responseGetRight
+        .readTimeout(1.seconds)
+        .send(underlyingB)
+        .map(_.body)
+        .transform {
+          case Failure(ex) =>
+            Failure(new Resiliency.StopException("Getting master info failed, retrying", ex))
+          case Success(peerInfo) if peerInfo.fullHeight.isEmpty =>
+            Failure(new Resiliency.StopException("Master peer full height is null", null))
+          case Success(peerInfo) =>
+            Success(peerInfo)
+        }
+    }
 
   def getConnectedPeers: Future[Set[ConnectedPeer]] =
-    retry
-      .Backoff(3, 1.second)
-      .apply { () =>
-        basicRequest
-          .get(masterPeerAddr.addPath("peers", "connected"))
-          .response(asJson[Set[ConnectedPeer]])
-          .readTimeout(2.seconds)
-          .send(underlyingB)
-          .map(_.body)
-          .map {
-            case Right(connectedPeers) =>
-              connectedPeers
-            case Left(ex) =>
-              logger.warn(s"Unable to obtain connected peers from $masterPeerAddr", ex)
-              Set.empty[ConnectedPeer]
-          }
-      }(retry.Success.always, global)
+    Resiliency.fallback(List(masterPeerAddress, localNodeAddress), retry.Backoff(3, 1.second)) { uri =>
+      basicRequest
+        .get(uri.addPath("peers", "connected"))
+        .response(asJson[Set[ConnectedPeer]])
+        .readTimeout(2.seconds)
+        .send(underlyingB)
+        .map(_.body)
+        .map {
+          case Right(connectedPeers) =>
+            connectedPeers
+          case Left(ex) =>
+            logger.warn(s"Unable to obtain connected peers from $uri", ex)
+            Set.empty[ConnectedPeer]
+        }
+    }
 
   def getPeers(masterFullHeight: Int, peerAddress: Uri): Future[Either[Uri, Uri]] =
     retry
