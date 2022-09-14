@@ -30,6 +30,8 @@ class Indexer(
   blockPersistence: BlockWriter,
   blockBuilder: BlockBuilder,
   epochService: EpochService,
+  metaHttpClient: MetadataHttpClient[_],
+  blockHttpClient: BlockHttpClient,
   progressMonitorRef: ActorRef[ProgressMonitorRequest]
 )(implicit val s: ActorSystem[Nothing])
   extends AkkaStreamSupport
@@ -37,7 +39,7 @@ class Indexer(
 
   implicit val timeout: Timeout = 3.seconds
 
-  def indexingFlow(blockHttpClient: BlockHttpClient): Flow[Int, Either[Int, Epoch], NotUsed] =
+  val indexingFlow: Flow[Int, Either[Int, Epoch], NotUsed] =
     Flow[Int]
       .via(blockHttpClient.blockResolvingFlow)
       .via(blockBuilder.blockBuildingFlow(blockHttpClient, progressMonitorRef))
@@ -46,8 +48,8 @@ class Indexer(
       .via(epochService.writeEpochFlow(progressMonitorRef))
       .withAttributes(supervisionStrategy(Resiliency.decider))
 
-  def sync(blockHttpClient: BlockHttpClient): Future[ProgressState] = {
-    val bestBlockHeightF = blockHttpClient.getBestBlockHeight
+  def sync: Future[ProgressState] = {
+    val bestBlockHeightF = metaHttpClient.getBestBlockHeight
     val progressF        = epochService.updateProgressFromDB(progressMonitorRef)
     bestBlockHeightF.flatMap { bestBlockHeight =>
       progressF.flatMap { progress =>
@@ -56,9 +58,9 @@ class Indexer(
           logger.info(s"Initiating indexing of ${epochIndexesToLoad.size} epochs ...")
           Source(epochIndexesToLoad)
             .mapConcat(Epoch.heightRangeForEpochIndex)
-            .via(indexingFlow(blockHttpClient))
+            .via(indexingFlow)
             .run()
-            .flatMap(_ => sync(blockHttpClient))
+            .flatMap(_ => sync)
         } else {
           Future.successful(progress)
         }
@@ -66,22 +68,22 @@ class Indexer(
     }
   }
 
-  def heightsToPollBlocksFor(blockHttpClient: BlockHttpClient): Future[Vector[Int]] =
+  def heightsToPollBlocksFor: Future[Vector[Int]] =
     progressMonitorRef
       .ask(ref => GetLastBlock(ref))
       .map(_.block.get.stats.height + 1)
-      .flatMap(fromHeight => blockHttpClient.getBestBlockHeight.map(toHeight => (fromHeight to toHeight).toVector))
+      .flatMap(fromHeight => metaHttpClient.getBestBlockHeight.map(toHeight => (fromHeight to toHeight).toVector))
 
-  def keepPolling(blockHttpClient: BlockHttpClient): Future[ProgressState] =
+  def keepPolling: Future[ProgressState] =
     restartSource {
       Source
         .tick(0.seconds, 5.seconds, ())
         .mapAsync(1) { _ =>
-          heightsToPollBlocksFor(blockHttpClient)
+          heightsToPollBlocksFor
             .flatMap { heights =>
               if (heights.nonEmpty) {
                 logger.info(s"Going to index ${heights.size} blocks starting at height ${heights.head}")
-                Source(heights).via(indexingFlow(blockHttpClient)).runWith(Sink.seq[Either[Int, Epoch]])
+                Source(heights).via(indexingFlow).runWith(Sink.seq[Either[Int, Epoch]])
               } else {
                 Future.successful(Seq.empty[Either[Int, Epoch]])
               }
@@ -96,9 +98,12 @@ object Indexer extends LazyLogging {
 
   def runWith(conf: ChainIndexerConf)(implicit ctx: ActorContext[Nothing]): Future[ProgressState] = {
     implicit val system: ActorSystem[Nothing] = ctx.system
+    implicit val protocol: ProtocolSettings   = conf.protocol
     implicit val futureSttpBackend: SttpBackend[Future, _] =
       HttpClientFutureBackend(SttpBackendOptions.connectionTimeout(5.seconds))
-    implicit val protocol: ProtocolSettings = conf.protocol
+
+    val metadataClient = new MetadataHttpClient(conf.peerUriToPollFrom, conf.nodeUriToInitFrom)
+    val pollingClient  = BlockHttpClient(metadataClient)
     val indexer =
       conf.backendType match {
         case ScyllaBackend =>
@@ -109,31 +114,25 @@ object Indexer extends LazyLogging {
             new ScyllaBlockWriter,
             new ScyllaBlockBuilder,
             new ScyllaEpochService(),
+            metadataClient,
+            pollingClient,
             ctx.spawn(new ProgressMonitor().initialBehavior, "ProgressMonitor")
           )
         case UnknownBackend =>
           throw new IllegalArgumentException(s"Unknown backend not supported yet.")
       }
 
-    val metadataClient    = new MetadataHttpClient(conf.peerUriToPollFrom, conf.nodeUriToInitFrom)
-    val initialSyncClient = BlockHttpClient.local(conf.nodeUriToInitFrom, metadataClient)
-    val pollingClient     = BlockHttpClient.remote(conf.peerUriToPollFrom, conf.nodeUriToInitFrom, metadataClient)
-
-    indexer
-      .sync(initialSyncClient)
+    indexer.sync
       .andThen { case Failure(ex) =>
         logger.error(
           s"Initial sync failed, there is no restart as DB could be corrupted if you find SIGKILL in scylla logs due to OOM error",
           ex
         )
-        initialSyncClient
-          .close()
-          .flatMap(_ => pollingClient.close())
-          .andThen { case _ => system.terminate() }
+        metadataClient.close().flatMap(_ => pollingClient.close()).andThen { case _ => system.terminate() }
       }
       .flatMap { _ =>
         logger.info(s"Initiating polling...")
-        indexer.keepPolling(pollingClient)
+        indexer.keepPolling
       }
   }
 }

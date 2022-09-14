@@ -21,8 +21,8 @@ import scala.util.{Failure, Success, Try}
 trait BlockBuilder {
 
   def blockBuildingFlow(
-    blockHttpClient: BlockHttpClient,
-    progressMonitor: ActorRef[ProgressMonitorRequest]
+                         blockHttpClient: BlockHttpClient,
+                         progressMonitor: ActorRef[ProgressMonitorRequest]
   ): Flow[ApiFullBlock, FlatBlock, NotUsed]
 }
 

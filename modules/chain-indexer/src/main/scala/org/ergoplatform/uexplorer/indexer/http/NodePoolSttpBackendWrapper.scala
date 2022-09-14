@@ -4,9 +4,8 @@ import akka.actor.typed._
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.StopException
-import org.ergoplatform.uexplorer.indexer.http.MetadataHttpClient._
-import org.ergoplatform.uexplorer.indexer.http.NodePool.NodePoolRequest
+import org.ergoplatform.uexplorer.indexer.{StopException, Utils}
+import org.ergoplatform.uexplorer.indexer.http.NodePool._
 import sttp.capabilities.Effect
 import sttp.client3._
 import sttp.model.Uri
@@ -16,12 +15,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util._
 
-class NodePoolSttpBackendWrapper[P](nodePoolRef: ActorRef[NodePoolRequest], metadataClient: MetadataHttpClient[P])(implicit
-  c: ActorSystem[Nothing]
-) extends DelegateSttpBackend[Future, P](metadataClient.underlyingB)
+class NodePoolSttpBackendWrapper[P](nodePoolRef: ActorRef[NodePoolRequest])(implicit
+  c: ActorSystem[Nothing],
+  underlying: SttpBackend[Future, P]
+) extends DelegateSttpBackend[Future, P](underlying)
   with LazyLogging {
-  import NodePool._
-  implicit private val timeout: Timeout = 3.seconds
+  implicit private val timeout: Timeout = 5.seconds
 
   override def close(): Future[Unit] = {
     logger.info("Closing sttp backend")
@@ -30,9 +29,9 @@ class NodePoolSttpBackendWrapper[P](nodePoolRef: ActorRef[NodePoolRequest], meta
   }
 
   def recursiveCall[R](
-    peerAddresses: List[Uri],
-    invalidPeers: Set[Uri] = Set.empty
-  )(run: Uri => Future[R], invalidFn: InvalidPeers => Future[_]): Future[R] =
+    peerAddresses: List[Peer],
+    invalidPeers: Set[Peer] = Set.empty
+  )(run: Peer => Future[R], invalidFn: InvalidPeers => Future[_]): Future[R] =
     peerAddresses.headOption match {
       case Some(peerAddress) =>
         run(peerAddress).transformWith {
@@ -54,20 +53,21 @@ class NodePoolSttpBackendWrapper[P](nodePoolRef: ActorRef[NodePoolRequest], meta
 
   override def send[T, R >: P with Effect[Future]](origRequest: Request[T, R]): Future[Response[T]] = {
 
-    def sendProxyRequest(peerUri: Uri): Future[Response[T]] = metadataClient.underlyingB.send(origRequest.get(peerUri))
+    def sendProxyRequest(peerUri: Peer): Future[Response[T]] =
+      underlying.send(origRequest.get(Utils.copyUri(origRequest.uri, peerUri.uri)))
 
     def invalidatePeers(invalidPeers: InvalidPeers): Future[NodePoolState] =
-      nodePoolRef.ask(ref => InvalidatePeers(invalidPeers.map(stripUri), ref))
+      nodePoolRef.ask(ref => InvalidatePeers(invalidPeers, ref))
 
     nodePoolRef
       .ask[AllBestPeers](GetAllPeers)
       .flatMap {
-        case AllBestPeers(addresses) if addresses.isEmpty =>
+        case AllBestPeers(peers) if peers.isEmpty =>
           Future.failed(
             new StopException(s"Run out of peers to make http call to, master should be always available", null)
           )
-        case AllBestPeers(peerHosts) =>
-          recursiveCall(peerHosts.map(copyUri(origRequest.uri, _)).toList)(sendProxyRequest, invalidatePeers)
+        case AllBestPeers(peers) =>
+          recursiveCall(peers)(sendProxyRequest, invalidatePeers)
       }
   }
 
@@ -78,6 +78,6 @@ object NodePoolSttpBackendWrapper {
   def apply[P](nodePoolRef: ActorRef[NodePoolRequest], httpClient: MetadataHttpClient[P])(implicit
     s: ActorSystem[Nothing]
   ): NodePoolSttpBackendWrapper[P] =
-    new NodePoolSttpBackendWrapper(nodePoolRef, httpClient)
+    new NodePoolSttpBackendWrapper(nodePoolRef)(s, httpClient.underlyingB)
 
 }

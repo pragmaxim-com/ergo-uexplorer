@@ -18,11 +18,25 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
 
   implicit private val timeout: Timeout = 3.seconds
 
-  def initialBehavior(metadataClient: MetadataHttpClient[_]): Behavior[NodePoolRequest] =
+  def behavior(metadataClient: MetadataHttpClient[_]): Behavior[NodePoolRequest] =
     Behaviors.setup[NodePoolRequest] { implicit ctx =>
       implicit val s: ActorSystem[Nothing] = ctx.system
       nodePoolUpdateSource(ctx.self, metadataClient).run()
-      initialized(NodePoolState.empty(metadataClient.masterPeerAddress, metadataClient.localNodeAddress))
+      uninitialized
+    }
+
+  def uninitialized(implicit ctx: ActorContext[NodePoolRequest]): Behavior[NodePoolRequest] =
+    Behaviors.receiveMessage[NodePoolRequest] {
+      case GetAllPeers(replyTo) =>
+        ctx.scheduleOnce(500.millis, ctx.self, GetAllPeers(replyTo))
+        Behaviors.same
+      case UpdateOpenApiPeers(validPeers, replyTo) =>
+        val newState = NodePoolState(validPeers, Set.empty)
+        replyTo ! newState
+        initialized(newState)
+      case x =>
+        logger.error(s"Message unexpected : $x")
+        Behaviors.stopped
     }
 
   def initialized(state: NodePoolState)(implicit
@@ -32,17 +46,11 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
       case GetAllPeers(replyTo) if state.openApiPeers.isEmpty =>
         ctx.scheduleOnce(500.millis, ctx.self, GetAllPeers(replyTo))
         Behaviors.same
-      case GetAnyBestPeer(replyTo) if state.openApiPeers.isEmpty =>
-        ctx.scheduleOnce(500.millis, ctx.self, GetAnyBestPeer(replyTo))
-        Behaviors.same
       case GetAllPeers(replyTo) =>
-        replyTo ! state.shufflePeers
+        replyTo ! state.sortPeers
         Behaviors.same
-      case GetAnyBestPeer(replyTo) =>
-        replyTo ! state.anyBestPeer
-        Behaviors.same
-      case UpdateOpenApiPeers(validPeers, addedInvalidPeers, replyTo) =>
-        val newState = state.updatePeers(validPeers, addedInvalidPeers)
+      case UpdateOpenApiPeers(validPeers, replyTo) =>
+        val newState = state.updatePeers(validPeers)
         replyTo ! newState
         initialized(newState)
       case InvalidatePeers(invalidatedPeers, replyTo) =>
@@ -60,54 +68,67 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
   ): Source[NodePoolState, NotUsed] =
     restartSource {
       Source
-        .tick(0.seconds, 30.seconds, ())
-        .mapAsync(1)(_ => metadataClient.getMasterInfo)
-        .mapAsync(1)(peerInfo => metadataClient.getValidAndInvalidPeers(peerInfo))
-        .mapAsync(1) { case (validPeers, invalidPeers) =>
-          nodePool.ask(ref => UpdateOpenApiPeers(validPeers, invalidPeers, ref))
+        .tick(0.seconds, 5.seconds, ())
+        .mapAsync(1)(_ => metadataClient.getOpenApiPeers)
+        .mapAsync(1) { validPeers =>
+          nodePool.ask(ref => UpdateOpenApiPeers(validPeers, ref))
         }
         .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
     }
 
-  type InvalidPeers = Set[Uri]
+  type InvalidPeers = Set[Peer]
 
-  case class ConnectedPeer(address: PeerAddress, restApiUrl: Option[PeerAddress])
+  case class ConnectedPeer(address: PeerAddress, restApiUrl: Option[PeerAddress]) {
+    def getRestApiUri: Option[Uri] = restApiUrl.flatMap(Uri.parse(_).toOption.map(Utils.stripUri))
+  }
 
-  case class PeerInfo(appVersion: String, stateType: String, fullHeight: Option[Int], restApiUrl: Option[PeerAddress])
+  sealed trait Peer {
+    def uri: Uri
+    def weight: Int
+    def fullHeight: Int
+  }
+
+  case class LocalNode(uri: Uri, fullHeight: Int, restApiUrl: Option[Uri]) extends Peer {
+    val weight: Int = 1
+  }
+
+  case class RemoteNode(uri: Uri, fullHeight: Int, restApiUrl: Option[Uri]) extends Peer {
+    val weight: Int = 2
+  }
+
+  case class RemotePeer(uri: Uri, fullHeight: Int) extends Peer {
+    val weight: Int = 3
+  }
+
+  case class PeerInfo(appVersion: String, stateType: String, fullHeight: Option[Int], restApiUrl: Option[PeerAddress]) {
+    def getFullHeight: Int         = fullHeight.getOrElse(0)
+    def getRestApiUri: Option[Uri] = restApiUrl.flatMap(Uri.parse(_).toOption.map(Utils.stripUri))
+  }
 
   sealed trait NodePoolRequest
 
   case object GracefulShutdown extends NodePoolRequest
 
-  case class GetAnyBestPeer(replyTo: ActorRef[AnyBestPeer]) extends NodePoolRequest
-
   case class GetAllPeers(replyTo: ActorRef[AllBestPeers]) extends NodePoolRequest
 
-  case class UpdateOpenApiPeers(validAddresses: Set[Uri], invalidAddresses: Set[Uri], replyTo: ActorRef[NodePoolState])
-    extends NodePoolRequest
+  case class UpdateOpenApiPeers(validAddresses: Set[Peer], replyTo: ActorRef[NodePoolState]) extends NodePoolRequest
 
-  case class InvalidatePeers(peerAddresses: Set[Uri], replyTo: ActorRef[NodePoolState]) extends NodePoolRequest
+  case class InvalidatePeers(peerAddresses: Set[Peer], replyTo: ActorRef[NodePoolState]) extends NodePoolRequest
 
   sealed trait NodePoolResponse
 
-  case class AllBestPeers(peerAddresses: IndexedSeq[Uri]) extends NodePoolResponse
+  case class AllBestPeers(peerAddresses: List[Peer]) extends NodePoolResponse
 
-  case class AnyBestPeer(peerAddress: Uri) extends NodePoolResponse
+  case class NodePoolState(openApiPeers: Set[Peer], invalidPeers: Set[Peer]) {
 
-  case class NodePoolState(openApiPeers: Set[Uri], invalidPeers: Set[Uri], masterPeerAddr: Uri, localNodeAddress: Uri) {
-
-    def invalidatePeers(invalidatedPeers: Set[Uri]): (Set[Uri], NodePoolState) = {
-      val newInvalidPeers = (invalidPeers ++ invalidatedPeers) - masterPeerAddr
+    def invalidatePeers(invalidatedPeers: Set[Peer]): (Set[Peer], NodePoolState) = {
+      val newInvalidPeers = invalidPeers ++ invalidatedPeers
       val newOpenApiPeers = openApiPeers.diff(newInvalidPeers)
-      invalidatedPeers
-        .diff(invalidPeers) -> NodePoolState(newOpenApiPeers, newInvalidPeers, masterPeerAddr, localNodeAddress)
+      invalidatedPeers.diff(invalidPeers) -> NodePoolState(newOpenApiPeers, newInvalidPeers)
     }
 
-    def updatePeers(validPeers: Set[Uri], addedInvalidPeers: Set[Uri]): NodePoolState = {
-      val newInvalidPeers = ((invalidPeers ++ addedInvalidPeers) - masterPeerAddr) -- validPeers.find(_ == localNodeAddress)
-      val newOpenApiPeers = (validPeers -- newInvalidPeers) + masterPeerAddr
-      NodePoolState(newOpenApiPeers, newInvalidPeers, masterPeerAddr, localNodeAddress)
-    }
+    def updatePeers(validPeers: Set[Peer]): NodePoolState =
+      NodePoolState(validPeers.diff(invalidPeers.filter(_.weight > 2)), invalidPeers -- validPeers.filter(_.weight < 3))
 
     override def toString: String = {
       val validPeersStr = openApiPeers.headOption
@@ -118,15 +139,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
       s"$validPeersStr$invalidPeersStr"
     }
 
-    def anyBestPeer: AnyBestPeer = AnyBestPeer(openApiPeers.toVector(Random.nextInt(openApiPeers.size)))
-
-    def shufflePeers: AllBestPeers = AllBestPeers(Utils.shuffle(openApiPeers.toArray))
-  }
-
-  object NodePoolState {
-
-    def empty(masterPeerAddr: Uri, localNodeAddress: Uri): NodePoolState =
-      NodePoolState(Set.empty, Set.empty, masterPeerAddr, localNodeAddress)
+    def sortPeers: AllBestPeers = AllBestPeers(openApiPeers.toList.sortBy(_.weight))
   }
 
 }
