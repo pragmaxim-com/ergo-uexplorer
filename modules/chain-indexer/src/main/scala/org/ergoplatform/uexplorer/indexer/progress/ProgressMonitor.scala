@@ -7,8 +7,7 @@ import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.Resiliency.StopException
+import org.ergoplatform.uexplorer.indexer.{Const, StopException}
 import org.ergoplatform.uexplorer.indexer.api.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.api.BlockBuilder._
 import scala.collection.immutable.{SortedMap, SortedSet, TreeMap, TreeSet}

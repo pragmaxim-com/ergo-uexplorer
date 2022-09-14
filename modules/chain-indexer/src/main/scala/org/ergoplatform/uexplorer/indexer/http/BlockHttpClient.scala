@@ -4,10 +4,9 @@ import akka.NotUsed
 import akka.actor.typed.scaladsl.ActorContext
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
-import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
-import org.ergoplatform.uexplorer.indexer.Resiliency
+import org.ergoplatform.uexplorer.indexer.{ResiliencySupport, StopException}
 import sttp.client3._
 import sttp.client3.circe._
 import sttp.model.Uri
@@ -18,12 +17,12 @@ import scala.concurrent.duration.DurationInt
 
 class BlockHttpClient(metadataClient: MetadataHttpClient[_], masterPeerAddresses: List[Uri])(implicit
   val sttpB: SttpBackend[Future, _]
-) extends LazyLogging {
+) extends ResiliencySupport {
 
   def getBestBlockHeight: Future[Int] = metadataClient.getMasterInfo.map(_.fullHeight.getOrElse(0))
 
   def getBlockIdForHeight(height: Int): Future[BlockId] =
-    Resiliency.fallback(masterPeerAddresses, retry.Backoff(3, 1.second)) { uri =>
+    fallback(masterPeerAddresses, retry.Backoff(3, 1.second)) { uri =>
       basicRequest
         .get(uri.addPath("blocks", "at", height.toString))
         .response(asJson[List[BlockId]])
@@ -34,15 +33,14 @@ class BlockHttpClient(metadataClient: MetadataHttpClient[_], masterPeerAddresses
           case Right(blockIds) if blockIds.nonEmpty =>
             Future.successful(blockIds.head)
           case Right(_) =>
-            Future.failed(new Resiliency.StopException(s"There is no block at height $height", null))
+            Future.failed(new StopException(s"There is no block at height $height", null))
           case Left(error) =>
-            Future.failed(new Resiliency.StopException(s"Getting block id at height $height failed", error))
-
+            Future.failed(new StopException(s"Getting block id at height $height failed", error))
         }
     }
 
   def getBlockForId(blockId: BlockId): Future[ApiFullBlock] =
-    Resiliency.fallback(masterPeerAddresses, retry.Backoff(3, 1.second)) { uri =>
+    fallback(masterPeerAddresses, retry.Backoff(3, 1.second)) { uri =>
       basicRequest
         .get(uri.addPath("blocks", blockId.toString))
         .response(asJson[ApiFullBlock])
@@ -53,7 +51,7 @@ class BlockHttpClient(metadataClient: MetadataHttpClient[_], masterPeerAddresses
           case Right(block) =>
             Future.successful(block)
           case Left(error) =>
-            Future.failed(new Resiliency.StopException(s"Getting block id $blockId failed due to $error", null))
+            Future.failed(new StopException(s"Getting block id $blockId failed due to $error", null))
         }
     }
 

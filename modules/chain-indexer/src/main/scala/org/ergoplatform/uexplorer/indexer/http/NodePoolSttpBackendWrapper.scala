@@ -4,7 +4,7 @@ import akka.actor.typed._
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.Resiliency
+import org.ergoplatform.uexplorer.indexer.StopException
 import org.ergoplatform.uexplorer.indexer.http.MetadataHttpClient._
 import org.ergoplatform.uexplorer.indexer.http.NodePool.NodePoolRequest
 import sttp.capabilities.Effect
@@ -47,11 +47,9 @@ class NodePoolSttpBackendWrapper[P](nodePoolRef: ActorRef[NodePoolRequest], meta
             recursiveCall(peerAddresses.tail, invalidPeers + peerAddresses.head)(run, invalidFn)
         }
       case None if invalidPeers.nonEmpty =>
-        invalidFn(invalidPeers).flatMap(_ =>
-          Future.failed(new Resiliency.StopException(s"All peers failed to execute request", null))
-        )
+        invalidFn(invalidPeers).flatMap(_ => Future.failed(new StopException(s"All peers failed to execute request", null)))
       case None =>
-        Future.failed(new Resiliency.StopException(s"Should never happen, probably received no peerAddresses", null))
+        Future.failed(new StopException(s"Should never happen, probably received no peerAddresses", null))
     }
 
   override def send[T, R >: P with Effect[Future]](origRequest: Request[T, R]): Future[Response[T]] = {
@@ -66,7 +64,7 @@ class NodePoolSttpBackendWrapper[P](nodePoolRef: ActorRef[NodePoolRequest], meta
       .flatMap {
         case AllBestPeers(addresses) if addresses.isEmpty =>
           Future.failed(
-            new Resiliency.StopException(s"Run out of peers to make http call to, master should be always available", null)
+            new StopException(s"Run out of peers to make http call to, master should be always available", null)
           )
         case AllBestPeers(peerHosts) =>
           recursiveCall(peerHosts.map(copyUri(origRequest.uri, _)).toList)(sendProxyRequest, invalidatePeers)

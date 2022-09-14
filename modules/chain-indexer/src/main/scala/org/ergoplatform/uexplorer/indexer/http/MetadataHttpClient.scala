@@ -1,10 +1,10 @@
 package org.ergoplatform.uexplorer.indexer.http
 
-import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.auto._
-import NodePool.{ConnectedPeer, PeerInfo}
 import org.ergoplatform.uexplorer.indexer.http.MetadataHttpClient.stripUri
-import org.ergoplatform.uexplorer.indexer.{PeerAddress, Resiliency}
+import org.ergoplatform.uexplorer.indexer.http.NodePool.{ConnectedPeer, PeerInfo}
+import org.ergoplatform.uexplorer.indexer.{PeerAddress, ResiliencySupport, StopException}
+import retry.Policy
 import sttp.client3._
 import sttp.client3.circe.asJson
 import sttp.model.Uri
@@ -17,10 +17,22 @@ import scala.util.{Failure, Right, Success}
 
 class MetadataHttpClient[P](val masterPeerAddress: Uri, val localNodeAddress: Uri)(implicit
   val underlyingB: SttpBackend[Future, P]
-) extends LazyLogging {
+) extends ResiliencySupport {
+
+  def bestPeerByHeight(local: Uri, remote: Uri, retryPolicy: Policy)(req: Uri => Future[PeerInfo]): Future[PeerInfo] =
+    retryPolicy
+      .apply { () =>
+        req(local).transformWith {
+          case Success(l) =>
+            req(remote).map(r => List(r, l).maxBy(_.fullHeight.getOrElse(0)))
+          case Failure(_) =>
+            req(remote)
+
+        }
+      }(retry.Success.always, global)
 
   def getMasterInfo: Future[PeerInfo] =
-    Resiliency.fallback(List(masterPeerAddress, localNodeAddress), retry.Backoff(3, 1.second)) { uri =>
+    bestPeerByHeight(localNodeAddress, masterPeerAddress, retry.Backoff(3, 1.second)) { uri =>
       basicRequest
         .get(uri.addPath("info"))
         .response(asJson[PeerInfo])
@@ -30,20 +42,20 @@ class MetadataHttpClient[P](val masterPeerAddress: Uri, val localNodeAddress: Ur
         .map(_.body)
         .transform {
           case Failure(ex) =>
-            Failure(new Resiliency.StopException("Getting master info failed, retrying", ex))
+            Failure(new StopException("Getting master info failed, retrying", ex))
           case Success(peerInfo) if peerInfo.fullHeight.isEmpty =>
-            Failure(new Resiliency.StopException("Master peer full height is null", null))
+            Failure(new StopException("Master peer full height is null", null))
           case Success(peerInfo) =>
             Success(peerInfo)
         }
     }
 
   def getConnectedPeers: Future[Set[ConnectedPeer]] =
-    Resiliency.fallback(List(masterPeerAddress, localNodeAddress), retry.Backoff(3, 1.second)) { uri =>
+    fallback(List(masterPeerAddress, localNodeAddress), retry.Backoff(3, 1.second)) { uri =>
       basicRequest
         .get(uri.addPath("peers", "connected"))
         .response(asJson[Set[ConnectedPeer]])
-        .readTimeout(2.seconds)
+        .readTimeout(1.seconds)
         .send(underlyingB)
         .map(_.body)
         .map {
@@ -62,7 +74,7 @@ class MetadataHttpClient[P](val masterPeerAddress: Uri, val localNodeAddress: Ur
         basicRequest
           .get(peerAddress.addPath("info"))
           .response(asJson[PeerInfo])
-          .readTimeout(5.seconds)
+          .readTimeout(1.seconds)
           .send(underlyingB)
           .map(_.body)
           .transform {

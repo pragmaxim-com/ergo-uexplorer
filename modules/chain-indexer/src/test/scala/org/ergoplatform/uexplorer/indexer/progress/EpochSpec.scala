@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
 import org.ergoplatform.explorer.{BlockId, HexString}
-import org.ergoplatform.uexplorer.indexer.Resiliency.StopException
+import org.ergoplatform.uexplorer.indexer.StopException
 import org.ergoplatform.uexplorer.indexer.commonGenerators._
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
