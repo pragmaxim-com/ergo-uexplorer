@@ -1,8 +1,8 @@
 package org.ergoplatform.uexplorer.indexer.http
 
-import io.circe.generic.auto._
-import org.ergoplatform.uexplorer.indexer.http.NodePool._
-import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport, StopException, Utils}
+import akka.stream.Materializer
+import akka.stream.scaladsl.{Sink, Source}
+import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport}
 import retry.Policy
 import sttp.client3._
 import sttp.client3.circe.asJson
@@ -14,12 +14,15 @@ import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 class MetadataHttpClient[P](val masterPeerAddress: Uri, val localNodeAddress: Uri)(implicit
-  val underlyingB: SttpBackend[Future, P]
+  val underlyingB: SttpBackend[Future, P],
+  mat: Materializer
 ) extends ResiliencySupport {
 
-  def getBestBlockHeight: Future[Int] = getOpenApiPeers.map(_.maxBy(_.fullHeight).fullHeight)
+  private val retryPolicy: Policy = retry.Backoff(3, 1.second)
 
-  def getPeerInfo(uri: Uri): Future[PeerInfo] =
+  def getBestBlockHeight: Future[Int] = getMasterNodes.map(_.maxBy(_.fullHeight).fullHeight)
+
+  def getPeerInfo[T](uri: Uri)(constructor: (Uri, PeerInfo) => T): Future[Option[T]] =
     basicRequest
       .get(uri.addPath("info"))
       .response(asJson[PeerInfo])
@@ -27,85 +30,65 @@ class MetadataHttpClient[P](val masterPeerAddress: Uri, val localNodeAddress: Ur
       .readTimeout(1.seconds)
       .send(underlyingB)
       .map(_.body)
+      .transform {
+        case Success(peerInfo) if peerInfo.fullHeight < Const.MinNodeHeight || peerInfo.stateType != "utxo" =>
+          logger.warn(s"Peer has empty fullHeight or it has not utxo state : $peerInfo")
+          Success(None)
+        case Success(peerInfo) =>
+          Success(Some(constructor(uri, peerInfo)))
+        case Failure(ex) =>
+          logger.warn("Getting peer info failed, retrying", ex)
+          Success(None)
+      }
 
-  def getOpenApiPeers: Future[Set[Peer]] =
-    filterMasterPeers(localNodeAddress, masterPeerAddress, retry.Backoff(3, 1.second)) { uri =>
-      getPeerInfo(uri)
-        .transform {
-          case Failure(ex) =>
-            Failure(new StopException("Getting master info failed, retrying", ex))
-          case Success(peerInfo) if peerInfo.fullHeight.isEmpty =>
-            Failure(new StopException("Master peer full height is null", null))
-          case Success(peerInfo) =>
-            Success(peerInfo)
-        }
-    }
+  def getAllOpenApiPeers: Future[Set[Peer]] =
+    getMasterNodes
+      .map {
+        case masterNodes if masterNodes.size > 1 =>
+          val bestFullHeight = masterNodes.maxBy(_.fullHeight).fullHeight
+          masterNodes.filter(_.fullHeight >= bestFullHeight - Const.AllowedHeightDiff)
+        case masterNodes =>
+          masterNodes
+      }
+      .flatMap(masterNodes =>
+        getConnectedPeers(masterNodes, masterNodes.maxBy(_.fullHeight).fullHeight).map(_ ++ masterNodes)
+      )
 
-  def filterMasterPeers(local: Uri, remote: Uri, retryPolicy: Policy)(req: Uri => Future[PeerInfo]): Future[Set[Peer]] =
+  def getMasterNodes: Future[Set[Peer]] =
     retryPolicy
       .apply { () =>
-        req(local)
-          .map(pi => LocalNode(local, pi.getFullHeight, pi.getRestApiUri))
+        getPeerInfo(localNodeAddress)(LocalNode.fromPeerInfo)
           .transformWith {
             case Success(localNode) =>
-              req(remote)
-                .map(pi => RemoteNode(remote, pi.getFullHeight, pi.getRestApiUri))
-                .map { remoteNode =>
-                  val bothNodes      = Set[Peer](localNode, remoteNode)
-                  val bestFullHeight = bothNodes.maxBy(_.fullHeight).fullHeight
-                  bothNodes.filter(_.fullHeight >= bestFullHeight - Const.AllowedHeightDiff)
-                }
-                .recover { case _ => Set[Peer](localNode).filter(_.fullHeight > Const.MinNodeHeight) }
-            case Failure(_) =>
-              req(remote).flatMap {
-                case pi if pi.getFullHeight > Const.MinNodeHeight =>
-                  val masterPeers = Set[Peer](
-                    RemoteNode(remote, pi.getFullHeight, pi.getRestApiUri)
-                  )
-                  getConnectedPeers(masterPeers, masterPeers.maxBy(_.fullHeight).fullHeight).map(masterPeers ++ _)
-                case _ =>
-                  Future.successful(Set.empty[Peer])
-              }
+              getPeerInfo(masterPeerAddress)(RemoteNode.fromPeerInfo)
+                .map(_.toSet[Peer] ++ localNode)
+                .recover { case _ => localNode.toSet[Peer] }
+            case Failure(_) | Success(None) =>
+              getPeerInfo(masterPeerAddress)(RemoteNode.fromPeerInfo).map(_.toSet[Peer])
           }
-      }(retry.Success.always, global)
+      }(retry.Success.apply(_.nonEmpty), global)
 
-  def getRemotePeer(masterFullHeight: Int)(peerAddress: Uri): Future[Option[RemotePeer]] =
-    retry
-      .Backoff(3, 1.second)
-      .apply { () =>
-        getPeerInfo(peerAddress)
-          .transform {
-            case Success(PeerInfo(_, "utxo", Some(fullHeight), Some(peerNodeAddr))) if fullHeight >= masterFullHeight - 5 =>
-              // TODO we expect Node to share only valid URIs
-              Success(Uri.parse(peerNodeAddr).right.toOption.map(Utils.stripUri).map(RemotePeer(_, fullHeight)))
-            case Failure(_) =>
-              Success(None)
-          }
-      }(retry.Success.always, global)
-
-  def getConnectedPeers(masterPeers: Set[Peer], bestFullHeight: Int): Future[Set[RemotePeer]] =
-    Future
-      .sequence(
-        masterPeers.map { peer =>
-          basicRequest
-            .get(peer.uri.addPath("peers", "connected"))
-            .response(asJson[Set[ConnectedPeer]])
-            .responseGetRight
-            .readTimeout(1.seconds)
-            .send(underlyingB)
-            .map(_.body)
-            .transformWith {
-              case Success(connectedPeers) =>
-                Future
-                  .sequence(connectedPeers.flatMap(_.getRestApiUri).map(getRemotePeer(bestFullHeight)))
-                  .map(_.flatten)
-              case Failure(ex) =>
-                logger.warn(s"Unable to obtain connected peers from ${peer.uri}", ex)
-                Future.successful(Set.empty[RemotePeer])
-            }
-        }
-      )
-      .map(_.flatten)
+  def getConnectedPeers(masterPeers: Set[Peer], bestFullHeight: Int): Future[Set[Peer]] =
+    Source(masterPeers)
+      .mapAsync(2) { peer =>
+        basicRequest
+          .get(peer.uri.addPath("peers", "connected"))
+          .response(asJson[Set[ConnectedPeer]])
+          .responseGetRight
+          .readTimeout(1.seconds)
+          .send(underlyingB)
+          .map(_.body)
+      }
+      .mapConcat(identity)
+      .collect { case p if p.restApiUrl.isDefined => p.restApiUrl.get }
+      .mapAsync(1)(getPeerInfo(_)(RemotePeer.fromPeerInfo))
+      .mapConcat {
+        case Some(remotePeer) if remotePeer.fullHeight >= bestFullHeight - 5 =>
+          List(remotePeer)
+        case _ =>
+          List.empty
+      }
+      .runWith(Sink.collection[Peer, Set[Peer]])
 
   def close(): Future[Unit] =
     underlyingB.close()

@@ -7,6 +7,7 @@ import akka.stream.scaladsl.Flow
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.uexplorer.indexer.{ResiliencySupport, StopException}
+import retry.Policy
 import sttp.client3._
 import sttp.client3.circe._
 import sttp.model.Uri
@@ -15,49 +16,39 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class BlockHttpClient(implicit
-  val sttpB: SttpBackend[Future, _]
-) extends ResiliencySupport {
+class BlockHttpClient(implicit val sttpB: SttpBackend[Future, _]) extends ResiliencySupport {
 
-  private val proxyUri = uri"http://proxy"
+  private val proxyUri            = uri"http://proxy"
+  private val retryPolicy: Policy = retry.Backoff(3, 1.second)
 
   def getBlockIdForHeight(height: Int): Future[BlockId] =
-    retry
-      .Backoff(3, 2.second)
-      .apply { () =>
-        basicRequest
-          .get(proxyUri.addPath("blocks", "at", height.toString))
-          .response(asJson[List[BlockId]])
-          .readTimeout(5.seconds)
-          .send(sttpB)
-          .map(_.body)
-          .flatMap {
-            case Right(blockIds) if blockIds.nonEmpty =>
-              Future.successful(blockIds.head)
-            case Right(_) =>
-              Future.failed(new StopException(s"There is no block at height $height", null))
-            case Left(error) =>
-              Future.failed(new StopException(s"Getting block id at height $height failed", error))
-          }
-      }(retry.Success.always, global)
+    retryPolicy.apply { () =>
+      basicRequest
+        .get(proxyUri.addPath("blocks", "at", height.toString))
+        .response(asJson[List[BlockId]])
+        .readTimeout(1.seconds)
+        .send(sttpB)
+        .map(_.body)
+        .flatMap {
+          case Right(blockIds) if blockIds.nonEmpty =>
+            Future.successful(blockIds.head)
+          case Right(_) =>
+            Future.failed(new StopException(s"There is no block at height $height", null))
+          case Left(error) =>
+            Future.failed(new StopException(s"Getting block id at height $height failed", error))
+        }
+    }(retry.Success.always, global)
 
   def getBlockForId(blockId: BlockId): Future[ApiFullBlock] =
-    retry
-      .Backoff(3, 2.second)
-      .apply { () =>
-        basicRequest
-          .get(proxyUri.addPath("blocks", blockId.toString))
-          .response(asJson[ApiFullBlock])
-          .readTimeout(5.seconds)
-          .send(sttpB)
-          .map(_.body)
-          .flatMap {
-            case Right(block) =>
-              Future.successful(block)
-            case Left(error) =>
-              Future.failed(new StopException(s"Getting block id $blockId failed due to $error", null))
-          }
-      }(retry.Success.always, global)
+    retryPolicy.apply { () =>
+      basicRequest
+        .get(proxyUri.addPath("blocks", blockId.toString))
+        .response(asJson[ApiFullBlock])
+        .responseGetRight
+        .readTimeout(3.seconds)
+        .send(sttpB)
+        .map(_.body)
+    }(retry.Success.always, global)
 
   def blockResolvingFlow: Flow[Int, ApiFullBlock, NotUsed] =
     Flow[Int]

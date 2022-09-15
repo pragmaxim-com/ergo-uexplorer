@@ -4,11 +4,11 @@ import akka.actor.typed._
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.{StopException, Utils}
 import org.ergoplatform.uexplorer.indexer.http.NodePool._
+import org.ergoplatform.uexplorer.indexer.http.NodePoolSttpBackendWrapper.InvalidPeers
+import org.ergoplatform.uexplorer.indexer.{StopException, Utils}
 import sttp.capabilities.Effect
 import sttp.client3._
-import sttp.model.Uri
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -74,6 +74,7 @@ class NodePoolSttpBackendWrapper[P](nodePoolRef: ActorRef[NodePoolRequest])(impl
 }
 
 object NodePoolSttpBackendWrapper {
+  type InvalidPeers = Set[Peer]
 
   def apply[P](nodePoolRef: ActorRef[NodePoolRequest], httpClient: MetadataHttpClient[P])(implicit
     s: ActorSystem[Nothing]

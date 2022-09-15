@@ -8,11 +8,9 @@ import akka.stream.ActorAttributes
 import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, PeerAddress, Resiliency, Utils}
-import sttp.model.Uri
+import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, Resiliency}
 
 import scala.concurrent.duration.DurationInt
-import scala.util.Random
 
 object NodePool extends AkkaStreamSupport with LazyLogging {
 
@@ -69,41 +67,12 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
     restartSource {
       Source
         .tick(0.seconds, 5.seconds, ())
-        .mapAsync(1)(_ => metadataClient.getOpenApiPeers)
+        .mapAsync(1)(_ => metadataClient.getAllOpenApiPeers)
         .mapAsync(1) { validPeers =>
           nodePool.ask(ref => UpdateOpenApiPeers(validPeers, ref))
         }
         .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
     }
-
-  type InvalidPeers = Set[Peer]
-
-  case class ConnectedPeer(address: PeerAddress, restApiUrl: Option[PeerAddress]) {
-    def getRestApiUri: Option[Uri] = restApiUrl.flatMap(Uri.parse(_).toOption.map(Utils.stripUri))
-  }
-
-  sealed trait Peer {
-    def uri: Uri
-    def weight: Int
-    def fullHeight: Int
-  }
-
-  case class LocalNode(uri: Uri, fullHeight: Int, restApiUrl: Option[Uri]) extends Peer {
-    val weight: Int = 1
-  }
-
-  case class RemoteNode(uri: Uri, fullHeight: Int, restApiUrl: Option[Uri]) extends Peer {
-    val weight: Int = 2
-  }
-
-  case class RemotePeer(uri: Uri, fullHeight: Int) extends Peer {
-    val weight: Int = 3
-  }
-
-  case class PeerInfo(appVersion: String, stateType: String, fullHeight: Option[Int], restApiUrl: Option[PeerAddress]) {
-    def getFullHeight: Int         = fullHeight.getOrElse(0)
-    def getRestApiUri: Option[Uri] = restApiUrl.flatMap(Uri.parse(_).toOption.map(Utils.stripUri))
-  }
 
   sealed trait NodePoolRequest
 

@@ -101,8 +101,7 @@ object Indexer extends LazyLogging {
     implicit val protocol: ProtocolSettings   = conf.protocol
     implicit val futureSttpBackend: SttpBackend[Future, _] =
       HttpClientFutureBackend(SttpBackendOptions.connectionTimeout(5.seconds))
-
-    val metadataClient = new MetadataHttpClient(conf.peerUriToPollFrom, conf.nodeUriToInitFrom)
+    val metadataClient = new MetadataHttpClient(conf.peerAddressToPollFrom, conf.nodeAddressToInitFrom)
     val pollingClient  = BlockHttpClient(metadataClient)
     val indexer =
       conf.backendType match {

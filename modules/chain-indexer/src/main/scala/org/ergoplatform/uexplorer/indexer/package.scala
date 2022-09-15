@@ -1,10 +1,6 @@
 package org.ergoplatform.uexplorer
 
 import cats.implicits.toBifunctorOps
-import eu.timepit.refined.refineV
-import eu.timepit.refined.string.HexStringSpec
-import io.circe.Decoder
-import org.ergoplatform.explorer.constraints.HexStringType
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
 import sttp.model.Uri
@@ -14,11 +10,6 @@ package object indexer {
 
   implicit def uriConfigReader(implicit cr: ConfigReader[String]): ConfigReader[Uri] =
     cr.emap(addr => Uri.parse(addr).leftMap(r => CannotConvert(addr, "Uri", r)))
-
-  implicit val hexStringDecoder: Decoder[HexStringType] =
-    Decoder.decodeString.emap(str => refineV[HexStringSpec](str))
-
-  type PeerAddress = String
 
   class StopException(msg: String, cause: Throwable) extends RuntimeException(msg, cause)
 
