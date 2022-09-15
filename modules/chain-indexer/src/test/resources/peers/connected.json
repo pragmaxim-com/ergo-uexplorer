@@ -1,0 +1,33 @@
+[
+  {
+    "address" : "",
+    "lastMessage" : 1663268578678,
+    "lastHandshake" : 1663239204834,
+    "name" : "ergo-mainnet-4.0.42",
+    "connectionType" : "Incoming"
+  },
+  {
+    "address" : "/13.40.184.113:9030",
+    "lastMessage" : 1663268560414,
+    "lastHandshake" : 1663262565226,
+    "name" : "ERGO-WELSH-PUBLICCLOUD-NODE",
+    "connectionType" : "Outgoing",
+    "restApiUrl" : "https://foo.io"
+  },
+  {
+    "address" : "/13.40.184.113:9030",
+    "lastMessage" : 1663268560414,
+    "lastHandshake" : 1663262565226,
+    "name" : "ERGO-WELSH-PUBLICCLOUD-NODE",
+    "connectionType" : "Outgoing",
+    "restApiUrl" : "invalid"
+  },
+  {
+    "address" : "/13.40.184.113:9030",
+    "lastMessage" : 1663268560414,
+    "lastHandshake" : 1663262565226,
+    "name" : "ERGO-WELSH-PUBLICCLOUD-NODE",
+    "connectionType" : "Outgoing",
+    "restApiUrl" : "https://bar.io/suffix"
+  }
+]

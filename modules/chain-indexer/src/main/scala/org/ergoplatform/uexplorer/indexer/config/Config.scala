@@ -6,6 +6,7 @@ import pureconfig.ConfigReader.Result
 import pureconfig.generic.auto._
 import org.ergoplatform.explorer.settings.pureConfigInstances._
 import org.ergoplatform.uexplorer.indexer._
+import org.ergoplatform.uexplorer.indexer.http.{LocalNodeUriMagnet, RemoteNodeUriMagnet}
 import sttp.model.Uri
 
 case class ChainIndexerConf(
@@ -13,7 +14,11 @@ case class ChainIndexerConf(
   peerAddressToPollFrom: Uri,
   backendType: BackendType,
   protocol: ProtocolSettings
-)
+) {
+  def remoteUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(peerAddressToPollFrom)
+  def localUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(peerAddressToPollFrom)
+
+}
 
 object ChainIndexerConf {
 

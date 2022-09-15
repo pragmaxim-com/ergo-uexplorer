@@ -15,7 +15,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.api.{BlockBuilder, BlockWriter, EpochService}
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ScyllaBackend, UnknownBackend}
-import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, MetadataHttpClient}
+import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{GetLastBlock, ProgressMonitorRequest, ProgressState}
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor}
 import org.ergoplatform.uexplorer.indexer.scylla.{ScyllaBlockBuilder, ScyllaBlockWriter, ScyllaEpochService}
@@ -101,7 +101,8 @@ object Indexer extends LazyLogging {
     implicit val protocol: ProtocolSettings   = conf.protocol
     implicit val futureSttpBackend: SttpBackend[Future, _] =
       HttpClientFutureBackend(SttpBackendOptions.connectionTimeout(5.seconds))
-    val metadataClient = new MetadataHttpClient(conf.peerAddressToPollFrom, conf.nodeAddressToInitFrom)
+
+    val metadataClient = MetadataHttpClient(conf)
     val pollingClient  = BlockHttpClient(metadataClient)
     val indexer =
       conf.backendType match {

@@ -66,7 +66,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
   ): Source[NodePoolState, NotUsed] =
     restartSource {
       Source
-        .tick(0.seconds, 5.seconds, ())
+        .tick(0.seconds, 30.seconds, ())
         .mapAsync(1)(_ => metadataClient.getAllOpenApiPeers)
         .mapAsync(1) { validPeers =>
           nodePool.ask(ref => UpdateOpenApiPeers(validPeers, ref))

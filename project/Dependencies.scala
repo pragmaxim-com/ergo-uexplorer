@@ -2,7 +2,7 @@ import sbt._
 
 object Version {
   lazy val akka            = "2.6.19"
-  lazy val sttp            = "3.7.2"
+  lazy val sttp            = "3.7.6"
   lazy val circe           = "0.14.2"
   lazy val enumeratum      = "1.7.0"
   lazy val alpakka         = "3.0.4"

@@ -2,42 +2,45 @@ package org.ergoplatform.uexplorer.indexer.http
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
+import io.circe.Decoder
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport}
 import retry.Policy
 import sttp.client3._
 import sttp.client3.circe.asJson
-import sttp.model.Uri
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
-class MetadataHttpClient[P](val masterPeerAddress: Uri, val localNodeAddress: Uri)(implicit
-  val underlyingB: SttpBackend[Future, P],
-  mat: Materializer
+class MetadataHttpClient[P](implicit
+  remoteUri: RemoteNodeUriMagnet,
+  localUri: LocalNodeUriMagnet,
+  mat: Materializer,
+  val underlyingB: SttpBackend[Future, P]
 ) extends ResiliencySupport {
 
   private val retryPolicy: Policy = retry.Backoff(3, 1.second)
 
   def getBestBlockHeight: Future[Int] = getMasterNodes.map(_.maxBy(_.fullHeight).fullHeight)
 
-  def getPeerInfo[T](uri: Uri)(constructor: (Uri, PeerInfo) => T): Future[Option[T]] =
+  def getPeerInfo[T <: Peer: Decoder: UriMagnet](minHeight: Int = Const.MinNodeHeight): Future[Option[T]] =
     basicRequest
-      .get(uri.addPath("info"))
-      .response(asJson[PeerInfo])
+      .get(implicitly[UriMagnet[T]].uri.addPath("info"))
+      .response(asJson[T])
       .responseGetRight
       .readTimeout(1.seconds)
       .send(underlyingB)
       .map(_.body)
       .transform {
-        case Success(peerInfo) if peerInfo.fullHeight < Const.MinNodeHeight || peerInfo.stateType != "utxo" =>
-          logger.warn(s"Peer has empty fullHeight or it has not utxo state : $peerInfo")
+        case Success(peer) if peer.fullHeight < minHeight - Const.AllowedHeightDiff || peer.stateType != "utxo" =>
+          logger.debug(s"Peer has empty fullHeight or it has not utxo state : $peer")
           Success(None)
-        case Success(peerInfo) =>
-          Success(Some(constructor(uri, peerInfo)))
+        case Success(peer) =>
+          Success(Some(peer))
         case Failure(ex) =>
-          logger.warn("Getting peer info failed, retrying", ex)
+          logger.debug("Getting peer info failed", ex)
           Success(None)
       }
 
@@ -51,45 +54,52 @@ class MetadataHttpClient[P](val masterPeerAddress: Uri, val localNodeAddress: Ur
           masterNodes
       }
       .flatMap(masterNodes =>
-        getConnectedPeers(masterNodes, masterNodes.maxBy(_.fullHeight).fullHeight).map(_ ++ masterNodes)
+        getAllValidConnectedPeers(masterNodes, masterNodes.maxBy(_.fullHeight).fullHeight).map(_ ++ masterNodes)
       )
 
   def getMasterNodes: Future[Set[Peer]] =
     retryPolicy
       .apply { () =>
-        getPeerInfo(localNodeAddress)(LocalNode.fromPeerInfo)
+        getPeerInfo[LocalNode]()
           .transformWith {
             case Success(localNode) =>
-              getPeerInfo(masterPeerAddress)(RemoteNode.fromPeerInfo)
+              getPeerInfo[RemoteNode]()
                 .map(_.toSet[Peer] ++ localNode)
                 .recover { case _ => localNode.toSet[Peer] }
             case Failure(_) | Success(None) =>
-              getPeerInfo(masterPeerAddress)(RemoteNode.fromPeerInfo).map(_.toSet[Peer])
+              getPeerInfo[RemoteNode]().map(_.toSet[Peer])
           }
       }(retry.Success.apply(_.nonEmpty), global)
 
-  def getConnectedPeers(masterPeers: Set[Peer], bestFullHeight: Int): Future[Set[Peer]] =
+  def getConnectedPeers(masterPeer: Peer): Future[Set[ConnectedPeer]] =
+    basicRequest
+      .get(masterPeer.uri.addPath("peers", "connected"))
+      .response(asJson[Set[ConnectedPeer]])
+      .responseGetRight
+      .readTimeout(1.seconds)
+      .send(underlyingB)
+      .map(_.body)
+
+  def getAllValidConnectedPeers(masterPeers: Set[Peer], bestFullHeight: Int): Future[Set[Peer]] =
     Source(masterPeers)
-      .mapAsync(2) { peer =>
-        basicRequest
-          .get(peer.uri.addPath("peers", "connected"))
-          .response(asJson[Set[ConnectedPeer]])
-          .responseGetRight
-          .readTimeout(1.seconds)
-          .send(underlyingB)
-          .map(_.body)
-      }
+      .mapAsync(2)(getConnectedPeers)
       .mapConcat(identity)
-      .collect { case p if p.restApiUrl.isDefined => p.restApiUrl.get }
-      .mapAsync(1)(getPeerInfo(_)(RemotePeer.fromPeerInfo))
-      .mapConcat {
-        case Some(remotePeer) if remotePeer.fullHeight >= bestFullHeight - 5 =>
-          List(remotePeer)
-        case _ =>
-          List.empty
-      }
+      .collect { case p if p.restApiUrl.isDefined => RemotePeerUriMagnet(p.restApiUrl.get) }
+      .mapAsync(1) { implicit m: RemotePeerUriMagnet => getPeerInfo[RemotePeer](bestFullHeight) }
+      .mapConcat(_.toList)
       .runWith(Sink.collection[Peer, Set[Peer]])
 
   def close(): Future[Unit] =
     underlyingB.close()
+}
+
+object MetadataHttpClient {
+
+  def apply[P](
+    conf: ChainIndexerConf
+  )(implicit underlyingB: SttpBackend[Future, P], mat: Materializer): MetadataHttpClient[P] = {
+    implicit val localNodeUriMagnet: LocalNodeUriMagnet   = conf.localUriMagnet
+    implicit val remoteNodeUriMagnet: RemoteNodeUriMagnet = conf.remoteUriMagnet
+    new MetadataHttpClient[P]()
+  }
 }

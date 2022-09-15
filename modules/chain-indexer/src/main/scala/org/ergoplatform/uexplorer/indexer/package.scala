@@ -18,7 +18,7 @@ package object indexer {
     val PreGenesisHeight  = 0
     val EpochLength       = 1024
     val FlushHeight       = EpochLength / 2
-    val AllowedHeightDiff = EpochLength / 2
+    val AllowedHeightDiff = 10
     val MinNodeHeight     = EpochLength * 800
 
     val FeeContractAddress =
