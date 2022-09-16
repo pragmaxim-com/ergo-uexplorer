@@ -16,9 +16,10 @@ import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.api.{BlockBuilder, BlockWriter, EpochService}
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ScyllaBackend, UnknownBackend}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, MetadataHttpClient}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{GetLastBlock, ProgressMonitorRequest, ProgressState}
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor}
-import org.ergoplatform.uexplorer.indexer.scylla.{ScyllaBlockBuilder, ScyllaBlockWriter, ScyllaEpochService}
+import org.ergoplatform.uexplorer.indexer.scylla.entity.ScyllaBlockUpdater
+import org.ergoplatform.uexplorer.indexer.scylla.{ScyllaBlockWriter, ScyllaEpochService}
 import sttp.client3.{HttpClientFutureBackend, SttpBackend, SttpBackendOptions}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -71,7 +72,7 @@ class Indexer(
   def heightsToPollBlocksFor: Future[Vector[Int]] =
     progressMonitorRef
       .ask(ref => GetLastBlock(ref))
-      .map(_.block.get.stats.height + 1)
+      .map(_.block.stats.height + 1)
       .flatMap(fromHeight => metaHttpClient.getBestBlockHeight.map(toHeight => (fromHeight to toHeight).toVector))
 
   def keepPolling: Future[ProgressState] =
@@ -112,7 +113,7 @@ object Indexer extends LazyLogging {
           implicit val cqlSession: CqlSession = Await.result(cassandraSession.underlying(), 5.seconds)
           new Indexer(
             new ScyllaBlockWriter,
-            new ScyllaBlockBuilder,
+            new BlockBuilder(new ScyllaBlockUpdater),
             new ScyllaEpochService(),
             metadataClient,
             pollingClient,

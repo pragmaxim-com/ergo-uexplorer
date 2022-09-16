@@ -32,8 +32,8 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
         val (winningForkInserted, newProgress) = p.insertWinningFork(winningFork)
         replyTo ! winningForkInserted
         initialized(newProgress)
-      case GetLastBlock(replyTo) =>
-        replyTo ! CachedBlock(p.blockCache.byHeight.lastOption.map(_._2))
+      case GetLastBlock(replyTo) if p.blockCache.byHeight.nonEmpty =>
+        replyTo ! LastCachedBlock(p.blockCache.byHeight.last._2)
         Behaviors.same
       case GetBlock(blockId, replyTo) =>
         replyTo ! CachedBlock(p.blockCache.byId.get(blockId))
@@ -52,14 +52,17 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
         replyTo ! maybeNewEpoch
         initialized(newProgress)
       case BlockPersisted(b, _) =>
-        logger.error(s"Unexpected persisted block ${b.header.id} at ${b.header.height} ...")
+        logger.error(s"Unexpected persisted block ${b.header.id} at ${b.header.height} : $p")
         Behaviors.stopped
       case InsertBestBlock(b, _) =>
-        logger.error(s"Unexpected insert ${b.header.id} at ${b.header.height}, parent ${b.header.parentId} ...")
+        logger.error(s"Unexpected insert ${b.header.id} at ${b.header.height}, parent ${b.header.parentId} : $p")
+        Behaviors.stopped
+      case GetLastBlock(_) =>
+        logger.error(s"Unexpected get last block request : $p")
         Behaviors.stopped
       case InsertWinningFork(fork, _) =>
         val h = fork.head.header
-        logger.error(s"Unexpected winningFork size ${fork.size} starting ${h.id} at ${h.height}, parent ${h.parentId} ...")
+        logger.error(s"Unexpected winningFork size ${fork.size} starting ${h.id} at ${h.height}, parent ${h.parentId} : $p")
         Behaviors.stopped
     }
 }
@@ -78,7 +81,7 @@ object ProgressMonitor {
 
   case class GetBlock(blockId: BlockId, replyTo: ActorRef[CachedBlock]) extends ProgressMonitorRequest
 
-  case class GetLastBlock(replyTo: ActorRef[CachedBlock]) extends ProgressMonitorRequest
+  case class GetLastBlock(replyTo: ActorRef[LastCachedBlock]) extends ProgressMonitorRequest
 
   case class UpdateEpochIndexes(lastBlockIdByEpochIndex: TreeMap[Int, BlockInfo], replyTo: ActorRef[ProgressState])
     extends ProgressMonitorRequest
@@ -89,6 +92,7 @@ object ProgressMonitor {
 
   sealed trait ProgressMonitorResponse
 
+  case class LastCachedBlock(block: BlockInfo) extends ProgressMonitorResponse
   case class CachedBlock(block: Option[BlockInfo]) extends ProgressMonitorResponse
 
   sealed trait Inserted extends ProgressMonitorResponse
