@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.{Address, BlockId}
 import org.ergoplatform.explorer.db.models.BlockStats
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.api.BlockBuilder.BlockInfo
+import org.ergoplatform.uexplorer.indexer.BlockBuilder.BlockInfo
 import org.ergoplatform.uexplorer.indexer.api.EpochService
 import org.ergoplatform.uexplorer.indexer.progress.Epoch
 import org.ergoplatform.uexplorer.indexer.scylla.entity.BlocksInfo

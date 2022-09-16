@@ -13,7 +13,7 @@ import akka.util.Timeout
 import com.datastax.oss.driver.api.core.CqlSession
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.settings.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.api.{BlockBuilder, BlockWriter, EpochService}
+import org.ergoplatform.uexplorer.indexer.api.{BlockWriter, EpochService}
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ScyllaBackend, UnknownBackend}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, MetadataHttpClient}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
@@ -28,7 +28,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Failure
 
 class Indexer(
-  blockPersistence: BlockWriter,
+  blockWriter: BlockWriter,
   blockBuilder: BlockBuilder,
   epochService: EpochService,
   metaHttpClient: MetadataHttpClient[_],
@@ -45,7 +45,7 @@ class Indexer(
       .via(blockHttpClient.blockResolvingFlow)
       .via(blockBuilder.blockBuildingFlow(blockHttpClient, progressMonitorRef))
       .async
-      .via(blockPersistence.blockWriteFlow)
+      .via(blockWriter.blockWriteFlow)
       .via(epochService.writeEpochFlow(progressMonitorRef))
       .withAttributes(supervisionStrategy(Resiliency.decider))
 

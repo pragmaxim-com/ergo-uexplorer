@@ -8,7 +8,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.api.BlockBuilder.BlockInfo
+import org.ergoplatform.uexplorer.indexer.BlockBuilder.BlockInfo
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, InvalidEpochCandidate}
 

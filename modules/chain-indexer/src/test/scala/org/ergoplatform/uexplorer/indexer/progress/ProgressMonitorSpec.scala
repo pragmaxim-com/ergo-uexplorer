@@ -6,7 +6,7 @@ import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.StopException
-import org.ergoplatform.uexplorer.indexer.api.BlockBuilder._
+import org.ergoplatform.uexplorer.indexer.BlockBuilder._
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{BlockCache, ProgressState}
 import org.scalatest.freespec.AnyFreeSpec

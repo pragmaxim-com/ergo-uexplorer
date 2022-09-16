@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.api
+package org.ergoplatform.uexplorer.indexer
 
 import akka.NotUsed
 import akka.actor.typed.scaladsl.AskPattern._
@@ -14,7 +14,7 @@ import org.ergoplatform.explorer.indexer.extractors._
 import org.ergoplatform.explorer.indexer.models.{FlatBlock, SlotData}
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.StopException
+import org.ergoplatform.uexplorer.indexer.api.BlockUpdater
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import tofu.Context
