@@ -5,6 +5,8 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import sttp.client3._
 
+import scala.collection.immutable.TreeSet
+
 class NodePoolSpec extends AnyFreeSpec with Matchers {
 
   private val remoteNode = RemoteNode(uri"http://master", "4.0.42", "utxo", 1)
@@ -12,14 +14,14 @@ class NodePoolSpec extends AnyFreeSpec with Matchers {
   private val remotePeer = RemotePeer(uri"http://peer", "4.0.42", "utxo", 1)
 
   "update should remove master/local nodes from invalid" in {
-    val initialState  = NodePoolState(Set.empty, Set(localNode, remoteNode))
-    val expectedState = NodePoolState(Set(localNode, remoteNode), Set.empty)
-    initialState.updatePeers(Set(localNode, remoteNode)) shouldBe expectedState
+    val initialState  = NodePoolState(TreeSet.empty, TreeSet(localNode, remoteNode))
+    val expectedState = NodePoolState(TreeSet(localNode, remoteNode), TreeSet.empty)
+    initialState.updatePeers(TreeSet(localNode, remoteNode)) shouldBe expectedState
   }
 
   "update should not remove peers from invalid" in {
-    val initialState  = NodePoolState(Set.empty, Set(remotePeer))
-    val expectedState = NodePoolState(Set.empty, Set(remotePeer))
-    initialState.updatePeers(Set(remotePeer)) shouldBe expectedState
+    val initialState  = NodePoolState(TreeSet.empty, TreeSet(remotePeer))
+    val expectedState = NodePoolState(TreeSet.empty, TreeSet(remotePeer))
+    initialState.updatePeers(TreeSet(remotePeer)) shouldBe expectedState
   }
 }

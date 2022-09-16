@@ -9,6 +9,7 @@ import retry.Policy
 import sttp.client3._
 import sttp.client3.circe.asJson
 
+import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -44,7 +45,7 @@ class MetadataHttpClient[P](implicit
           Success(None)
       }
 
-  def getAllOpenApiPeers: Future[Set[Peer]] =
+  def getAllOpenApiPeers: Future[SortedSet[Peer]] =
     getMasterNodes
       .map {
         case masterNodes if masterNodes.size > 1 =>
@@ -57,7 +58,7 @@ class MetadataHttpClient[P](implicit
         getAllValidConnectedPeers(masterNodes, masterNodes.maxBy(_.fullHeight).fullHeight).map(_ ++ masterNodes)
       )
 
-  def getMasterNodes: Future[Set[Peer]] =
+  def getMasterNodes: Future[SortedSet[Peer]] =
     retryPolicy
       .apply { () =>
         getPeerInfo[LocalNode]()
@@ -69,6 +70,7 @@ class MetadataHttpClient[P](implicit
             case Failure(_) | Success(None) =>
               getPeerInfo[RemoteNode]().map(_.toSet[Peer])
           }
+          .map(_.to[TreeSet])
       }(retry.Success.apply(_.nonEmpty), global)
 
   def getConnectedPeers(masterPeer: Peer): Future[Set[ConnectedPeer]] =
@@ -80,14 +82,14 @@ class MetadataHttpClient[P](implicit
       .send(underlyingB)
       .map(_.body)
 
-  def getAllValidConnectedPeers(masterPeers: Set[Peer], bestFullHeight: Int): Future[Set[Peer]] =
+  def getAllValidConnectedPeers(masterPeers: SortedSet[Peer], bestFullHeight: Int): Future[SortedSet[Peer]] =
     Source(masterPeers)
       .mapAsync(2)(getConnectedPeers)
       .mapConcat(identity)
       .collect { case p if p.restApiUrl.isDefined => RemotePeerUriMagnet(p.restApiUrl.get) }
       .mapAsync(1) { implicit m: RemotePeerUriMagnet => getPeerInfo[RemotePeer](bestFullHeight) }
       .mapConcat(_.toList)
-      .runWith(Sink.collection[Peer, Set[Peer]])
+      .runWith(Sink.collection[Peer, TreeSet[Peer]])
 
   def close(): Future[Unit] =
     underlyingB.close()

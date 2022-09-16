@@ -16,7 +16,7 @@ case class ChainIndexerConf(
   protocol: ProtocolSettings
 ) {
   def remoteUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(peerAddressToPollFrom)
-  def localUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(peerAddressToPollFrom)
+  def localUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(nodeAddressToInitFrom)
 
 }
 

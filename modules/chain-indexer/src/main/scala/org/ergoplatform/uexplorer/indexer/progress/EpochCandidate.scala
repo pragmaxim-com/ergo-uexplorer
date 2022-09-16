@@ -26,9 +26,6 @@ case class ValidEpochCandidate(epochIndex: Int, relsByHeight: TreeMap[Int, Block
 
 object EpochCandidate {
 
-  implicit def descEpochOrdering[C <: EpochCandidate]: Ordering[C] =
-    Ordering.by[C, Int](_.epochIndex).reverse
-
   def apply(
     rels: Seq[(Int, BlockRel)]
   ): Either[InvalidEpochCandidate, ValidEpochCandidate] = {

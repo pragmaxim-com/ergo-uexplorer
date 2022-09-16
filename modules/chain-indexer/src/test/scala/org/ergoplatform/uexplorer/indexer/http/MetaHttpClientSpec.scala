@@ -51,13 +51,13 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
         Response.ok[String](getPeerInfo(withRestApiAndFullHeight))
       )
     val client = new MetadataHttpClient()
-    client.getPeerInfo[LocalNode].map { node =>
+    client.getPeerInfo[LocalNode]().map { node =>
       node shouldBe Option(LocalNode(localNodeUriMagnet.uri, appVersion, stateType, 839249))
     }
-    client.getPeerInfo[RemoteNode].map { node =>
+    client.getPeerInfo[RemoteNode]().map { node =>
       node shouldBe Option(RemoteNode(remoteNodeUriMagnet.uri, appVersion, stateType, 839249))
     }
-    client.getPeerInfo[RemotePeer].map { node =>
+    client.getPeerInfo[RemotePeer]().map { node =>
       node shouldBe Option(RemotePeer(remotePeerUriMagnet.uri, appVersion, stateType, 839249))
     }
   }
@@ -69,13 +69,13 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
         Response.ok[String](getPeerInfo(woRestApiAndFullHeight))
       )
     val client = new MetadataHttpClient()
-    client.getPeerInfo[LocalNode].map { node =>
+    client.getPeerInfo[LocalNode]().map { node =>
       node shouldBe Option(LocalNode(localNodeUriMagnet.uri, appVersion, stateType, 839249))
     }
-    client.getPeerInfo[RemoteNode].map { node =>
+    client.getPeerInfo[RemoteNode]().map { node =>
       node shouldBe Option(RemoteNode(remoteNodeUriMagnet.uri, appVersion, stateType, 839249))
     }
-    client.getPeerInfo[RemotePeer].map { node =>
+    client.getPeerInfo[RemotePeer]().map { node =>
       node shouldBe Option(RemotePeer(remotePeerUriMagnet.uri, appVersion, stateType, 839249))
     }
   }
@@ -87,13 +87,13 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
         Response.ok[String](getPeerInfo(woRestApiAndWoFullHeight))
       )
     val client = new MetadataHttpClient()
-    client.getPeerInfo[LocalNode].map { node =>
+    client.getPeerInfo[LocalNode]().map { node =>
       node shouldBe None
     }
-    client.getPeerInfo[RemoteNode].map { node =>
+    client.getPeerInfo[RemoteNode]().map { node =>
       node shouldBe None
     }
-    client.getPeerInfo[RemotePeer].map { node =>
+    client.getPeerInfo[RemotePeer]().map { node =>
       node shouldBe None
     }
   }
@@ -119,7 +119,7 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
       )
     val client = new MetadataHttpClient()
 
-    client.getPeerInfo[RemotePeer].futureValue shouldBe None
+    client.getPeerInfo[RemotePeer]().futureValue shouldBe None
   }
 
 }

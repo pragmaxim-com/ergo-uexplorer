@@ -66,7 +66,7 @@ object BlockHttpClient {
 
   def apply(metadataClient: MetadataHttpClient[_])(implicit ctx: ActorContext[_]): BlockHttpClient = {
     val nodePoolRef = ctx.spawn(NodePool.behavior(metadataClient), "NodePool")
-    new BlockHttpClient()(NodePoolSttpBackendWrapper(nodePoolRef, metadataClient)(ctx.system))
+    new BlockHttpClient()(SttpBackendFallbackProxy(nodePoolRef, metadataClient)(ctx.system))
   }
 
 }

@@ -10,26 +10,6 @@ import scala.util.Try
 case class ConnectedPeer(restApiUrl: Option[Uri])
 
 object ConnectedPeer {
-  import Peer._
-
-  implicit val decoder: Decoder[ConnectedPeer] = (c: HCursor) => {
-    for {
-      restApiUri <- c.getOrElse[Option[Uri]]("restApiUrl")(Option.empty[Uri])
-    } yield new ConnectedPeer(restApiUri.map(Utils.stripUri))
-  }
-}
-
-sealed trait Peer {
-  def uri: Uri
-  def weight: Int
-  def stateType: Peer.StateType
-  def appVersion: Peer.AppVersion
-  def fullHeight: Int
-}
-
-object Peer {
-  type StateType  = String
-  type AppVersion = String
 
   private def hasFragments(uri: URI) =
     Option(uri.getQuery).exists(_.nonEmpty) ||
@@ -51,6 +31,28 @@ object Peer {
           )
       )
     }
+
+  implicit val decoder: Decoder[ConnectedPeer] = (c: HCursor) => {
+    for {
+      restApiUri <- c.getOrElse[Option[Uri]]("restApiUrl")(Option.empty[Uri])
+    } yield new ConnectedPeer(restApiUri.map(Utils.stripUri))
+  }
+}
+
+sealed trait Peer {
+  def uri: Uri
+  def weight: Int
+  def stateType: Peer.StateType
+  def appVersion: Peer.AppVersion
+  def fullHeight: Int
+}
+
+object Peer {
+  type StateType  = String
+  type AppVersion = String
+
+  implicit def ascWeightOrdering[P <: Peer]: Ordering[P] =
+    Ordering.by[P, Int](_.weight)
 
   def baseDecoder: Decoder[(StateType, AppVersion, Int)] = (c: HCursor) => {
     for {

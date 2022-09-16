@@ -10,6 +10,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, Resiliency}
 
+import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.concurrent.duration.DurationInt
 
 object NodePool extends AkkaStreamSupport with LazyLogging {
@@ -25,11 +26,12 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
 
   def uninitialized(implicit ctx: ActorContext[NodePoolRequest]): Behavior[NodePoolRequest] =
     Behaviors.receiveMessage[NodePoolRequest] {
-      case GetAllPeers(replyTo) =>
-        ctx.scheduleOnce(500.millis, ctx.self, GetAllPeers(replyTo))
+      case GetAvailablePeers(replyTo) =>
+        ctx.scheduleOnce(500.millis, ctx.self, GetAvailablePeers(replyTo))
         Behaviors.same
       case UpdateOpenApiPeers(validPeers, replyTo) =>
-        val newState = NodePoolState(validPeers, Set.empty)
+        val newState = NodePoolState(validPeers, TreeSet.empty)
+        logger.info(s"Getting blocks from : $newState")
         replyTo ! newState
         initialized(newState)
       case x =>
@@ -37,14 +39,9 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
         Behaviors.stopped
     }
 
-  def initialized(state: NodePoolState)(implicit
-    ctx: ActorContext[NodePoolRequest]
-  ): Behavior[NodePoolRequest] =
+  def initialized(state: NodePoolState): Behavior[NodePoolRequest] =
     Behaviors.receiveMessage[NodePoolRequest] {
-      case GetAllPeers(replyTo) if state.openApiPeers.isEmpty =>
-        ctx.scheduleOnce(500.millis, ctx.self, GetAllPeers(replyTo))
-        Behaviors.same
-      case GetAllPeers(replyTo) =>
+      case GetAvailablePeers(replyTo) =>
         replyTo ! state.sortPeers
         Behaviors.same
       case UpdateOpenApiPeers(validPeers, replyTo) =>
@@ -54,7 +51,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
       case InvalidatePeers(invalidatedPeers, replyTo) =>
         val (newInvalidPeers, newState) = state.invalidatePeers(invalidatedPeers)
         if (newInvalidPeers.nonEmpty)
-          logger.info(newState.toString)
+          logger.info(s"Getting blocks from : $newState")
         replyTo ! newState
         initialized(newState)
       case GracefulShutdown =>
@@ -78,17 +75,17 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
 
   case object GracefulShutdown extends NodePoolRequest
 
-  case class GetAllPeers(replyTo: ActorRef[AllBestPeers]) extends NodePoolRequest
+  case class GetAvailablePeers(replyTo: ActorRef[AvailablePeers]) extends NodePoolRequest
 
-  case class UpdateOpenApiPeers(validAddresses: Set[Peer], replyTo: ActorRef[NodePoolState]) extends NodePoolRequest
+  case class UpdateOpenApiPeers(validAddresses: SortedSet[Peer], replyTo: ActorRef[NodePoolState]) extends NodePoolRequest
 
   case class InvalidatePeers(peerAddresses: Set[Peer], replyTo: ActorRef[NodePoolState]) extends NodePoolRequest
 
   sealed trait NodePoolResponse
 
-  case class AllBestPeers(peerAddresses: List[Peer]) extends NodePoolResponse
+  case class AvailablePeers(peerAddresses: List[Peer]) extends NodePoolResponse
 
-  case class NodePoolState(openApiPeers: Set[Peer], invalidPeers: Set[Peer]) {
+  case class NodePoolState(openApiPeers: SortedSet[Peer], invalidPeers: SortedSet[Peer]) {
 
     def invalidatePeers(invalidatedPeers: Set[Peer]): (Set[Peer], NodePoolState) = {
       val newInvalidPeers = invalidPeers ++ invalidatedPeers
@@ -96,7 +93,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
       invalidatedPeers.diff(invalidPeers) -> NodePoolState(newOpenApiPeers, newInvalidPeers)
     }
 
-    def updatePeers(validPeers: Set[Peer]): NodePoolState =
+    def updatePeers(validPeers: SortedSet[Peer]): NodePoolState =
       NodePoolState(validPeers.diff(invalidPeers.filter(_.weight > 2)), invalidPeers -- validPeers.filter(_.weight < 3))
 
     override def toString: String = {
@@ -108,7 +105,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
       s"$validPeersStr$invalidPeersStr"
     }
 
-    def sortPeers: AllBestPeers = AllBestPeers(openApiPeers.toList.sortBy(_.weight))
+    def sortPeers: AvailablePeers = AvailablePeers(openApiPeers.toList)
   }
 
 }
