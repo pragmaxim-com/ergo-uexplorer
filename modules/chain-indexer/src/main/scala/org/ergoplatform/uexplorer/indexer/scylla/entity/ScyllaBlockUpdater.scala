@@ -1,14 +1,15 @@
 package org.ergoplatform.uexplorer.indexer.scylla.entity
 
-import akka.Done
-import akka.actor.typed.ActorSystem
-import akka.stream.scaladsl.{Sink, Source}
-import com.datastax.oss.driver.api.core.CqlSession
+import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.{Done, NotUsed}
 import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
+import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.BlockId
+import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.api.BlockUpdater
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{BestBlockInserted, ForkInserted, Inserted}
+import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBlockWriter
 import org.ergoplatform.uexplorer.indexer.scylla.entity.ScyllaBlockUpdater._
 
 import scala.collection.JavaConverters.seqAsJavaList
@@ -16,12 +17,24 @@ import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class ScyllaBlockUpdater(implicit cqlSession: CqlSession, s: ActorSystem[Nothing]) extends BlockUpdater {
+trait ScyllaBlockUpdater extends LazyLogging {
+  this: ScyllaBlockWriter =>
 
   private val updateMainChainPreparedStatements: Map[String, (Option[String], PreparedStatement)] =
     updateMainChainStatements.map { case (table, keyOpt, statement) =>
       table -> (keyOpt, cqlSession.prepare(statement))
     }.toMap
+
+  def blockUpdaterFlow(parallelism: Int): Flow[Inserted, FlatBlock, NotUsed] =
+    Flow[Inserted]
+      .mapAsync(parallelism) {
+        case BestBlockInserted(flatBlock) =>
+          Future.successful(List(flatBlock))
+        case ForkInserted(newFlatBlocks, supersededFork) =>
+          removeBlocksFromMainChain(supersededFork.map(_.stats.headerId))
+            .map(_ => newFlatBlocks)
+      }
+      .mapConcat(identity)
 
   def removeBlocksFromMainChain(blockIds: List[BlockId]): Future[Done] =
     Source(blockIds)

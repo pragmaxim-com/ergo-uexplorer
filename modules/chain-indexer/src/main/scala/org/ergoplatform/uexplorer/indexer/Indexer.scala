@@ -29,7 +29,6 @@ import scala.util.Failure
 
 class Indexer(
   blockWriter: BlockWriter,
-  blockBuilder: BlockBuilder,
   epochService: EpochService,
   metaHttpClient: MetadataHttpClient[_],
   blockHttpClient: BlockHttpClient,
@@ -42,8 +41,7 @@ class Indexer(
 
   val indexingFlow: Flow[Int, Either[Int, Epoch], NotUsed] =
     Flow[Int]
-      .via(blockHttpClient.blockResolvingFlow)
-      .via(blockBuilder.blockBuildingFlow(blockHttpClient, progressMonitorRef))
+      .via(blockHttpClient.blockCachingFlow(progressMonitorRef))
       .async
       .via(blockWriter.blockWriteFlow)
       .via(epochService.writeEpochFlow(progressMonitorRef))
@@ -113,7 +111,6 @@ object Indexer extends LazyLogging {
           implicit val cqlSession: CqlSession = Await.result(cassandraSession.underlying(), 5.seconds)
           new Indexer(
             new ScyllaBlockWriter,
-            new BlockBuilder(new ScyllaBlockUpdater),
             new ScyllaEpochService(),
             metadataClient,
             pollingClient,

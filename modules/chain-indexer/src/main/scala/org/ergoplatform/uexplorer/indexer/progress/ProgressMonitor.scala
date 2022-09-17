@@ -7,8 +7,10 @@ import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.{BlockBuilder, Const, StopException}
-import BlockBuilder._
+import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
+import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient.{BlockInfo, _}
+import org.ergoplatform.uexplorer.indexer.{Const, StopException}
+
 import scala.collection.immutable.{SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
 
@@ -179,7 +181,7 @@ object ProgressMonitor {
         )
       }
       val prevBlockStats = blockCache.byId.get(bestBlock.header.parentId).map(_.stats)
-      val flatBlock      = BlockBuilder.buildBlock(bestBlock, prevBlockStats)
+      val flatBlock      = BlockHttpClient.buildBlock(bestBlock, prevBlockStats)
       val newBlockInfo   = flatBlock.buildInfo
       BestBlockInserted(flatBlock) -> copy(blockCache =
         BlockCache(

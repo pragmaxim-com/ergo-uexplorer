@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.indexer.api
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import org.ergoplatform.explorer.indexer.models.FlatBlock
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.Inserted
 
 trait BlockWriter {
   def blockInfoWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
@@ -21,6 +22,8 @@ trait BlockWriter {
 
   def inputsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
 
-  def blockWriteFlow: Flow[FlatBlock, FlatBlock, NotUsed]
+  def blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed]
+
+  def blockUpdaterFlow(parallelism: Int): Flow[Inserted, FlatBlock, NotUsed]
 
 }
