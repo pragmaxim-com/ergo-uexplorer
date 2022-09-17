@@ -4,6 +4,9 @@ Supplementary, lightweight Ergo explorer with ScyllaDB backend :
   - rapid indexing speed
   - low memory requirements (designed for machines with 16GB)
   - limited querying possibilities (in comparison to RDBMS)
+  - shares the same model and schema as [Ergo explorer](https://github.com/ergoplatform/explorer-backend)
+  - resilient
+    - it primarily uses local node (mandatory for initial sync) with a fallback on peer network
 
 ## Chain Indexer
 
@@ -19,7 +22,7 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
       - if you have more RAM, change `scylla-start.sh` script to avoid memory issues
   - `4vCPU+` but the whole stack was tested on `8vCPU` machine (1/2 cores allocated for scylla)
   - local fully synced Ergo Node is running if you are syncing from scratch
-      - polling new blocks is done only from peer network
+      - polling new blocks automatically falls back to peer-network if local node is not available
 
 ### Build
 

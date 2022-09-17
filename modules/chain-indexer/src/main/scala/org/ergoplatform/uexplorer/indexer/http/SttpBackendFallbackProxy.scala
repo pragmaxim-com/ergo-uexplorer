@@ -81,7 +81,7 @@ object SttpBackendFallbackProxy extends LazyLogging {
             fallbackQuery(peerAddresses.tail, invalidPeers + peerAddresses.head)(run)
         }
       case None =>
-        logger.warn(s"We ran out of peers, all peers unavailable : ${invalidPeers.mkString(",")}")
+        logger.warn(s"We ran out of peers, all peers unavailable...")
         Future.successful(invalidPeers, Failure(new Exception("Run out of peers!")))
     }
 
