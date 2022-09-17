@@ -5,12 +5,12 @@ import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBlockWriter
+import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
 
 import java.nio.ByteBuffer
 
 trait ScyllaRegistersWriter extends LazyLogging {
-  this: ScyllaBlockWriter =>
+  this: ScyllaBackend =>
 
   import Registers._
 

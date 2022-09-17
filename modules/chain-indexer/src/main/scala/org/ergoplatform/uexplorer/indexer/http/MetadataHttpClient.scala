@@ -24,7 +24,7 @@ class MetadataHttpClient[P](implicit
 
   private val retryPolicy: Policy = retry.Backoff(3, 1.second)
 
-  def getBestBlockHeight: Future[Int] = getMasterNodes.map(_.maxBy(_.fullHeight).fullHeight)
+  def getBestBlockHeight: Future[Int] = getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
 
   def getPeerInfo[T <: Peer: Decoder: UriMagnet](minHeight: Int = Const.MinNodeHeight): Future[Option[T]] =
     basicRequest

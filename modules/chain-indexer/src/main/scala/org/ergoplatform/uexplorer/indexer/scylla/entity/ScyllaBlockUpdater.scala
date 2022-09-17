@@ -9,7 +9,7 @@ import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{BestBlockInserted, ForkInserted, Inserted}
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBlockWriter
+import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
 import org.ergoplatform.uexplorer.indexer.scylla.entity.ScyllaBlockUpdater._
 
 import scala.collection.JavaConverters.seqAsJavaList
@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 trait ScyllaBlockUpdater extends LazyLogging {
-  this: ScyllaBlockWriter =>
+  this: ScyllaBackend =>
 
   private val updateMainChainPreparedStatements: Map[String, (Option[String], PreparedStatement)] =
     updateMainChainStatements.map { case (table, keyOpt, statement) =>

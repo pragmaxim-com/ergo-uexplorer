@@ -4,10 +4,10 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement}
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBlockWriter
+import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
 
 trait ScyllaBlockInfoWriter {
-  this: ScyllaBlockWriter =>
+  this: ScyllaBackend =>
 
   import BlocksInfo._
 

@@ -12,6 +12,11 @@ import scala.concurrent.Future
 
 trait ScyllaPersistenceSupport {
 
+  protected[scylla] val node_epochs_table = "node_epochs"
+
+  protected[scylla] val epoch_index    = "epoch_index"
+  protected[scylla] val last_header_id = "last_header_id"
+
   def storeBlockFlow[T](
     parallelism: Int,
     simpleStatement: SimpleStatement,

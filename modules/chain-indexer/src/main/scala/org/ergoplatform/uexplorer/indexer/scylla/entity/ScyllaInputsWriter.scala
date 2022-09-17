@@ -4,9 +4,9 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBlockWriter
+import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
 
-trait ScyllaInputsWriter { this: ScyllaBlockWriter =>
+trait ScyllaInputsWriter { this: ScyllaBackend =>
   import Inputs._
 
   def inputsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed] =

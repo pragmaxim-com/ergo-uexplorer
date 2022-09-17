@@ -5,11 +5,11 @@ import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBlockWriter
+import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
 
 import java.nio.ByteBuffer
 
-trait ScyllaHeaderWriter extends LazyLogging { this: ScyllaBlockWriter =>
+trait ScyllaHeaderWriter extends LazyLogging { this: ScyllaBackend =>
   import Headers._
 
   def headerWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed] =

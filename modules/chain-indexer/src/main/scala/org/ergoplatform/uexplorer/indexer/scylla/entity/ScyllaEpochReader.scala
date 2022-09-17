@@ -1,19 +1,14 @@
-package org.ergoplatform.uexplorer.indexer.scylla
+package org.ergoplatform.uexplorer.indexer.scylla.entity
 
-import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement, Row, SimpleStatement}
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
-import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.{Address, BlockId}
 import org.ergoplatform.explorer.db.models.BlockStats
+import org.ergoplatform.explorer.{Address, BlockId}
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.BlockBuilder.BlockInfo
-import org.ergoplatform.uexplorer.indexer.api.EpochService
-import org.ergoplatform.uexplorer.indexer.progress.Epoch
-import org.ergoplatform.uexplorer.indexer.scylla.entity.BlocksInfo
+import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient.BlockInfo
+import org.ergoplatform.uexplorer.indexer.scylla.{ScyllaBackend, ScyllaPersistenceSupport}
 
 import scala.collection.immutable.TreeMap
 import scala.compat.java8.FutureConverters._
@@ -21,12 +16,15 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class ScyllaEpochService(implicit session: CqlSession, s: ActorSystem[Nothing]) extends EpochService with LazyLogging {
-  import ScyllaEpochService._
-  private val blockInfoSelectPreparedStatement = session.prepare(blockInfoSelectStatement)
+trait ScyllaEpochReader extends LazyLogging {
+  this: ScyllaBackend =>
+
+  import ScyllaEpochReader._
+
+  private val blockInfoSelectPreparedStatement = cqlSession.prepare(blockInfoSelectStatement)
 
   def getBlockInfo(headerId: BlockId): Future[BlockInfo] =
-    session
+    cqlSession
       .executeAsync(blockInfoSelectBinder(blockInfoSelectPreparedStatement)(headerId))
       .toScala
       .map(_.one())
@@ -36,7 +34,7 @@ class ScyllaEpochService(implicit session: CqlSession, s: ActorSystem[Nothing]) 
     logger.debug(s"Getting existing epoch indexes from db ")
     Source
       .fromPublisher(
-        session.executeReactive(s"SELECT $last_header_id, $epoch_index FROM ${Const.ScyllaKeyspace}.$node_epochs_table;")
+        cqlSession.executeReactive(s"SELECT $last_header_id, $epoch_index FROM ${Const.ScyllaKeyspace}.$node_epochs_table;")
       )
       .mapAsync(1)(r => getBlockInfo(BlockId.fromStringUnsafe(r.getString(last_header_id))).map(r.getInt(epoch_index) -> _))
       .runWith(Sink.seq)
@@ -48,39 +46,9 @@ class ScyllaEpochService(implicit session: CqlSession, s: ActorSystem[Nothing]) 
           logger.debug(s"Db contains ${indexes.size} epochs $rangeOpt")
       }
   }
-
-  override def persistEpoch(epoch: Epoch): Future[Epoch] =
-    session
-      .prepareAsync(epochInsertStatement)
-      .toScala
-      .map(epochInsertBinder(epoch))
-      .flatMap { stmnt =>
-        session
-          .executeAsync(stmnt)
-          .toScala
-          .map(_ => epoch)
-      }
 }
 
-object ScyllaEpochService {
-
-  protected[scylla] val node_epochs_table = "node_epochs"
-
-  protected[scylla] val epoch_index    = "epoch_index"
-  protected[scylla] val last_header_id = "last_header_id"
-
-  protected[scylla] def epochInsertBinder(epoch: Epoch)(stmt: PreparedStatement): BoundStatement =
-    stmt
-      .bind()
-      .setInt(epoch_index, epoch.index)
-      .setString(last_header_id, epoch.blockIds.last.value.unwrapped)
-
-  protected[scylla] val epochInsertStatement: SimpleStatement =
-    insertInto(Const.ScyllaKeyspace, node_epochs_table)
-      .value(epoch_index, bindMarker(epoch_index))
-      .value(last_header_id, bindMarker(last_header_id))
-      .build()
-      .setIdempotent(true)
+object ScyllaEpochReader extends ScyllaPersistenceSupport {
 
   protected[scylla] val blockInfoSelectStatement: SimpleStatement = {
     import BlocksInfo._

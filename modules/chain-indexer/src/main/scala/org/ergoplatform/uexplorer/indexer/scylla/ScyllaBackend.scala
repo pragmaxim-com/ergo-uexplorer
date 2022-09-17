@@ -10,14 +10,16 @@ import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.api.BlockWriter
+import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.Inserted
 import org.ergoplatform.uexplorer.indexer.scylla.entity._
 
-class ScyllaBlockWriter(implicit
+import scala.concurrent.duration.DurationInt
+
+class ScyllaBackend(implicit
   val cqlSession: CqlSession,
   val system: ActorSystem[Nothing]
-) extends BlockWriter
+) extends Backend
   with LazyLogging
   with ScyllaPersistenceSupport
   with ScyllaHeaderWriter
@@ -28,7 +30,9 @@ class ScyllaBlockWriter(implicit
   with ScyllaTokensWriter
   with ScyllaInputsWriter
   with ScyllaOutputsWriter
-  with ScyllaBlockUpdater {
+  with ScyllaBlockUpdater
+  with ScyllaEpochWriter
+  with ScyllaEpochReader {
 
   protected[scylla] def buildInsertStatement(columns: Seq[String], table: String): SimpleStatement = {
     import QueryBuilder.{bindMarker, insertInto}
@@ -55,4 +59,19 @@ class ScyllaBlockWriter(implicit
       .via(assetsWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
       .via(outputsWriteFlow(parallelism = 1))
       // format: on
+}
+
+object ScyllaBackend {
+
+  import akka.stream.alpakka.cassandra.CassandraSessionSettings
+  import akka.stream.alpakka.cassandra.scaladsl.{CassandraSession, CassandraSessionRegistry}
+  import com.datastax.oss.driver.api.core.CqlSession
+  import scala.concurrent.Await
+
+  def apply()(implicit system: ActorSystem[Nothing]): ScyllaBackend = {
+    val cassandraSession: CassandraSession =
+      CassandraSessionRegistry.get(system).sessionFor(CassandraSessionSettings())
+    implicit val cqlSession: CqlSession = Await.result(cassandraSession.underlying(), 5.seconds)
+    new ScyllaBackend()
+  }
 }

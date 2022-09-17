@@ -3,9 +3,14 @@ package org.ergoplatform.uexplorer.indexer.api
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.Inserted
+import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient.BlockInfo
+import org.ergoplatform.uexplorer.indexer.progress.Epoch
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{Inserted, MaybeNewEpoch}
 
-trait BlockWriter {
+import scala.collection.immutable.TreeMap
+import scala.concurrent.Future
+
+trait Backend {
   def blockInfoWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
 
   def headerWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
@@ -22,8 +27,11 @@ trait BlockWriter {
 
   def inputsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
 
-  def blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed]
-
   def blockUpdaterFlow(parallelism: Int): Flow[Inserted, FlatBlock, NotUsed]
 
+  def blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed]
+
+  def epochWriteFlow: Flow[MaybeNewEpoch, Either[Int, Epoch], NotUsed]
+
+  def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]]
 }

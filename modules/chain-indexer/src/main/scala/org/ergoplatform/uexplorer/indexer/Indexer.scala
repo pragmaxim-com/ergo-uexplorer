@@ -6,30 +6,25 @@ import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.ActorAttributes.supervisionStrategy
 import akka.stream.Attributes
-import akka.stream.alpakka.cassandra.CassandraSessionSettings
-import akka.stream.alpakka.cassandra.scaladsl.{CassandraSession, CassandraSessionRegistry}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
-import com.datastax.oss.driver.api.core.CqlSession
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.settings.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.api.{BlockWriter, EpochService}
-import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ScyllaBackend, UnknownBackend}
+import org.ergoplatform.uexplorer.indexer.api.Backend
+import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ScyllaDb, UnknownDb}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, MetadataHttpClient}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor}
-import org.ergoplatform.uexplorer.indexer.scylla.entity.ScyllaBlockUpdater
-import org.ergoplatform.uexplorer.indexer.scylla.{ScyllaBlockWriter, ScyllaEpochService}
+import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
 import sttp.client3.{HttpClientFutureBackend, SttpBackend, SttpBackendOptions}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
 import scala.util.Failure
 
 class Indexer(
-  blockWriter: BlockWriter,
-  epochService: EpochService,
+  backend: Backend,
   metaHttpClient: MetadataHttpClient[_],
   blockHttpClient: BlockHttpClient,
   progressMonitorRef: ActorRef[ProgressMonitorRequest]
@@ -43,13 +38,20 @@ class Indexer(
     Flow[Int]
       .via(blockHttpClient.blockCachingFlow(progressMonitorRef))
       .async
-      .via(blockWriter.blockWriteFlow)
-      .via(epochService.writeEpochFlow(progressMonitorRef))
+      .via(backend.blockWriteFlow)
+      .filter(b => Epoch.heightAtFlushPoint(b.header.height))
+      .mapAsync(1)(b => progressMonitorRef.ask(ref => BlockPersisted(b, ref)))
+      .via(backend.epochWriteFlow)
       .withAttributes(supervisionStrategy(Resiliency.decider))
+
+  def updateProgressFromDB(progressMonitorRef: ActorRef[ProgressMonitorRequest]): Future[ProgressState] =
+    backend.getLastBlockInfoByEpochIndex.flatMap { lastBlockInfoByEpochIndex =>
+      progressMonitorRef.ask(ref => UpdateEpochIndexes(lastBlockInfoByEpochIndex, ref))
+    }
 
   def sync: Future[ProgressState] = {
     val bestBlockHeightF = metaHttpClient.getBestBlockHeight
-    val progressF        = epochService.updateProgressFromDB(progressMonitorRef)
+    val progressF        = updateProgressFromDB(progressMonitorRef)
     bestBlockHeightF.flatMap { bestBlockHeight =>
       progressF.flatMap { progress =>
         val epochIndexesToLoad = progress.epochIndexesToDownload(bestBlockHeight)
@@ -81,7 +83,7 @@ class Indexer(
           heightsToPollBlocksFor
             .flatMap { heights =>
               if (heights.nonEmpty) {
-                logger.info(s"Going to index ${heights.size} blocks starting at height ${heights.head}")
+                logger.info(s"Going to index ${heights.size} block(s) starting at height ${heights.head}")
                 Source(heights).via(indexingFlow).runWith(Sink.seq[Either[Int, Epoch]])
               } else {
                 Future.successful(Seq.empty[Either[Int, Epoch]])
@@ -89,7 +91,7 @@ class Indexer(
             }
         }
         .withAttributes(Attributes.inputBuffer(0, 1))
-    }.run().flatMap(_ => epochService.updateProgressFromDB(progressMonitorRef))
+    }.run().flatMap(_ => updateProgressFromDB(progressMonitorRef))
 
 }
 
@@ -101,22 +103,18 @@ object Indexer extends LazyLogging {
     implicit val futureSttpBackend: SttpBackend[Future, _] =
       HttpClientFutureBackend(SttpBackendOptions.connectionTimeout(5.seconds))
 
-    val metadataClient = MetadataHttpClient(conf)
-    val pollingClient  = BlockHttpClient(metadataClient)
+    val metadataClient  = MetadataHttpClient(conf)
+    val blockHttpClient = BlockHttpClient(metadataClient)
     val indexer =
       conf.backendType match {
-        case ScyllaBackend =>
-          implicit val cassandraSession: CassandraSession =
-            CassandraSessionRegistry.get(system).sessionFor(CassandraSessionSettings())
-          implicit val cqlSession: CqlSession = Await.result(cassandraSession.underlying(), 5.seconds)
+        case ScyllaDb =>
           new Indexer(
-            new ScyllaBlockWriter,
-            new ScyllaEpochService(),
+            ScyllaBackend(),
             metadataClient,
-            pollingClient,
+            blockHttpClient,
             ctx.spawn(new ProgressMonitor().initialBehavior, "ProgressMonitor")
           )
-        case UnknownBackend =>
+        case UnknownDb =>
           throw new IllegalArgumentException(s"Unknown backend not supported yet.")
       }
 
@@ -126,7 +124,7 @@ object Indexer extends LazyLogging {
           s"Initial sync failed, there is no restart as DB could be corrupted if you find SIGKILL in scylla logs due to OOM error",
           ex
         )
-        metadataClient.close().flatMap(_ => pollingClient.close()).andThen { case _ => system.terminate() }
+        metadataClient.close().flatMap(_ => blockHttpClient.close()).andThen { case _ => system.terminate() }
       }
       .flatMap { _ =>
         logger.info(s"Initiating polling...")
