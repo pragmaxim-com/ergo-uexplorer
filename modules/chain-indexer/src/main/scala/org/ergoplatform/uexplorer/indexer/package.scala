@@ -11,13 +11,14 @@ package object indexer {
   implicit def uriConfigReader(implicit cr: ConfigReader[String]): ConfigReader[Uri] =
     cr.emap(addr => Uri.parse(addr).leftMap(r => CannotConvert(addr, "Uri", r)))
 
-  class StopException(msg: String, cause: Throwable) extends RuntimeException(msg, cause)
+  class UnexpectedStateError(msg: String, cause: Option[Throwable] = None) extends RuntimeException(msg, cause.orNull)
 
   object Const {
     val ScyllaKeyspace    = "uexplorer"
     val PreGenesisHeight  = 0
     val EpochLength       = 1024
-    val FlushHeight       = EpochLength / 2
+    val BufferSize        = 32
+    val FlushHeight       = 32
     val AllowedHeightDiff = 10
     val MinNodeHeight     = EpochLength * 800
 

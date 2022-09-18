@@ -35,7 +35,7 @@ dist
 │   ├── chain-indexer.bat
 │   ├── scylla.cql         # db schema sourced from scylla.sh
 │   ├── scylla.yaml        # for overriding default scylla server-side settings
-│   └── scylla-start.sh    # starts scylla in a docker container
+│   ├── scylla-start.sh    # starts scylla in a docker container
 │   └── scylla-stop.sh     # flushes scylla memtables to disk and then removes container
 ├── conf
 │   ├── application.ini    # memory settings (default well tested)

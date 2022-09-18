@@ -47,7 +47,7 @@ object Resiliency extends LazyLogging {
   ).withMaxRestarts(300, 60.minutes) // limits the amount of restarts to 20 within 5 minutes
 
   val decider: Supervision.Decider = {
-    case ex: StopException =>
+    case ex: UnexpectedStateError =>
       logger.error("Stopping stream due to", ex)
       Supervision.stop
     case NonFatal(ex) =>

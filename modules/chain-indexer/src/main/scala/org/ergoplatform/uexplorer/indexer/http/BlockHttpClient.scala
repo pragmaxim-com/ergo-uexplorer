@@ -16,7 +16,7 @@ import org.ergoplatform.explorer.indexer.models.{FlatBlock, SlotData}
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
-import org.ergoplatform.uexplorer.indexer.{ResiliencySupport, StopException}
+import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport, UnexpectedStateError}
 import retry.Policy
 import sttp.client3._
 import sttp.client3.circe._
@@ -45,9 +45,9 @@ class BlockHttpClient(implicit s: ActorSystem[Nothing], val sttpB: SttpBackend[F
           case Right(blockIds) if blockIds.nonEmpty =>
             Future.successful(blockIds.head)
           case Right(_) =>
-            Future.failed(new StopException(s"There is no block at height $height", null))
+            Future.failed(new Exception(s"There is no block at height $height"))
           case Left(error) =>
-            Future.failed(new StopException(s"Getting block id at height $height failed", error))
+            Future.failed(new Exception(s"Getting block id at height $height failed", error))
         }
     }(retry.Success.always, global)
 
@@ -83,16 +83,16 @@ class BlockHttpClient(implicit s: ActorSystem[Nothing], val sttpB: SttpBackend[F
   def blockCachingFlow(progressMonitor: ActorRef[ProgressMonitorRequest]): Flow[Int, Inserted, NotUsed] =
     Flow[Int]
       .mapAsync(1)(getBlockIdForHeight)
-      .buffer(64, OverflowStrategy.backpressure)
+      .buffer(Const.BufferSize * 2, OverflowStrategy.backpressure)
       .mapAsync(1)(getBlockForId)
-      .buffer(32, OverflowStrategy.backpressure)
+      .buffer(Const.BufferSize, OverflowStrategy.backpressure)
       .mapAsync(1) { block =>
         getBestBlockOrBranch(block, progressMonitor, List.empty)
           .flatMap {
             case bestBlock :: Nil =>
-              progressMonitor.ask(ref => InsertBestBlock(bestBlock, ref))
+              progressMonitor.askWithStatus(ref => InsertBestBlock(bestBlock, ref))
             case winningFork =>
-              progressMonitor.ask(ref => InsertWinningFork(winningFork, ref))
+              progressMonitor.askWithStatus(ref => InsertWinningFork(winningFork, ref))
           }
       }
 
@@ -131,16 +131,11 @@ object BlockHttpClient {
 
   def buildBlock(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
     protocol: ProtocolSettings
-  ): FlatBlock = {
+  ): Try[FlatBlock] = {
     implicit val ctx = Context.const(protocol)(Applicative[Try])
     SlotData(apiBlock, prevBlockInfo)
       .intoF[Try, FlatBlock]
-      .map(updateMainChain(_, mainChain = true)) match {
-      case Success(b) =>
-        b
-      case Failure(ex) =>
-        throw new StopException(s"Block $apiBlock with prevBlockInfo $prevBlockInfo is invalid", ex)
-    }
+      .map(updateMainChain(_, mainChain = true))
   }
 
   implicit class FlatBlockPimp(underlying: FlatBlock) {

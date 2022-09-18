@@ -50,13 +50,13 @@ class ScyllaBackend(implicit
     Flow[Inserted]
       // format: off
       .via(blockUpdaterFlow(parallelism = 1))
-      .via(headerWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
-      .via(blockInfoWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
-      .via(transactionsWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
-      .via(registersWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
-      .via(tokensWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
-      .via(inputsWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
-      .via(assetsWriteFlow(parallelism = 1)).buffer(32, OverflowStrategy.backpressure)
+      .via(headerWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(blockInfoWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(transactionsWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(registersWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(tokensWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(inputsWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(assetsWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
       .via(outputsWriteFlow(parallelism = 1))
       // format: on
 }
