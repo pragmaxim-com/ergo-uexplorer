@@ -36,4 +36,4 @@ object ChainIndexerConf {
 
 sealed trait BackendType
 case object ScyllaDb extends BackendType
-case object UnknownDb extends BackendType
+case object InMemoryDb extends BackendType

@@ -15,7 +15,6 @@ package object indexer {
 
   object Const {
     val ScyllaKeyspace    = "uexplorer"
-    val PreGenesisHeight  = 0
     val EpochLength       = 1024
     val BufferSize        = 32
     val FlushHeight       = 32

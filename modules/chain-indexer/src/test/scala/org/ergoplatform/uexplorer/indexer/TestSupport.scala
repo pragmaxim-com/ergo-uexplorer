@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.indexer
 
-import cats.instances.try_._
 import eu.timepit.refined._
 import eu.timepit.refined.string.HexStringSpec
 import org.ergoplatform.explorer._
@@ -9,9 +8,10 @@ import scorex.crypto.hash.Blake2b256
 import scorex.util.Random
 import scorex.util.encode.Base16
 
+import scala.io
 import scala.util.Try
 
-object commonGenerators {
+trait TestSupport {
 
   val MainNetMinerPk: HexString = HexString
     .fromString[Try](
@@ -31,4 +31,15 @@ object commonGenerators {
 
   def idGen: Gen[BlockId] =
     hexStringGen.map(x => BlockId.fromString[Try](x).get)
+
+  def getPeerInfo(fileName: String): String =
+    io.Source
+      .fromInputStream(Thread.currentThread().getContextClassLoader.getResourceAsStream(s"info/$fileName"))
+      .mkString
+
+  def getConnectedPeers: String =
+    io.Source
+      .fromInputStream(Thread.currentThread().getContextClassLoader.getResourceAsStream("peers/connected.json"))
+      .mkString
+
 }

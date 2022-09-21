@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.http
 
 import akka.actor.typed._
-import akka.actor.typed.scaladsl.AskPattern._
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.Utils
@@ -17,8 +16,9 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util._
 
-class SttpBackendFallbackProxy[P](nodePoolRef: ActorRef[NodePoolRequest])(implicit
+class SttpBackendFallbackProxy[P]()(implicit
   c: ActorSystem[Nothing],
+  nodePoolRef: ActorRef[NodePoolRequest],
   underlying: SttpBackend[Future, P]
 ) extends DelegateSttpBackend[Future, P](underlying) {
   import SttpBackendFallbackProxy.fallbackQuery
@@ -35,17 +35,14 @@ class SttpBackendFallbackProxy[P](nodePoolRef: ActorRef[NodePoolRequest])(implic
     def proxy(peer: Peer): Future[Response[T]] =
       underlying.send(swapUri(origRequest, peer.uri))
 
-    nodePoolRef
-      .ask[AvailablePeers](GetAvailablePeers)
+    NodePool.getAvailablePeers
       .flatMap {
         case AvailablePeers(peers) if peers.isEmpty =>
           Future.failed(new Exception(s"Run out of peers to make http call to, master should be always available", null))
         case AvailablePeers(peers) =>
           fallbackQuery(peers)(proxy).flatMap {
             case (invalidPeers, blockTry) if invalidPeers.nonEmpty =>
-              nodePoolRef
-                .ask(ref => InvalidatePeers(invalidPeers, ref))
-                .flatMap(_ => Future.fromTry(blockTry))
+              NodePool.invalidatePeers(invalidPeers).flatMap(_ => Future.fromTry(blockTry))
             case (_, blockTry) =>
               Future.fromTry(blockTry)
           }
@@ -60,7 +57,7 @@ object SttpBackendFallbackProxy extends LazyLogging {
   def apply[P](nodePoolRef: ActorRef[NodePoolRequest], httpClient: MetadataHttpClient[P])(implicit
     s: ActorSystem[Nothing]
   ): SttpBackendFallbackProxy[P] =
-    new SttpBackendFallbackProxy(nodePoolRef)(s, httpClient.underlyingB)
+    new SttpBackendFallbackProxy()(s, nodePoolRef, httpClient.underlyingB)
 
   def swapUri[T, R](reqWithDummyUri: Request[T, R], peerUri: Uri): Request[T, R] =
     reqWithDummyUri.get(Utils.copyUri(reqWithDummyUri.uri, peerUri))

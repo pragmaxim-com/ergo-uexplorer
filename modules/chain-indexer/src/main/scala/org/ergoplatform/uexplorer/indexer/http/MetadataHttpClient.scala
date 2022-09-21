@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.http
 
-import akka.stream.Materializer
+import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import io.circe.Decoder
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
@@ -15,18 +15,16 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
-class MetadataHttpClient[P](implicit
+class MetadataHttpClient[P](minNodeHeight: Int = Const.MinNodeHeight)(implicit
   remoteUri: RemoteNodeUriMagnet,
   localUri: LocalNodeUriMagnet,
-  mat: Materializer,
+  system: ActorSystem[Nothing],
   val underlyingB: SttpBackend[Future, P]
 ) extends ResiliencySupport {
 
   private val retryPolicy: Policy = retry.Backoff(3, 1.second)
 
-  def getBestBlockHeight: Future[Int] = getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
-
-  def getPeerInfo[T <: Peer: Decoder: UriMagnet](minHeight: Int = Const.MinNodeHeight): Future[Option[T]] =
+  def getPeerInfo[T <: Peer: Decoder: UriMagnet](minHeight: Int = minNodeHeight): Future[Option[T]] =
     basicRequest
       .get(implicitly[UriMagnet[T]].uri.addPath("info"))
       .response(asJson[T])
@@ -99,7 +97,7 @@ object MetadataHttpClient {
 
   def apply[P](
     conf: ChainIndexerConf
-  )(implicit underlyingB: SttpBackend[Future, P], mat: Materializer): MetadataHttpClient[P] = {
+  )(implicit underlyingB: SttpBackend[Future, P], system: ActorSystem[Nothing]): MetadataHttpClient[P] = {
     implicit val localNodeUriMagnet: LocalNodeUriMagnet   = conf.localUriMagnet
     implicit val remoteNodeUriMagnet: RemoteNodeUriMagnet = conf.remoteUriMagnet
     new MetadataHttpClient[P]()

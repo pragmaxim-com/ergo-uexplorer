@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.indexer.http
 
-import org.ergoplatform.uexplorer.indexer.http.NodePool.NodePoolState
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import sttp.client3._

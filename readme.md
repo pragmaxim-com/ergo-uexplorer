@@ -6,7 +6,7 @@ Supplementary, lightweight Ergo explorer with ScyllaDB backend :
   - limited querying possibilities (in comparison to RDBMS)
   - shares the same model and schema as [Ergo explorer](https://github.com/ergoplatform/explorer-backend)
   - resilient
-    - it primarily uses local node (mandatory for initial sync) with a fallback on peer network
+    - it primarily uses local node (good for initial sync) with a fallback to peer network
 
 ## Chain Indexer
 

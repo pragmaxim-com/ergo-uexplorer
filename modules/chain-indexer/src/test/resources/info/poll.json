@@ -11,6 +11,7 @@
   "appVersion" : "4.0.42",
   "stateRoot" : "1436ed51bd843af12e5bef6c0afffed489386a5055890ab1e9b1f8bf9288a25919",
   "genesisBlockId" : "b0244dfc267baca974a4caee06120321562784303a8a688976ae56170e4d175b",
+  "restApiUrl" : "http://213.239.193.208:9053",
   "previousFullHeaderId" : "a941715b735daf4d8fdd4c198cf40e916b783216c1fa1ece8fc2354c105750b0",
   "fullHeight" : 4200,
   "headersHeight" : 4200,

@@ -13,9 +13,6 @@ target
 *.log.gz
 *.tmp
 
-# binary files
-*.gz
-
 # local build
 project/project/
 

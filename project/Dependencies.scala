@@ -22,7 +22,7 @@ object Dependencies {
   lazy val logback             = "ch.qos.logback"              % "logback-classic"           % "1.2.11"
   lazy val refined             = "eu.timepit"                 %% "refined"                   % "0.9.29"
   lazy val derevo              = "org.manatki"                %% "derevo-circe"              % "0.11.6"
-  lazy val explorerGrabber     = "org.ergoplatform"           %% "chain-grabber"             % "9.16.5"
+  lazy val explorerGrabber     = "org.ergoplatform"           %% "chain-grabber"             % "9.17.3"
   lazy val pureConfig          = "com.github.pureconfig"      %% "pureconfig"                % "0.17.1"
   lazy val diffx               = "com.softwaremill.diffx"     %% "diffx-scalatest-should"    % "0.7.1"      % Test
 

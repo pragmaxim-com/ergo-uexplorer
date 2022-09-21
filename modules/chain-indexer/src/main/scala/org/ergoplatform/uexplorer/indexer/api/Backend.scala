@@ -2,36 +2,61 @@ package org.ergoplatform.uexplorer.indexer.api
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
+import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient.BlockInfo
-import org.ergoplatform.uexplorer.indexer.progress.Epoch
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{Inserted, MaybeNewEpoch}
+import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient.{BlockInfo, FlatBlockPimp}
+import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor}
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 
+import java.util.concurrent.ConcurrentHashMap
+import scala.collection.JavaConverters._
 import scala.collection.immutable.TreeMap
 import scala.concurrent.Future
 
 trait Backend {
-  def blockInfoWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
-
-  def headerWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
-
-  def transactionsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
-
-  def assetsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
-
-  def registersWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
-
-  def tokensWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
-
-  def outputsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
-
-  def inputsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed]
-
-  def blockUpdaterFlow(parallelism: Int): Flow[Inserted, FlatBlock, NotUsed]
 
   def blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed]
 
   def epochWriteFlow: Flow[MaybeNewEpoch, Either[Int, Epoch], NotUsed]
 
   def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]]
+}
+
+class InMemoryBackend extends Backend {
+
+  private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BlockInfo]()
+  private val blocksById                = new ConcurrentHashMap[BlockId, BlockInfo]()
+  private val blocksByHeight            = new ConcurrentHashMap[Int, BlockInfo]()
+
+  override def blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed] =
+    Flow[Inserted]
+      .mapConcat {
+        case BestBlockInserted(flatBlock) =>
+          val blockInfo = flatBlock.buildInfo
+          blocksByHeight.put(flatBlock.header.height, blockInfo)
+          blocksById.put(flatBlock.header.id, blockInfo)
+          List(flatBlock)
+        case ForkInserted(winningFork, _) =>
+          winningFork.foreach { flatBlock =>
+            val blockInfo = flatBlock.buildInfo
+            blocksByHeight.put(flatBlock.header.height, blockInfo)
+            blocksById.put(flatBlock.header.id, blockInfo)
+          }
+          winningFork
+      }
+
+  override def epochWriteFlow: Flow[ProgressMonitor.MaybeNewEpoch, Either[Int, Epoch], NotUsed] =
+    Flow[MaybeNewEpoch]
+      .map {
+        case NewEpochCreated(epoch) =>
+          lastBlockInfoByEpochIndex.put(epoch.index, blocksById.get(epoch.blockIds.last))
+          Right(epoch)
+        case NewEpochFailed(candidate) =>
+          Left(candidate.epochIndex)
+        case NewEpochExisted(epochIndex) =>
+          Left(epochIndex)
+      }
+
+  override def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]] =
+    Future.successful(TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*))
 }

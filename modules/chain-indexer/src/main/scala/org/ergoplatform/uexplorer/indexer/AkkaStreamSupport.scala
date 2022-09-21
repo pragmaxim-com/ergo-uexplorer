@@ -4,7 +4,20 @@ import akka.NotUsed
 import akka.stream.scaladsl.{Balance, Flow, GraphDSL, Merge, RestartSource, Source}
 import akka.stream.{ActorAttributes, Attributes, FlowShape}
 
+import scala.concurrent.Future
+import scala.concurrent.duration._
+
 trait AkkaStreamSupport {
+
+  def schedule[T](
+    interval: FiniteDuration
+  )(run: => Future[T]): Source[T, NotUsed] =
+    restartSource {
+      Source
+        .tick(0.seconds, interval, ())
+        .mapAsync(1)(_ => run)
+        .withAttributes(Attributes.inputBuffer(0, 1))
+    }
 
   def restartSource[Out, Mat](source: Source[Out, Mat]): Source[Out, NotUsed] =
     RestartSource

@@ -1,12 +1,11 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
 import org.ergoplatform.explorer.{BlockId, HexString}
-import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
-import org.ergoplatform.uexplorer.indexer.commonGenerators._
+import org.ergoplatform.uexplorer.indexer.{TestSupport, UnexpectedStateError}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
-class EpochSpec extends AnyFreeSpec with Matchers {
+class EpochSpec extends AnyFreeSpec with TestSupport with Matchers {
 
   val preGenesisBlockId = BlockId(
     HexString.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")

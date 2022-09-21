@@ -1,8 +1,7 @@
 package org.ergoplatform.uexplorer.indexer.http
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.ActorSystem
-import org.ergoplatform.uexplorer.indexer.http.NodePool.{GetAvailablePeers, NodePoolState}
+import akka.actor.typed.{ActorRef, ActorSystem}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -11,12 +10,9 @@ import sttp.capabilities
 import sttp.client3._
 import sttp.client3.testing.SttpBackendStub
 import sttp.model.StatusCode
-import akka.actor.typed.scaladsl.AskPattern._
-import akka.util.Timeout
 
 import scala.collection.immutable.TreeSet
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 import scala.util.Success
 
 class SttpBackendFallbackProxySpec extends AsyncFreeSpec with Matchers with BeforeAndAfterAll with ScalaFutures {
@@ -32,7 +28,6 @@ class SttpBackendFallbackProxySpec extends AsyncFreeSpec with Matchers with Befo
 
   private val testKit                      = ActorTestKit()
   implicit private val sys: ActorSystem[_] = testKit.internalSystem
-  implicit val timeout: Timeout            = 3.seconds
 
   override def afterAll(): Unit = {
     super.afterAll()
@@ -71,9 +66,9 @@ class SttpBackendFallbackProxySpec extends AsyncFreeSpec with Matchers with Befo
       .whenRequestMatches(_.uri == proxyUri)
       .thenRespondServerError()
 
-    val nodePoolRef =
+    implicit val nodePoolRef: ActorRef[NodePool.NodePoolRequest] =
       testKit.spawn(NodePool.initialized(NodePoolState(TreeSet(localNode, remoteNode, remotePeer), TreeSet.empty)))
-    val fallbackProxyBackend = new SttpBackendFallbackProxy[capabilities.WebSockets](nodePoolRef)
+    val fallbackProxyBackend = new SttpBackendFallbackProxy[capabilities.WebSockets]
 
     fallbackProxyBackend
       .send(basicRequest.get(proxyUri).responseGetRight)
@@ -82,7 +77,7 @@ class SttpBackendFallbackProxySpec extends AsyncFreeSpec with Matchers with Befo
         resp shouldBe "Remote peer available"
       }
       .flatMap { _ =>
-        nodePoolRef.ask(ref => GetAvailablePeers(ref)).map { availablePeers =>
+        NodePool.getAvailablePeers.map { availablePeers =>
           availablePeers.peerAddresses shouldBe List(remoteNode, remotePeer)
         }
       }

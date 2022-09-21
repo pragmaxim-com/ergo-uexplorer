@@ -2,11 +2,9 @@ package org.ergoplatform.uexplorer.indexer.http
 
 import akka.NotUsed
 import akka.actor.typed.scaladsl.ActorContext
-import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
-import akka.util.Timeout
 import cats.Applicative
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.BuildFrom.syntax._
@@ -15,8 +13,10 @@ import org.ergoplatform.explorer.indexer.extractors._
 import org.ergoplatform.explorer.indexer.models.{FlatBlock, SlotData}
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
-import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport, UnexpectedStateError}
+import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport}
 import retry.Policy
 import sttp.client3._
 import sttp.client3.circe._
@@ -25,13 +25,18 @@ import tofu.Context
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
-class BlockHttpClient(implicit s: ActorSystem[Nothing], val sttpB: SttpBackend[Future, _]) extends ResiliencySupport {
+class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
+  s: ActorSystem[Nothing],
+  progressMonitor: ActorRef[MonitorRequest],
+  val sttpB: SttpBackend[Future, _]
+) extends ResiliencySupport {
 
-  private val proxyUri                  = uri"http://proxy"
-  private val retryPolicy: Policy       = retry.Backoff(3, 1.second)
-  implicit private val timeout: Timeout = 3.seconds
+  private val proxyUri            = uri"http://proxy"
+  private val retryPolicy: Policy = retry.Backoff(3, 1.second)
+
+  def getBestBlockHeight: Future[Int] = metadataHttpClient.getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
 
   def getBlockIdForHeight(height: Int): Future[BlockId] =
     retryPolicy.apply { () =>
@@ -64,11 +69,10 @@ class BlockHttpClient(implicit s: ActorSystem[Nothing], val sttpB: SttpBackend[F
 
   def getBestBlockOrBranch(
     block: ApiFullBlock,
-    progressMonitor: ActorRef[ProgressMonitorRequest],
     acc: List[ApiFullBlock]
   ): Future[List[ApiFullBlock]] =
-    progressMonitor
-      .ask(ref => GetBlock(block.header.parentId, ref))
+    ProgressMonitor
+      .getBlock(block.header.parentId)
       .flatMap {
         case CachedBlock(Some(_)) =>
           Future.successful(block :: acc)
@@ -77,22 +81,22 @@ class BlockHttpClient(implicit s: ActorSystem[Nothing], val sttpB: SttpBackend[F
         case CachedBlock(None) =>
           logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
           getBlockForId(block.header.parentId)
-            .flatMap(b => getBestBlockOrBranch(b, progressMonitor, block :: acc))
+            .flatMap(b => getBestBlockOrBranch(b, block :: acc))
       }
 
-  def blockCachingFlow(progressMonitor: ActorRef[ProgressMonitorRequest]): Flow[Int, Inserted, NotUsed] =
+  def blockCachingFlow: Flow[Int, Inserted, NotUsed] =
     Flow[Int]
       .mapAsync(1)(getBlockIdForHeight)
       .buffer(Const.BufferSize * 2, OverflowStrategy.backpressure)
       .mapAsync(1)(getBlockForId)
       .buffer(Const.BufferSize, OverflowStrategy.backpressure)
       .mapAsync(1) { block =>
-        getBestBlockOrBranch(block, progressMonitor, List.empty)
+        getBestBlockOrBranch(block, List.empty)
           .flatMap {
             case bestBlock :: Nil =>
-              progressMonitor.askWithStatus(ref => InsertBestBlock(bestBlock, ref))
+              ProgressMonitor.insertBestBlock(bestBlock)
             case winningFork =>
-              progressMonitor.askWithStatus(ref => InsertWinningFork(winningFork, ref))
+              ProgressMonitor.insertWinningFork(winningFork)
           }
       }
 
@@ -103,11 +107,14 @@ class BlockHttpClient(implicit s: ActorSystem[Nothing], val sttpB: SttpBackend[F
 
 object BlockHttpClient {
 
-  def apply(metadataClient: MetadataHttpClient[_])(implicit ctx: ActorContext[_]): BlockHttpClient = {
-    val nodePoolRef                                   = ctx.spawn(NodePool.behavior(metadataClient), "NodePool")
-    implicit val sys: ActorSystem[Nothing]            = ctx.system
-    implicit val backend: SttpBackendFallbackProxy[_] = SttpBackendFallbackProxy(nodePoolRef, metadataClient)
-    new BlockHttpClient()
+  def apply(
+    conf: ChainIndexerConf
+  )(implicit ctx: ActorContext[_], progressMonitor: ActorRef[MonitorRequest]): BlockHttpClient = {
+    val futureSttpBackend: SttpBackend[Future, _] = HttpClientFutureBackend()
+    val metadataClient                            = MetadataHttpClient(conf)(futureSttpBackend, ctx.system)
+    val nodePoolRef                               = ctx.spawn(NodePool.behavior(metadataClient), "NodePool")
+    val backend: SttpBackendFallbackProxy[_]      = SttpBackendFallbackProxy(nodePoolRef, metadataClient)(ctx.system)
+    new BlockHttpClient(metadataClient)(ctx.system, progressMonitor, backend)
   }
 
   case class BlockInfo(parentId: BlockId, stats: BlockStats)

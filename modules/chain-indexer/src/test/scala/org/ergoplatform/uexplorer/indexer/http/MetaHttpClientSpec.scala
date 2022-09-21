@@ -2,6 +2,7 @@ package org.ergoplatform.uexplorer.indexer.http
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.ActorSystem
+import org.ergoplatform.uexplorer.indexer.{Rest, TestSupport}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -11,9 +12,8 @@ import sttp.client3._
 import sttp.model.StatusCode
 
 import scala.concurrent.Future
-import scala.io.Source
 
-class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfterAll with ScalaFutures {
+class MetaHttpClientSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
 
   implicit private val sys: ActorSystem[_] = ActorTestKit().internalSystem
 
@@ -24,33 +24,14 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
   private val appVersion = "4.0.42"
   private val stateType  = "utxo"
 
-  private val withRestApiAndFullHeight = "with-rest-api-and-full-height.json"
-  private val woRestApiAndFullHeight   = "wo-rest-api-and-full-height.json"
-  private val woRestApiAndWoFullHeight = "wo-rest-api-and-wo-full-height.json"
-
-  override def afterAll(): Unit = {
-    super.afterAll()
-    sys.terminate()
-  }
-
-  private def getPeerInfo(fileName: String): String =
-    Source
-      .fromInputStream(Thread.currentThread().getContextClassLoader.getResourceAsStream(s"info/$fileName"))
-      .mkString
-
-  private def getConnectedPeers: String =
-    Source
-      .fromInputStream(Thread.currentThread().getContextClassLoader.getResourceAsStream("peers/connected.json"))
-      .mkString
-
-  withRestApiAndFullHeight in {
+  Rest.info.sync in {
     implicit val testingBackend: SttpBackendStub[Future, _] = SttpBackendStub.asynchronousFuture.whenAnyRequest
       .thenRespondCyclicResponses(
-        Response.ok[String](getPeerInfo(withRestApiAndFullHeight)),
-        Response.ok[String](getPeerInfo(withRestApiAndFullHeight)),
-        Response.ok[String](getPeerInfo(withRestApiAndFullHeight))
+        Response.ok[String](getPeerInfo(Rest.info.sync)),
+        Response.ok[String](getPeerInfo(Rest.info.sync)),
+        Response.ok[String](getPeerInfo(Rest.info.sync))
       )
-    val client = new MetadataHttpClient()
+    val client = new MetadataHttpClient(Rest.info.minNodeHeight)
     client.getPeerInfo[LocalNode]().map { node =>
       node shouldBe Option(LocalNode(localNodeUriMagnet.uri, appVersion, stateType, 839249))
     }
@@ -58,17 +39,17 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
       node shouldBe Option(RemoteNode(remoteNodeUriMagnet.uri, appVersion, stateType, 839249))
     }
     client.getPeerInfo[RemotePeer]().map { node =>
-      node shouldBe Option(RemotePeer(remotePeerUriMagnet.uri, appVersion, stateType, 839249))
+      node shouldBe Option(RemotePeer(remotePeerUriMagnet.uri, appVersion, stateType, 4150))
     }
   }
-  woRestApiAndFullHeight in {
+  Rest.info.woRestApiAndFullHeight in {
     implicit val testingBackend: SttpBackendStub[Future, _] = SttpBackendStub.asynchronousFuture.whenAnyRequest
       .thenRespondCyclicResponses(
-        Response.ok[String](getPeerInfo(woRestApiAndFullHeight)),
-        Response.ok[String](getPeerInfo(woRestApiAndFullHeight)),
-        Response.ok[String](getPeerInfo(woRestApiAndFullHeight))
+        Response.ok[String](getPeerInfo(Rest.info.woRestApiAndFullHeight)),
+        Response.ok[String](getPeerInfo(Rest.info.woRestApiAndFullHeight)),
+        Response.ok[String](getPeerInfo(Rest.info.woRestApiAndFullHeight))
       )
-    val client = new MetadataHttpClient()
+    val client = new MetadataHttpClient(Rest.info.minNodeHeight)
     client.getPeerInfo[LocalNode]().map { node =>
       node shouldBe Option(LocalNode(localNodeUriMagnet.uri, appVersion, stateType, 839249))
     }
@@ -76,17 +57,17 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
       node shouldBe Option(RemoteNode(remoteNodeUriMagnet.uri, appVersion, stateType, 839249))
     }
     client.getPeerInfo[RemotePeer]().map { node =>
-      node shouldBe Option(RemotePeer(remotePeerUriMagnet.uri, appVersion, stateType, 839249))
+      node shouldBe Option(RemotePeer(remotePeerUriMagnet.uri, appVersion, stateType, 4200))
     }
   }
-  woRestApiAndWoFullHeight in {
+  Rest.info.woRestApiAndWoFullHeight in {
     implicit val testingBackend: SttpBackendStub[Future, _] = SttpBackendStub.asynchronousFuture.whenAnyRequest
       .thenRespondCyclicResponses(
-        Response.ok[String](getPeerInfo(woRestApiAndWoFullHeight)),
-        Response.ok[String](getPeerInfo(woRestApiAndWoFullHeight)),
-        Response.ok[String](getPeerInfo(woRestApiAndWoFullHeight))
+        Response.ok[String](getPeerInfo(Rest.info.woRestApiAndWoFullHeight)),
+        Response.ok[String](getPeerInfo(Rest.info.woRestApiAndWoFullHeight)),
+        Response.ok[String](getPeerInfo(Rest.info.woRestApiAndWoFullHeight))
       )
-    val client = new MetadataHttpClient()
+    val client = new MetadataHttpClient(Rest.info.minNodeHeight)
     client.getPeerInfo[LocalNode]().map { node =>
       node shouldBe None
     }
@@ -103,7 +84,7 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
       .thenRespondCyclicResponses(
         Response.ok[String](getConnectedPeers)
       )
-    val client = new MetadataHttpClient()
+    val client = new MetadataHttpClient(Rest.info.minNodeHeight)
 
     client.getConnectedPeers(LocalNode(localNodeUriMagnet.uri, appVersion, stateType, 839249)).map { connectedPeers =>
       connectedPeers.collect { case ConnectedPeer(Some(restApiUrl)) => restApiUrl } shouldBe Set(
@@ -117,7 +98,7 @@ class MetaHttpClientSpec extends AsyncFreeSpec with Matchers with BeforeAndAfter
       .thenRespondCyclicResponses(
         Response("error", StatusCode.InternalServerError, "Something went wrong")
       )
-    val client = new MetadataHttpClient()
+    val client = new MetadataHttpClient(Rest.info.minNodeHeight)
 
     client.getPeerInfo[RemotePeer]().futureValue shouldBe None
   }
