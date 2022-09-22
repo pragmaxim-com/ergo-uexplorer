@@ -1,6 +1,6 @@
 # uExplorer
 
-Supplementary, lightweight Ergo explorer with ScyllaDB backend :
+Supplementary, lightweight Ergo explorer with CassandraDB backend :
   - rapid indexing speed
   - low memory requirements (designed for machines with 16GB)
   - limited querying possibilities (in comparison to RDBMS)
@@ -14,13 +14,13 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
 
 **Requirements:**
   - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
-  - local/remote ScyllaDB, installation script expects :
-      - `/var/lib/scylla` dir exists
+  - local/remote CassandraDB, installation script expects :
+      - `/var/lib/cassandra` dir exists
       - `/proc/sys/fs/aio-max-nr` has value `1048576`
-      - we run `docker` distro which is for playing only, install [Debian](https://github.com/scylladb/scylladb/tree/60e8f5743cc777882c6b53fa04a0e82c8ae862b2/dist/debian) distro if you can
-  - `14GB+` of RAM (`scyllaDB=11GB`, `ergo-node=1GB`, `chain-indexer=512MB`, `system = 1.5GB`)
-      - if you have more RAM, change `scylla-start.sh` script to avoid memory issues
-  - `4vCPU+` but the whole stack was tested on `8vCPU` machine (1/2 cores allocated for scylla)
+      - we run `docker` distro which is for playing only, install prod-ready distro if you can
+  - `16GB+` of RAM (`cassandraDB=14GB`, `ergo-node=512MB`, `chain-indexer=512MB`, `system=1GB`)
+      - if you have more RAM, change `cassandra-start.sh` script to avoid memory issues
+  - `8vCPU+` for initial sync, polling and querying is not that demanding
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks automatically falls back to peer-network if local node is not available
 
@@ -31,15 +31,15 @@ $ sbt stage
 $ tree dist
 dist
 ├── bin
-│   ├── chain-indexer      # runs chain-indexer, expects ScyllaDB + Ergo Node running
+│   ├── chain-indexer      # runs chain-indexer, expects cassandraDB + Ergo Node running
 │   ├── chain-indexer.bat
-│   ├── scylla.cql         # db schema sourced from scylla.sh
-│   ├── scylla.yaml        # for overriding default scylla server-side settings
-│   ├── scylla-start.sh    # starts scylla in a docker container
-│   └── scylla-stop.sh     # flushes scylla memtables to disk and then removes container
+│   ├── cassandra.cql         # db schema sourced from cassandra.sh
+│   ├── cassandra.yaml        # for overriding default cassandra server-side settings
+│   ├── cassandra-start.sh    # starts cassandra in a docker container
+│   └── cassandra-stop.sh     # flushes cassandra memtables to disk and then removes container
 ├── conf
 │   ├── application.ini    # memory settings (default well tested)
-│   └── chain-indexer.conf # local/remote ergo node and scylla address must be defined
+│   └── chain-indexer.conf # local/remote ergo node and cassandra address must be defined
 └── lib
     └── chain-indexer.jar  # fat jar of all dependencies
 ```
@@ -47,15 +47,15 @@ dist
 ### Run
 
 Have fully synced ergo node running locally for initial explorer sync,
-start scylla in syncing mode and then chain-indexer syncs in ~ 90 minutes.
+start cassandra in syncing mode and then chain-indexer syncs in ~ 90 minutes.
 ```
 $ cd fully-synced-ergo-node
 $ nohup java -Xmx1g -jar ergo.jar --mainnet -c ergo.conf &
 
 $ cd ergo-uexplorer/dist/bin
-$ ./scylla-start.sh
+$ ./cassandra-start.sh
 4098518a35b0cdc74bf598dc52bcf032d952a2c30271a43064c1c353adb5fd6d
-Waiting for scylla to initialize...
+Waiting for cassandra to initialize...
 Loading db schema
 
 $ ./chain-indexer
@@ -76,33 +76,46 @@ $ ./chain-indexer
 
 **Troubleshooting:**
 
--  ScyllaDB crashes :
-    - reason : most likely OOM killer kicked in and killed scylla process
+-  cassandraDB crashes :
+    - reason : most likely OOM killer kicked in and killed cassandra process
     - solution : avoid running another memory intensive processes (Browser, IDE),
                  chain-indexer is tested on a dedicated server (laptop is unstable environment)
         ```
-        $ docker logs ergo-scylla 2>&1 | grep -i kill
-        2022-09-10 09:08:51,142 INFO exited: scylla (terminated by SIGKILL; not expected)
+        $ docker logs cassandra 2>&1 | grep -i kill
+        2022-09-10 09:08:51,142 INFO exited: cassandra (terminated by SIGKILL; not expected)
         ```
-    - docker version of scylla is not prod-ready, ie. OOM killer prone, etc. It is [covered](https://github.com/scylladb/scylladb/blob/60e8f5743cc777882c6b53fa04a0e82c8ae862b2/dist/common/systemd/scylla-server.service#L25)
-      in prod-ready [Debian](https://github.com/scylladb/scylladb/tree/60e8f5743cc777882c6b53fa04a0e82c8ae862b2/dist/debian) distro
+    - docker version of cassandra is not prod-ready, ie. OOM killer prone, etc.
 
 - Chain-indexer crashes :
-    - reason: almost exclusively due to scylla connection problems if OOM killer kills it
+    - reason: almost exclusively due to cassandra connection problems if OOM killer kills it
     - solution :
         - nothing should happen during polling when chain-indexer recovers on its own
-        - if scylla is killed during heavy initial sync by OOM killer,
+        - if cassandra is killed during heavy initial sync by OOM killer,
           there might be data loss as it is eventually consistent database
           which requires proper shutdown. Please start syncing from scratch with empty DB.
-        - if indexing crashes but scylla logs do not contain `SIGKILL`,
+        - if indexing crashes but cassandra logs do not contain `SIGKILL`,
           run `./chain-indexer` and it will continue when it stopped (no data gets lost)
 
 **Cleanup:**
 ```
-$ ./scylla-stop.sh
-$ sudo rm /var/lib/scylla/* -rf
+$ ./cassandra-stop.sh
+$ sudo rm /var/lib/cassandra/* -rf
 ```
 
-## Rest/Graphql API
+## Graphql API
 
-TODO
+When `./cassandra-start.sh` script finishes, go to http://localhost:8085/playground and
+copy/paste the auth token from following snippet to `HTTP HEADERS` at bottom-left of the playground
+and follow [documentation](https://stargate.io/docs/latest/develop/graphql.html).
+
+```
+curl -L -X POST 'http://localhost:8081/v1/auth' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+    "username": "cassandra",
+    "password": "cassandra"
+}'
+```
+```
+{"authToken":"{auth-token-here}"}
+```

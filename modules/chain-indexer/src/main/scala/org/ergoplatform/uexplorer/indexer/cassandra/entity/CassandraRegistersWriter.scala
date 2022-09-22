@@ -1,16 +1,16 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 import java.nio.ByteBuffer
 
-trait ScyllaRegistersWriter extends LazyLogging {
-  this: ScyllaBackend =>
+trait CassandraRegistersWriter extends LazyLogging {
+  this: CassandraBackend =>
 
   import Registers._
 
@@ -22,7 +22,7 @@ trait ScyllaRegistersWriter extends LazyLogging {
       registersInsertBinder
     )
 
-  protected[scylla] def registersInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def registersInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
     case (block, statement) =>
       block.registers.map { r =>
         // format: off
@@ -41,16 +41,16 @@ trait ScyllaRegistersWriter extends LazyLogging {
 }
 
 object Registers {
-  protected[scylla] val node_registers_table = "node_registers"
+  protected[cassandra] val node_registers_table = "node_registers"
 
-  protected[scylla] val header_id        = "header_id"
-  protected[scylla] val id               = "id"
-  protected[scylla] val box_id           = "box_id"
-  protected[scylla] val value_type       = "value_type"
-  protected[scylla] val serialized_value = "serialized_value"
-  protected[scylla] val rendered_value   = "rendered_value"
+  protected[cassandra] val header_id        = "header_id"
+  protected[cassandra] val id               = "id"
+  protected[cassandra] val box_id           = "box_id"
+  protected[cassandra] val value_type       = "value_type"
+  protected[cassandra] val serialized_value = "serialized_value"
+  protected[cassandra] val rendered_value   = "rendered_value"
 
-  protected[scylla] val columns = Seq(
+  protected[cassandra] val columns = Seq(
     header_id,
     id,
     box_id,

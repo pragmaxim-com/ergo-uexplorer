@@ -9,11 +9,11 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
-import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, InMemoryDb, ScyllaDb}
+import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, InMemoryDb, CassandraDb}
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor, ProgressState}
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -79,8 +79,8 @@ object Indexer extends LazyLogging {
     val blockHttpClient                               = BlockHttpClient(conf)
     val indexer =
       conf.backendType match {
-        case ScyllaDb =>
-          new Indexer(ScyllaBackend(), blockHttpClient)
+        case CassandraDb =>
+          new Indexer(CassandraBackend(), blockHttpClient)
         case InMemoryDb =>
           new Indexer(new InMemoryBackend(), blockHttpClient)
       }

@@ -47,7 +47,7 @@ lazy val indexer =
       )
     )
     .settings(
-      libraryDependencies ++= akka ++ sttp ++ scyllaDb ++ monocle ++ logging ++ Seq(
+      libraryDependencies ++= akka ++ sttp ++ cassandraDb ++ monocle ++ logging ++ Seq(
         explorerGrabber, scalaTest, scalaCheck, diffx,
         compilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full),
         compilerPlugin("io.tryp" % "splain" % "0.5.8" cross CrossVersion.patch)

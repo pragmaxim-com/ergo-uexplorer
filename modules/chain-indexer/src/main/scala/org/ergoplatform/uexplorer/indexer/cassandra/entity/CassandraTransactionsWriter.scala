@@ -1,13 +1,13 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
-trait ScyllaTransactionsWriter extends LazyLogging { this: ScyllaBackend =>
+trait CassandraTransactionsWriter extends LazyLogging { this: CassandraBackend =>
   import Transactions._
 
   def transactionsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed] =
@@ -18,7 +18,7 @@ trait ScyllaTransactionsWriter extends LazyLogging { this: ScyllaBackend =>
       transactionsInsertBinder
     )
 
-  protected[scylla] def transactionsInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def transactionsInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
     case (block, statement) =>
       block.txs.map { tx =>
         // format: off
@@ -40,19 +40,19 @@ trait ScyllaTransactionsWriter extends LazyLogging { this: ScyllaBackend =>
 }
 
 object Transactions {
-  protected[scylla] val node_transactions_table = "node_transactions"
+  protected[cassandra] val node_transactions_table = "node_transactions"
 
-  protected[scylla] val header_id        = "header_id"
-  protected[scylla] val tx_id            = "tx_id"
-  protected[scylla] val inclusion_height = "inclusion_height"
-  protected[scylla] val coinbase         = "coinbase"
-  protected[scylla] val timestamp        = "timestamp"
-  protected[scylla] val size             = "size"
-  protected[scylla] val idx              = "idx"
-  protected[scylla] val global_index     = "global_index"
-  protected[scylla] val main_chain       = "main_chain"
+  protected[cassandra] val header_id        = "header_id"
+  protected[cassandra] val tx_id            = "tx_id"
+  protected[cassandra] val inclusion_height = "inclusion_height"
+  protected[cassandra] val coinbase         = "coinbase"
+  protected[cassandra] val timestamp        = "timestamp"
+  protected[cassandra] val size             = "size"
+  protected[cassandra] val idx              = "idx"
+  protected[cassandra] val global_index     = "global_index"
+  protected[cassandra] val main_chain       = "main_chain"
 
-  protected[scylla] val columns = Seq(
+  protected[cassandra] val columns = Seq(
     header_id,
     tx_id,
     inclusion_height,

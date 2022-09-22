@@ -1,12 +1,12 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
-trait ScyllaInputsWriter { this: ScyllaBackend =>
+trait CassandraInputsWriter { this: CassandraBackend =>
   import Inputs._
 
   def inputsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed] =
@@ -17,7 +17,7 @@ trait ScyllaInputsWriter { this: ScyllaBackend =>
       inputInsertBinder
     )
 
-  protected[scylla] def inputInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def inputInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
     case (block, statement) =>
       block.inputs.map { input =>
         val partialStatement =
@@ -43,17 +43,17 @@ trait ScyllaInputsWriter { this: ScyllaBackend =>
 }
 
 object Inputs {
-  protected[scylla] val node_inputs_table = "node_inputs"
+  protected[cassandra] val node_inputs_table = "node_inputs"
 
-  protected[scylla] val box_id      = "box_id"
-  protected[scylla] val tx_id       = "tx_id"
-  protected[scylla] val header_id   = "header_id"
-  protected[scylla] val proof_bytes = "proof_bytes"
-  protected[scylla] val extension   = "extension"
-  protected[scylla] val idx         = "idx"
-  protected[scylla] val main_chain  = "main_chain"
+  protected[cassandra] val box_id      = "box_id"
+  protected[cassandra] val tx_id       = "tx_id"
+  protected[cassandra] val header_id   = "header_id"
+  protected[cassandra] val proof_bytes = "proof_bytes"
+  protected[cassandra] val extension   = "extension"
+  protected[cassandra] val idx         = "idx"
+  protected[cassandra] val main_chain  = "main_chain"
 
-  protected[scylla] val columns = Seq(
+  protected[cassandra] val columns = Seq(
     box_id,
     tx_id,
     header_id,

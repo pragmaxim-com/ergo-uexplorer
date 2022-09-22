@@ -14,7 +14,7 @@ package object indexer {
   class UnexpectedStateError(msg: String, cause: Option[Throwable] = None) extends RuntimeException(msg, cause.orNull)
 
   object Const {
-    val ScyllaKeyspace    = "uexplorer"
+    val CassandraKeyspace = "uexplorer"
     val EpochLength       = 1024
     val BufferSize        = 32
     val FlushHeight       = 32

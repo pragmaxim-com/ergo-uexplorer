@@ -47,7 +47,7 @@ object Dependencies {
     "com.softwaremill.retry"        %% "retry"             % "0.3.5"
   )
 
-  val scyllaDb = List(
+  val cassandraDb = List(
     "com.lightbend.akka" %% "akka-stream-alpakka-cassandra" % Version.alpakka,
     "com.datastax.oss"    % "java-driver-core"              % Version.cassandraDriver,
     "com.datastax.oss"    % "java-driver-query-builder"     % Version.cassandraDriver,

@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
@@ -9,15 +9,15 @@ import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, InvalidEpochCandidate}
-import org.ergoplatform.uexplorer.indexer.scylla.{ScyllaBackend, ScyllaPersistenceSupport}
+import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-trait ScyllaEpochWriter extends LazyLogging {
-  this: ScyllaBackend =>
-  import ScyllaEpochWriter._
+trait CassandraEpochWriter$ extends LazyLogging {
+  this: CassandraBackend =>
+  import CassandraEpochWriter$._
 
   def epochWriteFlow: Flow[(FlatBlock, Option[MaybeNewEpoch]), (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(FlatBlock, Option[MaybeNewEpoch])]
@@ -47,16 +47,16 @@ trait ScyllaEpochWriter extends LazyLogging {
       }
 }
 
-object ScyllaEpochWriter extends ScyllaPersistenceSupport {
+object CassandraEpochWriter$ extends CassandraPersistenceSupport {
 
-  protected[scylla] def epochInsertBinder(epoch: Epoch)(stmt: PreparedStatement): BoundStatement =
+  protected[cassandra] def epochInsertBinder(epoch: Epoch)(stmt: PreparedStatement): BoundStatement =
     stmt
       .bind()
       .setInt(epoch_index, epoch.index)
       .setString(last_header_id, epoch.blockIds.last.value.unwrapped)
 
-  protected[scylla] val epochInsertStatement: SimpleStatement =
-    insertInto(Const.ScyllaKeyspace, node_epochs_table)
+  protected[cassandra] val epochInsertStatement: SimpleStatement =
+    insertInto(Const.CassandraKeyspace, node_epochs_table)
       .value(epoch_index, bindMarker(epoch_index))
       .value(last_header_id, bindMarker(last_header_id))
       .build()

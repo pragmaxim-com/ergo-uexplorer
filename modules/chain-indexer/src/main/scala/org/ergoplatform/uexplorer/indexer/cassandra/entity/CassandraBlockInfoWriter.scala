@@ -1,13 +1,13 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement}
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
-trait ScyllaBlockInfoWriter {
-  this: ScyllaBackend =>
+trait CassandraBlockInfoWriter {
+  this: CassandraBackend =>
 
   import BlocksInfo._
 
@@ -18,7 +18,7 @@ trait ScyllaBlockInfoWriter {
       blockInfoInsertBinder
     )
 
-  protected[scylla] def blockInfoInsertBinder: (FlatBlock, PreparedStatement) => BoundStatement = { case (b, statement) =>
+  protected[cassandra] def blockInfoInsertBinder: (FlatBlock, PreparedStatement) => BoundStatement = { case (b, statement) =>
     // format: off
       statement
         .bind()
@@ -51,32 +51,32 @@ trait ScyllaBlockInfoWriter {
 }
 
 object BlocksInfo {
-  protected[scylla] val block_info_table = "blocks_info"
+  protected[cassandra] val block_info_table = "blocks_info"
 
-  protected[scylla] val header_id              = "header_id"
-  protected[scylla] val parent_id              = "parent_id"
-  protected[scylla] val timestamp              = "timestamp"
-  protected[scylla] val height                 = "height"
-  protected[scylla] val difficulty             = "difficulty"
-  protected[scylla] val block_size             = "block_size"
-  protected[scylla] val block_coins            = "block_coins"
-  protected[scylla] val block_mining_time      = "block_mining_time"
-  protected[scylla] val txs_count              = "txs_count"
-  protected[scylla] val txs_size               = "txs_size"
-  protected[scylla] val miner_address          = "miner_address"
-  protected[scylla] val miner_reward           = "miner_reward"
-  protected[scylla] val miner_revenue          = "miner_revenue"
-  protected[scylla] val block_fee              = "block_fee"
-  protected[scylla] val block_chain_total_size = "block_chain_total_size"
-  protected[scylla] val total_txs_count        = "total_txs_count"
-  protected[scylla] val total_coins_issued     = "total_coins_issued"
-  protected[scylla] val total_mining_time      = "total_mining_time"
-  protected[scylla] val total_fees             = "total_fees"
-  protected[scylla] val total_miners_reward    = "total_miners_reward"
-  protected[scylla] val total_coins_in_txs     = "total_coins_in_txs"
-  protected[scylla] val max_tx_gix             = "max_tx_gix"
-  protected[scylla] val max_box_gix            = "max_box_gix"
-  protected[scylla] val main_chain             = "main_chain"
+  protected[cassandra] val header_id              = "header_id"
+  protected[cassandra] val parent_id              = "parent_id"
+  protected[cassandra] val timestamp              = "timestamp"
+  protected[cassandra] val height                 = "height"
+  protected[cassandra] val difficulty             = "difficulty"
+  protected[cassandra] val block_size             = "block_size"
+  protected[cassandra] val block_coins            = "block_coins"
+  protected[cassandra] val block_mining_time      = "block_mining_time"
+  protected[cassandra] val txs_count              = "txs_count"
+  protected[cassandra] val txs_size               = "txs_size"
+  protected[cassandra] val miner_address          = "miner_address"
+  protected[cassandra] val miner_reward           = "miner_reward"
+  protected[cassandra] val miner_revenue          = "miner_revenue"
+  protected[cassandra] val block_fee              = "block_fee"
+  protected[cassandra] val block_chain_total_size = "block_chain_total_size"
+  protected[cassandra] val total_txs_count        = "total_txs_count"
+  protected[cassandra] val total_coins_issued     = "total_coins_issued"
+  protected[cassandra] val total_mining_time      = "total_mining_time"
+  protected[cassandra] val total_fees             = "total_fees"
+  protected[cassandra] val total_miners_reward    = "total_miners_reward"
+  protected[cassandra] val total_coins_in_txs     = "total_coins_in_txs"
+  protected[cassandra] val max_tx_gix             = "max_tx_gix"
+  protected[cassandra] val max_box_gix            = "max_box_gix"
+  protected[cassandra] val main_chain             = "main_chain"
 
   lazy val columns: Seq[String] = Seq(
     header_id,

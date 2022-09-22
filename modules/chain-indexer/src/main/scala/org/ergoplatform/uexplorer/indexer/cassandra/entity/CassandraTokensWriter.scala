@@ -1,16 +1,16 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 import java.nio.ByteBuffer
 
-trait ScyllaTokensWriter extends LazyLogging {
-  this: ScyllaBackend =>
+trait CassandraTokensWriter extends LazyLogging {
+  this: CassandraBackend =>
 
   import Tokens._
 
@@ -22,7 +22,7 @@ trait ScyllaTokensWriter extends LazyLogging {
       tokensInsertBinder
     )
 
-  protected[scylla] def tokensInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def tokensInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
     case (block, statement) =>
       block.tokens.map { t =>
         val partialStatement =
@@ -45,18 +45,18 @@ trait ScyllaTokensWriter extends LazyLogging {
 }
 
 object Tokens {
-  protected[scylla] val node_tokens_table = "node_tokens"
+  protected[cassandra] val node_tokens_table = "node_tokens"
 
-  protected[scylla] val header_id       = "header_id"
-  protected[scylla] val token_id        = "token_id"
-  protected[scylla] val box_id          = "box_id"
-  protected[scylla] val emission_amount = "emission_amount"
-  protected[scylla] val name            = "name"
-  protected[scylla] val description     = "description"
-  protected[scylla] val `type`          = "type"
-  protected[scylla] val decimals        = "decimals"
+  protected[cassandra] val header_id       = "header_id"
+  protected[cassandra] val token_id        = "token_id"
+  protected[cassandra] val box_id          = "box_id"
+  protected[cassandra] val emission_amount = "emission_amount"
+  protected[cassandra] val name            = "name"
+  protected[cassandra] val description     = "description"
+  protected[cassandra] val `type`          = "type"
+  protected[cassandra] val decimals        = "decimals"
 
-  protected[scylla] val columns = Seq(
+  protected[cassandra] val columns = Seq(
     header_id,
     token_id,
     box_id,

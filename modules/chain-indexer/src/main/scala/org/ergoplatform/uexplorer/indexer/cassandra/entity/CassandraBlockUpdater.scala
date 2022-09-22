@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
@@ -9,16 +9,16 @@ import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{BestBlockInserted, ForkInserted, Inserted}
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
-import org.ergoplatform.uexplorer.indexer.scylla.entity.ScyllaBlockUpdater._
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.entity.CassandraBlockUpdater._
 
 import scala.collection.JavaConverters.seqAsJavaList
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-trait ScyllaBlockUpdater extends LazyLogging {
-  this: ScyllaBackend =>
+trait CassandraBlockUpdater extends LazyLogging {
+  this: CassandraBackend =>
 
   private val updateMainChainPreparedStatements: Map[String, (Option[String], PreparedStatement)] =
     updateMainChainStatements.map { case (table, keyOpt, statement) =>
@@ -43,7 +43,7 @@ trait ScyllaBlockUpdater extends LazyLogging {
         case (table, Some(key), blockId) =>
           Source
             .fromPublisher(
-              cqlSession.executeReactive(s"SELECT $key FROM ${Const.ScyllaKeyspace}.$table WHERE header_id = '$blockId';")
+              cqlSession.executeReactive(s"SELECT $key FROM ${Const.CassandraKeyspace}.$table WHERE header_id = '$blockId';")
             )
             .map(_.getString(key))
             .runWith(Sink.seq)
@@ -66,16 +66,16 @@ trait ScyllaBlockUpdater extends LazyLogging {
 
 }
 
-object ScyllaBlockUpdater {
+object CassandraBlockUpdater {
 
   private def updateMainChainBase(table: String) =
     QueryBuilder
-      .update(Const.ScyllaKeyspace, table)
+      .update(Const.CassandraKeyspace, table)
       .setColumn("main_chain", QueryBuilder.bindMarker("main_chain"))
       .whereColumn("header_id")
       .isEqualTo(QueryBuilder.bindMarker("header_id"))
 
-  protected[scylla] val updateMainChainStatements: List[(String, Option[String], SimpleStatement)] =
+  protected[cassandra] val updateMainChainStatements: List[(String, Option[String], SimpleStatement)] =
     List(
       BlocksInfo.block_info_table          -> None,
       Headers.node_headers_table           -> None,
@@ -90,7 +90,7 @@ object ScyllaBlockUpdater {
         (table, Some(key), q)
     }
 
-  protected[scylla] def updateMainChainWithKeysBinder(headerId: BlockId, keys: Seq[String], mainChain: Boolean)(
+  protected[cassandra] def updateMainChainWithKeysBinder(headerId: BlockId, keys: Seq[String], mainChain: Boolean)(
     preparedStatement: PreparedStatement
   ): BoundStatement =
     preparedStatement
@@ -99,7 +99,7 @@ object ScyllaBlockUpdater {
       .setString("header_id", headerId.value.unwrapped)
       .setList("ids", seqAsJavaList(keys), classOf[String])
 
-  protected[scylla] def updateMainChainBinder(headerId: BlockId, mainChain: Boolean)(
+  protected[cassandra] def updateMainChainBinder(headerId: BlockId, mainChain: Boolean)(
     preparedStatement: PreparedStatement
   ): BoundStatement =
     preparedStatement

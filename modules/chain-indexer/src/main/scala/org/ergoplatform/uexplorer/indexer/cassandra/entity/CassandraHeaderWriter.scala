@@ -1,15 +1,15 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 import java.nio.ByteBuffer
 
-trait ScyllaHeaderWriter extends LazyLogging { this: ScyllaBackend =>
+trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
   import Headers._
 
   def headerWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed] =
@@ -19,7 +19,7 @@ trait ScyllaHeaderWriter extends LazyLogging { this: ScyllaBackend =>
       headerInsertBinder
     )
 
-  protected[scylla] def headerInsertBinder: (FlatBlock, PreparedStatement) => BoundStatement = { case (block, statement) =>
+  protected[cassandra] def headerInsertBinder: (FlatBlock, PreparedStatement) => BoundStatement = { case (block, statement) =>
     val validVersion =
       if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
         logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")
@@ -63,31 +63,31 @@ trait ScyllaHeaderWriter extends LazyLogging { this: ScyllaBackend =>
 }
 
 object Headers {
-  protected[scylla] val node_headers_table = "node_headers"
+  protected[cassandra] val node_headers_table = "node_headers"
 
-  protected[scylla] val header_id         = "header_id"
-  protected[scylla] val parent_id         = "parent_id"
-  protected[scylla] val version           = "version"
-  protected[scylla] val height            = "height"
-  protected[scylla] val n_bits            = "n_bits"
-  protected[scylla] val difficulty        = "difficulty"
-  protected[scylla] val timestamp         = "timestamp"
-  protected[scylla] val state_root        = "state_root"
-  protected[scylla] val ad_proofs_root    = "ad_proofs_root"
-  protected[scylla] val ad_proofs_bytes   = "ad_proofs_bytes"
-  protected[scylla] val ad_proofs_digest  = "ad_proofs_digest"
-  protected[scylla] val extensions_digest = "extensions_digest"
-  protected[scylla] val extensions_fields = "extensions_fields"
-  protected[scylla] val transactions_root = "transactions_root"
-  protected[scylla] val extension_hash    = "extension_hash"
-  protected[scylla] val miner_pk          = "miner_pk"
-  protected[scylla] val w                 = "w"
-  protected[scylla] val n                 = "n"
-  protected[scylla] val d                 = "d"
-  protected[scylla] val votes             = "votes"
-  protected[scylla] val main_chain        = "main_chain"
+  protected[cassandra] val header_id         = "header_id"
+  protected[cassandra] val parent_id         = "parent_id"
+  protected[cassandra] val version           = "version"
+  protected[cassandra] val height            = "height"
+  protected[cassandra] val n_bits            = "n_bits"
+  protected[cassandra] val difficulty        = "difficulty"
+  protected[cassandra] val timestamp         = "timestamp"
+  protected[cassandra] val state_root        = "state_root"
+  protected[cassandra] val ad_proofs_root    = "ad_proofs_root"
+  protected[cassandra] val ad_proofs_bytes   = "ad_proofs_bytes"
+  protected[cassandra] val ad_proofs_digest  = "ad_proofs_digest"
+  protected[cassandra] val extensions_digest = "extensions_digest"
+  protected[cassandra] val extensions_fields = "extensions_fields"
+  protected[cassandra] val transactions_root = "transactions_root"
+  protected[cassandra] val extension_hash    = "extension_hash"
+  protected[cassandra] val miner_pk          = "miner_pk"
+  protected[cassandra] val w                 = "w"
+  protected[cassandra] val n                 = "n"
+  protected[cassandra] val d                 = "d"
+  protected[cassandra] val votes             = "votes"
+  protected[cassandra] val main_chain        = "main_chain"
 
-  protected[scylla] val columns = Seq(
+  protected[cassandra] val columns = Seq(
     header_id,
     parent_id,
     version,

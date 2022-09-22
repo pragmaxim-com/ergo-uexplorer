@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.scylla
+package org.ergoplatform.uexplorer.indexer.cassandra
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
@@ -10,12 +10,12 @@ import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-trait ScyllaPersistenceSupport {
+trait CassandraPersistenceSupport {
 
-  protected[scylla] val node_epochs_table = "node_epochs"
+  protected[cassandra] val node_epochs_table = "node_epochs"
 
-  protected[scylla] val epoch_index    = "epoch_index"
-  protected[scylla] val last_header_id = "last_header_id"
+  protected[cassandra] val epoch_index    = "epoch_index"
+  protected[cassandra] val last_header_id = "last_header_id"
 
   def storeBlockFlow[T](
     parallelism: Int,

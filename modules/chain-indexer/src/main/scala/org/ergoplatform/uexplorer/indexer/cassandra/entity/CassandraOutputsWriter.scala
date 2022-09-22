@@ -1,15 +1,15 @@
-package org.ergoplatform.uexplorer.indexer.scylla.entity
+package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.scylla.ScyllaBackend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 import java.nio.ByteBuffer
 
-trait ScyllaOutputsWriter { this: ScyllaBackend =>
+trait CassandraOutputsWriter { this: CassandraBackend =>
   import Outputs._
 
   def outputsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed] =
@@ -20,7 +20,7 @@ trait ScyllaOutputsWriter { this: ScyllaBackend =>
       outputInsertBinder
     )
 
-  protected[scylla] def outputInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def outputInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
     case (block, statement) =>
       block.outputs.map { output =>
         val partialStatement =
@@ -51,24 +51,24 @@ trait ScyllaOutputsWriter { this: ScyllaBackend =>
 }
 
 object Outputs {
-  protected[scylla] val node_outputs_table = "node_outputs"
+  protected[cassandra] val node_outputs_table = "node_outputs"
 
-  protected[scylla] val box_id                  = "box_id"
-  protected[scylla] val tx_id                   = "tx_id"
-  protected[scylla] val header_id               = "header_id"
-  protected[scylla] val value                   = "value"
-  protected[scylla] val creation_height         = "creation_height"
-  protected[scylla] val settlement_height       = "settlement_height"
-  protected[scylla] val idx                     = "idx"
-  protected[scylla] val global_index            = "global_index"
-  protected[scylla] val ergo_tree               = "ergo_tree"
-  protected[scylla] val ergo_tree_template_hash = "ergo_tree_template_hash"
-  protected[scylla] val address                 = "address"
-  protected[scylla] val additional_registers    = "additional_registers"
-  protected[scylla] val timestamp               = "timestamp"
-  protected[scylla] val main_chain              = "main_chain"
+  protected[cassandra] val box_id                  = "box_id"
+  protected[cassandra] val tx_id                   = "tx_id"
+  protected[cassandra] val header_id               = "header_id"
+  protected[cassandra] val value                   = "value"
+  protected[cassandra] val creation_height         = "creation_height"
+  protected[cassandra] val settlement_height       = "settlement_height"
+  protected[cassandra] val idx                     = "idx"
+  protected[cassandra] val global_index            = "global_index"
+  protected[cassandra] val ergo_tree               = "ergo_tree"
+  protected[cassandra] val ergo_tree_template_hash = "ergo_tree_template_hash"
+  protected[cassandra] val address                 = "address"
+  protected[cassandra] val additional_registers    = "additional_registers"
+  protected[cassandra] val timestamp               = "timestamp"
+  protected[cassandra] val main_chain              = "main_chain"
 
-  protected[scylla] val columns = Seq(
+  protected[cassandra] val columns = Seq(
     box_id,
     tx_id,
     header_id,
