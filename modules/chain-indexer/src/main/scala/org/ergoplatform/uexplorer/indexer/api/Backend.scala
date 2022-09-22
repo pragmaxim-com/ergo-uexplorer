@@ -5,7 +5,6 @@ import akka.stream.scaladsl.Flow
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient.{BlockInfo, FlatBlockPimp}
-import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 
 import java.util.concurrent.ConcurrentHashMap
@@ -17,7 +16,7 @@ trait Backend {
 
   def blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed]
 
-  def epochWriteFlow: Flow[MaybeNewEpoch, Either[Int, Epoch], NotUsed]
+  def epochWriteFlow: Flow[(FlatBlock, Option[MaybeNewEpoch]), (FlatBlock, Option[MaybeNewEpoch]), NotUsed]
 
   def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]]
 }
@@ -45,16 +44,14 @@ class InMemoryBackend extends Backend {
           winningFork
       }
 
-  override def epochWriteFlow: Flow[ProgressMonitor.MaybeNewEpoch, Either[Int, Epoch], NotUsed] =
-    Flow[MaybeNewEpoch]
+  override def epochWriteFlow: Flow[(FlatBlock, Option[MaybeNewEpoch]), (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
+    Flow[(FlatBlock, Option[MaybeNewEpoch])]
       .map {
-        case NewEpochCreated(epoch) =>
+        case (block, Some(NewEpochCreated(epoch))) =>
           lastBlockInfoByEpochIndex.put(epoch.index, blocksById.get(epoch.blockIds.last))
-          Right(epoch)
-        case NewEpochFailed(candidate) =>
-          Left(candidate.epochIndex)
-        case NewEpochExisted(epochIndex) =>
-          Left(epochIndex)
+          block -> Some(NewEpochCreated(epoch))
+        case tuple =>
+          tuple
       }
 
   override def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]] =

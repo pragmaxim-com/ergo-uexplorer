@@ -12,7 +12,7 @@ import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient._
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache
 
-import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable.TreeMap
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
@@ -59,14 +59,13 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
       case UpdateChainState(persistedEpochIndexes, replyTo) =>
         val newProgress = p.updateState(persistedEpochIndexes)
         replyTo ! newProgress
-        logger.info(s"$newProgress")
         initialized(newProgress)
       case GetChainState(replyTo) =>
         replyTo ! p
         Behaviors.same
       case FinishEpoch(epochIndex, replyTo) =>
         val (maybeNewEpoch, newProgress) = p.getFinishedEpoch(epochIndex)
-        logger.info(s"$newProgress")
+        logger.info(s"$maybeNewEpoch, $newProgress")
         replyTo ! maybeNewEpoch
         initialized(newProgress)
     }
@@ -109,11 +108,23 @@ object ProgressMonitor {
 
   sealed trait MaybeNewEpoch extends MonitorResponse
 
-  case class NewEpochCreated(epoch: Epoch) extends MaybeNewEpoch
+  case class NewEpochCreated(epoch: Epoch) extends MaybeNewEpoch {
 
-  case class NewEpochFailed(epochCandidate: InvalidEpochCandidate) extends MaybeNewEpoch
+    override def toString: String =
+      s"New epoch ${epoch.index} created"
+  }
 
-  case class NewEpochExisted(epochIndex: Int) extends MaybeNewEpoch
+  case class NewEpochFailed(epochCandidate: InvalidEpochCandidate) extends MaybeNewEpoch {
+
+    override def toString: String =
+      s"New epoch ${epochCandidate.epochIndex} failed due to : ${epochCandidate.error}"
+  }
+
+  case class NewEpochExisted(epochIndex: Int) extends MaybeNewEpoch {
+
+    override def toString: String =
+      s"New epoch $epochIndex existed"
+  }
 
   /** API */
   import akka.actor.typed.scaladsl.AskPattern._

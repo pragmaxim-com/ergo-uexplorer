@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.indexer
 
-import akka.NotUsed
+import akka.{Done, NotUsed}
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.ActorAttributes.supervisionStrategy
@@ -26,14 +26,18 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
 ) extends AkkaStreamSupport
   with LazyLogging {
 
-  val blockToEpochFlow: Flow[FlatBlock, MaybeNewEpoch, NotUsed] =
+  val blockToEpochFlow: Flow[FlatBlock, (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
     Flow[FlatBlock]
-      .collect {
-        case b if Epoch.heightAtFlushPoint(b.header.height) => Epoch.epochIndexForHeight(b.header.height) - 1
+      .mapAsync(1) {
+        case block if Epoch.heightAtFlushPoint(block.header.height) =>
+          ProgressMonitor
+            .finishEpoch(Epoch.epochIndexForHeight(block.header.height) - 1)
+            .map(e => block -> Option(e))
+        case block =>
+          Future.successful(block -> Option.empty)
       }
-      .mapAsync(1)(ProgressMonitor.finishEpoch)
 
-  val indexingFlow: Flow[Int, Either[Int, Epoch], NotUsed] =
+  val indexingFlow: Flow[Int, (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
     Flow[Int]
       .via(blockHttpClient.blockCachingFlow)
       .async
@@ -55,19 +59,20 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       newProgress <- ProgressMonitor.getChainState
     } yield newProgress
 
-  def run(pollingInterval: FiniteDuration): Future[ProgressState] =
+  def run(pollingInterval: FiniteDuration): Future[Done] =
     for {
       lastBlockInfoByEpochIndex <- backend.getLastBlockInfoByEpochIndex
-      _                         <- ProgressMonitor.updateState(lastBlockInfoByEpochIndex)
-      progress                  <- schedule(pollingInterval)(sync).runWith(Sink.head)
-    } yield progress
+      progress                  <- ProgressMonitor.updateState(lastBlockInfoByEpochIndex)
+      _ = logger.info(s"Initiating indexing at $progress")
+      newProgress <- schedule(pollingInterval)(sync).run()
+    } yield newProgress
 }
 
 object Indexer extends LazyLogging {
 
   def runWith(
     conf: ChainIndexerConf
-  )(implicit ctx: ActorContext[Nothing]): Future[ProgressState] = {
+  )(implicit ctx: ActorContext[Nothing]): Future[Done] = {
     implicit val system: ActorSystem[Nothing]         = ctx.system
     implicit val protocol: ProtocolSettings           = conf.protocol
     implicit val monitorRef: ActorRef[MonitorRequest] = ctx.spawn(new ProgressMonitor().initialBehavior, "Monitor")

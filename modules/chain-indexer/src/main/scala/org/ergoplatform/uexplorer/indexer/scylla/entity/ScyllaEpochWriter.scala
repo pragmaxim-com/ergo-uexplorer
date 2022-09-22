@@ -5,6 +5,7 @@ import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement, SimpleStatement}
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, InvalidEpochCandidate}
@@ -18,17 +19,19 @@ trait ScyllaEpochWriter extends LazyLogging {
   this: ScyllaBackend =>
   import ScyllaEpochWriter._
 
-  def epochWriteFlow: Flow[MaybeNewEpoch, Either[Int, Epoch], NotUsed] =
-    Flow[MaybeNewEpoch]
+  def epochWriteFlow: Flow[(FlatBlock, Option[MaybeNewEpoch]), (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
+    Flow[(FlatBlock, Option[MaybeNewEpoch])]
       .mapAsync(1) {
-        case NewEpochCreated(epoch) =>
-          persistEpoch(epoch).map(Right(_))
-        case NewEpochFailed(InvalidEpochCandidate(epochIndex, invalidHeightsAsc, error)) =>
+        case (block, s @ Some(NewEpochCreated(epoch))) =>
+          persistEpoch(epoch).map(_ => block -> s)
+        case (block, s @ Some(NewEpochFailed(InvalidEpochCandidate(epochIndex, invalidHeightsAsc, error)))) =>
           logger.error(s"Epoch $epochIndex is invalid due to $error at heights ${invalidHeightsAsc.mkString(",")}")
-          Future.successful(Left(epochIndex))
-        case NewEpochExisted(epochIndex) =>
+          Future.successful(block -> s)
+        case (block, s @ Some(NewEpochExisted(epochIndex))) =>
           logger.debug(s"Skipping persistence of epoch $epochIndex as it already existed")
-          Future.successful(Left(epochIndex))
+          Future.successful(block -> s)
+        case t =>
+          Future.successful(t)
       }
 
   def persistEpoch(epoch: Epoch): Future[Epoch] =
