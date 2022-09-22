@@ -107,7 +107,6 @@ $ sudo rm /var/lib/cassandra/* -rf
 When `./cassandra-start.sh` script finishes, go to http://localhost:8085/playground and
 copy/paste the auth token from following snippet to `HTTP HEADERS` at bottom-left of the playground
 and follow [documentation](https://stargate.io/docs/latest/develop/graphql.html).
-
 ```
 curl -L -X POST 'http://localhost:8081/v1/auth' \
   -H 'Content-Type: application/json' \
@@ -116,6 +115,37 @@ curl -L -X POST 'http://localhost:8081/v1/auth' \
     "password": "cassandra"
 }'
 ```
+and copy `{"authToken": "secret"}` paste `{"x-cassandra-token": "secret"}`
+
+### Examples
+
+There is an address bar in the playground UI where you select either `DDL (/graphql-schema)` or `DML (/graphql/<keyspace>)` :
+
+**DDL (/graphql-schema)**
 ```
-{"authToken":"{auth-token-here}"}
+query {
+  keyspace(name: "uexplorer") {
+    node_outputs: table(name: "node_outputs") { columns { name } }
+  }
+}
+```
+
+**DML (/graphql/uexplorer)**
+```
+query {
+  node_outputs(filter: {header_id: {eq: "b0244dfc267baca974a4caee06120321562784303a8a688976ae56170e4d175b"}}){
+    values {
+      address
+    }
+  }
+}
+```
+```
+query {
+  node_outputs(filter: {address: {eq: "88dhgzEuTXaVTz3coGyrAbJ7DNqH37vUMzpSe2vZaCEeBzA6K2nKTZ2JQJhEFgoWmrCQEQLyZNDYMby5"}}){
+    values {
+      box_id
+    }
+  }
+}
 ```
