@@ -22,7 +22,6 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
 
   def initialBehavior: Behavior[MonitorRequest] =
     Behaviors.setup[MonitorRequest] { _ =>
-      logger.info(s"Starting epoch monitoring ...")
       initialized(ProgressState(TreeMap.empty, TreeMap.empty, BlockCache(Map.empty, TreeMap.empty)))
     }
 

@@ -76,20 +76,20 @@ object Indexer extends LazyLogging {
     implicit val system: ActorSystem[Nothing]         = ctx.system
     implicit val protocol: ProtocolSettings           = conf.protocol
     implicit val monitorRef: ActorRef[MonitorRequest] = ctx.spawn(new ProgressMonitor().initialBehavior, "Monitor")
-    val blockHttpClient                               = BlockHttpClient(conf)
-    val indexer =
-      conf.backendType match {
-        case CassandraDb =>
-          new Indexer(CassandraBackend(), blockHttpClient)
-        case InMemoryDb =>
-          new Indexer(new InMemoryBackend(), blockHttpClient)
-      }
-    indexer
-      .run(2.seconds, 5.seconds)
-      .andThen { case Failure(ex) =>
-        logger.error(s"Shutting down due to unexpected error", ex)
-        blockHttpClient.close().andThen { case _ => system.terminate() }
-      }
-
+    BlockHttpClient.withNodePoolBackend(conf).flatMap { blockHttpClient =>
+      val indexer =
+        conf.backendType match {
+          case CassandraDb =>
+            new Indexer(CassandraBackend(), blockHttpClient)
+          case InMemoryDb =>
+            new Indexer(new InMemoryBackend(), blockHttpClient)
+        }
+      indexer
+        .run(0.seconds, 5.seconds)
+        .andThen { case Failure(ex) =>
+          logger.error(s"Shutting down due to unexpected error", ex)
+          blockHttpClient.close().andThen { case _ => system.terminate() }
+        }
+    }
   }
 }

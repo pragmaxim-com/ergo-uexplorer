@@ -19,7 +19,7 @@ class MetadataHttpClient[P](minNodeHeight: Int = Const.MinNodeHeight)(implicit
   remoteUri: RemoteNodeUriMagnet,
   localUri: LocalNodeUriMagnet,
   system: ActorSystem[Nothing],
-  val underlyingB: SttpBackend[Future, P]
+  underlyingB: SttpBackend[Future, P]
 ) extends ResiliencySupport {
 
   private val retryPolicy: Policy = retry.Backoff(3, 1.second)

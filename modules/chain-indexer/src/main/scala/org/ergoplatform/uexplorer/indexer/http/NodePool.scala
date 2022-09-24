@@ -1,15 +1,12 @@
 package org.ergoplatform.uexplorer.indexer.http
 
-import akka.NotUsed
 import akka.actor.typed.scaladsl.AskPattern._
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
-import akka.stream.ActorAttributes
-import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.http.SttpBackendFallbackProxy.InvalidPeers
-import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, Resiliency}
+import org.ergoplatform.uexplorer.indexer.AkkaStreamSupport
+import org.ergoplatform.uexplorer.indexer.http.SttpNodePoolBackend.InvalidPeers
 
 import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.concurrent.Future
@@ -19,21 +16,11 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
 
   implicit private val timeout: Timeout = 3.seconds
 
-  def behavior(metadataClient: MetadataHttpClient[_]): Behavior[NodePoolRequest] =
-    Behaviors.setup[NodePoolRequest] { implicit ctx =>
-      implicit val s: ActorSystem[Nothing] = ctx.system
-      nodePoolUpdateSource(ctx.self, metadataClient).run()
-      uninitialized
-    }
-
-  def uninitialized(implicit ctx: ActorContext[NodePoolRequest]): Behavior[NodePoolRequest] =
+  def behavior: Behavior[NodePoolRequest] =
     Behaviors.receiveMessage[NodePoolRequest] {
-      case GetAvailablePeers(replyTo) =>
-        ctx.scheduleOnce(50.millis, ctx.self, GetAvailablePeers(replyTo))
-        Behaviors.same
       case UpdateOpenApiPeers(validPeers, replyTo) =>
         val newState = NodePoolState(validPeers, TreeSet.empty)
-        logger.info(s"Getting blocks from : $newState")
+        logger.info(s"$newState")
         replyTo ! newState
         initialized(newState)
       case x =>
@@ -59,19 +46,6 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
       case GracefulShutdown =>
         logger.error(s"Stopping NodePool")
         Behaviors.stopped
-    }
-
-  def nodePoolUpdateSource(nodePool: ActorRef[NodePoolRequest], metadataClient: MetadataHttpClient[_])(implicit
-    s: ActorSystem[_]
-  ): Source[NodePoolState, NotUsed] =
-    restartSource {
-      Source
-        .tick(0.seconds, 30.seconds, ())
-        .mapAsync(1)(_ => metadataClient.getAllOpenApiPeers)
-        .mapAsync(1) { validPeers =>
-          nodePool.ask(ref => UpdateOpenApiPeers(validPeers, ref))
-        }
-        .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
     }
 
   sealed trait NodePoolRequest

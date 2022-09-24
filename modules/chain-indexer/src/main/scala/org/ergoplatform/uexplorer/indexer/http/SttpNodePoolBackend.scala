@@ -1,14 +1,18 @@
 package org.ergoplatform.uexplorer.indexer.http
 
+import akka.{Done, NotUsed}
 import akka.actor.typed._
+import akka.stream.ActorAttributes
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.Utils
+import org.ergoplatform.uexplorer.indexer.{Resiliency, Utils}
 import org.ergoplatform.uexplorer.indexer.http.NodePool._
-import org.ergoplatform.uexplorer.indexer.http.SttpBackendFallbackProxy.swapUri
+import org.ergoplatform.uexplorer.indexer.http.SttpNodePoolBackend.swapUri
 import sttp.capabilities.Effect
 import sttp.client3._
 import sttp.model.Uri
+import akka.actor.typed.scaladsl.AskPattern._
 
 import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,12 +20,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util._
 
-class SttpBackendFallbackProxy[P]()(implicit
-  c: ActorSystem[Nothing],
+class SttpNodePoolBackend[P]()(implicit
+  sys: ActorSystem[Nothing],
   nodePoolRef: ActorRef[NodePoolRequest],
   underlying: SttpBackend[Future, P]
 ) extends DelegateSttpBackend[Future, P](underlying) {
-  import SttpBackendFallbackProxy.fallbackQuery
+  import SttpNodePoolBackend.fallbackQuery
 
   implicit private val timeout: Timeout = 5.seconds
 
@@ -29,6 +33,18 @@ class SttpBackendFallbackProxy[P]()(implicit
     nodePoolRef.tell(GracefulShutdown)
     super.close()
   }
+
+  private def updateNodePool(metadataClient: MetadataHttpClient[_]): Future[NodePoolState] =
+    metadataClient.getAllOpenApiPeers
+      .flatMap { validPeers =>
+        nodePoolRef.ask(ref => UpdateOpenApiPeers(validPeers, ref))
+      }
+
+  def keepNodePoolUpdated(metadataClient: MetadataHttpClient[_]): Future[NodePoolState] =
+    updateNodePool(metadataClient)
+      .andThen { case Success(_) =>
+        schedule(15.seconds, 30.seconds)(updateNodePool(metadataClient)).run()
+      }
 
   override def send[T, R >: P with Effect[Future]](origRequest: Request[T, R]): Future[Response[T]] = {
 
@@ -51,13 +67,14 @@ class SttpBackendFallbackProxy[P]()(implicit
 
 }
 
-object SttpBackendFallbackProxy extends LazyLogging {
+object SttpNodePoolBackend extends LazyLogging {
   type InvalidPeers = SortedSet[Peer]
 
-  def apply[P](nodePoolRef: ActorRef[NodePoolRequest], httpClient: MetadataHttpClient[P])(implicit
-    s: ActorSystem[Nothing]
-  ): SttpBackendFallbackProxy[P] =
-    new SttpBackendFallbackProxy()(s, nodePoolRef, httpClient.underlyingB)
+  def apply[P](nodePoolRef: ActorRef[NodePoolRequest])(implicit
+    s: ActorSystem[Nothing],
+    underlyingBackend: SttpBackend[Future, P]
+  ): SttpNodePoolBackend[P] =
+    new SttpNodePoolBackend()(s, nodePoolRef, underlyingBackend)
 
   def swapUri[T, R](reqWithDummyUri: Request[T, R], peerUri: Uri): Request[T, R] =
     reqWithDummyUri.get(Utils.copyUri(reqWithDummyUri.uri, peerUri))

@@ -18,6 +18,7 @@ import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport}
 import retry.Policy
+import sttp.capabilities.WebSockets
 import sttp.client3._
 import sttp.client3.circe._
 import tofu.Context
@@ -30,7 +31,7 @@ import scala.util.Try
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   s: ActorSystem[Nothing],
   progressMonitor: ActorRef[MonitorRequest],
-  val sttpB: SttpBackend[Future, _]
+  sttpB: SttpBackend[Future, _]
 ) extends ResiliencySupport {
 
   private val proxyUri            = uri"http://proxy"
@@ -107,14 +108,16 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
 
 object BlockHttpClient {
 
-  def apply(
+  def withNodePoolBackend(
     conf: ChainIndexerConf
-  )(implicit ctx: ActorContext[_], progressMonitor: ActorRef[MonitorRequest]): BlockHttpClient = {
-    val futureSttpBackend: SttpBackend[Future, _] = HttpClientFutureBackend()
-    val metadataClient                            = MetadataHttpClient(conf)(futureSttpBackend, ctx.system)
-    val nodePoolRef                               = ctx.spawn(NodePool.behavior(metadataClient), "NodePool")
-    val backend: SttpBackendFallbackProxy[_]      = SttpBackendFallbackProxy(nodePoolRef, metadataClient)(ctx.system)
-    new BlockHttpClient(metadataClient)(ctx.system, progressMonitor, backend)
+  )(implicit ctx: ActorContext[_], progressMonitor: ActorRef[MonitorRequest]): Future[BlockHttpClient] = {
+    val futureSttpBackend = HttpClientFutureBackend()
+    val metadataClient    = MetadataHttpClient(conf)(futureSttpBackend, ctx.system)
+    val nodePoolRef       = ctx.spawn(NodePool.behavior, "NodePool")
+    val backend           = SttpNodePoolBackend[WebSockets](nodePoolRef)(ctx.system, futureSttpBackend)
+    backend.keepNodePoolUpdated(metadataClient).map { _ =>
+      new BlockHttpClient(metadataClient)(ctx.system, progressMonitor, backend)
+    }
   }
 
   case class BlockInfo(parentId: BlockId, stats: BlockStats)
