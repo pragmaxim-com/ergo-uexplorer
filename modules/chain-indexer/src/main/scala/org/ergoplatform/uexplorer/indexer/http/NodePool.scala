@@ -29,7 +29,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
   def uninitialized(implicit ctx: ActorContext[NodePoolRequest]): Behavior[NodePoolRequest] =
     Behaviors.receiveMessage[NodePoolRequest] {
       case GetAvailablePeers(replyTo) =>
-        ctx.scheduleOnce(500.millis, ctx.self, GetAvailablePeers(replyTo))
+        ctx.scheduleOnce(50.millis, ctx.self, GetAvailablePeers(replyTo))
         Behaviors.same
       case UpdateOpenApiPeers(validPeers, replyTo) =>
         val newState = NodePoolState(validPeers, TreeSet.empty)
@@ -57,6 +57,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
         replyTo ! newState
         initialized(newState)
       case GracefulShutdown =>
+        logger.error(s"Stopping NodePool")
         Behaviors.stopped
     }
 
@@ -88,7 +89,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
   case class AvailablePeers(peerAddresses: List[Peer]) extends NodePoolResponse
 
   def getAvailablePeers(implicit s: ActorSystem[Nothing], actorRef: ActorRef[NodePoolRequest]): Future[AvailablePeers] =
-    actorRef.ask[AvailablePeers](GetAvailablePeers)
+    actorRef.ask[AvailablePeers](ref => GetAvailablePeers(ref))
 
   def invalidatePeers(
     invalidPeers: InvalidPeers

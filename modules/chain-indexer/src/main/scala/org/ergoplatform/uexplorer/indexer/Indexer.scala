@@ -1,19 +1,19 @@
 package org.ergoplatform.uexplorer.indexer
 
-import akka.{Done, NotUsed}
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.ActorAttributes.supervisionStrategy
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.scaladsl.{Flow, Source}
+import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
-import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, InMemoryDb, CassandraDb}
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
+import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor, ProgressState}
-import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -59,12 +59,12 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       newProgress <- ProgressMonitor.getChainState
     } yield newProgress
 
-  def run(pollingInterval: FiniteDuration): Future[Done] =
+  def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
     for {
       lastBlockInfoByEpochIndex <- backend.getLastBlockInfoByEpochIndex
       progress                  <- ProgressMonitor.updateState(lastBlockInfoByEpochIndex)
       _ = logger.info(s"Initiating indexing at $progress")
-      newProgress <- schedule(pollingInterval)(sync).run()
+      newProgress <- schedule(initialDelay, pollingInterval)(sync).run()
     } yield newProgress
 }
 
@@ -85,7 +85,7 @@ object Indexer extends LazyLogging {
           new Indexer(new InMemoryBackend(), blockHttpClient)
       }
     indexer
-      .run(5.seconds)
+      .run(2.seconds, 5.seconds)
       .andThen { case Failure(ex) =>
         logger.error(s"Shutting down due to unexpected error", ex)
         blockHttpClient.close().andThen { case _ => system.terminate() }

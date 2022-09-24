@@ -10,11 +10,12 @@ import scala.concurrent.duration._
 trait AkkaStreamSupport {
 
   def schedule[T](
+    initialDelay: FiniteDuration,
     interval: FiniteDuration
   )(run: => Future[T]): Source[T, NotUsed] =
     restartSource {
       Source
-        .tick(0.seconds, interval, ())
+        .tick(initialDelay, interval, ())
         .mapAsync(1)(_ => run)
         .withAttributes(Attributes.inputBuffer(0, 1))
     }
