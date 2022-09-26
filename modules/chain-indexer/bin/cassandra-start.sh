@@ -27,7 +27,7 @@ while true; do
         [Nn]* )
           export CASSANDRA_HEAP_NEWSIZE=1G
           export CASSANDRA_MAX_HEAP_SIZE=4G
-          exit;;
+          break;;
         * ) echo "y/n ?";;
     esac
 done
