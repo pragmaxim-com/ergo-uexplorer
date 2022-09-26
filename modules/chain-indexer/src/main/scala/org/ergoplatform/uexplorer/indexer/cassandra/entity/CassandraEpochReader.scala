@@ -7,8 +7,8 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.db.models.BlockStats
 import org.ergoplatform.explorer.{Address, BlockId}
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient.BlockInfo
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockInfo
 
 import scala.collection.immutable.TreeMap
 import scala.compat.java8.FutureConverters._
@@ -16,10 +16,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-trait CassandraEpochReader$ extends LazyLogging {
+trait CassandraEpochReader extends LazyLogging {
   this: CassandraBackend =>
 
-  import CassandraEpochReader$._
+  import CassandraEpochReader._
 
   private val blockInfoSelectPreparedStatement = cqlSession.prepare(blockInfoSelectStatement)
 
@@ -34,7 +34,9 @@ trait CassandraEpochReader$ extends LazyLogging {
     logger.debug(s"Getting existing epoch indexes from db ")
     Source
       .fromPublisher(
-        cqlSession.executeReactive(s"SELECT $last_header_id, $epoch_index FROM ${Const.CassandraKeyspace}.$node_epochs_table;")
+        cqlSession.executeReactive(
+          s"SELECT $last_header_id, $epoch_index FROM ${Const.CassandraKeyspace}.$node_epochs_table;"
+        )
       )
       .mapAsync(1)(r => getBlockInfo(BlockId.fromStringUnsafe(r.getString(last_header_id))).map(r.getInt(epoch_index) -> _))
       .runWith(Sink.seq)
@@ -48,7 +50,7 @@ trait CassandraEpochReader$ extends LazyLogging {
   }
 }
 
-object CassandraEpochReader$ extends CassandraPersistenceSupport {
+object CassandraEpochReader extends CassandraPersistenceSupport {
 
   protected[cassandra] val blockInfoSelectStatement: SimpleStatement = {
     import BlocksInfo._

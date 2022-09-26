@@ -9,8 +9,7 @@ import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient._
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.Future

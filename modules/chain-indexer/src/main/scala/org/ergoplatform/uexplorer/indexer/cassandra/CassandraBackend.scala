@@ -11,8 +11,8 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.api.Backend
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.Inserted
 import org.ergoplatform.uexplorer.indexer.cassandra.entity._
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.Inserted
 
 import scala.concurrent.duration.DurationInt
 
@@ -31,8 +31,8 @@ class CassandraBackend(implicit
   with CassandraInputsWriter
   with CassandraOutputsWriter
   with CassandraBlockUpdater
-  with CassandraEpochWriter$
-  with CassandraEpochReader$ {
+  with CassandraEpochWriter
+  with CassandraEpochReader {
 
   protected[cassandra] def buildInsertStatement(columns: Seq[String], table: String): SimpleStatement = {
     import QueryBuilder.{bindMarker, insertInto}
@@ -66,6 +66,7 @@ object CassandraBackend {
   import akka.stream.alpakka.cassandra.CassandraSessionSettings
   import akka.stream.alpakka.cassandra.scaladsl.{CassandraSession, CassandraSessionRegistry}
   import com.datastax.oss.driver.api.core.CqlSession
+
   import scala.concurrent.Await
 
   def apply()(implicit system: ActorSystem[Nothing]): CassandraBackend = {

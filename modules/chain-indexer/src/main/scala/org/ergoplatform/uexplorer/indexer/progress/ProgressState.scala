@@ -5,20 +5,19 @@ import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient._
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache
 
 import scala.collection.immutable.{SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
-import ProgressMonitor._
-import ProgressState.BlockCache
 
 case class ProgressState(
   lastBlockIdInEpoch: SortedMap[Int, BlockId],
   invalidEpochs: SortedMap[Int, InvalidEpochCandidate],
   blockCache: BlockCache
 ) {
+  import ProgressState._
 
   def getFinishedEpoch(currentEpochIndex: Int): (MaybeNewEpoch, ProgressState) =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
@@ -80,8 +79,7 @@ case class ProgressState(
         )
       )
     } else
-      BlockHttpClient
-        .buildBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId).map(_.stats))
+      buildBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId).map(_.stats))
         .map { flatBlock =>
           val newBlockInfo = flatBlock.buildInfo
           BestBlockInserted(flatBlock) -> copy(blockCache =
@@ -189,10 +187,76 @@ case class ProgressState(
 
 object ProgressState {
 
+  import cats.Applicative
+  import org.ergoplatform.explorer.BlockId
+  import org.ergoplatform.explorer.BuildFrom.syntax._
+  import org.ergoplatform.explorer.db.models.BlockStats
+  import org.ergoplatform.explorer.indexer.extractors._
+  import org.ergoplatform.explorer.indexer.models.{FlatBlock, SlotData}
+  import org.ergoplatform.explorer.protocol.models.ApiFullBlock
+  import org.ergoplatform.explorer.settings.ProtocolSettings
+  import tofu.Context
+
+  import scala.util.Try
+
   case class BlockCache(byId: Map[BlockId, BlockInfo], byHeight: SortedMap[Int, BlockInfo]) {
     def isEmpty: Boolean = byId.isEmpty || byHeight.isEmpty
 
     def heights: SortedSet[Int] = byHeight.keySet
+  }
+
+  case class BlockInfo(parentId: BlockId, stats: BlockStats)
+
+  def updateTotalStats(currentBlockStats: BlockStats, prevBlockStats: BlockStats)(implicit
+    protocol: ProtocolSettings
+  ): BlockStats =
+    currentBlockStats.copy(
+      blockChainTotalSize = prevBlockStats.blockChainTotalSize + currentBlockStats.blockSize,
+      totalTxsCount       = prevBlockStats.totalTxsCount + currentBlockStats.txsCount,
+      totalCoinsIssued    = protocol.emission.issuedCoinsAfterHeight(currentBlockStats.height),
+      totalMiningTime     = prevBlockStats.totalMiningTime + (currentBlockStats.timestamp - prevBlockStats.timestamp),
+      totalFees           = prevBlockStats.totalFees + currentBlockStats.blockFee,
+      totalMinersReward   = prevBlockStats.totalMinersReward + currentBlockStats.minerReward,
+      totalCoinsInTxs     = prevBlockStats.totalCoinsInTxs + currentBlockStats.blockCoins
+    )
+
+  def updateMainChain(block: FlatBlock, mainChain: Boolean, prevBlockInfoOpt: Option[BlockStats])(implicit
+    protocol: ProtocolSettings
+  ): FlatBlock = {
+    import monocle.macros.syntax.lens._
+    block
+      .lens(_.header.mainChain)
+      .modify(_ => mainChain)
+      .lens(_.info.mainChain)
+      .modify(_ => mainChain)
+      .lens(_.txs)
+      .modify(_.map(_.copy(mainChain = mainChain)))
+      .lens(_.inputs)
+      .modify(_.map(_.copy(mainChain = mainChain)))
+      .lens(_.dataInputs)
+      .modify(_.map(_.copy(mainChain = mainChain)))
+      .lens(_.outputs)
+      .modify(_.map(_.copy(mainChain = mainChain)))
+      .lens(_.info)
+      .modify {
+        case currentBlockStats if prevBlockInfoOpt.nonEmpty =>
+          updateTotalStats(currentBlockStats, prevBlockInfoOpt.get)
+        case currentBlockStats =>
+          currentBlockStats
+      }
+  }
+
+  def buildBlock(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
+    protocol: ProtocolSettings
+  ): Try[FlatBlock] = {
+    implicit val ctx = Context.const(protocol)(Applicative[Try])
+    SlotData(apiBlock, prevBlockInfo)
+      .intoF[Try, FlatBlock]
+      .map(updateMainChain(_, mainChain = true, prevBlockInfo))
+  }
+
+  implicit class FlatBlockPimp(underlying: FlatBlock) {
+    def buildInfo: BlockInfo = BlockInfo(underlying.header.parentId, underlying.info)
   }
 
 }

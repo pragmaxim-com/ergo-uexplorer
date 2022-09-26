@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient.{BlockInfo, FlatBlockPimp}
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.{BlockInfo, FlatBlockPimp}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 
 import java.util.concurrent.ConcurrentHashMap

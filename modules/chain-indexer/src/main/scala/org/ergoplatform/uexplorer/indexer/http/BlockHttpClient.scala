@@ -5,14 +5,8 @@ import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
-import cats.Applicative
 import org.ergoplatform.explorer.BlockId
-import org.ergoplatform.explorer.BuildFrom.syntax._
-import org.ergoplatform.explorer.db.models.BlockStats
-import org.ergoplatform.explorer.indexer.extractors._
-import org.ergoplatform.explorer.indexer.models.{FlatBlock, SlotData}
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
-import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
@@ -21,12 +15,10 @@ import retry.Policy
 import sttp.capabilities.WebSockets
 import sttp.client3._
 import sttp.client3.circe._
-import tofu.Context
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util.Try
 
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   s: ActorSystem[Nothing],
@@ -119,37 +111,4 @@ object BlockHttpClient {
       new BlockHttpClient(metadataClient)(ctx.system, progressMonitor, backend)
     }
   }
-
-  case class BlockInfo(parentId: BlockId, stats: BlockStats)
-
-  def updateMainChain(block: FlatBlock, mainChain: Boolean): FlatBlock = {
-    import monocle.macros.syntax.lens._
-    block
-      .lens(_.header.mainChain)
-      .modify(_ => mainChain)
-      .lens(_.info.mainChain)
-      .modify(_ => mainChain)
-      .lens(_.txs)
-      .modify(_.map(_.copy(mainChain = mainChain)))
-      .lens(_.inputs)
-      .modify(_.map(_.copy(mainChain = mainChain)))
-      .lens(_.dataInputs)
-      .modify(_.map(_.copy(mainChain = mainChain)))
-      .lens(_.outputs)
-      .modify(_.map(_.copy(mainChain = mainChain)))
-  }
-
-  def buildBlock(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
-    protocol: ProtocolSettings
-  ): Try[FlatBlock] = {
-    implicit val ctx = Context.const(protocol)(Applicative[Try])
-    SlotData(apiBlock, prevBlockInfo)
-      .intoF[Try, FlatBlock]
-      .map(updateMainChain(_, mainChain = true))
-  }
-
-  implicit class FlatBlockPimp(underlying: FlatBlock) {
-    def buildInfo: BlockInfo = BlockInfo(underlying.header.parentId, underlying.info)
-  }
-
 }

@@ -6,15 +6,14 @@ import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.protocol.models.ApiFullBlock
 import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient._
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
 import org.ergoplatform.uexplorer.indexer.{Rest, UnexpectedStateError}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
-import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable.TreeMap
 
-class ProgressMonitorSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
+class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
 
   private def emptyState: ProgressState =
     ProgressState(TreeMap.empty, TreeMap.empty, BlockCache(Map.empty, TreeMap.empty))
@@ -37,7 +36,7 @@ class ProgressMonitorSpec extends AnyFreeSpec with Matchers with DiffShouldMatch
   }
 
   val lastBlockInfoByEpochIndex =
-    "Progress monitor state should" - {
+    "ProgressState state should" - {
       "allow for updating epoch indexes" - {
         "when db has no epochs yet" - {
           emptyState.updateState(TreeMap.empty) shouldBe emptyState

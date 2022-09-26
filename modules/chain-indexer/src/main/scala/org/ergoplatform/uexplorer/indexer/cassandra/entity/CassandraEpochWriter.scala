@@ -15,9 +15,9 @@ import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-trait CassandraEpochWriter$ extends LazyLogging {
+trait CassandraEpochWriter extends LazyLogging {
   this: CassandraBackend =>
-  import CassandraEpochWriter$._
+  import CassandraEpochWriter._
 
   def epochWriteFlow: Flow[(FlatBlock, Option[MaybeNewEpoch]), (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(FlatBlock, Option[MaybeNewEpoch])]
@@ -47,7 +47,7 @@ trait CassandraEpochWriter$ extends LazyLogging {
       }
 }
 
-object CassandraEpochWriter$ extends CassandraPersistenceSupport {
+object CassandraEpochWriter extends CassandraPersistenceSupport {
 
   protected[cassandra] def epochInsertBinder(epoch: Epoch)(stmt: PreparedStatement): BoundStatement =
     stmt
