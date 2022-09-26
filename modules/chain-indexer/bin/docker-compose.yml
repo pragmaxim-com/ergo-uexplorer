@@ -14,8 +14,8 @@ services:
       - ${PWD}/cassandra.yaml:/etc/cassandra/cassandra.yaml
       - /var/lib/cassandra:/var/lib/cassandra
     environment:
-      - HEAP_NEWSIZE=3G
-      - MAX_HEAP_SIZE=12G
+      - HEAP_NEWSIZE=${CASSANDRA_HEAP_NEWSIZE}
+      - MAX_HEAP_SIZE=${CASSANDRA_MAX_HEAP_SIZE}
       - CASSANDRA_CLUSTER_NAME=ergo-cluster
   stargate:
     image: stargateio/stargate-4_0:v1.0.65

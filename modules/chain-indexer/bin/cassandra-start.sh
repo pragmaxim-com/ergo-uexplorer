@@ -2,44 +2,39 @@
 
 set -euo pipefail
 
-printf "Make sure that:
-  - /var/lib/cassandra dir exists
-  - /proc/sys/fs/aio-max-nr = 1048576
-  - you have at least 16GB of ram
-  - your system won't run another memory intensive processes like Browser, IDE, etc. (OOM killer might kick in) \n"
+if [ ! -d "/var/lib/cassandra" ]
+then
+    echo "Please create /var/lib/cassandra directory before proceeding."
+fi
+
+export CASSANDRA_HEAP_NEWSIZE=3G
+export CASSANDRA_MAX_HEAP_SIZE=12G
 
 while true; do
-    read -p "Do you want to continue? " yn
+    read -p "Are you going to sync blockchain from scratch? " yn
     case $yn in
-        [Yy]* ) break;;
-        [Nn]* ) exit;;
+        [Yy]* )
+          MEM_TOTAL=$(awk '/^MemTotal:/{print $2}' /proc/meminfo);
+          if [ "$MEM_TOTAL" -lt 14000000 ]
+          then
+              echo "You should have at least 14GB of RAM, exiting ..."
+              exit 1
+          elif [ "$MEM_TOTAL" -lt 17000000 ]
+          then
+            echo "Please close all memory intensive processes like Browser, IDE, etc. (OOM killer might kick in) until syncing finishes"
+          fi
+          break;;
+        [Nn]* )
+          export CASSANDRA_HEAP_NEWSIZE=1G
+          export CASSANDRA_MAX_HEAP_SIZE=4G
+          exit;;
         * ) echo "y/n ?";;
     esac
 done
 
-if [ ! -d "/var/lib/cassandra" ]
-then
-    echo "Directory /var/lib/cassandra DOES NOT exists."
-    exit 1
-fi
-
-MEM_TOTAL=$(awk '/^MemTotal:/{print $2}' /proc/meminfo);
-if [ "$MEM_TOTAL" -lt 14000000 ]
-then
-    echo "Cassandra is tested only with 16GB ram, you should have at least 14GB, it will most likely fail otherwise."
-    exit 1
-fi
-
-AIO_MAX_NR=$(cat /proc/sys/fs/aio-max-nr);
-if [ "$AIO_MAX_NR" -lt 1000000 ]
-then
-    echo "Indexing is tested with /proc/sys/fs/aio-max-nr = 1048576, it will most likely fail otherwise"
-    exit 1
-fi
-
 docker compose up -d cassandra
 
-(docker compose logs -f cassandra &) | grep -q "Created default superuser role"
+(docker compose logs -f cassandra &) | grep -q -e "Created default superuser role" -e "Startup complete"
 
 echo "Loading db schema"
 docker exec -it cassandra cqlsh --file '/tmp/cassandra.cql'
