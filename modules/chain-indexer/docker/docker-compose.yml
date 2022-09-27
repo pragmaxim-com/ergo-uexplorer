@@ -56,7 +56,8 @@ services:
     image: stargateio/stargate-4_0:v1.0.65
     container_name: stargate
     depends_on:
-      - cassandra
+      cassandra:
+        condition: service_healthy
     networks:
       - backend
     ports:
@@ -84,8 +85,8 @@ services:
     image: pragmaxim/uexplorer:latest
     container_name: uexplorer
     depends_on:
-      - cassandra
-      - ergo
+      cassandra:
+        condition: service_healthy
     volumes:
       - ./chain-indexer.conf:/uexplorer/conf/chain-indexer.conf
     networks:
