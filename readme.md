@@ -14,51 +14,41 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
 
 **Requirements:**
   - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
-  - local/remote CassandraDB, installation script expects :
-      - `/var/lib/cassandra` dir exists
-      - `/proc/sys/fs/aio-max-nr` has value `1048576`
-      - we run `docker` distro which is for playing only, install prod-ready distro if you can
-  - `16GB+` of RAM (`cassandraDB=14GB`, `ergo-node=512MB`, `chain-indexer=512MB`, `system=1GB`)
-      - if you have more RAM, change `cassandra-start.sh` script to avoid memory issues
+  - `16GB+` of RAM
+      - ergo-node = 1GB
+      - cassandraDB = 12GB
+      - stargate = 1GB
+      - chain-indexer = 512MB
+      - system = 1.5GB
+      - `start-all.sh` script asks you if you are syncing chain from scratch or not
   - `8vCPU+` for initial sync, polling and querying is not that demanding
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks automatically falls back to peer-network if local node is not available
 
 ### Build
 
+Not necessary as all docker images from docker-compose are publicly available :
 ```
-$ sbt stage
-$ tree dist
-dist
-├── bin
-│   ├── chain-indexer      # runs chain-indexer, expects cassandraDB + Ergo Node running
-│   ├── chain-indexer.bat
-│   ├── cassandra.cql         # db schema sourced from cassandra.sh
-│   ├── cassandra.yaml        # for overriding default cassandra server-side settings
-│   ├── cassandra-start.sh    # starts cassandra in a docker container
-│   └── cassandra-stop.sh     # flushes cassandra memtables to disk and then removes container
-├── conf
-│   ├── application.ini    # memory settings (default well tested)
-│   └── chain-indexer.conf # local/remote ergo node and cassandra address must be defined
-└── lib
-    └── chain-indexer.jar  # fat jar of all dependencies
+$ docker build . -t pragmaxim/uexplorer:latest
+```
+
+```
+# tree
+  ├── cassandra.cql         # db schema sourced in docker-compose.yml
+  ├── ergo-conf             # supply secret token
+  ├── chain-indexer.conf    # no need to change anything
+  ├── docker-compose.yml    # feel free to troubleshoot
+  ├── start-all.sh          # starts everything, feel free to start up services individually
+  ├── stop-ergo.sh          # ergo node must be shutdown gracefully with secret token
+  └── stop-cassandra.sh     # cassandra must be stopped gracefully
 ```
 
 ### Run
 
-Have fully synced ergo node running locally for initial explorer sync,
-start cassandra in syncing mode and then chain-indexer syncs in ~ 90 minutes.
 ```
-$ cd fully-synced-ergo-node
-$ nohup java -Xmx1g -jar ergo.jar --mainnet -c ergo.conf &
-
-$ cd ergo-uexplorer/dist/bin
-$ ./cassandra-start.sh
-4098518a35b0cdc74bf598dc52bcf032d952a2c30271a43064c1c353adb5fd6d
-Waiting for cassandra to initialize...
-Loading db schema
-
-$ ./chain-indexer
+$ cd modules/chain-indexer/docker
+$ start-all.sh
+$ docker compose logs uexplorer
 11:43:19 Initiating indexing of 816 epochs ...
 11:43:21 Persisted Epochs: 1[0], Blocks cache size (heights): 1538[1 - 1538]
 11:43:23 Persisted Epochs: 2[0 - 1], Blocks cache size (heights): 1538[1025 - 2562]
@@ -93,18 +83,18 @@ $ ./chain-indexer
         - if cassandra is killed during heavy initial sync by OOM killer,
           there might be data loss as it is eventually consistent database
           which requires proper shutdown. Please start syncing from scratch with empty DB.
-        - if indexing crashes but cassandra logs do not contain `SIGKILL`,
-          run `./chain-indexer` and it will continue when it stopped (no data gets lost)
+        - if indexing crashes but cassandra logs do not contain `SIGKILL`, no data gets lost
 
 **Cleanup:**
 ```
-$ ./cassandra-stop.sh
-$ sudo rm /var/lib/cassandra/* -rf
+$ ./stop-cassandra.sh
+$ ./stop-ergo.sh
+$ docker volume ls # cassandra and ergo volumes contain a lot of data
 ```
 
 ## Graphql API
 
-When `./cassandra-start.sh` script finishes, go to http://localhost:8085/playground and
+When `./start-all.sh` script finishes, go to http://localhost:8085/playground and
 copy/paste the auth token from following snippet to `HTTP HEADERS` at bottom-left of the playground
 and follow [documentation](https://stargate.io/docs/latest/develop/graphql.html).
 ```

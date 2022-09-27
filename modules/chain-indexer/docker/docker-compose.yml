@@ -1,0 +1,94 @@
+version: '3'
+
+volumes:
+  ergo-volume:
+  cassandra-volume:
+
+services:
+  ergo:
+    image: ergoplatform/ergo:latest
+    container_name: ergo
+    networks:
+      - backend
+    ports:
+      - 9030:9030
+      - 127.0.0.1:9053:9053
+    volumes:
+      - ergo-volume:/home/ergo/.ergo
+      - ./ergo.conf:/home/ergo/ergo.conf
+    environment:
+      - _JAVA_OPTIONS="-Xmx${ERGO_MAX_HEAP:-3G}"
+    entrypoint: ["java", "-jar", "/home/ergo/ergo.jar", "--mainnet", "-c", "ergo.conf"]
+  cassandra:
+    image: cassandra:4.0.6
+    container_name: cassandra
+    networks:
+      - backend
+    ports:
+      - 127.0.0.1:9044:9042
+    oom_kill_disable: true
+    volumes:
+      - cassandra-volume:/var/lib/cassandra
+    environment:
+      - HEAP_NEWSIZE=${CASSANDRA_HEAP_NEWSIZE:-1G}
+      - MAX_HEAP_SIZE=${CASSANDRA_MAX_HEAP_SIZE:-4G}
+      - CASSANDRA_CLUSTER_NAME=ergo-cluster
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+  cassandra-init:
+    image: cassandra:4.0.6
+    container_name: cassandra-init
+    restart: "no"
+    networks:
+      - backend
+    volumes:
+      - ./cassandra.cql:/cassandra.cql
+    environment:
+      - CQLSH_HOST=cassandra
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    command: /bin/bash -c "echo loading cassandra keyspace && cqlsh -f /cassandra.cql"
+  stargate:
+    image: stargateio/stargate-4_0:v1.0.65
+    container_name: stargate
+    depends_on:
+      - cassandra
+    networks:
+      - backend
+    ports:
+      # cql
+      - 127.0.0.1:9045:9042
+      # graphql
+      - 127.0.0.1:8085:8080
+      # auth
+      - 127.0.0.1:8081:8081
+      # REST
+      - 127.0.0.1:8082:8082
+      # health
+      - 127.0.0.1:8084:8084
+      # grpc
+      - 127.0.0.1:8090:8090
+    environment:
+      - JAVA_OPTS="-Xmx1G"
+      - CLUSTER_NAME=ergo-cluster
+      - CLUSTER_VERSION=4.0
+      - SEED=cassandra
+      - RACK_NAME=rack1
+      - DATACENTER_NAME=datacenter1
+      - ENABLE_AUTH=false
+  uexplorer:
+    image: pragmaxim/uexplorer:latest
+    container_name: uexplorer
+    depends_on:
+      - cassandra
+      - ergo
+    volumes:
+      - ./chain-indexer.conf:/uexplorer/conf/chain-indexer.conf
+    networks:
+      - backend
+networks:
+  backend:

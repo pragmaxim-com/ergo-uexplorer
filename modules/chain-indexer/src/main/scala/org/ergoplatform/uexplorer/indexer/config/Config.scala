@@ -27,7 +27,7 @@ object ChainIndexerConf {
 
   lazy val loadWithFallback: Result[ChainIndexerConf] =
     ConfigSource
-      .file("../conf/chain-indexer.conf")
+      .file("conf/chain-indexer.conf")
       .withFallback(ConfigSource.default)
       .at("chain-indexer")
       .load[ChainIndexerConf]

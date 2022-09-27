@@ -29,8 +29,6 @@ lazy val indexer =
         case other if other.contains("io.netty.versions") => MergeStrategy.first
         case other => (assembly / assemblyMergeStrategy).value(other)
       },
-      Universal / mappings ++= (baseDirectory.value / "bin" * "*" get) map(x => x -> ("bin/" + x.getName)),
-      Universal / mappings ++= (baseDirectory.value / "conf" * "*" get) map(x => x -> ("conf/" + x.getName)),
       Universal / mappings := {
         val universalMappings = (Universal / mappings).value
         val fatJar = (Compile / assembly).value
