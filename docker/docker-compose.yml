@@ -9,6 +9,7 @@ services:
   cassandra:
     image: cassandra:4.0.6
     container_name: cassandra
+    restart: "on-failure"
     networks:
       - backend
     ports:
@@ -20,26 +21,25 @@ services:
       - HEAP_NEWSIZE=${CASSANDRA_HEAP_NEWSIZE:-1G}
       - MAX_HEAP_SIZE=${CASSANDRA_MAX_HEAP_SIZE:-4G}
       - CASSANDRA_CLUSTER_NAME=ergo-cluster
-    restart: "on-failure"
     healthcheck:
       test: cqlsh -e "describe keyspaces" || exit 1
-      interval: 30s
-      timeout: 10s
-      start_period: 29s
-      retries: 10
+      interval: 5s
+      timeout: 5s
+      start_period: 31s
+      retries: 6
   cassandra-init:
     image: cassandra:4.0.6
     container_name: cassandra-init
     restart: "no"
+    depends_on:
+      cassandra:
+        condition: service_healthy
     networks:
       - backend
     volumes:
       - ./cassandra.cql:/cassandra.cql
     environment:
       - CQLSH_HOST=cassandra
-    depends_on:
-      cassandra:
-        condition: service_healthy
     command: /bin/bash -c "echo loading cassandra keyspace && cqlsh -f /cassandra.cql"
   stargate:
     image: stargateio/stargate-4_0:v1.0.65
@@ -70,6 +70,12 @@ services:
       - RACK_NAME=rack1
       - DATACENTER_NAME=datacenter1
       - ENABLE_AUTH=false
+    healthcheck:
+      test: curl --fail http://127.0.0.1:8082 || exit 1
+      interval: 3s
+      timeout: 1s
+      start_period: 12s
+      retries: 4
   uexplorer:
     image: pragmaxim/uexplorer:latest
     container_name: uexplorer
@@ -78,10 +84,10 @@ services:
         condition: service_healthy
       cassandra-init:
         condition: service_completed_successfully
-    volumes:
-      - ./chain-indexer.conf:/uexplorer/conf/chain-indexer.conf
     networks:
       - backend
+    volumes:
+      - ./chain-indexer.conf:/uexplorer/conf/chain-indexer.conf
     environment:
       # override in case you run your own Ergo node deployment
       - LOCAL_ERGO_NODE_HOST=host.docker.internal
