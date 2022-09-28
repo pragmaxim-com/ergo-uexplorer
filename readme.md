@@ -35,11 +35,11 @@ $ docker build . -t pragmaxim/uexplorer:latest
 ```
 # tree
   ├── cassandra.cql         # db schema sourced in docker-compose.yml
-  ├── ergo-conf             # expect global env variable SCOREX_REST_API_KEY_HASH
+  ├── ergo-conf             # expects global env variable SCOREX_REST_API_KEY_HASH
   ├── chain-indexer.conf    # no need to change anything
   ├── docker-compose.yml    # feel free to troubleshoot
   ├── start-all.sh          # starts everything, feel free to start up services individually
-  ├── stop-ergo.sh          # ergo node must be shutdown gracefully with secret token
+  ├── stop-ergo.sh          # expects global env variable SCOREX_REST_API_KEY
   └── stop-cassandra.sh     # cassandra must be stopped gracefully
 ```
 
