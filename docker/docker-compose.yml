@@ -90,7 +90,7 @@ services:
       - ./chain-indexer.conf:/uexplorer/conf/chain-indexer.conf
     environment:
       # override in case you run your own Ergo node deployment
-      - LOCAL_ERGO_NODE_HOST=host.docker.internal
+      - LOCAL_ERGO_NODE_HOST=172.17.0.1
       - LOCAL_ERGO_NODE_PORT=9053
       # override in case you run your own Cassandra deployment
       - CASSANDRA_SEED_HOST=cassandra
