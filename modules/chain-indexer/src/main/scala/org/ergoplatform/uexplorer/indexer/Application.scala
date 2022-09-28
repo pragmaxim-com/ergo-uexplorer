@@ -13,14 +13,13 @@ object Application extends App with LazyLogging {
     case Left(failures) =>
       failures.toList.foreach(f => logger.error(s"Config error ${f.description} at ${f.location}"))
       System.exit(1)
-    case Right(conf) =>
+    case Right((chainIndexerConf, config)) =>
       val guardian: Behavior[Nothing] =
         Behaviors.setup[Nothing] { implicit ctx =>
-          Indexer.runWith(conf)
+          Indexer.runWith(chainIndexerConf)
           Behaviors.same
         }
-
-      val system: ActorSystem[Nothing] = ActorSystem[Nothing](guardian, "uexplorer")
+      val system: ActorSystem[Nothing] = ActorSystem[Nothing](guardian, "uexplorer", config)
       Await.result(system.whenTerminated, Duration.Inf)
   }
 
