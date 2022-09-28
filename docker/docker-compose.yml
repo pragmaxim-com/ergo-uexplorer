@@ -3,32 +3,9 @@ version: '3'
 name: uexplorer
 
 volumes:
-  ergo-volume:
   cassandra-volume:
 
 services:
-  ergo:
-    image: ergoplatform/ergo:latest
-    container_name: ergo
-    networks:
-      - backend
-    ports:
-      - 9030:9030
-      - 127.0.0.1:9053:9053
-    volumes:
-      - ergo-volume:/home/ergo/.ergo
-      - ./ergo.conf:/home/ergo/ergo.conf
-    environment:
-      - _JAVA_OPTIONS="-Xmx${ERGO_MAX_HEAP:-3G}"
-      - SCOREX_REST_API_KEY_HASH=${SCOREX_REST_API_KEY_HASH:-324dcf027dd4a30a932c441f365a25e86b173defa4b8e58948253471b81b72cf}
-    restart: "on-failure"
-    healthcheck:
-      test: curl --fail http://localhost:9053/info || exit 1
-      interval: 30s
-      timeout: 10s
-      start_period: 29s
-      retries: 10
-    entrypoint: ["java", "-jar", "/home/ergo/ergo.jar", "--mainnet", "-c", "ergo.conf"]
   cassandra:
     image: cassandra:4.0.6
     container_name: cassandra
@@ -101,15 +78,13 @@ services:
         condition: service_healthy
       cassandra-init:
         condition: service_completed_successfully
-      ergo:
-        condition: service_started
     volumes:
       - ./chain-indexer.conf:/uexplorer/conf/chain-indexer.conf
     networks:
       - backend
     environment:
       # override in case you run your own Ergo node deployment
-      - LOCAL_ERGO_NODE_HOST=ergo
+      - LOCAL_ERGO_NODE_HOST=host.docker.internal
       - LOCAL_ERGO_NODE_PORT=9053
       # override in case you run your own Cassandra deployment
       - CASSANDRA_SEED_HOST=cassandra

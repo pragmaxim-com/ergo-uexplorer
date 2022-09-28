@@ -29,4 +29,17 @@ while true; do
     esac
 done
 
-docker compose up -d
+while true; do
+    read -p "Do you want to create Ergo Node docker container? " yn
+    case $yn in
+        [Yy]* )
+          echo "Starting Ergo node, cassandra, stargate and uexplorer..."
+          docker compose -f docker-compose.yml -f docker-compose.node.yml up -d
+          break;;
+        [Nn]* )
+          echo "Starting cassandra, stargate and uexplorer..."
+          docker compose up -d
+          break;;
+        * ) echo "y/n ?";;
+    esac
+done
