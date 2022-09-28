@@ -35,7 +35,7 @@ $ docker build . -t pragmaxim/uexplorer:latest
 ```
 # tree
   ├── cassandra.cql         # db schema sourced in docker-compose.yml
-  ├── ergo-conf             # supply secret token
+  ├── ergo-conf             # expect global env variable SCOREX_REST_API_KEY_HASH
   ├── chain-indexer.conf    # no need to change anything
   ├── docker-compose.yml    # feel free to troubleshoot
   ├── start-all.sh          # starts everything, feel free to start up services individually

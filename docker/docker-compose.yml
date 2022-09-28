@@ -20,6 +20,8 @@ services:
       - ./ergo.conf:/home/ergo/ergo.conf
     environment:
       - _JAVA_OPTIONS="-Xmx${ERGO_MAX_HEAP:-3G}"
+      - SCOREX_REST_API_KEY_HASH=${SCOREX_REST_API_KEY_HASH:-324dcf027dd4a30a932c441f365a25e86b173defa4b8e58948253471b81b72cf}
+    restart: "on-failure"
     healthcheck:
       test: curl --fail http://localhost:9053/info || exit 1
       interval: 30s
@@ -41,6 +43,7 @@ services:
       - HEAP_NEWSIZE=${CASSANDRA_HEAP_NEWSIZE:-1G}
       - MAX_HEAP_SIZE=${CASSANDRA_MAX_HEAP_SIZE:-4G}
       - CASSANDRA_CLUSTER_NAME=ergo-cluster
+    restart: "on-failure"
     healthcheck:
       test: cqlsh -e "describe keyspaces" || exit 1
       interval: 30s

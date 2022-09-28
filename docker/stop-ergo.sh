@@ -1,10 +1,8 @@
 #!/bin/bash
 
-SECRET=$1
-
-if [ -z "$SECRET" ]
+if [ -z "$SCOREX_REST_API_KEY_HASH" ]
   then
-    echo "Please pass scorex.restApi.apiKeyHash as argument to shutdown ergo node properly"
+    echo "Please export SCOREX_REST_API_KEY_HASH env var to shutdown ergo node properly"
     exit 1
 fi
 
@@ -12,7 +10,7 @@ docker compose stop uexplorer
 
 echo "Shutting down Ergo node..."
 
-curl -X POST "http://127.0.0.1:9053/node/shutdown" -H "accept: application/json" -H "api_key: $SECRET"
+curl -X POST "http://127.0.0.1:9053/node/shutdown" -H "accept: application/json" -H "api_key: $SCOREX_REST_API_KEY_HASH"
 
 sleep 5
 
