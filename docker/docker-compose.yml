@@ -1,5 +1,7 @@
 version: '3'
 
+name: uexplorer
+
 volumes:
   ergo-volume:
   cassandra-volume:
@@ -18,6 +20,12 @@ services:
       - ./ergo.conf:/home/ergo/ergo.conf
     environment:
       - _JAVA_OPTIONS="-Xmx${ERGO_MAX_HEAP:-3G}"
+    healthcheck:
+      test: curl --fail http://localhost:9053/info || exit 1
+      interval: 30s
+      timeout: 10s
+      start_period: 29s
+      retries: 10
     entrypoint: ["java", "-jar", "/home/ergo/ergo.jar", "--mainnet", "-c", "ergo.conf"]
   cassandra:
     image: cassandra:4.0.6
@@ -34,9 +42,10 @@ services:
       - MAX_HEAP_SIZE=${CASSANDRA_MAX_HEAP_SIZE:-4G}
       - CASSANDRA_CLUSTER_NAME=ergo-cluster
     healthcheck:
-      test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
-      interval: 15s
+      test: cqlsh -e "describe keyspaces" || exit 1
+      interval: 30s
       timeout: 10s
+      start_period: 29s
       retries: 10
   cassandra-init:
     image: cassandra:4.0.6
@@ -74,10 +83,10 @@ services:
       # grpc
       - 127.0.0.1:8090:8090
     environment:
+      - SEED=cassandra
       - JAVA_OPTS="-Xmx1G"
       - CLUSTER_NAME=ergo-cluster
       - CLUSTER_VERSION=4.0
-      - SEED=cassandra
       - RACK_NAME=rack1
       - DATACENTER_NAME=datacenter1
       - ENABLE_AUTH=false
@@ -87,9 +96,20 @@ services:
     depends_on:
       cassandra:
         condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
+      ergo:
+        condition: service_started
     volumes:
       - ./chain-indexer.conf:/uexplorer/conf/chain-indexer.conf
     networks:
       - backend
+    environment:
+      # override in case you run your own Ergo node deployment
+      - LOCAL_ERGO_NODE_HOST=ergo
+      - LOCAL_ERGO_NODE_PORT=9053
+      # override in case you run your own Cassandra deployment
+      - CASSANDRA_SEED_HOST=cassandra
+      - CASSANDRA_SEED_PORT=9042
 networks:
   backend:

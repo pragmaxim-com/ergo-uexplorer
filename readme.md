@@ -46,7 +46,7 @@ $ docker build . -t pragmaxim/uexplorer:latest
 ### Run
 
 ```
-$ cd modules/chain-indexer/docker
+$ cd docker
 $ start-all.sh
 $ docker compose logs uexplorer
 11:43:19 Initiating indexing of 816 epochs ...
