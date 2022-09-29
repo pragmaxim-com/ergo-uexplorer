@@ -23,7 +23,7 @@ jobs:
         uses: docker/metadata-action@v3.5.0
         id: meta
         with:
-          images: pragmaxim/uexplorer
+          images: pragmaxim/uexplorer-chain-indexer
       -
         name: Build and push
         uses: docker/build-push-action@v2.7.0

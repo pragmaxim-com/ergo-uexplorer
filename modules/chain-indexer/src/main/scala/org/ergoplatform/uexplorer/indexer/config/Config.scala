@@ -38,7 +38,7 @@ object ChainIndexerConf extends LazyLogging {
         .resolve()
 
     val chainIndexerConf =
-      rootConfig.getValue("chain-indexer").render(formatting(true))
+      rootConfig.getValue("uexplorer.chain-indexer").render(formatting(true))
     val cassandraContactPoints =
       rootConfig.getValue("datastax-java-driver.basic.contact-points").render(formatting(false))
     logger.info(s"ChainIndexer config: $chainIndexerConf")
@@ -47,7 +47,7 @@ object ChainIndexerConf extends LazyLogging {
     ConfigSource
       .file("conf/chain-indexer.conf")
       .withFallback(ConfigSource.default)
-      .at("chain-indexer")
+      .at("uexplorer.chain-indexer")
       .load[ChainIndexerConf]
       .map(_ -> rootConfig)
   }

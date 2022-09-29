@@ -26,7 +26,7 @@ services:
       start_period: 8s
       retries: 4
     entrypoint: ["java", "-jar", "/home/ergo/ergo.jar", "--mainnet", "-c", "ergo.conf"]
-  uexplorer:
+  chain-indexer:
     depends_on:
       ergo:
         condition: service_started
