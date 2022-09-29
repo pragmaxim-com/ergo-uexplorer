@@ -7,8 +7,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
-import java.nio.ByteBuffer
-
 trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
   import Headers._
 
@@ -19,17 +17,18 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
       headerInsertBinder
     )
 
-  protected[cassandra] def headerInsertBinder: (FlatBlock, PreparedStatement) => BoundStatement = { case (block, statement) =>
-    val validVersion =
-      if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
-        logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")
-        0: Byte
-      } else {
-        block.header.version
-      }
+  protected[cassandra] def headerInsertBinder: (FlatBlock, PreparedStatement) => BoundStatement = {
+    case (block, statement) =>
+      val validVersion =
+        if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
+          logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")
+          0: Byte
+        } else {
+          block.header.version
+        }
 
-    val partialStatement =
-      // format: off
+      val partialStatement =
+        // format: off
       statement
         .bind()
         .setString(header_id,             block.header.id.value.unwrapped)
@@ -39,25 +38,25 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
         .setLong(n_bits,                  block.header.nBits)
         .setBigDecimal(difficulty,        block.header.difficulty.bigDecimal)
         .setLong(timestamp,               block.header.timestamp)
-        .setByteBuffer(state_root,        ByteBuffer.wrap(block.header.stateRoot.bytes))
-        .setByteBuffer(ad_proofs_root,    ByteBuffer.wrap(block.header.adProofsRoot.bytes))
-        .setByteBuffer(extensions_digest, ByteBuffer.wrap(block.extension.digest.bytes))
+        .setString(state_root,            block.header.stateRoot.unwrapped)
+        .setString(ad_proofs_root,        block.header.adProofsRoot.unwrapped)
+        .setString(extensions_digest,     block.extension.digest.unwrapped)
         .setString(extensions_fields,     block.extension.fields.noSpaces)
-        .setByteBuffer(transactions_root, ByteBuffer.wrap(block.header.transactionsRoot.bytes))
-        .setByteBuffer(extension_hash,    ByteBuffer.wrap(block.header.extensionHash.bytes))
-        .setByteBuffer(miner_pk,          ByteBuffer.wrap(block.header.minerPk.bytes))
-        .setByteBuffer(w,                 ByteBuffer.wrap(block.header.w.bytes))
-        .setByteBuffer(n,                 ByteBuffer.wrap(block.header.n.bytes))
+        .setString(transactions_root,     block.header.transactionsRoot.unwrapped)
+        .setString(extension_hash,        block.header.extensionHash.unwrapped)
+        .setString(miner_pk,              block.header.minerPk.unwrapped)
+        .setString(w,                     block.header.w.unwrapped)
+        .setString(n,                     block.header.n.unwrapped)
         .setString(d,                     block.header.d)
         .setString(votes,                 block.header.votes)
         .setBoolean(main_chain,           block.header.mainChain)
         // format: on
 
-    block.adProofOpt.fold(partialStatement) { adProof =>
-      partialStatement
-        .setByteBuffer(ad_proofs_bytes, ByteBuffer.wrap(adProof.proofBytes.bytes))
-        .setByteBuffer(ad_proofs_digest, ByteBuffer.wrap(adProof.digest.bytes))
-    }
+      block.adProofOpt.fold(partialStatement) { adProof =>
+        partialStatement
+          .setString(ad_proofs_bytes, adProof.proofBytes.unwrapped)
+          .setString(ad_proofs_digest, adProof.digest.unwrapped)
+      }
   }
 
 }

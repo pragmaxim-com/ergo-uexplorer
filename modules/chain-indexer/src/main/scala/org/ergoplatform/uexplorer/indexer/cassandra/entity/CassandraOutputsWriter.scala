@@ -7,8 +7,6 @@ import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
-import java.nio.ByteBuffer
-
 trait CassandraOutputsWriter { this: CassandraBackend =>
   import Outputs._
 
@@ -23,29 +21,23 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
   protected[cassandra] def outputInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
     case (block, statement) =>
       block.outputs.map { output =>
-        val partialStatement =
-          statement
-            .bind()
-            // format: off
-            .setString(header_id,                   output.headerId.value.unwrapped)
-            .setString(box_id,                      output.boxId.value)
-            .setString(tx_id,                       output.txId.value)
-            .setLong(value,                         output.value)
-            .setInt(creation_height,                output.creationHeight)
-            .setInt(settlement_height,              output.settlementHeight)
-            .setInt(idx,                            output.index)
-            .setLong(global_index,                  output.globalIndex)
-            .setByteBuffer(ergo_tree,               ByteBuffer.wrap(output.ergoTree.bytes))
-            .setByteBuffer(ergo_tree_template_hash, ByteBuffer.wrap(output.ergoTreeTemplateHash.value.bytes))
-            .setString(additional_registers,        output.additionalRegisters.noSpaces)
-            .setLong(timestamp,                     output.timestamp)
-            .setBoolean(main_chain,                 output.mainChain)
-          // format: on
-
-        if (output.address.unwrapped != Const.FeeContractAddress)
-          partialStatement.setString(address, output.address.unwrapped)
-        else
-          partialStatement.setToNull(address)
+        statement
+          .bind()
+          // format: off
+          .setString(header_id,                   output.headerId.value.unwrapped)
+          .setString(box_id,                      output.boxId.value)
+          .setString(tx_id,                       output.txId.value)
+          .setLong(value,                         output.value)
+          .setString(address,                     output.address.unwrapped)
+          .setInt(creation_height,                output.creationHeight)
+          .setInt(settlement_height,              output.settlementHeight)
+          .setInt(idx,                            output.index)
+          .setLong(global_index,                  output.globalIndex)
+          .setString(ergo_tree,                   output.ergoTree.unwrapped)
+          .setString(ergo_tree_template_hash,     output.ergoTreeTemplateHash.value.unwrapped)
+          .setLong(timestamp,                     output.timestamp)
+          .setBoolean(main_chain,                 output.mainChain)
+        // format: on
       }
   }
 }
@@ -64,7 +56,6 @@ object Outputs {
   protected[cassandra] val ergo_tree               = "ergo_tree"
   protected[cassandra] val ergo_tree_template_hash = "ergo_tree_template_hash"
   protected[cassandra] val address                 = "address"
-  protected[cassandra] val additional_registers    = "additional_registers"
   protected[cassandra] val timestamp               = "timestamp"
   protected[cassandra] val main_chain              = "main_chain"
 
@@ -80,7 +71,6 @@ object Outputs {
     ergo_tree,
     ergo_tree_template_hash,
     address,
-    additional_registers,
     timestamp,
     main_chain
   )

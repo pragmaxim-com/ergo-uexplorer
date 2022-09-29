@@ -9,17 +9,17 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_headers
     n_bits            BIGINT,
     difficulty        DECIMAL,
     timestamp         BIGINT,
-    state_root        BLOB,
-    ad_proofs_root    BLOB,
-    ad_proofs_bytes   BLOB,
-    ad_proofs_digest  BLOB,
-    extensions_digest BLOB,
+    state_root        VARCHAR,
+    ad_proofs_root    VARCHAR,
+    ad_proofs_bytes   VARCHAR,
+    ad_proofs_digest  VARCHAR,
+    extensions_digest VARCHAR,
     extensions_fields VARCHAR,
-    transactions_root BLOB,
-    extension_hash    BLOB,
-    miner_pk          BLOB,
-    w                 BLOB,
-    n                 BLOB,
+    transactions_root VARCHAR,
+    extension_hash    VARCHAR,
+    miner_pk          VARCHAR,
+    w                 VARCHAR,
+    n                 VARCHAR,
     d                 VARCHAR,
     votes             VARCHAR,
     main_chain        BOOLEAN,
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_inputs
     header_id   VARCHAR,
     box_id      VARCHAR,
     tx_id       VARCHAR,
-    proof_bytes BLOB,
+    proof_bytes VARCHAR,
     extension   VARCHAR,
     idx         INT,
     main_chain  BOOLEAN,
@@ -112,10 +112,9 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_outputs
     settlement_height       INT,
     idx                     INT,
     global_index            BIGINT,
-    ergo_tree               BLOB,
-    ergo_tree_template_hash BLOB,
+    ergo_tree               VARCHAR,
+    ergo_tree_template_hash VARCHAR,
     address                 VARCHAR,
-    additional_registers    VARCHAR,
     timestamp               BIGINT,
     main_chain              BOOLEAN,
     PRIMARY KEY ((header_id), box_id)
@@ -125,12 +124,14 @@ CREATE INDEX IF NOT EXISTS "node_outputs__box_id" ON uexplorer.node_outputs (box
 CREATE INDEX IF NOT EXISTS "node_outputs__tx_id" ON uexplorer.node_outputs (tx_id);
 CREATE INDEX IF NOT EXISTS "node_outputs__timestamp" ON uexplorer.node_outputs (timestamp);
 CREATE INDEX IF NOT EXISTS "node_outputs__address" ON uexplorer.node_outputs (address);
+CREATE INDEX IF NOT EXISTS "node_outputs__ergo_tree" ON uexplorer.node_outputs (ergo_tree);
+CREATE INDEX IF NOT EXISTS "node_outputs__ergo_tree_template_hash" ON uexplorer.node_outputs (ergo_tree_template_hash);
 
 
 CREATE TABLE IF NOT EXISTS uexplorer.node_assets
 (
     header_id VARCHAR,
-    token_id  BLOB,
+    token_id  VARCHAR,
     box_id    VARCHAR,
     idx       INT,
     value     BIGINT,
@@ -147,8 +148,7 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_registers
     id               VARCHAR,
     box_id           VARCHAR,
     value_type       VARCHAR,
-    serialized_value BLOB,
-    rendered_value   VARCHAR,
+    serialized_value VARCHAR,
     PRIMARY KEY ((header_id), id, box_id)
 );
 
@@ -158,7 +158,7 @@ CREATE INDEX IF NOT EXISTS "node_registers__box_id" ON uexplorer.node_registers 
 CREATE TABLE IF NOT EXISTS uexplorer.node_tokens
 (
     header_id       VARCHAR,
-    token_id        BLOB,
+    token_id        VARCHAR,
     box_id          VARCHAR,
     emission_amount BIGINT,
     name            VARCHAR,

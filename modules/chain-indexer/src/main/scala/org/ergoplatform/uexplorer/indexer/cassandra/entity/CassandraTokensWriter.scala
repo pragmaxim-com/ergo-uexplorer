@@ -7,8 +7,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
-import java.nio.ByteBuffer
-
 trait CassandraTokensWriter extends LazyLogging {
   this: CassandraBackend =>
 
@@ -30,7 +28,7 @@ trait CassandraTokensWriter extends LazyLogging {
             // format: off
             .bind()
             .setString(header_id,     block.header.id.value.unwrapped)
-            .setByteBuffer(token_id,  ByteBuffer.wrap(t.id.value.bytes))
+            .setString(token_id,      t.id.value.unwrapped)
             .setString(box_id,        t.boxId.value)
             .setLong(emission_amount, t.emissionAmount)
             .setInt(decimals,         t.decimals.getOrElse(0))

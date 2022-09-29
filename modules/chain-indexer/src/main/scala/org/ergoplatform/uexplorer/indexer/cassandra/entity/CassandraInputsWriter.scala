@@ -31,9 +31,9 @@ trait CassandraInputsWriter { this: CassandraBackend =>
             .setInt(idx,              input.index)
             .setBoolean(main_chain,   input.mainChain)
             // format: on
-        input.proofBytes.map(_.bytes) match {
+        input.proofBytes match {
           case Some(proofBytes) =>
-            partialStatement.setByteBuffer(proof_bytes, java.nio.ByteBuffer.wrap(proofBytes))
+            partialStatement.setString(proof_bytes, proofBytes.unwrapped)
           case None =>
             partialStatement.setToNull(proof_bytes)
         }
