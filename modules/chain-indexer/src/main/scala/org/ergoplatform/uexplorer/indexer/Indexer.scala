@@ -79,8 +79,8 @@ object Indexer extends LazyLogging {
     BlockHttpClient.withNodePoolBackend(conf).flatMap { blockHttpClient =>
       val indexer =
         conf.backendType match {
-          case CassandraDb =>
-            new Indexer(CassandraBackend(), blockHttpClient)
+          case CassandraDb(parallelism) =>
+            new Indexer(CassandraBackend(parallelism), blockHttpClient)
           case InMemoryDb =>
             new Indexer(new InMemoryBackend(), blockHttpClient)
         }

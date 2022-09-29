@@ -54,5 +54,6 @@ object ChainIndexerConf extends LazyLogging {
 }
 
 sealed trait BackendType
-case object CassandraDb extends BackendType
+
+case class CassandraDb(parallelism: Int) extends BackendType
 case object InMemoryDb extends BackendType

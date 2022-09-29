@@ -16,7 +16,7 @@ import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.Inserted
 
 import scala.concurrent.duration.DurationInt
 
-class CassandraBackend(implicit
+class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
   val system: ActorSystem[Nothing]
 ) extends Backend
@@ -49,15 +49,15 @@ class CassandraBackend(implicit
   val blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed] =
     Flow[Inserted]
       // format: off
-      .via(blockUpdaterFlow(parallelism = 1))
-      .via(headerWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(blockInfoWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(transactionsWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(registersWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(tokensWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(inputsWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(assetsWriteFlow(parallelism = 1)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(outputsWriteFlow(parallelism = 1))
+      .via(blockUpdaterFlow(parallelism))
+      .via(headerWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(blockInfoWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(transactionsWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(registersWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(tokensWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(inputsWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(assetsWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(outputsWriteFlow(parallelism))
       // format: on
 }
 
@@ -69,10 +69,10 @@ object CassandraBackend {
 
   import scala.concurrent.Await
 
-  def apply()(implicit system: ActorSystem[Nothing]): CassandraBackend = {
+  def apply(parallelism: Int)(implicit system: ActorSystem[Nothing]): CassandraBackend = {
     val cassandraSession: CassandraSession =
       CassandraSessionRegistry.get(system).sessionFor(CassandraSessionSettings())
     implicit val cqlSession: CqlSession = Await.result(cassandraSession.underlying(), 5.seconds)
-    new CassandraBackend()
+    new CassandraBackend(parallelism)
   }
 }
