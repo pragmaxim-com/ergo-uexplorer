@@ -45,14 +45,12 @@ object Registers {
   protected[cassandra] val box_id           = "box_id"
   protected[cassandra] val value_type       = "value_type"
   protected[cassandra] val serialized_value = "serialized_value"
-  protected[cassandra] val rendered_value   = "rendered_value"
 
   protected[cassandra] val columns = Seq(
     header_id,
     id,
     box_id,
     value_type,
-    serialized_value,
-    rendered_value
+    serialized_value
   )
 }
