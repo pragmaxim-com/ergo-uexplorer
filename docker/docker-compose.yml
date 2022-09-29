@@ -25,11 +25,11 @@ services:
       test: cqlsh -e "describe keyspaces" || exit 1
       interval: 5s
       timeout: 5s
-      start_period: 31s
-      retries: 6
-  cassandra-init:
+      start_period: 45s
+      retries: 9
+  cassandra-init-tables:
     image: cassandra:4.0.6
-    container_name: cassandra-init
+    container_name: cassandra-init-tables
     restart: "no"
     depends_on:
       cassandra:
@@ -37,58 +37,24 @@ services:
     networks:
       - backend
     volumes:
-      - ./cassandra.cql:/cassandra.cql
+      - ./schema-tables.cql:/schema-tables.cql
     environment:
       - CQLSH_HOST=cassandra
-    command: /bin/bash -c "echo loading cassandra keyspace && cqlsh -f /cassandra.cql"
-  stargate:
-    image: stargateio/stargate-4_0:v1.0.65
-    container_name: stargate
-    depends_on:
-      cassandra:
-        condition: service_healthy
-    networks:
-      - backend
-    ports:
-      # cql
-      - 127.0.0.1:9045:9042
-      # graphql
-      - 127.0.0.1:8085:8080
-      # auth
-      - 127.0.0.1:8081:8081
-      # REST
-      - 127.0.0.1:8082:8082
-      # health
-      - 127.0.0.1:8084:8084
-      # grpc
-      - 127.0.0.1:8090:8090
-    environment:
-      - SEED=cassandra
-      - JAVA_OPTS="-Xmx1G"
-      - CLUSTER_NAME=ergo-cluster
-      - CLUSTER_VERSION=4.0
-      - RACK_NAME=rack1
-      - DATACENTER_NAME=datacenter1
-      - ENABLE_AUTH=false
-    healthcheck:
-      test: curl --fail http://127.0.0.1:8082 || exit 1
-      interval: 3s
-      timeout: 1s
-      start_period: 12s
-      retries: 4
+    command: /bin/bash -c "echo loading cassandra keyspace && cqlsh -f /schema-tables.cql"
   uexplorer:
     image: pragmaxim/uexplorer:latest
     container_name: uexplorer
     depends_on:
       cassandra:
         condition: service_healthy
-      cassandra-init:
+      cassandra-init-tables:
         condition: service_completed_successfully
     networks:
       - backend
     volumes:
       - ./chain-indexer.conf:/uexplorer/conf/chain-indexer.conf
     environment:
+      - BACKEND_INDEXING_PARALLELISM=${BACKEND_INDEXING_PARALLELISM:-1}
       # override in case you run your own Ergo node deployment
       - LOCAL_ERGO_NODE_HOST=172.17.0.1
       - LOCAL_ERGO_NODE_PORT=9053

@@ -5,6 +5,7 @@ set -euo pipefail
 export CASSANDRA_HEAP_NEWSIZE=3G
 export CASSANDRA_MAX_HEAP_SIZE=12G
 export ERGO_MAX_HEAP=4G
+export BACKEND_INDEXING_PARALLELISM=1
 
 while true; do
     read -p "Are you going to sync blockchain from scratch? " yn
@@ -18,6 +19,13 @@ while true; do
           elif [ "$MEM_TOTAL" -lt 17000000 ]
           then
             echo "Please close all memory intensive processes like Browser, IDE, etc. (OOM killer might kick in) until syncing finishes"
+          elif [ "$MEM_TOTAL" -gt 30000000 ]
+          then
+            export CASSANDRA_HEAP_NEWSIZE=5G
+            export CASSANDRA_MAX_HEAP_SIZE=20G
+            export BACKEND_INDEXING_PARALLELISM=2
+            V_CPU_COUNT=$(nproc --all)
+            if [ "$V_CPU_COUNT" -ge 16 ]; then export BACKEND_INDEXING_PARALLELISM=2; fi
           fi
           break;;
         [Nn]* )
@@ -34,11 +42,11 @@ while true; do
     case $yn in
         [Yy]* )
           echo "Starting Ergo node, cassandra, stargate and uexplorer..."
-          docker compose -f docker-compose.yml -f docker-compose.node.yml up -d
+          docker compose -f docker-compose.yml -f docker-compose.node.yml up -d --no-recreate
           break;;
         [Nn]* )
           echo "Starting cassandra, stargate and uexplorer..."
-          docker compose up -d
+          docker compose up -d --no-recreate
           break;;
         * ) echo "y/n ?";;
     esac

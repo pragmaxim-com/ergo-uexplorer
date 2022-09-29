@@ -14,14 +14,20 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
 
 **Requirements:**
   - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
-  - `16GB+` of RAM
+  - `16GB+` of RAM and `8vCPU+` for rapid sync from local Ergo Node
+      - `start-indexing.sh` script asks you if you are syncing chain from scratch or not
       - ergo-node = 1GB
       - cassandraDB = 12GB
       - stargate = 1GB
       - chain-indexer = 512MB
       - system = 1.5GB
-      - `start-all.sh` script asks you if you are syncing chain from scratch or not
-  - `8vCPU+` for initial sync, polling and querying is not that demanding
+  - `8GB+` of RAM and `4vCPU+` for polling and querying
+      - `start-querying.sh`
+      - ergo-node = 1GB
+      - cassandraDB = 4GB
+      - stargate = 1GB
+      - chain-indexer = 512MB
+      - system = 1.5GB
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks automatically falls back to peer-network if local node is not available
 
@@ -34,20 +40,24 @@ $ docker build . -t pragmaxim/uexplorer:latest
 
 ```
 # tree
-  ├── cassandra.cql         # db schema sourced in docker-compose.yml
-  ├── ergo-conf             # expects global env variable SCOREX_REST_API_KEY_HASH
-  ├── chain-indexer.conf    # no need to change anything
-  ├── docker-compose.yml    # feel free to troubleshoot
-  ├── start-all.sh          # starts everything, feel free to start up services individually
-  ├── stop-ergo.sh          # expects global env variable SCOREX_REST_API_KEY
-  └── stop-cassandra.sh     # cassandra must be stopped gracefully
+  ├── schema-tables.cql             # db schema applied at start-indexing.sh phase
+  ├── schema-indexes.cql            # db indexes applied at start-querying.sh phase
+  ├── ergo.conf                     # expects global env variable SCOREX_REST_API_KEY_HASH
+  ├── chain-indexer.conf            # no need to change anything
+  ├── docker-compose.yml            # base for minimal indexing with locally running Ergo Node
+  ├── docker-compose.node.yml       # apply to base for running also Ergo Node
+  ├── docker-compose.stargate.yml   # apply to base for applying indexes and graphql querying
+  ├── start-indexing.sh             # starts indexing, feel free to start up services individually
+  ├── start-querying.sh             # applies indexes and starts stargate for graphql querying
+  ├── stop-all.sh                   # safely stops everything running
+  └── stop-gracefully-cassandra.sh  # cassandra must be stopped gracefully
 ```
 
 ### Run
 
 ```
 $ cd docker
-$ start-all.sh
+$ start-indexing.sh
 $ docker compose logs uexplorer
 11:43:19 Initiating indexing of 816 epochs ...
 11:43:21 Persisted Epochs: 1[0], Blocks cache size (heights): 1538[1 - 1538]
@@ -62,6 +72,8 @@ $ docker compose logs uexplorer
 13:12:59 Going to index 3 blocks starting at height 836229
 13:13:44 Going to index 1 blocks starting at height 836232
 13:14:35 Going to index 1 blocks starting at height 836233
+
+$ start-querying.sh
 ```
 
 **Troubleshooting:**
@@ -87,8 +99,7 @@ $ docker compose logs uexplorer
 
 **Cleanup:**
 ```
-$ ./stop-cassandra.sh
-$ ./stop-ergo.sh
+$ ./stop-all.sh
 $ docker volume ls # cassandra and ergo volumes contain a lot of data
 ```
 

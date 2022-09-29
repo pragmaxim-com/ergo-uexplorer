@@ -1,0 +1,54 @@
+version: '3'
+
+services:
+  cassandra-init-indexes:
+    image: cassandra:4.0.6
+    container_name: cassandra-init-indexes
+    restart: "no"
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - backend
+    volumes:
+      - ./schema-indexes.cql:/schema-indexes.cql
+    environment:
+      - CQLSH_HOST=cassandra
+    command: /bin/bash -c "echo loading cassandra keyspace && cqlsh -f /schema-indexes.cql"
+  stargate:
+    image: stargateio/stargate-4_0:v1.0.65
+    container_name: stargate
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      cassandra-init-indexes:
+        condition: service_completed_successfully
+    networks:
+      - backend
+    ports:
+      # cql
+      - 127.0.0.1:9045:9042
+      # graphql
+      - 127.0.0.1:8085:8080
+      # auth
+      - 127.0.0.1:8081:8081
+      # REST
+      - 127.0.0.1:8082:8082
+      # health
+      - 127.0.0.1:8084:8084
+      # grpc
+      - 127.0.0.1:8090:8090
+    environment:
+      - SEED=cassandra
+      - JAVA_OPTS="-Xmx1G"
+      - CLUSTER_NAME=ergo-cluster
+      - CLUSTER_VERSION=4.0
+      - RACK_NAME=rack1
+      - DATACENTER_NAME=datacenter1
+      - ENABLE_AUTH=false
+    healthcheck:
+      test: curl --fail http://127.0.0.1:8082 || exit 1
+      interval: 3s
+      timeout: 1s
+      start_period: 12s
+      retries: 4
