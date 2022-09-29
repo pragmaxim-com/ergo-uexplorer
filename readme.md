@@ -35,7 +35,7 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
 
 Not necessary as all docker images from docker-compose are publicly available :
 ```
-$ docker build . -t pragmaxim/uexplorer:latest
+$ docker build . -t pragmaxim/uexplorer-chain-indexer:latest
 ```
 
 ```
@@ -58,7 +58,7 @@ $ docker build . -t pragmaxim/uexplorer:latest
 ```
 $ cd docker
 $ start-indexing.sh
-$ docker compose logs uexplorer
+$ docker compose logs uexplorer-chain-indexer
 11:43:19 Initiating indexing of 816 epochs ...
 11:43:21 Persisted Epochs: 1[0], Blocks cache size (heights): 1538[1 - 1538]
 11:43:23 Persisted Epochs: 2[0 - 1], Blocks cache size (heights): 1538[1025 - 2562]
