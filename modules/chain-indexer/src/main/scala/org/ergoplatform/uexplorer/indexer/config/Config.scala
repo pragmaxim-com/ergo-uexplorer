@@ -27,7 +27,7 @@ case class ChainIndexerConf(
 object ChainIndexerConf extends LazyLogging {
 
   lazy val loadDefaultOrThrow: ChainIndexerConf =
-    ConfigSource.default.at("chain-indexer").loadOrThrow[ChainIndexerConf]
+    ConfigSource.default.at("uexplorer.chain-indexer").loadOrThrow[ChainIndexerConf]
 
   lazy val loadWithFallback: Result[(ChainIndexerConf, Config)] = {
     def formatting(formatted: Boolean) = ConfigRenderOptions.concise().setFormatted(formatted).setJson(true)
