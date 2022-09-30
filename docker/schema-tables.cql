@@ -26,10 +26,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_headers
     PRIMARY KEY (header_id)
 );
 
-CREATE INDEX IF NOT EXISTS "node_headers__parent_id" ON uexplorer.node_headers (parent_id);
-CREATE INDEX IF NOT EXISTS "node_headers__height" ON uexplorer.node_headers (height);
-CREATE INDEX IF NOT EXISTS "node_headers__ts" ON uexplorer.node_headers (timestamp);
-
 CREATE TABLE IF NOT EXISTS uexplorer.blocks_info
 (
     header_id              VARCHAR,
@@ -59,10 +55,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.blocks_info
     PRIMARY KEY (header_id)
 );
 
-CREATE INDEX IF NOT EXISTS "blocks_info__height" ON uexplorer.blocks_info (height);
-CREATE INDEX IF NOT EXISTS "blocks_info__ts" ON uexplorer.blocks_info (timestamp);
-
-
 /* ^^   Tables having one row per partition representing a block    */
 /* ---------------------------------------------------------------- */
 /* vv   Tables having many rows per partition representing a block  */
@@ -81,11 +73,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_transactions
     PRIMARY KEY ((header_id), tx_id)
 );
 
-CREATE INDEX IF NOT EXISTS "node_transactions__tx_id" ON uexplorer.node_transactions (tx_id);
-CREATE INDEX IF NOT EXISTS "node_transactions__timestamp" ON uexplorer.node_transactions (timestamp);
-CREATE INDEX IF NOT EXISTS "node_transactions__inclusion_height" ON uexplorer.node_transactions (inclusion_height);
-
-
 CREATE TABLE IF NOT EXISTS uexplorer.node_inputs
 (
     header_id   VARCHAR,
@@ -97,10 +84,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_inputs
     main_chain  BOOLEAN,
     PRIMARY KEY ((header_id), box_id)
 );
-
-CREATE INDEX IF NOT EXISTS "node_inputs__box_id" ON uexplorer.node_inputs (box_id);
-CREATE INDEX IF NOT EXISTS "node_inputs__tx_id" ON uexplorer.node_inputs (tx_id);
-
 
 CREATE TABLE IF NOT EXISTS uexplorer.node_outputs
 (
@@ -120,14 +103,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_outputs
     PRIMARY KEY ((header_id), box_id)
 );
 
-CREATE INDEX IF NOT EXISTS "node_outputs__box_id" ON uexplorer.node_outputs (box_id);
-CREATE INDEX IF NOT EXISTS "node_outputs__tx_id" ON uexplorer.node_outputs (tx_id);
-CREATE INDEX IF NOT EXISTS "node_outputs__timestamp" ON uexplorer.node_outputs (timestamp);
-CREATE INDEX IF NOT EXISTS "node_outputs__address" ON uexplorer.node_outputs (address);
-CREATE INDEX IF NOT EXISTS "node_outputs__ergo_tree" ON uexplorer.node_outputs (ergo_tree);
-CREATE INDEX IF NOT EXISTS "node_outputs__ergo_tree_template_hash" ON uexplorer.node_outputs (ergo_tree_template_hash);
-
-
 CREATE TABLE IF NOT EXISTS uexplorer.node_assets
 (
     header_id VARCHAR,
@@ -138,10 +113,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_assets
     PRIMARY KEY ((header_id), token_id, box_id)
 );
 
-CREATE INDEX IF NOT EXISTS "node_assets__box_id" ON uexplorer.node_assets (box_id);
-CREATE INDEX IF NOT EXISTS "node_assets__token_id" ON uexplorer.node_assets (token_id);
-
-
 CREATE TABLE IF NOT EXISTS uexplorer.node_registers
 (
     header_id        VARCHAR,
@@ -151,9 +122,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_registers
     serialized_value VARCHAR,
     PRIMARY KEY ((header_id), id, box_id)
 );
-
-CREATE INDEX IF NOT EXISTS "node_registers__box_id" ON uexplorer.node_registers (box_id);
-
 
 CREATE TABLE IF NOT EXISTS uexplorer.node_tokens
 (
@@ -167,9 +135,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_tokens
     decimals        INT,
     PRIMARY KEY ((header_id), token_id, box_id)
 );
-
-CREATE INDEX IF NOT EXISTS "node_tokens__box_id" ON uexplorer.node_tokens (box_id);
-
 
 CREATE TABLE IF NOT EXISTS uexplorer.node_epochs
 (
