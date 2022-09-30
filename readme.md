@@ -3,7 +3,7 @@
 Supplementary, lightweight Ergo explorer with CassandraDB backend :
   - rapid indexing speed
   - low memory requirements (designed for machines with 16GB)
-  - limited querying possibilities (in comparison to RDBMS)
+  - [stargate](https://stargate.io/) graphql server over cassandra schema
   - shares the same model and schema as [Ergo explorer](https://github.com/ergoplatform/explorer-backend)
   - resilient
     - it primarily uses local node (good for initial sync) with a fallback to peer network
@@ -21,7 +21,7 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
       - stargate = 1GB
       - chain-indexer = 512MB
       - system = 1.5GB
-  - `8GB+` of RAM and `4vCPU+` for polling and querying
+  - `8GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
       - `start-querying.sh`
       - ergo-node = 1GB
       - cassandraDB = 4GB
