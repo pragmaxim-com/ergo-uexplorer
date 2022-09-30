@@ -9,15 +9,24 @@ import scala.collection.JavaConverters._
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
+import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.indexer.Const
 
-trait CassandraPersistenceSupport {
+trait CassandraPersistenceSupport extends LazyLogging {
 
-  protected[cassandra] val node_epochs_table = "node_epochs"
+  protected[cassandra] def buildInsertStatement(columns: Seq[String], table: String): SimpleStatement = {
+    logger.info(s"Building insert statement for table $table with columns ${columns.mkString(", ")}")
+    val insertIntoTable = insertInto(Const.CassandraKeyspace, table)
+    columns.tail
+      .foldLeft(insertIntoTable.value(columns.head, bindMarker(columns.head))) { case (acc, column) =>
+        acc.value(column, bindMarker(column))
+      }
+      .build()
+      .setIdempotent(true)
+  }
 
-  protected[cassandra] val epoch_index    = "epoch_index"
-  protected[cassandra] val last_header_id = "last_header_id"
-
-  def storeBlockFlow[T](
+  protected[cassandra] def storeBlockFlow[T](
     parallelism: Int,
     simpleStatement: SimpleStatement,
     statementBinder: (T, PreparedStatement) => BoundStatement
@@ -36,7 +45,7 @@ trait CassandraPersistenceSupport {
       )
       .mapMaterializedValue(_ => NotUsed)
 
-  def storeBlockBatchFlow[T](
+  protected[cassandra] def storeBlockBatchFlow[T](
     parallelism: Int,
     batchType: BatchType = DefaultBatchType.LOGGED,
     simpleStatement: SimpleStatement,
@@ -65,4 +74,12 @@ trait CassandraPersistenceSupport {
         }
       )
       .mapMaterializedValue(_ => NotUsed)
+}
+
+trait EpochPersistenceSupport {
+  protected[cassandra] val node_epochs_table = "node_epochs"
+
+  protected[cassandra] val epoch_index    = "epoch_index"
+  protected[cassandra] val last_header_id = "last_header_id"
+
 }

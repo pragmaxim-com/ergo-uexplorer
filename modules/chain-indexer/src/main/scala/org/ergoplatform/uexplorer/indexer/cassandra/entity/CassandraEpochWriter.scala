@@ -7,9 +7,9 @@ import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insert
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
+import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, InvalidEpochCandidate}
-import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -47,7 +47,7 @@ trait CassandraEpochWriter extends LazyLogging {
       }
 }
 
-object CassandraEpochWriter extends CassandraPersistenceSupport {
+object CassandraEpochWriter extends EpochPersistenceSupport {
 
   protected[cassandra] def epochInsertBinder(epoch: Epoch)(stmt: PreparedStatement): BoundStatement =
     stmt

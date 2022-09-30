@@ -5,8 +5,6 @@ import akka.actor.typed.ActorSystem
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.CqlSession
-import com.datastax.oss.driver.api.core.cql.SimpleStatement
-import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
@@ -33,18 +31,6 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraBlockUpdater
   with CassandraEpochWriter
   with CassandraEpochReader {
-
-  protected[cassandra] def buildInsertStatement(columns: Seq[String], table: String): SimpleStatement = {
-    import QueryBuilder.{bindMarker, insertInto}
-    logger.info(s"Building insert statement for $table")
-    val insertIntoTable = insertInto(Const.CassandraKeyspace, table)
-    columns.tail
-      .foldLeft(insertIntoTable.value(columns.head, bindMarker(columns.head))) { case (acc, column) =>
-        acc.value(column, bindMarker(column))
-      }
-      .build()
-      .setIdempotent(true)
-  }
 
   val blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed] =
     Flow[Inserted]

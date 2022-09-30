@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.db.models.BlockStats
 import org.ergoplatform.explorer.{Address, BlockId}
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
+import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockInfo
 
 import scala.collection.immutable.TreeMap
@@ -16,7 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-trait CassandraEpochReader extends LazyLogging {
+trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
   this: CassandraBackend =>
 
   import CassandraEpochReader._
