@@ -8,9 +8,9 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.BlockId
 import org.ergoplatform.explorer.indexer.models.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{BestBlockInserted, ForkInserted, Inserted}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.CassandraBlockUpdater._
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{BestBlockInserted, ForkInserted, Inserted}
 
 import scala.collection.JavaConverters.seqAsJavaList
 import scala.compat.java8.FutureConverters._
@@ -77,7 +77,6 @@ object CassandraBlockUpdater {
 
   protected[cassandra] val updateMainChainStatements: List[(String, Option[String], SimpleStatement)] =
     List(
-      BlocksInfo.block_info_table          -> None,
       Headers.node_headers_table           -> None,
       Transactions.node_transactions_table -> Some(Transactions.tx_id),
       Inputs.node_inputs_table             -> Some(Inputs.box_id),

@@ -1,38 +1,7 @@
 CREATE KEYSPACE IF NOT EXISTS uexplorer WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
 
-CREATE TABLE IF NOT EXISTS uexplorer.node_headers
+CREATE TYPE IF NOT EXISTS uexplorer.block_info
 (
-    header_id         VARCHAR,
-    parent_id         VARCHAR,
-    version           TINYINT,
-    height            INT,
-    n_bits            BIGINT,
-    difficulty        DECIMAL,
-    timestamp         BIGINT,
-    state_root        VARCHAR,
-    ad_proofs_root    VARCHAR,
-    ad_proofs_bytes   VARCHAR,
-    ad_proofs_digest  VARCHAR,
-    extensions_digest VARCHAR,
-    extensions_fields VARCHAR,
-    transactions_root VARCHAR,
-    extension_hash    VARCHAR,
-    miner_pk          VARCHAR,
-    w                 VARCHAR,
-    n                 VARCHAR,
-    d                 VARCHAR,
-    votes             VARCHAR,
-    main_chain        BOOLEAN,
-    PRIMARY KEY (header_id)
-);
-
-CREATE TABLE IF NOT EXISTS uexplorer.blocks_info
-(
-    header_id              VARCHAR,
-    parent_id              VARCHAR,
-    timestamp              BIGINT,
-    height                 INT,
-    difficulty             BIGINT,
     block_size             INT,
     block_coins            BIGINT,
     block_mining_time      BIGINT,
@@ -51,7 +20,32 @@ CREATE TABLE IF NOT EXISTS uexplorer.blocks_info
     total_coins_in_txs     BIGINT,
     max_tx_gix             BIGINT,
     max_box_gix            BIGINT,
-    main_chain             BOOLEAN,
+);
+
+CREATE TABLE IF NOT EXISTS uexplorer.node_headers
+(
+    header_id         VARCHAR,
+    parent_id         VARCHAR,
+    height            INT,
+    timestamp         BIGINT,
+    difficulty        DECIMAL,
+    version           TINYINT,
+    n_bits            BIGINT,
+    state_root        VARCHAR,
+    ad_proofs_root    VARCHAR,
+    ad_proofs_bytes   VARCHAR,
+    ad_proofs_digest  VARCHAR,
+    extensions_digest VARCHAR,
+    extensions_fields VARCHAR,
+    transactions_root VARCHAR,
+    extension_hash    VARCHAR,
+    miner_pk          VARCHAR,
+    w                 VARCHAR,
+    n                 VARCHAR,
+    d                 VARCHAR,
+    votes             VARCHAR,
+    main_chain        BOOLEAN,
+    block_info        frozen<block_info>,
     PRIMARY KEY (header_id)
 );
 

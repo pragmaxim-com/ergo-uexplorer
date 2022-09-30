@@ -52,28 +52,34 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
 
 object CassandraEpochReader extends CassandraPersistenceSupport {
 
-  protected[cassandra] val blockInfoSelectStatement: SimpleStatement = {
-    import BlocksInfo._
+  protected[cassandra] val blockInfoSelectStatement: SimpleStatement =
     QueryBuilder
-      .selectFrom(Const.CassandraKeyspace, block_info_table)
-      .columns(columns: _*)
-      .whereColumn(header_id)
-      .isEqualTo(QueryBuilder.bindMarker(header_id))
+      .selectFrom(Const.CassandraKeyspace, Headers.node_headers_table)
+      .columns(
+        Headers.header_id,
+        Headers.parent_id,
+        Headers.timestamp,
+        Headers.height,
+        Headers.difficulty,
+        Headers.main_chain,
+        Headers.BlockInfo.udtName
+      )
+      .whereColumn(Headers.header_id)
+      .isEqualTo(QueryBuilder.bindMarker(Headers.header_id))
       .build()
-  }
 
   protected[cassandra] def blockInfoSelectBinder(preparedStatement: PreparedStatement)(headerId: BlockId): BoundStatement =
-    preparedStatement.bind().setString(BlocksInfo.header_id, headerId.value.unwrapped)
+    preparedStatement.bind().setString(Headers.header_id, headerId.value.unwrapped)
 
   protected[cassandra] def blockInfoRowReader(row: Row): BlockInfo = {
-    import BlocksInfo._
+    import Headers.BlockInfo._
     BlockInfo(
-      BlockId.fromStringUnsafe(row.getString(parent_id)),
+      BlockId.fromStringUnsafe(row.getString(Headers.parent_id)),
       BlockStats(
-        BlockId.fromStringUnsafe(row.getString(header_id)),
-        row.getLong(timestamp),
-        row.getInt(height),
-        row.getLong(difficulty),
+        BlockId.fromStringUnsafe(row.getString(Headers.header_id)),
+        row.getLong(Headers.timestamp),
+        row.getInt(Headers.height),
+        row.getLong(Headers.difficulty),
         row.getInt(block_size),
         row.getLong(block_coins),
         Option(row.getLong(block_mining_time)),
@@ -92,7 +98,7 @@ object CassandraEpochReader extends CassandraPersistenceSupport {
         row.getLong(total_coins_in_txs),
         row.getLong(max_tx_gix),
         row.getLong(max_box_gix),
-        row.getBoolean(main_chain)
+        row.getBoolean(Headers.main_chain)
       )
     )
   }

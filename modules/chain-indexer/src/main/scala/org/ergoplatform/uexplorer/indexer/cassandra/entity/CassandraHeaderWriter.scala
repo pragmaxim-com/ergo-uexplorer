@@ -2,9 +2,13 @@ package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
+import com.datastax.oss.driver.api.core.`type`.DataTypes
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement}
+import com.datastax.oss.driver.api.core.data.UdtValue
+import com.datastax.oss.driver.internal.core.`type`.UserDefinedTypeBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.explorer.indexer.models.FlatBlock
+import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
@@ -29,27 +33,28 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
 
       val partialStatement =
         // format: off
-      statement
-        .bind()
-        .setString(header_id,             block.header.id.value.unwrapped)
-        .setString(parent_id,             block.header.parentId.value.unwrapped)
-        .setByte(version,                 validVersion)
-        .setInt(height,                   block.header.height)
-        .setLong(n_bits,                  block.header.nBits)
-        .setBigDecimal(difficulty,        block.header.difficulty.bigDecimal)
-        .setLong(timestamp,               block.header.timestamp)
-        .setString(state_root,            block.header.stateRoot.unwrapped)
-        .setString(ad_proofs_root,        block.header.adProofsRoot.unwrapped)
-        .setString(extensions_digest,     block.extension.digest.unwrapped)
-        .setString(extensions_fields,     block.extension.fields.noSpaces)
-        .setString(transactions_root,     block.header.transactionsRoot.unwrapped)
-        .setString(extension_hash,        block.header.extensionHash.unwrapped)
-        .setString(miner_pk,              block.header.minerPk.unwrapped)
-        .setString(w,                     block.header.w.unwrapped)
-        .setString(n,                     block.header.n.unwrapped)
-        .setString(d,                     block.header.d)
-        .setString(votes,                 block.header.votes)
-        .setBoolean(main_chain,           block.header.mainChain)
+        statement
+          .bind()
+          .setString(header_id,             block.header.id.value.unwrapped)
+          .setString(parent_id,             block.header.parentId.value.unwrapped)
+          .setByte(version,                 validVersion)
+          .setInt(height,                   block.header.height)
+          .setLong(n_bits,                  block.header.nBits)
+          .setBigDecimal(difficulty,        block.header.difficulty.bigDecimal)
+          .setLong(timestamp,               block.header.timestamp)
+          .setString(state_root,            block.header.stateRoot.unwrapped)
+          .setString(ad_proofs_root,        block.header.adProofsRoot.unwrapped)
+          .setString(extensions_digest,     block.extension.digest.unwrapped)
+          .setString(extensions_fields,     block.extension.fields.noSpaces)
+          .setString(transactions_root,     block.header.transactionsRoot.unwrapped)
+          .setString(extension_hash,        block.header.extensionHash.unwrapped)
+          .setString(miner_pk,              block.header.minerPk.unwrapped)
+          .setString(w,                     block.header.w.unwrapped)
+          .setString(n,                     block.header.n.unwrapped)
+          .setString(d,                     block.header.d)
+          .setString(votes,                 block.header.votes)
+          .setBoolean(main_chain,           block.header.mainChain)
+          .setUdtValue(BlockInfo.udtName,   BlockInfo.buildUdtValue(block))
         // format: on
 
       block.adProofOpt.fold(partialStatement) { adProof =>
@@ -107,6 +112,76 @@ object Headers {
     n,
     d,
     votes,
-    main_chain
+    main_chain,
+    BlockInfo.udtName
   )
+
+  object BlockInfo {
+    val udtName = "block_info"
+
+    val block_size             = "block_size"
+    val block_coins            = "block_coins"
+    val block_mining_time      = "block_mining_time"
+    val txs_count              = "txs_count"
+    val txs_size               = "txs_size"
+    val miner_address          = "miner_address"
+    val miner_reward           = "miner_reward"
+    val miner_revenue          = "miner_revenue"
+    val block_fee              = "block_fee"
+    val block_chain_total_size = "block_chain_total_size"
+    val total_txs_count        = "total_txs_count"
+    val total_coins_issued     = "total_coins_issued"
+    val total_mining_time      = "total_mining_time"
+    val total_fees             = "total_fees"
+    val total_miners_reward    = "total_miners_reward"
+    val total_coins_in_txs     = "total_coins_in_txs"
+    val max_tx_gix             = "max_tx_gix"
+    val max_box_gix            = "max_box_gix"
+
+    // format: off
+    private lazy val udt =
+      new UserDefinedTypeBuilder(Const.CassandraKeyspace, udtName)
+        .withField(block_size,              DataTypes.INT)
+        .withField(block_coins,             DataTypes.BIGINT)
+        .withField(block_mining_time,       DataTypes.BIGINT)
+        .withField(txs_count,               DataTypes.INT)
+        .withField(txs_size,                DataTypes.INT)
+        .withField(miner_address,           DataTypes.TEXT)
+        .withField(miner_reward,            DataTypes.BIGINT)
+        .withField(miner_revenue,           DataTypes.BIGINT)
+        .withField(block_fee,               DataTypes.BIGINT)
+        .withField(block_chain_total_size,  DataTypes.BIGINT)
+        .withField(total_txs_count,         DataTypes.BIGINT)
+        .withField(total_coins_issued,      DataTypes.BIGINT)
+        .withField(total_mining_time,       DataTypes.BIGINT)
+        .withField(total_fees,              DataTypes.BIGINT)
+        .withField(total_miners_reward,     DataTypes.BIGINT)
+        .withField(total_coins_in_txs,      DataTypes.BIGINT)
+        .withField(max_tx_gix,              DataTypes.BIGINT)
+        .withField(max_box_gix,             DataTypes.BIGINT)
+        .build()
+    def buildUdtValue(b: FlatBlock): UdtValue =
+      udt.newValue()
+        .setInt(    block_size,             b.info.blockSize)
+        .setLong(   block_coins,            b.info.blockCoins)
+        .setLong(   block_mining_time,      b.info.blockMiningTime.getOrElse(0L))
+        .setInt(    txs_count,              b.info.txsCount)
+        .setInt(    txs_size,               b.info.txsSize)
+        .setString( miner_address,          b.info.minerAddress.unwrapped)
+        .setLong(   miner_reward,           b.info.minerReward)
+        .setLong(   miner_revenue,          b.info.minerRevenue)
+        .setLong(   block_fee,              b.info.blockFee)
+        .setLong(   block_chain_total_size, b.info.blockChainTotalSize)
+        .setLong(   total_txs_count,        b.info.totalTxsCount)
+        .setLong(   total_coins_issued,     b.info.totalCoinsIssued)
+        .setLong(   total_mining_time,      b.info.totalMiningTime)
+        .setLong(   total_fees,             b.info.totalFees)
+        .setLong(   total_miners_reward,    b.info.totalMinersReward)
+        .setLong(   total_coins_in_txs,     b.info.totalCoinsInTxs)
+        .setLong(   max_tx_gix,             b.info.maxTxGix)
+        .setLong(   max_box_gix,            b.info.maxBoxGix)
+    // format: on
+
+  }
+
 }

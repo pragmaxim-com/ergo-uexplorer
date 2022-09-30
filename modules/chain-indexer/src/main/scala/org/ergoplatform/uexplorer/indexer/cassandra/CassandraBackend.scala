@@ -21,7 +21,6 @@ class CassandraBackend(parallelism: Int)(implicit
   with LazyLogging
   with CassandraPersistenceSupport
   with CassandraHeaderWriter
-  with CassandraBlockInfoWriter
   with CassandraTransactionsWriter
   with CassandraAssetsWriter
   with CassandraRegistersWriter
@@ -37,7 +36,6 @@ class CassandraBackend(parallelism: Int)(implicit
       // format: off
       .via(blockUpdaterFlow(parallelism))
       .via(headerWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(blockInfoWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
       .via(transactionsWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
       .via(registersWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
       .via(tokensWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)

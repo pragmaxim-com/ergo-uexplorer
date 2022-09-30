@@ -25,8 +25,8 @@ services:
       test: cqlsh -e "describe keyspaces" || exit 1
       interval: 5s
       timeout: 5s
-      start_period: 45s
-      retries: 9
+      start_period: 90s
+      retries: 18
   cassandra-init-tables:
     image: cassandra:4.0.6
     container_name: cassandra-init-tables
