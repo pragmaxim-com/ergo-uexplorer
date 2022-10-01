@@ -1,7 +1,7 @@
 # uExplorer
 
 Supplementary, lightweight Ergo explorer with CassandraDB backend :
-  - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`12GB RAM`
+  - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`10GB RAM`
   - [stargate](https://stargate.io/) graphql server over cassandra schema
   - shares the same model and schema as [Ergo explorer](https://github.com/ergoplatform/explorer-backend)
   - resilient
@@ -13,20 +13,17 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
 
 **Requirements:**
   - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
-  - `12GB+` of RAM and `4vCPU+` for rapid sync from local Ergo Node
+  - `10GB+` of RAM and `4vCPU+` for rapid sync from local Ergo Node
       - `start-indexing.sh` script asks you if you are syncing chain from scratch or not
       - ergo-node = 1GB
       - cassandraDB = 8GB
-      - stargate = 1GB
       - chain-indexer = 512MB
-      - system = 1.5GB
-  - `6GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
+  - `5GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
       - `start-querying.sh`
       - ergo-node = 1GB
       - cassandraDB = 2GB
       - stargate = 1GB
       - chain-indexer = 512MB
-      - system = 1.5GB
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks automatically falls back to peer-network if local node is not available
 
