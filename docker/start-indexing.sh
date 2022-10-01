@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-export CASSANDRA_HEAP_NEWSIZE=3G
-export CASSANDRA_MAX_HEAP_SIZE=12G
-export ERGO_MAX_HEAP=4G
+export CASSANDRA_HEAP_NEWSIZE=2G
+export CASSANDRA_MAX_HEAP_SIZE=8G
+export ERGO_MAX_HEAP=1G
 export BACKEND_INDEXING_PARALLELISM=1
 
 while true; do
@@ -12,26 +12,25 @@ while true; do
     case $yn in
         [Yy]* )
           MEM_TOTAL=$(awk '/^MemTotal:/{print $2}' /proc/meminfo);
-          if [ "$MEM_TOTAL" -lt 14000000 ]
+          if [ "$MEM_TOTAL" -lt 10000000 ]
           then
-              echo "You should have at least 14GB of RAM, exiting ..."
+              echo "You should have at least 12GB of RAM, exiting ..."
               exit 1
-          elif [ "$MEM_TOTAL" -lt 17000000 ]
+          elif [ "$MEM_TOTAL" -lt 12000000 ]
           then
             echo "Please close all memory intensive processes like Browser, IDE, etc. (OOM killer might kick in) until syncing finishes"
           elif [ "$MEM_TOTAL" -gt 30000000 ]
           then
             export CASSANDRA_HEAP_NEWSIZE=5G
             export CASSANDRA_MAX_HEAP_SIZE=20G
-            export BACKEND_INDEXING_PARALLELISM=2
+            export ERGO_MAX_HEAP=4G
             V_CPU_COUNT=$(nproc --all)
             if [ "$V_CPU_COUNT" -ge 16 ]; then export BACKEND_INDEXING_PARALLELISM=2; fi
           fi
           break;;
         [Nn]* )
-          export CASSANDRA_HEAP_NEWSIZE=1G
-          export CASSANDRA_MAX_HEAP_SIZE=4G
-          export ERGO_MAX_HEAP=1G
+          export CASSANDRA_HEAP_NEWSIZE=512M
+          export CASSANDRA_MAX_HEAP_SIZE=2G
           break;;
         * ) echo "y/n ?";;
     esac
