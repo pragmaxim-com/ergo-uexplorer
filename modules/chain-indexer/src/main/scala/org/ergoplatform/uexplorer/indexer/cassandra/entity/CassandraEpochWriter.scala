@@ -5,7 +5,7 @@ import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement, SimpleStatement}
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.db.FlatBlock
+import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
@@ -19,8 +19,8 @@ trait CassandraEpochWriter extends LazyLogging {
   this: CassandraBackend =>
   import CassandraEpochWriter._
 
-  def epochWriteFlow: Flow[(FlatBlock, Option[MaybeNewEpoch]), (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
-    Flow[(FlatBlock, Option[MaybeNewEpoch])]
+  def epochWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
+    Flow[(Block, Option[MaybeNewEpoch])]
       .mapAsync(1) {
         case (block, s @ Some(NewEpochCreated(epoch))) =>
           persistEpoch(epoch).map(_ => block -> s)

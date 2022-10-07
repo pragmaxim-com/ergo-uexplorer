@@ -10,10 +10,3 @@ final case class ExpandedRegister(
   sigmaType: Option[SigmaType],
   renderedValue: Option[String]
 )
-
-@derive(encoder, decoder)
-final case class ExpandedLegacyRegister(
-  rawValue: HexString,
-  valueType: String,
-  decodedValue: String
-)

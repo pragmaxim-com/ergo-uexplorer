@@ -6,7 +6,7 @@ import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.CqlSession
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.db.FlatBlock
+import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity._
@@ -31,7 +31,7 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraEpochWriter
   with CassandraEpochReader {
 
-  val blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed] =
+  val blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]
       // format: off
       .via(blockUpdaterFlow(parallelism))

@@ -6,7 +6,7 @@ import akka.pattern.StatusReply
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.{BlockId, ProtocolSettings}
-import org.ergoplatform.uexplorer.db.{BlockInfo, FlatBlock}
+import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
@@ -85,7 +85,7 @@ object ProgressMonitor {
 
   case class GetBlock(blockId: BlockId, replyTo: ActorRef[IsBlockCached]) extends MonitorRequest
 
-  case class UpdateChainState(lastBlockByEpochIndex: TreeMap[Int, BlockInfo], replyTo: ActorRef[ProgressState])
+  case class UpdateChainState(lastBlockByEpochIndex: TreeMap[Int, CachedBlock], replyTo: ActorRef[ProgressState])
     extends MonitorRequest
 
   case class GetChainState(replyTo: ActorRef[ProgressState]) extends MonitorRequest
@@ -99,9 +99,9 @@ object ProgressMonitor {
 
   sealed trait Inserted extends MonitorResponse
 
-  case class BestBlockInserted(flatBlock: FlatBlock) extends Inserted
+  case class BestBlockInserted(flatBlock: Block) extends Inserted
 
-  case class ForkInserted(newFork: List[FlatBlock], supersededFork: List[BlockInfo]) extends Inserted
+  case class ForkInserted(newFork: List[Block], supersededFork: List[CachedBlock]) extends Inserted
 
   sealed trait MaybeNewEpoch extends MonitorResponse
 
@@ -142,7 +142,7 @@ object ProgressMonitor {
     ref.ask(ref => GetBlock(blockId, ref))
 
   def updateState(
-    lastBlockByEpochIndex: TreeMap[Int, BlockInfo]
+    lastBlockByEpochIndex: TreeMap[Int, CachedBlock]
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[ProgressState] =
     ref.ask(ref => UpdateChainState(lastBlockByEpochIndex, ref))
 

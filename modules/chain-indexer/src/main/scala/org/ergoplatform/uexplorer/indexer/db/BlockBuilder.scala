@@ -1,35 +1,21 @@
-package org.ergoplatform.uexplorer.db
+package org.ergoplatform.uexplorer.indexer.db
+
+import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.db._
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlock
+import org.ergoplatform.uexplorer.node.{ApiFullBlock, RegisterValue}
+import org.ergoplatform.uexplorer.{sigma, Address, ProtocolSettings, RegistersParser, TokenId, TokenPropsParser, TokenType}
 
 import cats.syntax.traverse._
 import io.circe.syntax._
-import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.node.{ApiFullBlock, RegisterValue}
-import org.ergoplatform.uexplorer._
 
 import scala.util.Try
 
-/** Flattened representation of a full block from
-  * Ergo protocol enriched with statistics.
-  */
-final case class FlatBlock(
-  header: Header,
-  info: BlockInfo,
-  extension: BlockExtension,
-  adProofOpt: Option[AdProof],
-  txs: List[Transaction],
-  inputs: List[Input],
-  dataInputs: List[DataInput],
-  outputs: List[Output],
-  assets: List[Asset],
-  registers: List[BoxRegister],
-  tokens: List[Token]
-)
+object BlockBuilder {
 
-object FlatBlock {
-
-  def apply(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockInfo])(implicit
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[CachedBlock])(implicit
     protocolSettings: ProtocolSettings
-  ): Try[FlatBlock] = {
+  ): Try[Block] = {
     val apiHeader       = apiBlock.header
     val apiExtension    = apiBlock.extension
     val apiAdProofOpt   = apiBlock.adProofs
@@ -55,7 +41,7 @@ object FlatBlock {
         mainChain = false
       )
 
-    val infoTry = BlockInfo(apiBlock, prevBlockInfo)
+    val infoTry = BlockInfoBuilder(apiBlock, prevBlock)
 
     val extension =
       BlockExtension(
@@ -74,7 +60,7 @@ object FlatBlock {
       }
 
     val txs: List[Transaction] = {
-      val lastTxGlobalIndex = prevBlockInfo.map(_.maxTxGix).getOrElse(-1L)
+      val lastTxGlobalIndex = prevBlock.map(_.info.maxTxGix).getOrElse(-1L)
       val headerId          = apiBlock.header.id
       val height            = apiBlock.header.height
       val ts                = apiBlock.header.timestamp
@@ -115,7 +101,7 @@ object FlatBlock {
       }
 
     val outputsTry = {
-      val lastOutputGlobalIndex          = prevBlockInfo.map(_.maxBoxGix).getOrElse(-1L)
+      val lastOutputGlobalIndex          = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
       implicit val e: ErgoAddressEncoder = protocolSettings.addressEncoder
       apiTransactions.transactions.zipWithIndex
         .flatMap { case (tx, tix) =>
@@ -185,18 +171,23 @@ object FlatBlock {
         )
       }
 
-    def updateTotalInfo(currentBlockInfo: BlockInfo, prevBlockStats: BlockInfo): BlockInfo =
+    def updateTotalInfo(
+      currentBlockInfo: BlockInfo,
+      currentTimestamp: Long,
+      currentHeight: Int,
+      prevBlock: CachedBlock
+    ): BlockInfo =
       currentBlockInfo.copy(
-        blockChainTotalSize = prevBlockStats.blockChainTotalSize + currentBlockInfo.blockSize,
-        totalTxsCount       = prevBlockStats.totalTxsCount + currentBlockInfo.txsCount,
-        totalCoinsIssued    = protocolSettings.emission.issuedCoinsAfterHeight(currentBlockInfo.height),
-        totalMiningTime     = prevBlockStats.totalMiningTime + (currentBlockInfo.timestamp - prevBlockStats.timestamp),
-        totalFees           = prevBlockStats.totalFees + currentBlockInfo.blockFee,
-        totalMinersReward   = prevBlockStats.totalMinersReward + currentBlockInfo.minerReward,
-        totalCoinsInTxs     = prevBlockStats.totalCoinsInTxs + currentBlockInfo.blockCoins
+        blockChainTotalSize = prevBlock.info.blockChainTotalSize + currentBlockInfo.blockSize,
+        totalTxsCount       = prevBlock.info.totalTxsCount + currentBlockInfo.txsCount,
+        totalCoinsIssued    = protocolSettings.emission.issuedCoinsAfterHeight(currentHeight),
+        totalMiningTime     = prevBlock.info.totalMiningTime + (currentTimestamp - prevBlock.timestamp),
+        totalFees           = prevBlock.info.totalFees + currentBlockInfo.blockFee,
+        totalMinersReward   = prevBlock.info.totalMinersReward + currentBlockInfo.minerReward,
+        totalCoinsInTxs     = prevBlock.info.totalCoinsInTxs + currentBlockInfo.blockCoins
       )
 
-    def updateMainChain(block: FlatBlock, mainChain: Boolean): FlatBlock = {
+    def updateMainChain(block: Block, mainChain: Boolean): Block = {
       import monocle.macros.syntax.lens._
       block
         .lens(_.header.mainChain)
@@ -213,8 +204,8 @@ object FlatBlock {
         .modify(_.map(_.copy(mainChain = mainChain)))
         .lens(_.info)
         .modify {
-          case currentBlockInfo if prevBlockInfo.nonEmpty =>
-            updateTotalInfo(currentBlockInfo, prevBlockInfo.get)
+          case currentBlockInfo if prevBlock.nonEmpty =>
+            updateTotalInfo(currentBlockInfo, block.header.timestamp, block.header.height, prevBlock.get)
           case currentBlockInfo =>
             currentBlockInfo
         }
@@ -224,7 +215,7 @@ object FlatBlock {
       info    <- infoTry
       outputs <- outputsTry
     } yield updateMainChain(
-      new FlatBlock(header, info, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers, tokens),
+      Block(header, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers, tokens, info),
       mainChain = true
     )
   }

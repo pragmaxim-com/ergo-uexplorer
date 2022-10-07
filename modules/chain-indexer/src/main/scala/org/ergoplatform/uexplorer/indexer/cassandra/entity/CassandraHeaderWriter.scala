@@ -7,21 +7,21 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement}
 import com.datastax.oss.driver.api.core.data.UdtValue
 import com.datastax.oss.driver.internal.core.`type`.UserDefinedTypeBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.db.FlatBlock
+import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
   import Headers._
 
-  def headerWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed] =
+  def headerWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
     storeBlockFlow(
       parallelism,
       buildInsertStatement(columns, node_headers_table),
       headerInsertBinder
     )
 
-  protected[cassandra] def headerInsertBinder: (FlatBlock, PreparedStatement) => BoundStatement = {
+  protected[cassandra] def headerInsertBinder: (Block, PreparedStatement) => BoundStatement = {
     case (block, statement) =>
       val validVersion =
         if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
@@ -160,7 +160,7 @@ object Headers {
         .withField(max_tx_gix,              DataTypes.BIGINT)
         .withField(max_box_gix,             DataTypes.BIGINT)
         .build()
-    def buildUdtValue(b: FlatBlock): UdtValue =
+    def buildUdtValue(b: Block): UdtValue =
       udt.newValue()
         .setInt(    block_size,             b.info.blockSize)
         .setLong(   block_coins,            b.info.blockCoins)

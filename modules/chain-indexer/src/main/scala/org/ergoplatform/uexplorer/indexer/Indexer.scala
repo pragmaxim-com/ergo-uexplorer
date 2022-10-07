@@ -7,7 +7,7 @@ import akka.stream.scaladsl.{Flow, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.ProtocolSettings
-import org.ergoplatform.uexplorer.db.FlatBlock
+import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb}
@@ -26,8 +26,8 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
 ) extends AkkaStreamSupport
   with LazyLogging {
 
-  val blockToEpochFlow: Flow[FlatBlock, (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
-    Flow[FlatBlock]
+  val blockToEpochFlow: Flow[Block, (Block, Option[MaybeNewEpoch]), NotUsed] =
+    Flow[Block]
       .mapAsync(1) {
         case block if Epoch.heightAtFlushPoint(block.header.height) =>
           ProgressMonitor
@@ -37,7 +37,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
           Future.successful(block -> Option.empty)
       }
 
-  val indexingFlow: Flow[Int, (FlatBlock, Option[MaybeNewEpoch]), NotUsed] =
+  val indexingFlow: Flow[Int, (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[Int]
       .via(blockHttpClient.blockCachingFlow)
       .async

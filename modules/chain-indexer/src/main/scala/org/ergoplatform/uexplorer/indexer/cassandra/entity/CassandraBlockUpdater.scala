@@ -6,7 +6,7 @@ import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.db.FlatBlock
+import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.CassandraBlockUpdater._
@@ -24,7 +24,7 @@ trait CassandraBlockUpdater extends LazyLogging {
       table -> (keyOpt, cqlSession.prepare(statement))
     }.toMap
 
-  def blockUpdaterFlow(parallelism: Int): Flow[Inserted, FlatBlock, NotUsed] =
+  def blockUpdaterFlow(parallelism: Int): Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]
       .mapAsync(parallelism) {
         case BestBlockInserted(flatBlock) =>

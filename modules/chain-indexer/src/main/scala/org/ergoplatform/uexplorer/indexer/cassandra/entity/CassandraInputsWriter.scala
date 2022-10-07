@@ -3,13 +3,13 @@ package org.ergoplatform.uexplorer.indexer.cassandra.entity
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
-import org.ergoplatform.uexplorer.db.FlatBlock
+import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 trait CassandraInputsWriter { this: CassandraBackend =>
   import Inputs._
 
-  def inputsWriteFlow(parallelism: Int): Flow[FlatBlock, FlatBlock, NotUsed] =
+  def inputsWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
     storeBlockBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
@@ -17,7 +17,7 @@ trait CassandraInputsWriter { this: CassandraBackend =>
       inputInsertBinder
     )
 
-  protected[cassandra] def inputInsertBinder: (FlatBlock, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def inputInsertBinder: (Block, PreparedStatement) => List[BoundStatement] = {
     case (block, statement) =>
       block.inputs.map { input =>
         val partialStatement =

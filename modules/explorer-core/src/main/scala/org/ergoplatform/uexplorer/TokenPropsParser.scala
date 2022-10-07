@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer
 
 import java.util.regex.Pattern
-import org.ergoplatform.uexplorer.node.TokenPropsEip4
+import org.ergoplatform.uexplorer.node.TokenProps
 import sigmastate.{SByte, SCollection}
 import tofu.syntax.monadic._
 
@@ -9,10 +9,10 @@ import scala.util.Try
 
 object TokenPropsParser {
 
-  private val Eip4StringCharset = "UTF-8"
-  private val MaxEip4StringLen  = 1000
+  private val StringCharset = "UTF-8"
+  private val MaxStringLen  = 1000
 
-  def parse(registers: Map[RegisterId, HexString]): Option[TokenPropsEip4] = {
+  def parse(registers: Map[RegisterId, HexString]): Option[TokenProps] = {
     def parse(raw: HexString) = RegistersParser.parse[SCollection[SByte.type]](raw).toOption
 
     val r4      = registers.get(RegisterId.R4)
@@ -27,7 +27,7 @@ object TokenPropsParser {
       val decimalsOpt =
         Try(decimalsRaw >>= (raw => toUtf8String(raw.toArray).map(_.toInt))).toOption.flatten
       val (description, decimals) = (descriptionOpt.getOrElse(""), decimalsOpt.getOrElse(0))
-      TokenPropsEip4(name, description, decimals)
+      TokenProps(name, description, decimals)
     }
   }
 
@@ -50,7 +50,7 @@ object TokenPropsParser {
   }
 
   private def toUtf8String(raw: Array[Byte]): Option[String] =
-    if (raw.length <= MaxEip4StringLen && looksLikeUTF8(raw))
-      Try(new String(raw, Eip4StringCharset)).toOption
+    if (raw.length <= MaxStringLen && looksLikeUTF8(raw))
+      Try(new String(raw, StringCharset)).toOption
     else None
 }

@@ -2,8 +2,9 @@ package org.ergoplatform.uexplorer.indexer.progress
 
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.ProtocolSettings
-import org.ergoplatform.uexplorer.db.{BlockInfo, FlatBlock}
+import org.ergoplatform.uexplorer.db.{BlockInfo, Block}
 import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
+import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache
 import org.ergoplatform.uexplorer.node.ApiFullBlock
@@ -79,12 +80,12 @@ case class ProgressState(
         )
       )
     } else
-      FlatBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId))
+      BlockBuilder(bestBlock, blockCache.byId.get(bestBlock.header.parentId))
         .map { flatBlock =>
           BestBlockInserted(flatBlock) -> copy(blockCache =
             BlockCache(
-              blockCache.byId.updated(flatBlock.header.id, flatBlock.info),
-              blockCache.byHeight.updated(flatBlock.header.height, flatBlock.info)
+              blockCache.byId.updated(flatBlock.header.id, CachedBlock.fromBlock(flatBlock)),
+              blockCache.byHeight.updated(flatBlock.header.height, CachedBlock.fromBlock(flatBlock))
             )
           )
         }
@@ -100,15 +101,15 @@ case class ProgressState(
       )
     } else
       winningFork
-        .foldLeft(Try(ListBuffer.empty[FlatBlock] -> ListBuffer.empty[BlockInfo])) {
+        .foldLeft(Try(ListBuffer.empty[Block] -> ListBuffer.empty[CachedBlock])) {
           case (f @ Failure(_), _) =>
             f
           case (Success((newBlocksAcc, toRemoveAcc)), apiBlock) =>
-            FlatBlock(
+            BlockBuilder(
               apiBlock,
               Some(
                 newBlocksAcc.lastOption
-                  .collect { case b if b.header.id == apiBlock.header.parentId => b.info }
+                  .collect { case b if b.header.id == apiBlock.header.parentId => CachedBlock.fromBlock(b) }
                   .getOrElse(blockCache.byId(apiBlock.header.parentId))
               )
             ).map { newBlock =>
@@ -124,13 +125,13 @@ case class ProgressState(
           val newBlockCache =
             BlockCache(
               (blockCache.byId -- supersededBlocks.map(_.headerId)) ++ newBlocks
-                .map(b => b.header.id -> b.info),
-              blockCache.byHeight ++ newBlocks.map(b => b.header.height -> b.info)
+                .map(b => b.header.id -> CachedBlock.fromBlock(b)),
+              blockCache.byHeight ++ newBlocks.map(b => b.header.height -> CachedBlock.fromBlock(b))
             )
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(blockCache = newBlockCache)
         }
 
-  def updateState(persistedEpochIndexes: TreeMap[Int, BlockInfo]): ProgressState = {
+  def updateState(persistedEpochIndexes: TreeMap[Int, CachedBlock]): ProgressState = {
     val newEpochIndexes = lastBlockIdInEpoch ++ persistedEpochIndexes.view.mapValues(_.headerId)
     val newBlockCache =
       BlockCache(
@@ -140,7 +141,7 @@ case class ProgressState(
     ProgressState(newEpochIndexes, invalidEpochs, newBlockCache)
   }
 
-  def getLastCachedBlock: Option[BlockInfo] = blockCache.byHeight.lastOption.map(_._2)
+  def getLastCachedBlock: Option[CachedBlock] = blockCache.byHeight.lastOption.map(_._2)
 
   def persistedEpochIndexes: SortedSet[Int] = lastBlockIdInEpoch.keySet
 
@@ -186,7 +187,15 @@ case class ProgressState(
 
 object ProgressState {
 
-  case class BlockCache(byId: Map[BlockId, BlockInfo], byHeight: SortedMap[Int, BlockInfo]) {
+  case class CachedBlock(headerId: BlockId, parentId: BlockId, timestamp: Long, height: Int, info: BlockInfo)
+
+  object CachedBlock {
+
+    def fromBlock(b: Block): CachedBlock =
+      CachedBlock(b.header.id, b.header.parentId, b.header.timestamp, b.header.height, b.info)
+  }
+
+  case class BlockCache(byId: Map[BlockId, CachedBlock], byHeight: SortedMap[Int, CachedBlock]) {
     def isEmpty: Boolean = byId.isEmpty || byHeight.isEmpty
 
     def heights: SortedSet[Int] = byHeight.keySet

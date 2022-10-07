@@ -2,8 +2,7 @@ package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.{BlockId, BoxId, TxId}
 
-/** Represents `node_data_inputs` table.
-  */
+/** Represents `node_data_inputs` table. */
 final case class DataInput(
   boxId: BoxId,
   txId: TxId,
