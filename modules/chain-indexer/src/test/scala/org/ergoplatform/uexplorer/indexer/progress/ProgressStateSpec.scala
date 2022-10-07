@@ -5,9 +5,9 @@ import io.circe.parser._
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
-import org.ergoplatform.uexplorer.indexer.{Rest, UnexpectedStateError}
+import org.ergoplatform.uexplorer.indexer.{ProtocolSettings, Rest, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.{BlockId, ProtocolSettings}
+import org.ergoplatform.uexplorer.BlockId
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 

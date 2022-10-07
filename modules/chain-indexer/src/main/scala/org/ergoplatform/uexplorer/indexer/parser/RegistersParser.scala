@@ -1,78 +1,20 @@
-package org.ergoplatform.uexplorer
+package org.ergoplatform.uexplorer.indexer.parser
 
 import cats.Eval
 import cats.data.OptionT
 import cats.implicits.toTraverseOps
-import org.ergoplatform.uexplorer.Err.RequestProcessingErr.DexErr.ContractParsingErr.Base16DecodingFailed
-import org.ergoplatform.uexplorer.Err.RequestProcessingErr.DexErr.ContractParsingErr.ErgoTreeSerializationErr.ErgoTreeDeserializationFailed
-import org.ergoplatform.{uexplorer, ErgoAddress, ErgoAddressEncoder, Pay2SAddress}
-import scorex.crypto.hash.Sha256
+import org.ergoplatform.uexplorer.node.{ExpandedRegister, RegisterValue}
+import org.ergoplatform.uexplorer.{HexString, RegisterId, SigmaType}
 import scorex.util.encode.Base16
-import sigmastate.Values.{Constant, ConstantNode, ErgoTree, EvaluatedValue, FalseLeaf, SigmaPropConstant}
+import sigmastate.Values.{Constant, ConstantNode, EvaluatedValue, SigmaPropConstant}
 import sigmastate._
 import sigmastate.basics.DLogProtocol.ProveDlogProp
-import sigmastate.serialization.{ErgoTreeSerializer, SigmaSerializer}
+import sigmastate.serialization.ValueSerializer
 
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
-object sigma {
-
-  private val treeSerializer: ErgoTreeSerializer = ErgoTreeSerializer.DefaultSerializer
-
-  @inline def deserializeErgoTree(raw: HexString): Try[Values.ErgoTree] =
-    Base16.decode(raw.unwrapped).map(treeSerializer.deserializeErgoTree)
-
-  @inline def deriveErgoTreeTemplateHash(ergoTree: HexString): Try[ErgoTreeTemplateHash] =
-    deserializeErgoTree(ergoTree).map { tree =>
-      ErgoTreeTemplateHash.fromStringUnsafe(Base16.encode(Sha256.hash(tree.template)))
-    }
-
-  @inline def ergoTreeToAddress(
-    ergoTree: HexString
-  )(implicit enc: ErgoAddressEncoder): Try[ErgoAddress] =
-    Base16
-      .decode(ergoTree.unwrapped)
-      .flatMap { bytes =>
-        enc.fromProposition(treeSerializer.deserializeErgoTree(bytes))
-      }
-      .transform(_ => Try(Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress), Failure(_))
-
-  @inline def addressToErgoTree(
-    address: Address
-  )(implicit enc: ErgoAddressEncoder): ErgoTree =
-    enc
-      .fromString(address.unwrapped)
-      .map(_.script)
-      .get
-
-  @inline def addressToErgoTreeHex(address: Address)(implicit enc: ErgoAddressEncoder): Try[HexString] =
-    Try(HexString.fromStringUnsafe(Base16.encode(addressToErgoTree(address).bytes)))
-
-  @inline def addressToErgoTreeNewtype(address: Address)(implicit
-    enc: ErgoAddressEncoder
-  ): Try[uexplorer.ErgoTree] =
-    addressToErgoTreeHex(address).map(uexplorer.ErgoTree(_))
-
-  @inline def hexStringToBytes(s: HexString): Try[Array[Byte]] =
-    Base16
-      .decode(s.unwrapped)
-      .transform(Success(_), e => Failure(Base16DecodingFailed(s, Option(e.getMessage))))
-
-  @inline def bytesToErgoTree(bytes: Array[Byte]): Try[ErgoTree] =
-    Try(treeSerializer.deserializeErgoTree(bytes))
-      .transform(Success(_), e => Failure(ErgoTreeDeserializationFailed(bytes, Option(e.getMessage))))
-
-  /** Extracts ErgoTree's template (serialized tree with placeholders instead of values)
-    * @param ergoTree ErgoTree
-    * @return serialized ErgoTree's template
-    */
-  @inline def ergoTreeTemplateBytes(ergoTree: ErgoTree): Try[Array[Byte]] = {
-    val bytes = ergoTree.bytes
-    Try {
-      val r = SigmaSerializer.startReader(bytes)
-      treeSerializer.deserializeHeaderWithTreeBytes(r)._4
-    }.transform(Success(_), e => Failure(ErgoTreeDeserializationFailed(bytes, Option(e.getMessage))))
-  }
+object RegistersParser {
 
   @inline def renderEvaluatedValue[T <: SType](ev: EvaluatedValue[T]): Option[(SigmaType, String)] = {
     def goRender[T0 <: SType](ev0: EvaluatedValue[T0]): OptionT[Eval, (SigmaType, String)] =
@@ -132,6 +74,40 @@ object sigma {
       }
 
     goRender(ev).value.value
+  }
+
+  def parseAny(raw: HexString): Try[RegisterValue] =
+    Try(ValueSerializer.deserialize(raw.bytes)).flatMap {
+      case v: EvaluatedValue[_] =>
+        renderEvaluatedValue(v)
+          .map { case (tp, vl) => Try(RegisterValue(tp, vl)) }
+          .getOrElse(Failure(new Exception(s"Failed to render constant value [$v] in register")))
+      case v =>
+        Failure(new Exception(s"Got non constant value [$v] in register"))
+    }
+
+  def parse[T <: SType](raw: HexString)(implicit ev: ClassTag[T#WrappedType]): Try[T#WrappedType] =
+    Try(ValueSerializer.deserialize(raw.bytes)).flatMap {
+      case v: EvaluatedValue[_] =>
+        v.value match {
+          case wrappedValue: T#WrappedType =>
+            Success(wrappedValue)
+          case wrappedValue =>
+            Failure(new Exception(s"Got wrapped value [$wrappedValue] of unexpected type in register"))
+        }
+      case v =>
+        Failure(new Exception(s"Got non constant value [$v] in register"))
+    }
+
+  /** Expand registers into `register_id -> expanded_register` form.
+    */
+  @inline def expand(registers: Map[RegisterId, HexString]): Map[RegisterId, ExpandedRegister] = {
+    val expanded =
+      for {
+        (idSig, serializedValue) <- registers.toList
+        rv = parseAny(serializedValue).toOption
+      } yield idSig -> ExpandedRegister(serializedValue, rv.map(_.sigmaType), rv.map(_.value))
+    expanded.toMap
   }
 
 }

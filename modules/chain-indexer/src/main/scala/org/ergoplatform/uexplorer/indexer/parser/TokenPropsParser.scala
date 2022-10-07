@@ -1,10 +1,11 @@
-package org.ergoplatform.uexplorer
+package org.ergoplatform.uexplorer.indexer.parser
 
-import java.util.regex.Pattern
+import cats.implicits.catsSyntaxFlatMapOps
+import org.ergoplatform.uexplorer.{HexString, RegisterId}
 import org.ergoplatform.uexplorer.node.TokenProps
 import sigmastate.{SByte, SCollection}
-import tofu.syntax.monadic._
 
+import java.util.regex.Pattern
 import scala.util.Try
 
 object TokenPropsParser {

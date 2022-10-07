@@ -6,7 +6,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.api.{Refined, Validate}
 import eu.timepit.refined.refineV
-import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.indexer.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.http.{LocalNodeUriMagnet, RemoteNodeUriMagnet}
 import pureconfig.ConfigReader.Result
 import pureconfig.error.CannotConvert

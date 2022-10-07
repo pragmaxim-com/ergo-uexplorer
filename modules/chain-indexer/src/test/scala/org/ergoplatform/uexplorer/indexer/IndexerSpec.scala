@@ -2,7 +2,6 @@ package org.ergoplatform.uexplorer.indexer
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
-import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}

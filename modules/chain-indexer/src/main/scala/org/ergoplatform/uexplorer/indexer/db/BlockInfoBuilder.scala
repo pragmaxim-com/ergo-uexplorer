@@ -1,10 +1,10 @@
 package org.ergoplatform.uexplorer.indexer.db
 
-import org.ergoplatform.uexplorer.Err.ProcessingErr
 import org.ergoplatform.uexplorer.db.BlockInfo
+import org.ergoplatform.uexplorer.indexer.{Const, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlock
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.{Address, Const, ProtocolSettings}
+import org.ergoplatform.uexplorer.Address
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
 import scorex.util.encode.Base16
 import sigmastate.basics.DLogProtocol.ProveDlog
@@ -22,7 +22,6 @@ object BlockInfoBuilder {
       .flatMap { bytes =>
         Try(GroupElementSerializer.parse(SigmaSerializer.startReader(bytes)))
       }
-      .transform(Success(_), ex => Failure(ProcessingErr.EcPointDecodingFailed(ex.getMessage)))
       .flatMap { x =>
         val minerPk = ProveDlog(x)
         val rewardScript =

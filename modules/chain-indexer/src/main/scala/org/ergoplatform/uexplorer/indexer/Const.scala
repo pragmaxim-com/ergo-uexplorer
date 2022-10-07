@@ -1,26 +1,23 @@
-package org.ergoplatform.uexplorer
+package org.ergoplatform.uexplorer.indexer
 
 import org.ergoplatform.ErgoScriptPredef
 import scorex.util.encode.Base16
-import sigmastate.basics.BcDlogGroup
-import sigmastate.interpreter.CryptoConstants
-import sigmastate.interpreter.CryptoConstants.EcPointType
 
 object Const {
 
-  val PreGenesisHeight = 0
+  val CassandraKeyspace = "uexplorer"
+  val EpochLength       = 1024
+  val BufferSize        = 32
+  val FlushHeight       = 32
+  val AllowedHeightDiff = 10
+  val MinNodeHeight     = EpochLength * 800
 
-  val GenesisHeight: Int = PreGenesisHeight + 1
-
-  val PublicKeyLength = 33
-
-  val EpochLength = 1024
+  val FeeContractAddress =
+    "2iHkR7CWvD1R4j1yZg5bkeDRQavjAaVPeTDFGGLZduHyfWMuYpmhHocX8GJoaieTx78FntzJbCBVL6rf96ocJoZdmWBL2fci7NqWgAirppPQmZ7fN9V6z13Ay6brPriBKYqLp1bT2Fk4FkFLCfdPpe"
 
   val MinerRewardDelta = 720
 
   val TeamTreasuryThreshold = 67500000000L
-
-  val group: BcDlogGroup[EcPointType] = CryptoConstants.dlogGroup
 
   val FeePropositionScriptHex: String = {
     val script = ErgoScriptPredef.feeProposition(MinerRewardDelta)
@@ -28,8 +25,6 @@ object Const {
   }
 
   val CoinsInOneErgo: Long = 1000000000L
-
-  val ErgoDecimalPlacesNum: Int = 9
 
   val Eip27UpperPoint        = 15 * CoinsInOneErgo
   val Eip27DefaultReEmission = 12 * CoinsInOneErgo

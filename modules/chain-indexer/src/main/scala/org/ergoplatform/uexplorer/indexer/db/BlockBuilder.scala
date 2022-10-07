@@ -4,10 +4,12 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db._
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlock
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, RegisterValue}
-import org.ergoplatform.uexplorer.{sigma, Address, ProtocolSettings, RegistersParser, TokenId, TokenPropsParser, TokenType}
-
+import org.ergoplatform.uexplorer.{Address, TokenId, TokenType}
+import io.circe.generic.auto._
 import cats.syntax.traverse._
 import io.circe.syntax._
+import org.ergoplatform.uexplorer.indexer.ProtocolSettings
+import org.ergoplatform.uexplorer.indexer.parser.{ErgoTreeParser, RegistersParser, TokenPropsParser}
 
 import scala.util.Try
 
@@ -113,8 +115,8 @@ object BlockBuilder {
         .zipWithIndex
         .traverse { case ((o, outIndex, txId), blockIndex) =>
           for {
-            address            <- sigma.ergoTreeToAddress(o.ergoTree).map(t => Address.fromStringUnsafe(t.toString))
-            scriptTemplateHash <- sigma.deriveErgoTreeTemplateHash(o.ergoTree)
+            address            <- ErgoTreeParser.ergoTreeToAddress(o.ergoTree).map(t => Address.fromStringUnsafe(t.toString))
+            scriptTemplateHash <- ErgoTreeParser.deriveErgoTreeTemplateHash(o.ergoTree)
             registersJson = RegistersParser.expand(o.additionalRegisters).asJson
             globalIndex   = lastOutputGlobalIndex + blockIndex + 1
           } yield Output(
