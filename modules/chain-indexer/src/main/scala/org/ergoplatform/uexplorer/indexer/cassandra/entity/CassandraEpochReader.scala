@@ -4,11 +4,10 @@ import akka.stream.scaladsl.{Sink, Source}
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement, Row, SimpleStatement}
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Address, BlockId}
-import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlock
+import org.ergoplatform.uexplorer.{db, Address, BlockId}
 
 import scala.collection.immutable.TreeMap
 import scala.compat.java8.FutureConverters._
@@ -72,31 +71,31 @@ object CassandraEpochReader extends CassandraPersistenceSupport {
 
   protected[cassandra] def blockInfoRowReader(row: Row): CachedBlock = {
     import Headers.BlockInfo._
+    val blockInfoUdt = row.getUdtValue(Headers.BlockInfo.udtName)
     CachedBlock(
       BlockId.fromStringUnsafe(row.getString(Headers.header_id)),
       BlockId.fromStringUnsafe(row.getString(Headers.parent_id)),
       row.getLong(Headers.timestamp),
       row.getInt(Headers.height),
-      BlockInfo(
-        row.getInt(block_size),
-        row.getLong(block_coins),
-        Option(row.getLong(block_mining_time)),
-        row.getInt(txs_count),
-        row.getInt(txs_size),
-        Address.fromStringUnsafe(row.getString(miner_address)),
-        row.getLong(miner_reward),
-        row.getLong(miner_revenue),
-        row.getLong(block_fee),
-        row.getLong(block_chain_total_size),
-        row.getLong(total_txs_count),
-        row.getLong(total_coins_issued),
-        row.getLong(total_mining_time),
-        row.getLong(total_fees),
-        row.getLong(total_miners_reward),
-        row.getLong(total_coins_in_txs),
-        row.getLong(max_tx_gix),
-        row.getLong(max_box_gix),
-        row.getBoolean(Headers.main_chain)
+      db.BlockInfo(
+        blockInfoUdt.getInt(block_size),
+        blockInfoUdt.getLong(block_coins),
+        Option(blockInfoUdt.getLong(block_mining_time)),
+        blockInfoUdt.getInt(txs_count),
+        blockInfoUdt.getInt(txs_size),
+        Address.fromStringUnsafe(blockInfoUdt.getString(miner_address)),
+        blockInfoUdt.getLong(miner_reward),
+        blockInfoUdt.getLong(miner_revenue),
+        blockInfoUdt.getLong(block_fee),
+        blockInfoUdt.getLong(block_chain_total_size),
+        blockInfoUdt.getLong(total_txs_count),
+        blockInfoUdt.getLong(total_coins_issued),
+        blockInfoUdt.getLong(total_mining_time),
+        blockInfoUdt.getLong(total_fees),
+        blockInfoUdt.getLong(total_miners_reward),
+        blockInfoUdt.getLong(total_coins_in_txs),
+        blockInfoUdt.getLong(max_tx_gix),
+        blockInfoUdt.getLong(max_box_gix)
       )
     )
   }

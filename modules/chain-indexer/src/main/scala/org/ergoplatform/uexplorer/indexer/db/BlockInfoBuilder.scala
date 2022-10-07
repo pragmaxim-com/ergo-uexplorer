@@ -103,8 +103,7 @@ object BlockInfoBuilder {
           .getOrElse(0L) + reward,
         totalCoinsInTxs = prevBlock.map(_.info.totalCoinsInTxs).getOrElse(0L) + blockCoins,
         maxTxGix        = maxGlobalTxIndex,
-        maxBoxGix       = maxGlobalBoxIndex,
-        mainChain       = false
+        maxBoxGix       = maxGlobalBoxIndex
       )
     }
 }

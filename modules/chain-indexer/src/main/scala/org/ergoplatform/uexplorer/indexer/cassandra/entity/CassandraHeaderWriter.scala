@@ -21,18 +21,17 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
       headerInsertBinder
     )
 
-  protected[cassandra] def headerInsertBinder: (Block, PreparedStatement) => BoundStatement = {
-    case (block, statement) =>
-      val validVersion =
-        if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
-          logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")
-          0: Byte
-        } else {
-          block.header.version
-        }
+  protected[cassandra] def headerInsertBinder: (Block, PreparedStatement) => BoundStatement = { case (block, statement) =>
+    val validVersion =
+      if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
+        logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")
+        0: Byte
+      } else {
+        block.header.version
+      }
 
-      val partialStatement =
-        // format: off
+    val partialStatement =
+      // format: off
         statement
           .bind()
           .setString(header_id,             block.header.id.value.unwrapped)
@@ -57,11 +56,11 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
           .setUdtValue(BlockInfo.udtName,   BlockInfo.buildUdtValue(block))
         // format: on
 
-      block.adProofOpt.fold(partialStatement) { adProof =>
-        partialStatement
-          .setString(ad_proofs_bytes, adProof.proofBytes.unwrapped)
-          .setString(ad_proofs_digest, adProof.digest.unwrapped)
-      }
+    block.adProofOpt.fold(partialStatement) { adProof =>
+      partialStatement
+        .setString(ad_proofs_bytes, adProof.proofBytes.unwrapped)
+        .setString(ad_proofs_digest, adProof.digest.unwrapped)
+    }
   }
 
 }

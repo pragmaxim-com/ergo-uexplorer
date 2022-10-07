@@ -194,8 +194,6 @@ object BlockBuilder {
       block
         .lens(_.header.mainChain)
         .modify(_ => mainChain)
-        .lens(_.info.mainChain)
-        .modify(_ => mainChain)
         .lens(_.txs)
         .modify(_.map(_.copy(mainChain = mainChain)))
         .lens(_.inputs)
