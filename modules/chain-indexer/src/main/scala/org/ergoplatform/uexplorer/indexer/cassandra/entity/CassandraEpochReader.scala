@@ -5,7 +5,7 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement, 
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.{Address, BlockId}
-import org.ergoplatform.uexplorer.db.BlockStats
+import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 
@@ -22,14 +22,14 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
 
   private val blockInfoSelectPreparedStatement = cqlSession.prepare(blockInfoSelectStatement)
 
-  def getBlockInfo(headerId: BlockId): Future[BlockStats] =
+  def getBlockInfo(headerId: BlockId): Future[BlockInfo] =
     cqlSession
       .executeAsync(blockInfoSelectBinder(blockInfoSelectPreparedStatement)(headerId))
       .toScala
       .map(_.one())
       .map(blockInfoRowReader)
 
-  def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockStats]] = {
+  def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]] = {
     logger.debug(s"Getting existing epoch indexes from db ")
     Source
       .fromPublisher(
@@ -70,9 +70,9 @@ object CassandraEpochReader extends CassandraPersistenceSupport {
   protected[cassandra] def blockInfoSelectBinder(preparedStatement: PreparedStatement)(headerId: BlockId): BoundStatement =
     preparedStatement.bind().setString(Headers.header_id, headerId.value.unwrapped)
 
-  protected[cassandra] def blockInfoRowReader(row: Row): BlockStats = {
+  protected[cassandra] def blockInfoRowReader(row: Row): BlockInfo = {
     import Headers.BlockInfo._
-    BlockStats(
+    BlockInfo(
       BlockId.fromStringUnsafe(row.getString(Headers.header_id)),
       BlockId.fromStringUnsafe(row.getString(Headers.parent_id)),
       row.getLong(Headers.timestamp),

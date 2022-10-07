@@ -6,7 +6,7 @@ import akka.pattern.StatusReply
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.{BlockId, ProtocolSettings}
-import org.ergoplatform.uexplorer.db.{BlockStats, FlatBlock}
+import org.ergoplatform.uexplorer.db.{BlockInfo, FlatBlock}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
@@ -51,7 +51,7 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
             Behaviors.same
         }
       case GetBlock(blockId, replyTo) =>
-        replyTo ! CachedBlock(p.blockCache.byId.get(blockId))
+        replyTo ! IsBlockCached(p.blockCache.byId.contains(blockId))
         Behaviors.same
       case UpdateChainState(persistedEpochIndexes, replyTo) =>
         val newProgress = p.updateState(persistedEpochIndexes)
@@ -83,9 +83,9 @@ object ProgressMonitor {
 
   case class InsertWinningFork(blocks: List[ApiFullBlock], replyTo: ActorRef[StatusReply[Inserted]]) extends Insertable
 
-  case class GetBlock(blockId: BlockId, replyTo: ActorRef[CachedBlock]) extends MonitorRequest
+  case class GetBlock(blockId: BlockId, replyTo: ActorRef[IsBlockCached]) extends MonitorRequest
 
-  case class UpdateChainState(lastBlockByEpochIndex: TreeMap[Int, BlockStats], replyTo: ActorRef[ProgressState])
+  case class UpdateChainState(lastBlockByEpochIndex: TreeMap[Int, BlockInfo], replyTo: ActorRef[ProgressState])
     extends MonitorRequest
 
   case class GetChainState(replyTo: ActorRef[ProgressState]) extends MonitorRequest
@@ -95,13 +95,13 @@ object ProgressMonitor {
   /** RESPONSE */
   sealed trait MonitorResponse
 
-  case class CachedBlock(block: Option[BlockStats]) extends MonitorResponse
+  case class IsBlockCached(present: Boolean) extends MonitorResponse
 
   sealed trait Inserted extends MonitorResponse
 
   case class BestBlockInserted(flatBlock: FlatBlock) extends Inserted
 
-  case class ForkInserted(newFork: List[FlatBlock], supersededFork: List[BlockStats]) extends Inserted
+  case class ForkInserted(newFork: List[FlatBlock], supersededFork: List[BlockInfo]) extends Inserted
 
   sealed trait MaybeNewEpoch extends MonitorResponse
 
@@ -136,11 +136,13 @@ object ProgressMonitor {
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[Inserted] =
     ref.askWithStatus(ref => InsertBestBlock(bestBlock, ref))
 
-  def getBlock(blockId: BlockId)(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[CachedBlock] =
+  def containsBlock(
+    blockId: BlockId
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[IsBlockCached] =
     ref.ask(ref => GetBlock(blockId, ref))
 
   def updateState(
-    lastBlockByEpochIndex: TreeMap[Int, BlockStats]
+    lastBlockByEpochIndex: TreeMap[Int, BlockInfo]
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[ProgressState] =
     ref.ask(ref => UpdateChainState(lastBlockByEpochIndex, ref))
 

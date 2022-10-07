@@ -13,7 +13,7 @@ import scala.util.Try
   */
 final case class FlatBlock(
   header: Header,
-  info: BlockStats,
+  info: BlockInfo,
   extension: BlockExtension,
   adProofOpt: Option[AdProof],
   txs: List[Transaction],
@@ -27,7 +27,7 @@ final case class FlatBlock(
 
 object FlatBlock {
 
-  def apply(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
+  def apply(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockInfo])(implicit
     protocolSettings: ProtocolSettings
   ): Try[FlatBlock] = {
     val apiHeader       = apiBlock.header
@@ -55,7 +55,7 @@ object FlatBlock {
         mainChain = false
       )
 
-    val infoTry = BlockStats(apiBlock, prevBlockInfo)
+    val infoTry = BlockInfo(apiBlock, prevBlockInfo)
 
     val extension =
       BlockExtension(
@@ -185,9 +185,47 @@ object FlatBlock {
         )
       }
 
+    def updateTotalInfo(currentBlockInfo: BlockInfo, prevBlockStats: BlockInfo): BlockInfo =
+      currentBlockInfo.copy(
+        blockChainTotalSize = prevBlockStats.blockChainTotalSize + currentBlockInfo.blockSize,
+        totalTxsCount       = prevBlockStats.totalTxsCount + currentBlockInfo.txsCount,
+        totalCoinsIssued    = protocolSettings.emission.issuedCoinsAfterHeight(currentBlockInfo.height),
+        totalMiningTime     = prevBlockStats.totalMiningTime + (currentBlockInfo.timestamp - prevBlockStats.timestamp),
+        totalFees           = prevBlockStats.totalFees + currentBlockInfo.blockFee,
+        totalMinersReward   = prevBlockStats.totalMinersReward + currentBlockInfo.minerReward,
+        totalCoinsInTxs     = prevBlockStats.totalCoinsInTxs + currentBlockInfo.blockCoins
+      )
+
+    def updateMainChain(block: FlatBlock, mainChain: Boolean): FlatBlock = {
+      import monocle.macros.syntax.lens._
+      block
+        .lens(_.header.mainChain)
+        .modify(_ => mainChain)
+        .lens(_.info.mainChain)
+        .modify(_ => mainChain)
+        .lens(_.txs)
+        .modify(_.map(_.copy(mainChain = mainChain)))
+        .lens(_.inputs)
+        .modify(_.map(_.copy(mainChain = mainChain)))
+        .lens(_.dataInputs)
+        .modify(_.map(_.copy(mainChain = mainChain)))
+        .lens(_.outputs)
+        .modify(_.map(_.copy(mainChain = mainChain)))
+        .lens(_.info)
+        .modify {
+          case currentBlockInfo if prevBlockInfo.nonEmpty =>
+            updateTotalInfo(currentBlockInfo, prevBlockInfo.get)
+          case currentBlockInfo =>
+            currentBlockInfo
+        }
+    }
+
     for {
       info    <- infoTry
       outputs <- outputsTry
-    } yield new FlatBlock(header, info, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers, tokens)
+    } yield updateMainChain(
+      new FlatBlock(header, info, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers, tokens),
+      mainChain = true
+    )
   }
 }

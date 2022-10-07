@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.indexer.api
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.db.{BlockStats, FlatBlock}
+import org.ergoplatform.uexplorer.db.{BlockInfo, FlatBlock}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 
 import java.util.concurrent.ConcurrentHashMap
@@ -17,14 +17,14 @@ trait Backend {
 
   def epochWriteFlow: Flow[(FlatBlock, Option[MaybeNewEpoch]), (FlatBlock, Option[MaybeNewEpoch]), NotUsed]
 
-  def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockStats]]
+  def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]]
 }
 
 class InMemoryBackend extends Backend {
 
-  private val lastBlockStatsByEpochIndex = new ConcurrentHashMap[Int, BlockStats]()
-  private val blocksById                 = new ConcurrentHashMap[BlockId, BlockStats]()
-  private val blocksByHeight             = new ConcurrentHashMap[Int, BlockStats]()
+  private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BlockInfo]()
+  private val blocksById                = new ConcurrentHashMap[BlockId, BlockInfo]()
+  private val blocksByHeight            = new ConcurrentHashMap[Int, BlockInfo]()
 
   override def blockWriteFlow: Flow[Inserted, FlatBlock, NotUsed] =
     Flow[Inserted]
@@ -45,12 +45,12 @@ class InMemoryBackend extends Backend {
     Flow[(FlatBlock, Option[MaybeNewEpoch])]
       .map {
         case (block, Some(NewEpochCreated(epoch))) =>
-          lastBlockStatsByEpochIndex.put(epoch.index, blocksById.get(epoch.blockIds.last))
+          lastBlockInfoByEpochIndex.put(epoch.index, blocksById.get(epoch.blockIds.last))
           block -> Some(NewEpochCreated(epoch))
         case tuple =>
           tuple
       }
 
-  override def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockStats]] =
-    Future.successful(TreeMap(lastBlockStatsByEpochIndex.asScala.toSeq: _*))
+  override def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]] =
+    Future.successful(TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*))
 }

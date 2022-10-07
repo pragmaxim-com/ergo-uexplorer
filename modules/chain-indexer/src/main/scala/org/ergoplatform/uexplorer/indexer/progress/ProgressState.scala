@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer.progress
 
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.ProtocolSettings
-import org.ergoplatform.uexplorer.db.{BlockStats, FlatBlock}
+import org.ergoplatform.uexplorer.db.{BlockInfo, FlatBlock}
 import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache
@@ -79,7 +79,7 @@ case class ProgressState(
         )
       )
     } else
-      buildBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId))
+      FlatBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId))
         .map { flatBlock =>
           BestBlockInserted(flatBlock) -> copy(blockCache =
             BlockCache(
@@ -100,11 +100,11 @@ case class ProgressState(
       )
     } else
       winningFork
-        .foldLeft(Try(ListBuffer.empty[FlatBlock] -> ListBuffer.empty[BlockStats])) {
+        .foldLeft(Try(ListBuffer.empty[FlatBlock] -> ListBuffer.empty[BlockInfo])) {
           case (f @ Failure(_), _) =>
             f
           case (Success((newBlocksAcc, toRemoveAcc)), apiBlock) =>
-            buildBlock(
+            FlatBlock(
               apiBlock,
               Some(
                 newBlocksAcc.lastOption
@@ -130,7 +130,7 @@ case class ProgressState(
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(blockCache = newBlockCache)
         }
 
-  def updateState(persistedEpochIndexes: TreeMap[Int, BlockStats]): ProgressState = {
+  def updateState(persistedEpochIndexes: TreeMap[Int, BlockInfo]): ProgressState = {
     val newEpochIndexes = lastBlockIdInEpoch ++ persistedEpochIndexes.view.mapValues(_.headerId)
     val newBlockCache =
       BlockCache(
@@ -140,7 +140,7 @@ case class ProgressState(
     ProgressState(newEpochIndexes, invalidEpochs, newBlockCache)
   }
 
-  def getLastCachedBlock: Option[BlockStats] = blockCache.byHeight.lastOption.map(_._2)
+  def getLastCachedBlock: Option[BlockInfo] = blockCache.byHeight.lastOption.map(_._2)
 
   def persistedEpochIndexes: SortedSet[Int] = lastBlockIdInEpoch.keySet
 
@@ -186,61 +186,10 @@ case class ProgressState(
 
 object ProgressState {
 
-  import cats.Applicative
-  import org.ergoplatform.uexplorer.node.ApiFullBlock
-  import tofu.Context
-
-  import scala.util.Try
-
-  case class BlockCache(byId: Map[BlockId, BlockStats], byHeight: SortedMap[Int, BlockStats]) {
+  case class BlockCache(byId: Map[BlockId, BlockInfo], byHeight: SortedMap[Int, BlockInfo]) {
     def isEmpty: Boolean = byId.isEmpty || byHeight.isEmpty
 
     def heights: SortedSet[Int] = byHeight.keySet
   }
-
-  def updateTotalStats(currentBlockStats: BlockStats, prevBlockStats: BlockStats)(implicit
-    protocol: ProtocolSettings
-  ): BlockStats =
-    currentBlockStats.copy(
-      blockChainTotalSize = prevBlockStats.blockChainTotalSize + currentBlockStats.blockSize,
-      totalTxsCount       = prevBlockStats.totalTxsCount + currentBlockStats.txsCount,
-      totalCoinsIssued    = protocol.emission.issuedCoinsAfterHeight(currentBlockStats.height),
-      totalMiningTime     = prevBlockStats.totalMiningTime + (currentBlockStats.timestamp - prevBlockStats.timestamp),
-      totalFees           = prevBlockStats.totalFees + currentBlockStats.blockFee,
-      totalMinersReward   = prevBlockStats.totalMinersReward + currentBlockStats.minerReward,
-      totalCoinsInTxs     = prevBlockStats.totalCoinsInTxs + currentBlockStats.blockCoins
-    )
-
-  def updateMainChain(block: FlatBlock, mainChain: Boolean, prevBlockInfoOpt: Option[BlockStats])(implicit
-    protocol: ProtocolSettings
-  ): FlatBlock = {
-    import monocle.macros.syntax.lens._
-    block
-      .lens(_.header.mainChain)
-      .modify(_ => mainChain)
-      .lens(_.info.mainChain)
-      .modify(_ => mainChain)
-      .lens(_.txs)
-      .modify(_.map(_.copy(mainChain = mainChain)))
-      .lens(_.inputs)
-      .modify(_.map(_.copy(mainChain = mainChain)))
-      .lens(_.dataInputs)
-      .modify(_.map(_.copy(mainChain = mainChain)))
-      .lens(_.outputs)
-      .modify(_.map(_.copy(mainChain = mainChain)))
-      .lens(_.info)
-      .modify {
-        case currentBlockStats if prevBlockInfoOpt.nonEmpty =>
-          updateTotalStats(currentBlockStats, prevBlockInfoOpt.get)
-        case currentBlockStats =>
-          currentBlockStats
-      }
-  }
-
-  def buildBlock(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
-    protocol: ProtocolSettings
-  ): Try[FlatBlock] =
-    FlatBlock(apiBlock, prevBlockInfo)
-      .map(updateMainChain(_, mainChain = true, prevBlockInfo))
 
 }

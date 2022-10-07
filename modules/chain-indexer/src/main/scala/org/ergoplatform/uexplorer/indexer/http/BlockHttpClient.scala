@@ -65,13 +65,13 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
     acc: List[ApiFullBlock]
   ): Future[List[ApiFullBlock]] =
     ProgressMonitor
-      .getBlock(block.header.parentId)
+      .containsBlock(block.header.parentId)
       .flatMap {
-        case CachedBlock(Some(_)) =>
+        case IsBlockCached(true) =>
           Future.successful(block :: acc)
-        case CachedBlock(None) if block.header.height == 1 =>
+        case IsBlockCached(false) if block.header.height == 1 =>
           Future.successful(block :: acc)
-        case CachedBlock(None) =>
+        case IsBlockCached(false) =>
           logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
           getBlockForId(block.header.parentId)
             .flatMap(b => getBestBlockOrBranch(b, block :: acc))

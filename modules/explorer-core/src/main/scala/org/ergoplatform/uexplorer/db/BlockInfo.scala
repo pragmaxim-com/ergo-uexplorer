@@ -11,9 +11,9 @@ import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
 import scala.util.{Failure, Success, Try}
 
 /** Represents `blocks_info` table.
-  * Containing main fields from protocol header and full-block stats.
+  * Containing main fields from protocol header and full-block info.
   */
-final case class BlockStats(
+final case class BlockInfo(
   headerId: BlockId,
   parentId: BlockId,
   timestamp: Long,
@@ -40,7 +40,7 @@ final case class BlockStats(
   mainChain: Boolean
 )
 
-object BlockStats {
+object BlockInfo {
 
   private def minerRewardAddress(
     apiBlock: ApiFullBlock
@@ -87,9 +87,9 @@ object BlockStats {
     }
   }
 
-  def apply(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
+  def apply(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockInfo])(implicit
     protocolSettings: ProtocolSettings
-  ): Try[BlockStats] =
+  ): Try[BlockInfo] =
     minerRewardAddress(apiBlock)(protocolSettings).map { minerAddress =>
       val (reward, fee) = minerRewardAndFee(apiBlock)(protocolSettings)
       val coinBaseValue = reward + fee
@@ -106,7 +106,7 @@ object BlockStats {
       val maxGlobalTxIndex   = lastGlobalTxIndex + apiBlock.transactions.transactions.size
       val maxGlobalBoxIndex  = lastGlobalBoxIndex + apiBlock.transactions.transactions.flatMap(_.outputs.toList).size
 
-      BlockStats(
+      BlockInfo(
         headerId        = apiBlock.header.id,
         parentId        = apiBlock.header.parentId,
         timestamp       = apiBlock.header.timestamp,
