@@ -30,7 +30,7 @@ trait CassandraBlockUpdater extends LazyLogging {
         case BestBlockInserted(flatBlock) =>
           Future.successful(List(flatBlock))
         case ForkInserted(newFlatBlocks, supersededFork) =>
-          removeBlocksFromMainChain(supersededFork.map(_.stats.headerId))
+          removeBlocksFromMainChain(supersededFork.map(_.headerId))
             .map(_ => newFlatBlocks)
       }
       .mapConcat(identity)

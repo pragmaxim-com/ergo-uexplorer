@@ -30,7 +30,7 @@ case class ProgressState(
             .heightRangeForEpochIndex(currentEpochIndex)
             .map { height =>
               val info = blockCache.byHeight(height)
-              height -> BlockRel(info.stats.headerId, info.parentId)
+              height -> BlockRel(info.headerId, info.parentId)
             }
         )
       epochCandidate match {
@@ -41,7 +41,7 @@ case class ProgressState(
         case Right(candidate) if lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
           def removeEpochFromCache(heightsToRemove: Seq[Int]): BlockCache =
             BlockCache(
-              blockCache.byId -- heightsToRemove.flatMap(blockCache.byHeight.get).map(_.stats.headerId),
+              blockCache.byId -- heightsToRemove.flatMap(blockCache.byHeight.get).map(_.headerId),
               blockCache.byHeight -- heightsToRemove
             )
 
@@ -79,13 +79,12 @@ case class ProgressState(
         )
       )
     } else
-      buildBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId).map(_.stats))
+      buildBlock(bestBlock, blockCache.byId.get(bestBlock.header.parentId))
         .map { flatBlock =>
-          val newBlockInfo = flatBlock.buildInfo
           BestBlockInserted(flatBlock) -> copy(blockCache =
             BlockCache(
-              blockCache.byId.updated(flatBlock.header.id, newBlockInfo),
-              blockCache.byHeight.updated(flatBlock.header.height, newBlockInfo)
+              blockCache.byId.updated(flatBlock.header.id, flatBlock.info),
+              blockCache.byHeight.updated(flatBlock.header.height, flatBlock.info)
             )
           )
         }
@@ -101,7 +100,7 @@ case class ProgressState(
       )
     } else
       winningFork
-        .foldLeft(Try(ListBuffer.empty[FlatBlock] -> ListBuffer.empty[BlockInfo])) {
+        .foldLeft(Try(ListBuffer.empty[FlatBlock] -> ListBuffer.empty[BlockStats])) {
           case (f @ Failure(_), _) =>
             f
           case (Success((newBlocksAcc, toRemoveAcc)), apiBlock) =>
@@ -110,38 +109,38 @@ case class ProgressState(
               Some(
                 newBlocksAcc.lastOption
                   .collect { case b if b.header.id == apiBlock.header.parentId => b.info }
-                  .getOrElse(blockCache.byId(apiBlock.header.parentId).stats)
+                  .getOrElse(blockCache.byId(apiBlock.header.parentId))
               )
             ).map { newBlock =>
               val newBlocks = newBlocksAcc :+ newBlock
               val toRemove =
                 toRemoveAcc ++ blockCache.byHeight
                   .get(apiBlock.header.height)
-                  .filter(_.stats.headerId != apiBlock.header.id)
+                  .filter(_.headerId != apiBlock.header.id)
               newBlocks -> toRemove
             }
         }
         .map { case (newBlocks, supersededBlocks) =>
           val newBlockCache =
             BlockCache(
-              (blockCache.byId -- supersededBlocks.map(_.stats.headerId)) ++ newBlocks
-                .map(b => b.header.id -> b.buildInfo),
-              blockCache.byHeight ++ newBlocks.map(b => b.header.height -> b.buildInfo)
+              (blockCache.byId -- supersededBlocks.map(_.headerId)) ++ newBlocks
+                .map(b => b.header.id -> b.info),
+              blockCache.byHeight ++ newBlocks.map(b => b.header.height -> b.info)
             )
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(blockCache = newBlockCache)
         }
 
-  def updateState(persistedEpochIndexes: TreeMap[Int, BlockInfo]): ProgressState = {
-    val newEpochIndexes = lastBlockIdInEpoch ++ persistedEpochIndexes.view.mapValues(_.stats.headerId)
+  def updateState(persistedEpochIndexes: TreeMap[Int, BlockStats]): ProgressState = {
+    val newEpochIndexes = lastBlockIdInEpoch ++ persistedEpochIndexes.view.mapValues(_.headerId)
     val newBlockCache =
       BlockCache(
-        blockCache.byId ++ persistedEpochIndexes.toSeq.map(i => i._2.stats.headerId -> i._2),
-        blockCache.byHeight ++ persistedEpochIndexes.map(i => i._2.stats.height -> i._2)
+        blockCache.byId ++ persistedEpochIndexes.toSeq.map(i => i._2.headerId -> i._2),
+        blockCache.byHeight ++ persistedEpochIndexes.map(i => i._2.height -> i._2)
       )
     ProgressState(newEpochIndexes, invalidEpochs, newBlockCache)
   }
 
-  def getLastCachedBlock: Option[BlockInfo] = blockCache.byHeight.lastOption.map(_._2)
+  def getLastCachedBlock: Option[BlockStats] = blockCache.byHeight.lastOption.map(_._2)
 
   def persistedEpochIndexes: SortedSet[Int] = lastBlockIdInEpoch.keySet
 
@@ -193,13 +192,11 @@ object ProgressState {
 
   import scala.util.Try
 
-  case class BlockCache(byId: Map[BlockId, BlockInfo], byHeight: SortedMap[Int, BlockInfo]) {
+  case class BlockCache(byId: Map[BlockId, BlockStats], byHeight: SortedMap[Int, BlockStats]) {
     def isEmpty: Boolean = byId.isEmpty || byHeight.isEmpty
 
     def heights: SortedSet[Int] = byHeight.keySet
   }
-
-  case class BlockInfo(parentId: BlockId, stats: BlockStats)
 
   def updateTotalStats(currentBlockStats: BlockStats, prevBlockStats: BlockStats)(implicit
     protocol: ProtocolSettings
@@ -245,9 +242,5 @@ object ProgressState {
   ): Try[FlatBlock] =
     FlatBlock(apiBlock, prevBlockInfo)
       .map(updateMainChain(_, mainChain = true, prevBlockInfo))
-
-  implicit class FlatBlockPimp(underlying: FlatBlock) {
-    def buildInfo: BlockInfo = BlockInfo(underlying.header.parentId, underlying.info)
-  }
 
 }

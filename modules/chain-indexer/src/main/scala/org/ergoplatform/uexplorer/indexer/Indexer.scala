@@ -49,7 +49,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
   def sync: Future[ProgressState] =
     for {
       progress <- ProgressMonitor.getChainState
-      fromHeight = progress.getLastCachedBlock.map(_.stats.height).getOrElse(0) + 1
+      fromHeight = progress.getLastCachedBlock.map(_.height).getOrElse(0) + 1
       toHeight <- blockHttpClient.getBestBlockHeight
       pastHeights = progress.findMissingIndexes.flatMap(Epoch.heightRangeForEpochIndex)
       _           = if (pastHeights.nonEmpty) logger.error(s"Going to index $pastHeights missing blocks")

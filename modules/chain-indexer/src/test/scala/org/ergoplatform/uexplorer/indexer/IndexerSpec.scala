@@ -58,11 +58,11 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
 
   "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {
     indexer.sync.flatMap { progress =>
-      progress.getLastCachedBlock.map(_.stats.height).get shouldBe 4150
+      progress.getLastCachedBlock.map(_.height).get shouldBe 4150
       progress.invalidEpochs shouldBe empty
       progress.findMissingIndexes shouldBe empty
       indexer.sync.map { progress =>
-        progress.getLastCachedBlock.map(_.stats.height).get shouldBe 4200
+        progress.getLastCachedBlock.map(_.height).get shouldBe 4200
         progress.invalidEpochs shouldBe empty
         progress.findMissingIndexes shouldBe empty
       }

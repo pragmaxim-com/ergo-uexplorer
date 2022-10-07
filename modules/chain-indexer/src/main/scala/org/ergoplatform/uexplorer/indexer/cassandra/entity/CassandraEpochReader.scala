@@ -8,7 +8,6 @@ import org.ergoplatform.uexplorer.{Address, BlockId}
 import org.ergoplatform.uexplorer.db.BlockStats
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockInfo
 
 import scala.collection.immutable.TreeMap
 import scala.compat.java8.FutureConverters._
@@ -23,14 +22,14 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
 
   private val blockInfoSelectPreparedStatement = cqlSession.prepare(blockInfoSelectStatement)
 
-  def getBlockInfo(headerId: BlockId): Future[BlockInfo] =
+  def getBlockInfo(headerId: BlockId): Future[BlockStats] =
     cqlSession
       .executeAsync(blockInfoSelectBinder(blockInfoSelectPreparedStatement)(headerId))
       .toScala
       .map(_.one())
       .map(blockInfoRowReader)
 
-  def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockInfo]] = {
+  def getLastBlockInfoByEpochIndex: Future[TreeMap[Int, BlockStats]] = {
     logger.debug(s"Getting existing epoch indexes from db ")
     Source
       .fromPublisher(
@@ -71,35 +70,33 @@ object CassandraEpochReader extends CassandraPersistenceSupport {
   protected[cassandra] def blockInfoSelectBinder(preparedStatement: PreparedStatement)(headerId: BlockId): BoundStatement =
     preparedStatement.bind().setString(Headers.header_id, headerId.value.unwrapped)
 
-  protected[cassandra] def blockInfoRowReader(row: Row): BlockInfo = {
+  protected[cassandra] def blockInfoRowReader(row: Row): BlockStats = {
     import Headers.BlockInfo._
-    BlockInfo(
+    BlockStats(
+      BlockId.fromStringUnsafe(row.getString(Headers.header_id)),
       BlockId.fromStringUnsafe(row.getString(Headers.parent_id)),
-      BlockStats(
-        BlockId.fromStringUnsafe(row.getString(Headers.header_id)),
-        row.getLong(Headers.timestamp),
-        row.getInt(Headers.height),
-        row.getLong(Headers.difficulty),
-        row.getInt(block_size),
-        row.getLong(block_coins),
-        Option(row.getLong(block_mining_time)),
-        row.getInt(txs_count),
-        row.getInt(txs_size),
-        Address.fromStringUnsafe(row.getString(miner_address)),
-        row.getLong(miner_reward),
-        row.getLong(miner_revenue),
-        row.getLong(block_fee),
-        row.getLong(block_chain_total_size),
-        row.getLong(total_txs_count),
-        row.getLong(total_coins_issued),
-        row.getLong(total_mining_time),
-        row.getLong(total_fees),
-        row.getLong(total_miners_reward),
-        row.getLong(total_coins_in_txs),
-        row.getLong(max_tx_gix),
-        row.getLong(max_box_gix),
-        row.getBoolean(Headers.main_chain)
-      )
+      row.getLong(Headers.timestamp),
+      row.getInt(Headers.height),
+      row.getLong(Headers.difficulty),
+      row.getInt(block_size),
+      row.getLong(block_coins),
+      Option(row.getLong(block_mining_time)),
+      row.getInt(txs_count),
+      row.getInt(txs_size),
+      Address.fromStringUnsafe(row.getString(miner_address)),
+      row.getLong(miner_reward),
+      row.getLong(miner_revenue),
+      row.getLong(block_fee),
+      row.getLong(block_chain_total_size),
+      row.getLong(total_txs_count),
+      row.getLong(total_coins_issued),
+      row.getLong(total_mining_time),
+      row.getLong(total_fees),
+      row.getLong(total_miners_reward),
+      row.getLong(total_coins_in_txs),
+      row.getLong(max_tx_gix),
+      row.getLong(max_box_gix),
+      row.getBoolean(Headers.main_chain)
     )
   }
 

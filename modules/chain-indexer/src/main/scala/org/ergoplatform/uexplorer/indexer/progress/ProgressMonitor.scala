@@ -5,9 +5,8 @@ import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.pattern.StatusReply
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.db.FlatBlock
-import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.{BlockId, ProtocolSettings}
+import org.ergoplatform.uexplorer.db.{BlockStats, FlatBlock}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
@@ -86,7 +85,7 @@ object ProgressMonitor {
 
   case class GetBlock(blockId: BlockId, replyTo: ActorRef[CachedBlock]) extends MonitorRequest
 
-  case class UpdateChainState(lastBlockByEpochIndex: TreeMap[Int, BlockInfo], replyTo: ActorRef[ProgressState])
+  case class UpdateChainState(lastBlockByEpochIndex: TreeMap[Int, BlockStats], replyTo: ActorRef[ProgressState])
     extends MonitorRequest
 
   case class GetChainState(replyTo: ActorRef[ProgressState]) extends MonitorRequest
@@ -96,13 +95,13 @@ object ProgressMonitor {
   /** RESPONSE */
   sealed trait MonitorResponse
 
-  case class CachedBlock(block: Option[BlockInfo]) extends MonitorResponse
+  case class CachedBlock(block: Option[BlockStats]) extends MonitorResponse
 
   sealed trait Inserted extends MonitorResponse
 
   case class BestBlockInserted(flatBlock: FlatBlock) extends Inserted
 
-  case class ForkInserted(newFork: List[FlatBlock], supersededFork: List[BlockInfo]) extends Inserted
+  case class ForkInserted(newFork: List[FlatBlock], supersededFork: List[BlockStats]) extends Inserted
 
   sealed trait MaybeNewEpoch extends MonitorResponse
 
@@ -141,7 +140,7 @@ object ProgressMonitor {
     ref.ask(ref => GetBlock(blockId, ref))
 
   def updateState(
-    lastBlockByEpochIndex: TreeMap[Int, BlockInfo]
+    lastBlockByEpochIndex: TreeMap[Int, BlockStats]
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[ProgressState] =
     ref.ask(ref => UpdateChainState(lastBlockByEpochIndex, ref))
 

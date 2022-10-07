@@ -15,6 +15,7 @@ import scala.util.{Failure, Success, Try}
   */
 final case class BlockStats(
   headerId: BlockId,
+  parentId: BlockId,
   timestamp: Long,
   height: Int,
   difficulty: BigInt,
@@ -107,6 +108,7 @@ object BlockStats {
 
       BlockStats(
         headerId        = apiBlock.header.id,
+        parentId        = apiBlock.header.parentId,
         timestamp       = apiBlock.header.timestamp,
         height          = apiBlock.header.height,
         difficulty      = apiBlock.header.difficulty.value.toLong,

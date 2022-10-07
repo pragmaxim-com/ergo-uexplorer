@@ -45,13 +45,13 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           val e0b2     = getBlock(1024)
           val e1b1     = getBlock(2047)
           val e1b2     = getBlock(2048)
-          val e0b2Info = buildBlock(e0b2, Option(buildBlock(e0b1, None).get.info)).get.buildInfo
-          val e1b2Info = buildBlock(e1b2, Option(buildBlock(e1b1, None).get.info)).get.buildInfo
+          val e0b2Info = buildBlock(e0b2, Option(buildBlock(e0b1, None).get.info)).get.info
+          val e1b2Info = buildBlock(e1b2, Option(buildBlock(e1b1, None).get.info)).get.info
 
           val lastBlockIdByEpochIndex = TreeMap(0 -> e0b2Info, 1 -> e1b2Info)
 
           emptyState.updateState(lastBlockIdByEpochIndex) shouldBe ProgressState(
-            lastBlockIdByEpochIndex.map { case (k, v) => k -> v.stats.headerId },
+            lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
             TreeMap.empty,
             BlockCache(
               Map(e0b2.header.id -> e0b2Info, e1b2.header.id -> e1b2Info),
@@ -74,18 +74,18 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
             TreeMap.empty,
             TreeMap.empty,
             BlockCache(
-              Map(firstApiBlock.header.id -> firstFlatBlock.buildInfo),
-              TreeMap(1                   -> firstFlatBlock.buildInfo)
+              Map(firstApiBlock.header.id -> firstFlatBlock.info),
+              TreeMap(1                   -> firstFlatBlock.info)
             )
           )
         }
         "after an existing block" in {
           val e0b1                    = getBlock(1024)
-          val e0b1Info                = buildBlock(e0b1, None).get.buildInfo
+          val e0b1Info                = buildBlock(e0b1, None).get.info
           val lastBlockIdByEpochIndex = TreeMap(0 -> e0b1Info)
           val newState                = emptyState.updateState(lastBlockIdByEpochIndex)
           newState shouldBe ProgressState(
-            lastBlockIdByEpochIndex.map { case (k, v) => k -> v.stats.headerId },
+            lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
             TreeMap.empty,
             BlockCache(
               Map(e0b1.header.id -> e0b1Info),
@@ -94,12 +94,12 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           )
 
           val e1b1                       = getBlock(1025)
-          val e1b1Block                  = buildBlock(e1b1, Some(e0b1Info.stats)).get
-          val e1b1Info                   = BlockInfo(e1b1.header.parentId, e1b1Block.info)
+          val e1b1Block                  = buildBlock(e1b1, Some(e0b1Info)).get
+          val e1b1Info                   = e1b1Block.info
           val (blockInserted, newState2) = newState.insertBestBlock(e1b1).get
           blockInserted.flatBlock shouldBe e1b1Block
           newState2 shouldBe ProgressState(
-            TreeMap(0 -> e0b1Info.stats.headerId),
+            TreeMap(0 -> e0b1Info.headerId),
             TreeMap.empty,
             BlockCache(
               Map(e1b1.header.id -> e1b1Info, e0b1.header.id -> e0b1Info),
@@ -118,7 +118,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
       "allow for inserting new fork" in {
         val commonBlock     = getBlock(1024)
         val commonFlatBlock = buildBlock(commonBlock, None).get
-        val s               = emptyState.updateState(TreeMap(0 -> commonFlatBlock.buildInfo))
+        val s               = emptyState.updateState(TreeMap(0 -> commonFlatBlock.info))
         val b1              = getBlock(1025)
         val b1FlatBlock     = buildBlock(b1, Option(commonFlatBlock.info)).get
         val b2              = getBlock(1026)
@@ -137,22 +137,22 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
         forkInserted.newFork.size shouldBe 3
         forkInserted.supersededFork.size shouldBe 2
         forkInserted.newFork shouldBe List(b1FlatBlock, b2FlatBlock, b3FlatBlock)
-        forkInserted.supersededFork shouldBe List(b1ForkFlatBlock.get.buildInfo, b2ForkFlatBlock.buildInfo)
+        forkInserted.supersededFork shouldBe List(b1ForkFlatBlock.get.info, b2ForkFlatBlock.info)
         newState4 shouldBe ProgressState(
           TreeMap(0 -> commonBlock.header.id),
           TreeMap.empty,
           BlockCache(
             Map(
-              commonBlock.header.id -> commonFlatBlock.buildInfo,
-              b1.header.id          -> b1FlatBlock.buildInfo,
-              b2.header.id          -> b2FlatBlock.buildInfo,
-              b3.header.id          -> b3FlatBlock.buildInfo
+              commonBlock.header.id -> commonFlatBlock.info,
+              b1.header.id          -> b1FlatBlock.info,
+              b2.header.id          -> b2FlatBlock.info,
+              b3.header.id          -> b3FlatBlock.info
             ),
             TreeMap(
-              1024 -> commonFlatBlock.buildInfo,
-              1025 -> b1FlatBlock.buildInfo,
-              1026 -> b2FlatBlock.buildInfo,
-              1027 -> b3FlatBlock.buildInfo
+              1024 -> commonFlatBlock.info,
+              1025 -> b1FlatBlock.info,
+              1026 -> b2FlatBlock.info,
+              1027 -> b3FlatBlock.info
             )
           )
         )
