@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
-import org.ergoplatform.explorer.BlockId
+import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.progress.Epoch._
 

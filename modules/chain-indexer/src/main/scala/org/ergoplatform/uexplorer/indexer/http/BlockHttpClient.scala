@@ -5,8 +5,8 @@ import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
-import org.ergoplatform.explorer.BlockId
-import org.ergoplatform.explorer.protocol.models.ApiFullBlock
+import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._

@@ -6,8 +6,8 @@ import akka.stream.ActorAttributes.supervisionStrategy
 import akka.stream.scaladsl.{Flow, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.explorer.settings.ProtocolSettings
+import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.db.FlatBlock
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb}

@@ -2,13 +2,13 @@ package org.ergoplatform.uexplorer.indexer.api
 
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
-import org.ergoplatform.explorer.BlockId
-import org.ergoplatform.explorer.indexer.models.FlatBlock
+import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.db.FlatBlock
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.{BlockInfo, FlatBlockPimp}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 
 import java.util.concurrent.ConcurrentHashMap
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.immutable.TreeMap
 import scala.concurrent.Future
 

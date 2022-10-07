@@ -11,7 +11,7 @@ import scala.concurrent.duration.Duration
 object Application extends App with LazyLogging {
   ChainIndexerConf.loadWithFallback match {
     case Left(failures) =>
-      failures.toList.foreach(f => logger.error(s"Config error ${f.description} at ${f.location}"))
+      failures.toList.foreach(f => logger.error(s"Config error ${f.description} at ${f.origin}"))
       System.exit(1)
     case Right((chainIndexerConf, config)) =>
       val guardian: Behavior[Nothing] =

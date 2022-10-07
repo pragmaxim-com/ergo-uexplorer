@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.indexer.cassandra.entity
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
-import org.ergoplatform.explorer.indexer.models.FlatBlock
+import org.ergoplatform.uexplorer.db.FlatBlock
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 trait CassandraInputsWriter { this: CassandraBackend =>

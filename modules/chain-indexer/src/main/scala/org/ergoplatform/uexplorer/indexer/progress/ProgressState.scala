@@ -1,12 +1,12 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
-import org.ergoplatform.explorer.BlockId
-import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.explorer.protocol.models.ApiFullBlock
-import org.ergoplatform.explorer.settings.ProtocolSettings
+import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.db.{BlockStats, FlatBlock}
 import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import scala.collection.immutable.{SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
@@ -132,10 +132,10 @@ case class ProgressState(
         }
 
   def updateState(persistedEpochIndexes: TreeMap[Int, BlockInfo]): ProgressState = {
-    val newEpochIndexes = lastBlockIdInEpoch ++ persistedEpochIndexes.mapValues(_.stats.headerId)
+    val newEpochIndexes = lastBlockIdInEpoch ++ persistedEpochIndexes.view.mapValues(_.stats.headerId)
     val newBlockCache =
       BlockCache(
-        blockCache.byId ++ persistedEpochIndexes.map(i => i._2.stats.headerId -> i._2),
+        blockCache.byId ++ persistedEpochIndexes.toSeq.map(i => i._2.stats.headerId -> i._2),
         blockCache.byHeight ++ persistedEpochIndexes.map(i => i._2.stats.height -> i._2)
       )
     ProgressState(newEpochIndexes, invalidEpochs, newBlockCache)
@@ -188,13 +188,7 @@ case class ProgressState(
 object ProgressState {
 
   import cats.Applicative
-  import org.ergoplatform.explorer.BlockId
-  import org.ergoplatform.explorer.BuildFrom.syntax._
-  import org.ergoplatform.explorer.db.models.BlockStats
-  import org.ergoplatform.explorer.indexer.extractors._
-  import org.ergoplatform.explorer.indexer.models.{FlatBlock, SlotData}
-  import org.ergoplatform.explorer.protocol.models.ApiFullBlock
-  import org.ergoplatform.explorer.settings.ProtocolSettings
+  import org.ergoplatform.uexplorer.node.ApiFullBlock
   import tofu.Context
 
   import scala.util.Try
@@ -248,12 +242,9 @@ object ProgressState {
 
   def buildBlock(apiBlock: ApiFullBlock, prevBlockInfo: Option[BlockStats])(implicit
     protocol: ProtocolSettings
-  ): Try[FlatBlock] = {
-    implicit val ctx = Context.const(protocol)(Applicative[Try])
-    SlotData(apiBlock, prevBlockInfo)
-      .intoF[Try, FlatBlock]
+  ): Try[FlatBlock] =
+    FlatBlock(apiBlock, prevBlockInfo)
       .map(updateMainChain(_, mainChain = true, prevBlockInfo))
-  }
 
   implicit class FlatBlockPimp(underlying: FlatBlock) {
     def buildInfo: BlockInfo = BlockInfo(underlying.header.parentId, underlying.info)

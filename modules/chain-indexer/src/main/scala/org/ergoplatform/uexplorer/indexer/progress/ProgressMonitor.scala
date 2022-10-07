@@ -5,11 +5,11 @@ import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.pattern.StatusReply
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.BlockId
-import org.ergoplatform.explorer.indexer.models.FlatBlock
-import org.ergoplatform.explorer.protocol.models.ApiFullBlock
-import org.ergoplatform.explorer.settings.ProtocolSettings
+import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.db.FlatBlock
+import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import scala.collection.immutable.TreeMap
 import scala.concurrent.Future

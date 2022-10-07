@@ -5,14 +5,13 @@ import akka.{Done, NotUsed}
 import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.BlockId
-import org.ergoplatform.explorer.indexer.models.FlatBlock
+import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.db.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.CassandraBlockUpdater._
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.{BestBlockInserted, ForkInserted, Inserted}
-
-import scala.collection.JavaConverters.seqAsJavaList
+import scala.jdk.CollectionConverters._
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -96,7 +95,7 @@ object CassandraBlockUpdater {
       .bind()
       .setBoolean("main_chain", mainChain)
       .setString("header_id", headerId.value.unwrapped)
-      .setList("ids", seqAsJavaList(keys), classOf[String])
+      .setList("ids", keys.asJava, classOf[String])
 
   protected[cassandra] def updateMainChainBinder(headerId: BlockId, mainChain: Boolean)(
     preparedStatement: PreparedStatement

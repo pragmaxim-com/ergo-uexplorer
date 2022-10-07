@@ -68,7 +68,7 @@ class MetadataHttpClient[P](minNodeHeight: Int = Const.MinNodeHeight)(implicit
             case Failure(_) | Success(None) =>
               getPeerInfo[RemoteNode]().map(_.toSet[Peer])
           }
-          .map(_.to[TreeSet])
+          .map(_.to(TreeSet.evidenceIterableFactory[Peer]))
       }(retry.Success.apply(_.nonEmpty), global)
 
   def getConnectedPeers(masterPeer: Peer): Future[Set[ConnectedPeer]] =

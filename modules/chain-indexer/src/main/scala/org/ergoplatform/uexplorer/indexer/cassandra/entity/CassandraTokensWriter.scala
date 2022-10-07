@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.indexer.models.FlatBlock
+import org.ergoplatform.uexplorer.db.FlatBlock
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 
 trait CassandraTokensWriter extends LazyLogging {

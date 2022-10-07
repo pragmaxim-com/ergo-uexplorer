@@ -4,8 +4,8 @@ import akka.stream.scaladsl.{Sink, Source}
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement, Row, SimpleStatement}
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.db.models.BlockStats
-import org.ergoplatform.explorer.{Address, BlockId}
+import org.ergoplatform.uexplorer.{Address, BlockId}
+import org.ergoplatform.uexplorer.db.BlockStats
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockInfo

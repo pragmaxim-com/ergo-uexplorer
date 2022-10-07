@@ -2,12 +2,11 @@ package org.ergoplatform.uexplorer.indexer.progress
 
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.parser._
-import org.ergoplatform.explorer.BlockId
-import org.ergoplatform.explorer.protocol.models.ApiFullBlock
-import org.ergoplatform.explorer.settings.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
 import org.ergoplatform.uexplorer.indexer.{Rest, UnexpectedStateError}
+import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.{BlockId, ProtocolSettings}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -20,7 +19,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
   implicit private val protocol: ProtocolSettings = ChainIndexerConf.loadDefaultOrThrow.protocol
 
   private def getBlock(height: Int): ApiFullBlock =
-    parse(Rest.blocks.byHeight(height)).flatMap(_.as[ApiFullBlock]).right.get
+    parse(Rest.blocks.byHeight(height)).flatMap(_.as[ApiFullBlock]).toOption.get
 
   private def forkBlock(
     apiFullBlock: ApiFullBlock,
@@ -52,7 +51,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           val lastBlockIdByEpochIndex = TreeMap(0 -> e0b2Info, 1 -> e1b2Info)
 
           emptyState.updateState(lastBlockIdByEpochIndex) shouldBe ProgressState(
-            lastBlockIdByEpochIndex.mapValues(_.stats.headerId),
+            lastBlockIdByEpochIndex.map { case (k, v) => k -> v.stats.headerId },
             TreeMap.empty,
             BlockCache(
               Map(e0b2.header.id -> e0b2Info, e1b2.header.id -> e1b2Info),
@@ -86,7 +85,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           val lastBlockIdByEpochIndex = TreeMap(0 -> e0b1Info)
           val newState                = emptyState.updateState(lastBlockIdByEpochIndex)
           newState shouldBe ProgressState(
-            lastBlockIdByEpochIndex.mapValues(_.stats.headerId),
+            lastBlockIdByEpochIndex.map { case (k, v) => k -> v.stats.headerId },
             TreeMap.empty,
             BlockCache(
               Map(e0b1.header.id -> e0b1Info),

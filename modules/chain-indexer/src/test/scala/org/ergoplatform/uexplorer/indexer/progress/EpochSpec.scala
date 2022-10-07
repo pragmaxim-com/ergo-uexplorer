@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
-import org.ergoplatform.explorer.{BlockId, HexString}
 import org.ergoplatform.uexplorer.indexer.{TestSupport, UnexpectedStateError}
+import org.ergoplatform.uexplorer.{BlockId, HexString}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -39,9 +39,9 @@ class EpochSpec extends AnyFreeSpec with TestSupport with Matchers {
       val firstEpoch  = EpochCandidate(epochRelationsByHeight(1 to 1024))
       val secondEpoch = EpochCandidate(epochRelationsByHeight(1025 to 2048))
       val thirdEpoch  = EpochCandidate(epochRelationsByHeight(2049 to 3072))
-      firstEpoch.right.get.isComplete shouldBe true
-      secondEpoch.right.get.isComplete shouldBe true
-      thirdEpoch.right.get.isComplete shouldBe true
+      firstEpoch.toOption.get.isComplete shouldBe true
+      secondEpoch.toOption.get.isComplete shouldBe true
+      thirdEpoch.toOption.get.isComplete shouldBe true
     }
 
     "fail with" - {
@@ -50,16 +50,16 @@ class EpochSpec extends AnyFreeSpec with TestSupport with Matchers {
       }
       "invalid height range size" in {
         val epoch = EpochCandidate(epochRelationsByHeight(2 to 1024))
-        epoch.left.get.isComplete shouldBe false
+        epoch.swap.toOption.get.isComplete shouldBe false
       }
       "invalid sequence" in {
         val epoch = EpochCandidate(epochRelationsByHeight((512 to 1 by -1) ++ (513 to 1024)))
-        epoch.left.get.isComplete shouldBe false
+        epoch.swap.toOption.get.isComplete shouldBe false
       }
       "invalid relations" in {
         val invalidRels = (1025 to 2048).map(height => height -> BlockRel(idGen.sample.get, preGenesisBlockId))
         val epoch       = EpochCandidate(invalidRels)
-        epoch.left.get.isComplete shouldBe false
+        epoch.swap.toOption.get.isComplete shouldBe false
       }
     }
 

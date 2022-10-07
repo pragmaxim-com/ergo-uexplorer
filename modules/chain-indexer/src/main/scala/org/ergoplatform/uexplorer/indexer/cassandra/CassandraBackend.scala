@@ -6,7 +6,7 @@ import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.CqlSession
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.indexer.models.FlatBlock
+import org.ergoplatform.uexplorer.db.FlatBlock
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity._

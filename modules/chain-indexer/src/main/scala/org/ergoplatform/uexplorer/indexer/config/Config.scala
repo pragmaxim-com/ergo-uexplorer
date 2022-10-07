@@ -2,13 +2,12 @@ package org.ergoplatform.uexplorer.indexer.config
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.explorer.settings.ProtocolSettings
-import pureconfig.ConfigSource
+import org.ergoplatform.uexplorer.ProtocolSettings
+import pureconfig.{ConfigReader, ConfigSource}
 import pureconfig.ConfigReader.Result
 import pureconfig.generic.auto._
-import org.ergoplatform.explorer.settings.pureConfigInstances._
-import org.ergoplatform.uexplorer.indexer._
 import org.ergoplatform.uexplorer.indexer.http.{LocalNodeUriMagnet, RemoteNodeUriMagnet}
+import pureconfig.error.CannotConvert
 import sttp.model.Uri
 
 import java.io.File
@@ -25,6 +24,9 @@ case class ChainIndexerConf(
 }
 
 object ChainIndexerConf extends LazyLogging {
+
+  implicit def uriConfigReader(implicit cr: ConfigReader[String]): ConfigReader[Uri] =
+    cr.emap(addr => Uri.parse(addr).left.map(r => CannotConvert(addr, "Uri", r)))
 
   lazy val loadDefaultOrThrow: ChainIndexerConf =
     ConfigSource.default.at("uexplorer.chain-indexer").loadOrThrow[ChainIndexerConf]

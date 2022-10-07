@@ -1,15 +1,9 @@
 package org.ergoplatform.uexplorer
 
-import cats.implicits.toBifunctorOps
-import pureconfig.ConfigReader
-import pureconfig.error.CannotConvert
 import sttp.model.Uri
 import sttp.model.Uri.{EmptyPath, QuerySegment}
 
 package object indexer {
-
-  implicit def uriConfigReader(implicit cr: ConfigReader[String]): ConfigReader[Uri] =
-    cr.emap(addr => Uri.parse(addr).leftMap(r => CannotConvert(addr, "Uri", r)))
 
   class UnexpectedStateError(msg: String, cause: Option[Throwable] = None) extends RuntimeException(msg, cause.orNull)
 
