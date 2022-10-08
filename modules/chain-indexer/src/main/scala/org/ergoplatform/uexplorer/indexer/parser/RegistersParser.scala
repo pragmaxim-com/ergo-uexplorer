@@ -76,8 +76,10 @@ object RegistersParser {
     goRender(ev).value.value
   }
 
+  final def bytesOf(hex: HexString): Array[Byte] = Base16.decode(hex.unwrapped).get
+
   def parseAny(raw: HexString): Try[RegisterValue] =
-    Try(ValueSerializer.deserialize(raw.bytes)).flatMap {
+    Try(ValueSerializer.deserialize(bytesOf(raw))).flatMap {
       case v: EvaluatedValue[_] =>
         renderEvaluatedValue(v)
           .map { case (tp, vl) => Try(RegisterValue(tp, vl)) }
@@ -87,7 +89,7 @@ object RegistersParser {
     }
 
   def parse[T <: SType](raw: HexString)(implicit ev: ClassTag[T#WrappedType]): Try[T#WrappedType] =
-    Try(ValueSerializer.deserialize(raw.bytes)).flatMap {
+    Try(ValueSerializer.deserialize(bytesOf(raw))).flatMap {
       case v: EvaluatedValue[_] =>
         v.value match {
           case wrappedValue: T#WrappedType =>

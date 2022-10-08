@@ -9,8 +9,6 @@ import io.circe.{Decoder, Encoder, KeyDecoder, KeyEncoder}
 import io.estatico.newtype.macros.newtype
 import io.estatico.newtype.ops._
 import org.ergoplatform.uexplorer.constraints._
-import pureconfig.ConfigReader
-import scorex.util.encode.Base16
 
 package object uexplorer {
 
@@ -51,8 +49,6 @@ package object uexplorer {
 
     implicit def decoder: Decoder[BoxId] = deriving
 
-    def fromErgo(boxId: org.ergoplatform.ErgoBox.BoxId): BoxId =
-      BoxId(Base16.encode(boxId))
   }
 
   @newtype case class TokenId(value: HexString)
@@ -123,16 +119,12 @@ package object uexplorer {
 
     implicit def decoder: Decoder[Address] = deriving
 
-    implicit def configReader: ConfigReader[Address] =
-      implicitly[ConfigReader[String]].map(fromStringUnsafe)
-
     def fromStringUnsafe(s: String): Address = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
   }
 
   @newtype case class HexString(value: HexStringType) {
     final def unwrapped: String = value.value
 
-    final def bytes: Array[Byte] = Base16.decode(unwrapped).get
   }
 
   object HexString {

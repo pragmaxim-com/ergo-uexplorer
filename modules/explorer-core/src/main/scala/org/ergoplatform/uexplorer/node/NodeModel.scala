@@ -1,11 +1,8 @@
 package org.ergoplatform.uexplorer.node
 
 import cats.data.NonEmptyList
-import cats.syntax.option.none
 import io.circe.{Decoder, DecodingFailure, HCursor, Json}
 import org.ergoplatform.uexplorer.{BlockId, BoxId, HexString, RegisterId, SigmaType, TokenId, TxId}
-import enumeratum.{CirceEnum, Enum, EnumEntry}
-import io.circe.{KeyDecoder, KeyEncoder}
 
 import scala.util.{Failure, Success, Try}
 
@@ -163,7 +160,7 @@ object ApiSpendingProof {
     for {
       proofBytes <- c.downField("proofBytes").as[String].flatMap { s =>
                       Try(HexString.fromStringUnsafe(s)) match {
-                        case Failure(_)     => Right[DecodingFailure, Option[HexString]](none)
+                        case Failure(_)     => Right[DecodingFailure, Option[HexString]](Option.empty)
                         case Success(value) => Right[DecodingFailure, Option[HexString]](Option(value))
                       }
                     }

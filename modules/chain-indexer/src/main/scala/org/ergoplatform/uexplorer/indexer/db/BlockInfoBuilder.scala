@@ -1,16 +1,16 @@
 package org.ergoplatform.uexplorer.indexer.db
 
-import org.ergoplatform.uexplorer.db.BlockInfo
-import org.ergoplatform.uexplorer.indexer.{Const, ProtocolSettings}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlock
-import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.Address
+import org.ergoplatform.uexplorer.db.BlockInfo
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlock
+import org.ergoplatform.uexplorer.indexer.{Const, ProtocolSettings}
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
 import scorex.util.encode.Base16
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 object BlockInfoBuilder {
 

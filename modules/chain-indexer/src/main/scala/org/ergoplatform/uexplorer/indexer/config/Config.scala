@@ -6,6 +6,7 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.api.{Refined, Validate}
 import eu.timepit.refined.refineV
+import org.ergoplatform.uexplorer.Address
 import org.ergoplatform.uexplorer.indexer.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.http.{LocalNodeUriMagnet, RemoteNodeUriMagnet}
 import pureconfig.ConfigReader.Result
@@ -27,6 +28,9 @@ case class ChainIndexerConf(
 }
 
 object ChainIndexerConf extends LazyLogging {
+
+  implicit def configReader: ConfigReader[Address] =
+    implicitly[ConfigReader[String]].map(Address.fromStringUnsafe)
 
   implicit def configReaderForRefined[A: ConfigReader, P](implicit
     v: Validate[A, P]
