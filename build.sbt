@@ -58,7 +58,7 @@ lazy val core =
     .settings(commonSettings)
     .settings(scalacOptions ++= Seq("-Ymacro-annotations", "-language:implicitConversions", "-Ypatmat-exhaust-depth", "off"))
     .settings(
-      libraryDependencies ++= cats ++ circe ++ refined ++ enumeratums ++ Seq(newtype)
+      libraryDependencies ++= cats("2.13") ++ circe("2.13") ++ refined ++ enumeratums ++ Seq(newtype)
     )
 
 lazy val indexer =
@@ -82,3 +82,5 @@ lazy val graphql =
     .settings(scalacOptions ++= Seq("-explain-types", "-Ykind-projector"))
     .settings(assemblySettings("graphql-gateway"))
     .settings(libraryDependencies ++= caliban ++ cql4s ++ logging)
+    .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)))
+    .dependsOn(core)

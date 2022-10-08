@@ -34,17 +34,17 @@ object Dependencies {
   lazy val logging = Seq(slf4jApi, logback, scalaLogging)
   lazy val akka    = Seq(akkaActor, akkaStream, akkaSlf4j, akkaTest)
 
-  lazy val circe = List(
-    "io.circe" %% "circe-core"    % Version.circe,
-    "io.circe" %% "circe-generic" % Version.circe,
-    "io.circe" %% "circe-parser"  % Version.circe,
-    "io.circe" %% "circe-refined" % Version.circe
-  ) map (_ cross CrossVersion.for3Use2_13)
+  def circe(v: String) = List(
+    "io.circe" % s"circe-core_$v"    % Version.circe,
+    "io.circe" % s"circe-generic_$v" % Version.circe,
+    "io.circe" % s"circe-parser_$v"  % Version.circe,
+    "io.circe" % s"circe-refined_$v" % Version.circe
+  )
 
-  lazy val cats = List(
-    "org.typelevel" %% "cats-kernel" % "2.8.0",
-    "org.typelevel" %% "cats-core"   % "2.8.0"
-  ) map (_ cross CrossVersion.for3Use2_13)
+  def cats(v: String) = List(
+    "org.typelevel" % s"cats-kernel_$v" % "2.8.0",
+    "org.typelevel" % s"cats-core_$v"   % "2.8.0"
+  )
 
   lazy val refined: List[ModuleID] = List(
     "eu.timepit" %% "refined"      % "0.10.1",
