@@ -50,7 +50,6 @@ lazy val root = (project in file("."))
     name := "ergo-uexplorer"
   ).aggregate(core, indexer, graphql)
 
-
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .enablePlugins(JavaAppPackaging)

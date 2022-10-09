@@ -1,6 +1,8 @@
 package org.ergoplatform.uexplorer.graphql
 
 import cql4s.dsl.*
+import org.ergoplatform.uexplorer.Address
+import org.ergoplatform.uexplorer.db.BlockInfo
 
 import java.util.Currency
 
@@ -8,11 +10,10 @@ import java.util.Currency
 // Custom types
 // ------------
 
-trait currencyType
-
-object currencyType:
-  given DataTypeCodec[currencyType, String, Currency] =
-    DataType.textCodec.map(_.getCurrencyCode, Currency.getInstance)
+trait addressType
+object addressType:
+  given DataTypeCodec[addressType, String, Address] =
+    DataType.textCodec.map(_.unwrapped, Address.fromStringUnsafe)
 
 
 // ------------------
@@ -26,10 +27,10 @@ class blockInfoType extends udt[
   (
     "block_size"              :=: int,
     "block_coins"             :=: bigint,
-    "block_mining_time"       :=: bigint,
+    "block_mining_time"       :=: nullable[bigint],
     "txs_count"               :=: int,
     "txs_size"                :=: int,
-    "miner_address"           :=: varchar,
+    "miner_address"           :=: addressType,
     "miner_reward"            :=: bigint,
     "miner_revenue"           :=: bigint,
     "block_fee"               :=: bigint,
@@ -49,6 +50,7 @@ class blockInfoType extends udt[
 // Tables
 // ------
 
+/*
 object headers extends Table[
   "uexplorer",  // keyspace
   "node_headers", // table name
@@ -77,3 +79,4 @@ object headers extends Table[
     "block_info"        :=: blockInfoType
   )
 ]
+*/
