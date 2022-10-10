@@ -14,6 +14,8 @@ import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
+import eu.timepit.refined.auto._
+
 
 trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
   this: CassandraBackend =>
@@ -67,7 +69,7 @@ object CassandraEpochReader extends CassandraPersistenceSupport {
       .build()
 
   protected[cassandra] def blockInfoSelectBinder(preparedStatement: PreparedStatement)(headerId: BlockId): BoundStatement =
-    preparedStatement.bind().setString(Headers.header_id, headerId.value.unwrapped)
+    preparedStatement.bind().setString(Headers.header_id, headerId)
 
   protected[cassandra] def blockInfoRowReader(row: Row): CachedBlock = {
     import Headers.BlockInfo._

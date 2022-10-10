@@ -9,13 +9,14 @@ import sigmastate._
 import sigmastate.serialization.ErgoTreeSerializer
 
 import scala.util.{Failure, Try}
+import eu.timepit.refined.auto._
 
 object ErgoTreeParser {
 
   private val treeSerializer: ErgoTreeSerializer = ErgoTreeSerializer.DefaultSerializer
 
   @inline def deserializeErgoTree(raw: HexString): Try[Values.ErgoTree] =
-    Base16.decode(raw.unwrapped).map(treeSerializer.deserializeErgoTree)
+    Base16.decode(raw).map(treeSerializer.deserializeErgoTree)
 
   @inline def deriveErgoTreeTemplateHash(ergoTree: HexString): Try[ErgoTreeTemplateHash] =
     deserializeErgoTree(ergoTree).map { tree =>
@@ -26,7 +27,7 @@ object ErgoTreeParser {
     ergoTree: HexString
   )(implicit enc: ErgoAddressEncoder): Try[ErgoAddress] =
     Base16
-      .decode(ergoTree.unwrapped)
+      .decode(ergoTree)
       .flatMap { bytes =>
         enc.fromProposition(treeSerializer.deserializeErgoTree(bytes))
       }

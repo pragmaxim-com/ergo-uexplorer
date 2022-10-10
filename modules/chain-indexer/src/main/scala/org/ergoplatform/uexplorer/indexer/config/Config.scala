@@ -1,43 +1,61 @@
 package org.ergoplatform.uexplorer.indexer.config
 
 import cats.data.NonEmptyList
-import cats.syntax.list._
+import cats.syntax.list.*
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.api.{Refined, Validate}
 import eu.timepit.refined.refineV
-import org.ergoplatform.uexplorer.Address
-import org.ergoplatform.uexplorer.indexer.ProtocolSettings
+import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.mining.emission.EmissionRules
+import org.ergoplatform.settings.MonetarySettings
+import org.ergoplatform.uexplorer.{Address, NetworkPrefix}
 import org.ergoplatform.uexplorer.indexer.http.{LocalNodeUriMagnet, RemoteNodeUriMagnet}
 import pureconfig.ConfigReader.Result
 import pureconfig.error.CannotConvert
-import pureconfig.generic.auto._
 import pureconfig.{ConfigReader, ConfigSource}
 import sttp.model.Uri
+import pureconfig.generic.derivation.default.*
 
 import java.io.File
+
+final case class ProtocolSettings(
+                                   networkPrefix: NetworkPrefix,
+                                   genesisAddress: Address,
+                                 )  derives ConfigReader {
+
+  val monetary = MonetarySettings()
+  val emission = new EmissionRules(monetary)
+
+  val addressEncoder: ErgoAddressEncoder =
+    ErgoAddressEncoder(networkPrefix.value.toByte)
+}
+object ProtocolSettings {
+
+  implicit def addrConfigReader: ConfigReader[Address] =
+    implicitly[ConfigReader[String]].map(Address.fromStringUnsafe)
+
+  implicit def netConfigReader: ConfigReader[NetworkPrefix] =
+    implicitly[ConfigReader[String]].map(NetworkPrefix.fromStringUnsafe)
+
+}
+
+sealed trait BackendType derives ConfigReader
+
+case class CassandraDb(parallelism: Int) extends BackendType
+case object InMemoryDb extends BackendType
 
 case class ChainIndexerConf(
   nodeAddressToInitFrom: Uri,
   peerAddressToPollFrom: Uri,
   backendType: BackendType,
   protocol: ProtocolSettings
-) {
+) derives ConfigReader {
   def remoteUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(peerAddressToPollFrom)
   def localUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(nodeAddressToInitFrom)
 }
 
 object ChainIndexerConf extends LazyLogging {
-
-  implicit def configReader: ConfigReader[Address] =
-    implicitly[ConfigReader[String]].map(Address.fromStringUnsafe)
-
-  implicit def configReaderForRefined[A: ConfigReader, P](implicit
-    v: Validate[A, P]
-  ): ConfigReader[A Refined P] =
-    ConfigReader[A].emap { a =>
-      refineV[P](a).left.map(r => CannotConvert(a.toString, s"Refined", r))
-    }
 
   implicit def nelReader[A: ConfigReader]: ConfigReader[NonEmptyList[A]] =
     implicitly[ConfigReader[List[A]]].emap { list =>
@@ -73,8 +91,3 @@ object ChainIndexerConf extends LazyLogging {
       .map(_ -> rootConfig)
   }
 }
-
-sealed trait BackendType
-
-case class CassandraDb(parallelism: Int) extends BackendType
-case object InMemoryDb extends BackendType

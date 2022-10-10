@@ -15,7 +15,7 @@ import retry.Policy
 import sttp.capabilities.WebSockets
 import sttp.client3._
 import sttp.client3.circe._
-
+import io.circe.refined.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt

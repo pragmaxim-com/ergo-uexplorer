@@ -7,7 +7,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.ProtocolSettings
+import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 

@@ -5,6 +5,7 @@ import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
+import eu.timepit.refined.auto._
 
 trait CassandraInputsWriter { this: CassandraBackend =>
   import Inputs._
@@ -24,16 +25,16 @@ trait CassandraInputsWriter { this: CassandraBackend =>
           statement
             .bind()
             // format: off
-            .setString(header_id,     input.headerId.value.unwrapped)
-            .setString(box_id,        input.boxId.value)
-            .setString(tx_id,         input.txId.value)
+            .setString(header_id,     input.headerId)
+            .setString(box_id,        input.boxId.unwrapped)
+            .setString(tx_id,         input.txId.unwrapped)
             .setString(extension,     input.extension.noSpaces)
             .setInt(idx,              input.index)
             .setBoolean(main_chain,   input.mainChain)
             // format: on
         input.proofBytes match {
           case Some(proofBytes) =>
-            partialStatement.setString(proof_bytes, proofBytes.unwrapped)
+            partialStatement.setString(proof_bytes, proofBytes)
           case None =>
             partialStatement.setToNull(proof_bytes)
         }

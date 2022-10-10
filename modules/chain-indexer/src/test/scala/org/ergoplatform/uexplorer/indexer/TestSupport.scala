@@ -22,8 +22,7 @@ trait TestSupport {
 
   def hexStringRGen: Gen[HexString] =
     hexStringGen
-      .map(x => refineV[HexStringSpec](x).toOption.get)
-      .map(HexString.apply)
+      .map(HexString.fromStringUnsafe)
 
   def idGen: Gen[BlockId] =
     hexStringGen.map(x => BlockId.fromStringUnsafe(x))

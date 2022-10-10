@@ -10,6 +10,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
+import eu.timepit.refined.auto._
 
 trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
   import Headers._
@@ -34,22 +35,22 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
       // format: off
         statement
           .bind()
-          .setString(header_id,             block.header.id.value.unwrapped)
-          .setString(parent_id,             block.header.parentId.value.unwrapped)
+          .setString(header_id,             block.header.id)
+          .setString(parent_id,             block.header.parentId)
           .setByte(version,                 validVersion)
           .setInt(height,                   block.header.height)
           .setLong(n_bits,                  block.header.nBits)
           .setBigDecimal(difficulty,        block.header.difficulty.bigDecimal)
           .setLong(timestamp,               block.header.timestamp)
-          .setString(state_root,            block.header.stateRoot.unwrapped)
-          .setString(ad_proofs_root,        block.header.adProofsRoot.unwrapped)
-          .setString(extensions_digest,     block.extension.digest.unwrapped)
+          .setString(state_root,            block.header.stateRoot)
+          .setString(ad_proofs_root,        block.header.adProofsRoot)
+          .setString(extensions_digest,     block.extension.digest)
           .setString(extensions_fields,     block.extension.fields.noSpaces)
-          .setString(transactions_root,     block.header.transactionsRoot.unwrapped)
-          .setString(extension_hash,        block.header.extensionHash.unwrapped)
-          .setString(miner_pk,              block.header.minerPk.unwrapped)
-          .setString(w,                     block.header.w.unwrapped)
-          .setString(n,                     block.header.n.unwrapped)
+          .setString(transactions_root,     block.header.transactionsRoot)
+          .setString(extension_hash,        block.header.extensionHash)
+          .setString(miner_pk,              block.header.minerPk)
+          .setString(w,                     block.header.w)
+          .setString(n,                     block.header.n)
           .setString(d,                     block.header.d)
           .setString(votes,                 block.header.votes)
           .setBoolean(main_chain,           block.header.mainChain)
@@ -58,8 +59,8 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
 
     block.adProofOpt.fold(partialStatement) { adProof =>
       partialStatement
-        .setString(ad_proofs_bytes, adProof.proofBytes.unwrapped)
-        .setString(ad_proofs_digest, adProof.digest.unwrapped)
+        .setString(ad_proofs_bytes, adProof.proofBytes)
+        .setString(ad_proofs_digest, adProof.digest)
     }
   }
 
@@ -166,7 +167,7 @@ object Headers {
         .setLong(   block_mining_time,      b.info.blockMiningTime.getOrElse(0L))
         .setInt(    txs_count,              b.info.txsCount)
         .setInt(    txs_size,               b.info.txsSize)
-        .setString( miner_address,          b.info.minerAddress.unwrapped)
+        .setString( miner_address,          b.info.minerAddress)
         .setLong(   miner_reward,           b.info.minerReward)
         .setLong(   miner_revenue,          b.info.minerRevenue)
         .setLong(   block_fee,              b.info.blockFee)

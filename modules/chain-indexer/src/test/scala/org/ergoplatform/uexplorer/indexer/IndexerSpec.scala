@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.indexer
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
 import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor
 import org.scalatest.BeforeAndAfterAll
@@ -11,7 +11,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 import sttp.capabilities.WebSockets
-import sttp.client3._
+import sttp.client3.*
 import sttp.client3.testing.SttpBackendStub
 
 import scala.concurrent.Future

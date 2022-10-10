@@ -2,10 +2,10 @@ package org.ergoplatform.uexplorer.indexer.progress
 
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.parser._
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
-import org.ergoplatform.uexplorer.indexer.{ProtocolSettings, Rest, UnexpectedStateError}
+import org.ergoplatform.uexplorer.indexer.{Rest, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.BlockId
 import org.scalatest.freespec.AnyFreeSpec
@@ -27,11 +27,11 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
     newBlockId: String,
     parentIdOpt: Option[BlockId] = None
   ): ApiFullBlock = {
-    import monocle.macros.syntax.lens._
+    import monocle.syntax.all._
     apiFullBlock
-      .lens(_.header.id)
+      .focus(_.header.id)
       .modify(_ => BlockId.fromStringUnsafe(newBlockId))
-      .lens(_.header.parentId)
+      .focus(_.header.parentId)
       .modify(parentId => parentIdOpt.getOrElse(parentId))
   }
 

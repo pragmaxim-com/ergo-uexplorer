@@ -6,10 +6,11 @@ import cats.implicits.toTraverseOps
 import org.ergoplatform.uexplorer.node.{ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.{HexString, RegisterId, SigmaType}
 import scorex.util.encode.Base16
-import sigmastate.Values.{Constant, ConstantNode, EvaluatedValue, SigmaPropConstant}
-import sigmastate._
+import sigmastate.Values.{Constant, ConstantNode, EvaluatedValue, SigmaPropConstant, Value}
+import sigmastate.*
 import sigmastate.basics.DLogProtocol.ProveDlogProp
 import sigmastate.serialization.ValueSerializer
+import eu.timepit.refined.auto.*
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
@@ -76,10 +77,8 @@ object RegistersParser {
     goRender(ev).value.value
   }
 
-  final def bytesOf(hex: HexString): Array[Byte] = Base16.decode(hex.unwrapped).get
-
   def parseAny(raw: HexString): Try[RegisterValue] =
-    Try(ValueSerializer.deserialize(bytesOf(raw))).flatMap {
+    Try(ValueSerializer.deserialize(Base16.decode(raw).get)).flatMap {
       case v: EvaluatedValue[_] =>
         renderEvaluatedValue(v)
           .map { case (tp, vl) => Try(RegisterValue(tp, vl)) }
@@ -88,22 +87,8 @@ object RegistersParser {
         Failure(new Exception(s"Got non constant value [$v] in register"))
     }
 
-  def parse[T <: SType](raw: HexString)(implicit ev: ClassTag[T#WrappedType]): Try[T#WrappedType] =
-    Try(ValueSerializer.deserialize(bytesOf(raw))).flatMap {
-      case v: EvaluatedValue[_] =>
-        v.value match {
-          case wrappedValue: T#WrappedType =>
-            Success(wrappedValue)
-          case wrappedValue =>
-            Failure(new Exception(s"Got wrapped value [$wrappedValue] of unexpected type in register"))
-        }
-      case v =>
-        Failure(new Exception(s"Got non constant value [$v] in register"))
-    }
-
-  /** Expand registers into `register_id -> expanded_register` form.
-    */
-  @inline def expand(registers: Map[RegisterId, HexString]): Map[RegisterId, ExpandedRegister] = {
+  /** Expand registers into `register_id -> expanded_register` form. */
+  inline def expand(registers: Map[RegisterId, HexString]): Map[RegisterId, ExpandedRegister] = {
     val expanded =
       for {
         (idSig, serializedValue) <- registers.toList

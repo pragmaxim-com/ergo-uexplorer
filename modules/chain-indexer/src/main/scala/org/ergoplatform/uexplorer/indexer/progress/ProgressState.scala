@@ -2,7 +2,8 @@ package org.ergoplatform.uexplorer.indexer.progress
 
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.db.{BlockInfo, Block}
-import org.ergoplatform.uexplorer.indexer.{ProtocolSettings, UnexpectedStateError}
+import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
+import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache

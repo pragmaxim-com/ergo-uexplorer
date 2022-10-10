@@ -1,15 +1,18 @@
 package org.ergoplatform.uexplorer.indexer.db
 
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.db._
+import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlock
-import org.ergoplatform.uexplorer.node.{ApiFullBlock, RegisterValue}
-import org.ergoplatform.uexplorer.{Address, TokenId, TokenType}
-import io.circe.generic.auto._
-import cats.syntax.traverse._
-import io.circe.syntax._
-import org.ergoplatform.uexplorer.indexer.ProtocolSettings
+import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, RegisterValue}
+import org.ergoplatform.uexplorer.{Address, HexString, SigmaType, TokenId, TokenType}
+import io.circe.generic.auto.*
+import io.circe.refined.*
+import cats.syntax.traverse.*
+import io.circe.syntax.*
+import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.parser.{ErgoTreeParser, RegistersParser, TokenPropsParser}
+import eu.timepit.refined.auto.*
+import io.circe.Encoder
 
 import scala.util.Try
 
@@ -103,6 +106,8 @@ object BlockBuilder {
       }
 
     val outputsTry = {
+      summon[Encoder[HexString]]
+      summon[Encoder[ExpandedRegister]]
       val lastOutputGlobalIndex          = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
       implicit val e: ErgoAddressEncoder = protocolSettings.addressEncoder
       apiTransactions.transactions.zipWithIndex
@@ -155,7 +160,7 @@ object BlockBuilder {
 
     val tokens =
       apiTransactions.transactions.flatMap { tx =>
-        val allowedTokenId = TokenId.fromStringUnsafe(tx.inputs.head.boxId.value)
+        val allowedTokenId = TokenId.fromStringUnsafe(tx.inputs.head.boxId.unwrapped)
         for {
           out <- tx.outputs.toList.find(_.assets.map(_.tokenId).contains(allowedTokenId))
           props  = TokenPropsParser.parse(out.additionalRegisters)
@@ -190,19 +195,19 @@ object BlockBuilder {
       )
 
     def updateMainChain(block: Block, mainChain: Boolean): Block = {
-      import monocle.macros.syntax.lens._
+      import monocle.syntax.all._
       block
-        .lens(_.header.mainChain)
+        .focus(_.header.mainChain)
         .modify(_ => mainChain)
-        .lens(_.txs)
+        .focus(_.txs)
         .modify(_.map(_.copy(mainChain = mainChain)))
-        .lens(_.inputs)
+        .focus(_.inputs)
         .modify(_.map(_.copy(mainChain = mainChain)))
-        .lens(_.dataInputs)
+        .focus(_.dataInputs)
         .modify(_.map(_.copy(mainChain = mainChain)))
-        .lens(_.outputs)
+        .focus(_.outputs)
         .modify(_.map(_.copy(mainChain = mainChain)))
-        .lens(_.info)
+        .focus(_.info)
         .modify {
           case currentBlockInfo if prevBlock.nonEmpty =>
             updateTotalInfo(currentBlockInfo, block.header.timestamp, block.header.height, prevBlock.get)

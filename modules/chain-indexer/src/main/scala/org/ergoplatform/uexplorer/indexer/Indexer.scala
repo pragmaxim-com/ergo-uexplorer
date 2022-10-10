@@ -9,9 +9,9 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
-import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb}
+import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.*
 import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor, ProgressState}
 
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -4,10 +4,13 @@ Global / cancelable := true // Allow cancellation of forked task without killing
 
 lazy val commonSettings = Seq(
   organization := "org.ergoplatform",
+  scalaVersion := "3.2.0",
   version := "0.0.1",
   resolvers ++= Resolver.sonatypeOssRepos("public") ++ Resolver.sonatypeOssRepos("snapshots"),
   ThisBuild / evictionErrorLevel := Level.Info,
+  excludeDependencies ++= allExclusions.map( x => ExclusionRule(x.organization, x.name)),
   scalacOptions ++= Seq(
+    "-Xmax-inlines", "512",
     "-deprecation",
     "-encoding",
     "UTF-8",
@@ -50,36 +53,31 @@ lazy val root = (project in file("."))
     name := "ergo-uexplorer"
   ).aggregate(core, indexer, graphql)
 
+lazy val playground =
+  Utils.mkModule("playground", "playground")
+    .settings(commonSettings)
+    .settings(libraryDependencies ++= circe("3") ++ refined("3"))
+
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
-    .enablePlugins(JavaAppPackaging)
-    .settings(scalaVersion := "2.13.9")
     .settings(commonSettings)
-    .settings(scalacOptions ++= Seq("-Ymacro-annotations", "-language:implicitConversions", "-Ypatmat-exhaust-depth", "off"))
-    .settings(
-      libraryDependencies ++= cats("2.13") ++ circe("2.13") ++ refined ++ enumeratums ++ Seq(newtype)
-    )
+    .settings(libraryDependencies ++= cats("3") ++ circe("3") ++ refined("3"))
+
 
 lazy val indexer =
   Utils.mkModule("chain-indexer", "chain-indexer")
     .enablePlugins(JavaAppPackaging)
-    .settings(scalaVersion := "2.13.9")
     .settings(commonSettings)
     .settings(assemblySettings("chain-indexer"))
-    .settings(scalacOptions ++= Seq("-Ymacro-annotations", "-language:implicitConversions"))
-    .settings(
-      libraryDependencies ++= akka ++ sttp ++ cassandraDb ++ monocle ++ enumeratums ++ refined ++ logging ++ Seq(
-        ergoWallet, pureConfig, scalaTest, scalaCheck, diffx
-      )
-    ).dependsOn(core)
+    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ logging ++ Seq(ergoWallet, pureConfig)).settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)))
+    .dependsOn(core)
+
 
 lazy val graphql =
   Utils.mkModule("graphql-gateway", "graphql-gateway")
     .enablePlugins(JavaAppPackaging)
-    .settings(scalaVersion := "3.2.0")
     .settings(commonSettings)
     .settings(scalacOptions ++= Seq("-explain-types", "-Ykind-projector"))
     .settings(assemblySettings("graphql-gateway"))
     .settings(libraryDependencies ++= caliban ++ cql4s ++ logging)
-    .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)))
     .dependsOn(core)

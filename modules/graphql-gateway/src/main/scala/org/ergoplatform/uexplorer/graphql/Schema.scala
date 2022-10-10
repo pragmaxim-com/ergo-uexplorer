@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.graphql
 import cql4s.dsl.*
 import org.ergoplatform.uexplorer.Address
 import org.ergoplatform.uexplorer.db.BlockInfo
+import eu.timepit.refined.auto.*
 
 import java.util.Currency
 
@@ -13,7 +14,7 @@ import java.util.Currency
 trait addressType
 object addressType:
   given DataTypeCodec[addressType, String, Address] =
-    DataType.textCodec.map(_.unwrapped, Address.fromStringUnsafe)
+    DataType.textCodec.map[addressType, Address](identity, Address.fromStringUnsafe)
 
 
 // ------------------

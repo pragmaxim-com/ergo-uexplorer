@@ -1,9 +1,11 @@
 package org.ergoplatform.uexplorer.indexer.parser
 
-import cats.implicits.catsSyntaxFlatMapOps
 import org.ergoplatform.uexplorer.{HexString, RegisterId}
-import org.ergoplatform.uexplorer.node.TokenProps
+import org.ergoplatform.uexplorer.node.{RegisterValue, TokenProps}
+import scorex.util.encode.Base16
+import sigmastate.serialization.ValueSerializer
 import sigmastate.{SByte, SCollection}
+import eu.timepit.refined.auto.*
 
 import java.util.regex.Pattern
 import scala.util.Try
@@ -14,22 +16,12 @@ object TokenPropsParser {
   private val MaxStringLen  = 1000
 
   def parse(registers: Map[RegisterId, HexString]): Option[TokenProps] = {
-    def parse(raw: HexString) = RegistersParser.parse[SCollection[SByte.type]](raw).toOption
-
-    val r4      = registers.get(RegisterId.R4)
-    val r5      = registers.get(RegisterId.R5)
-    val r6      = registers.get(RegisterId.R6)
-    val nameRaw = r4 >>= parse
-    val nameOpt = nameRaw >>= (raw => toUtf8String(raw.toArray))
-    nameOpt.map { name =>
-      val descriptionRaw = r5 >>= parse
-      val decimalsRaw    = r6 >>= parse
-      val descriptionOpt = descriptionRaw >>= (raw => toUtf8String(raw.toArray))
-      val decimalsOpt =
-        Try(decimalsRaw >>= (raw => toUtf8String(raw.toArray).map(_.toInt))).toOption.flatten
-      val (description, decimals) = (descriptionOpt.getOrElse(""), decimalsOpt.getOrElse(0))
-      TokenProps(name, description, decimals)
-    }
+    def parse(raw: HexString): Option[String] = RegistersParser.parseAny(raw).toOption.map(_.value)
+    for {
+      name <- registers.get(RegisterId.R4).flatMap(parse)
+      description = registers.get(RegisterId.R5).flatMap(parse).getOrElse("")
+      decimals    = registers.get(RegisterId.R6).flatMap(parse).map(_.toInt).getOrElse(0)
+    } yield TokenProps(name, description, decimals)
   }
 
   private def looksLikeUTF8(utf8: Array[Byte]): Boolean = {

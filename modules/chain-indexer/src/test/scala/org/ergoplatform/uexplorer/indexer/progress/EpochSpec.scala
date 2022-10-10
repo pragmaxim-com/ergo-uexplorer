@@ -7,9 +7,7 @@ import org.scalatest.matchers.should.Matchers
 
 class EpochSpec extends AnyFreeSpec with TestSupport with Matchers {
 
-  val preGenesisBlockId = BlockId(
-    HexString.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
-  )
+  val preGenesisBlockId = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
 
   private def epochRelationsByHeight(heightRange: Iterable[Int]) =
     heightRange.foldLeft(Vector.empty[(Int, BlockRel)]) {

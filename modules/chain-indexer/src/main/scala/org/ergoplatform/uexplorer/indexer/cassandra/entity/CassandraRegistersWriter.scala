@@ -6,6 +6,7 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, P
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
+import eu.timepit.refined.auto._
 
 trait CassandraRegistersWriter extends LazyLogging {
   this: CassandraBackend =>
@@ -26,9 +27,9 @@ trait CassandraRegistersWriter extends LazyLogging {
         // format: off
         statement
           .bind()
-          .setString(header_id,             block.header.id.value.unwrapped)
-          .setString(id,                    r.id.entryName)
-          .setString(box_id,                r.boxId.value)
+          .setString(header_id,             block.header.id)
+          .setString(id,                    r.id.toString)
+          .setString(box_id,                r.boxId.unwrapped)
           .setString(value_type,            r.sigmaType.toString)
           .setString(serialized_value,      r.renderedValue)
         // format: on

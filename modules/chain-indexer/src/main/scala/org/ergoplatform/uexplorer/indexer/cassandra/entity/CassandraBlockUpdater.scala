@@ -94,7 +94,7 @@ object CassandraBlockUpdater {
     preparedStatement
       .bind()
       .setBoolean("main_chain", mainChain)
-      .setString("header_id", headerId.value.unwrapped)
+      .setString("header_id", headerId.value)
       .setList("ids", keys.asJava, classOf[String])
 
   protected[cassandra] def updateMainChainBinder(headerId: BlockId, mainChain: Boolean)(
@@ -103,5 +103,5 @@ object CassandraBlockUpdater {
     preparedStatement
       .bind()
       .setBoolean("main_chain", mainChain)
-      .setString("header_id", headerId.value.unwrapped)
+      .setString("header_id", headerId.value)
 }

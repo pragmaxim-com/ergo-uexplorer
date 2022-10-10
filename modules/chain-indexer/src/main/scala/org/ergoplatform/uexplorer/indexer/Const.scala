@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.indexer
 
 import org.ergoplatform.ErgoScriptPredef
+import org.ergoplatform.uexplorer.HexString
 import scorex.util.encode.Base16
 
 object Const {
@@ -19,9 +20,9 @@ object Const {
 
   val TeamTreasuryThreshold = 67500000000L
 
-  val FeePropositionScriptHex: String = {
+  val FeePropositionScriptHex: HexString = {
     val script = ErgoScriptPredef.feeProposition(MinerRewardDelta)
-    Base16.encode(script.bytes)
+    HexString.fromStringUnsafe(Base16.encode(script.bytes))
   }
 
   val CoinsInOneErgo: Long = 1000000000L

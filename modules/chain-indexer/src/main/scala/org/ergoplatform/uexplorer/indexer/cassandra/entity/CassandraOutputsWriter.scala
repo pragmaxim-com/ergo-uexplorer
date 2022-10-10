@@ -6,6 +6,7 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, P
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
+import eu.timepit.refined.auto._
 
 trait CassandraOutputsWriter { this: CassandraBackend =>
   import Outputs._
@@ -24,17 +25,17 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
         statement
           .bind()
           // format: off
-          .setString(header_id,                   output.headerId.value.unwrapped)
-          .setString(box_id,                      output.boxId.value)
-          .setString(tx_id,                       output.txId.value)
+          .setString(header_id,                   output.headerId)
+          .setString(box_id,                      output.boxId.unwrapped)
+          .setString(tx_id,                       output.txId.unwrapped)
           .setLong(value,                         output.value)
-          .setString(address,                     output.address.unwrapped)
+          .setString(address,                     output.address)
           .setInt(creation_height,                output.creationHeight)
           .setInt(settlement_height,              output.settlementHeight)
           .setInt(idx,                            output.index)
           .setLong(global_index,                  output.globalIndex)
-          .setString(ergo_tree,                   output.ergoTree.unwrapped)
-          .setString(ergo_tree_template_hash,     output.ergoTreeTemplateHash.value.unwrapped)
+          .setString(ergo_tree,                   output.ergoTree)
+          .setString(ergo_tree_template_hash,     output.ergoTreeTemplateHash)
           .setLong(timestamp,                     output.timestamp)
           .setBoolean(main_chain,                 output.mainChain)
         // format: on

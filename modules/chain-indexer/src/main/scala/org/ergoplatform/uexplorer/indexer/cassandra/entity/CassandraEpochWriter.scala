@@ -14,6 +14,7 @@ import org.ergoplatform.uexplorer.indexer.progress.{Epoch, InvalidEpochCandidate
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import eu.timepit.refined.auto._
 
 trait CassandraEpochWriter extends LazyLogging {
   this: CassandraBackend =>
@@ -53,7 +54,7 @@ object CassandraEpochWriter extends EpochPersistenceSupport {
     stmt
       .bind()
       .setInt(epoch_index, epoch.index)
-      .setString(last_header_id, epoch.blockIds.last.value.unwrapped)
+      .setString(last_header_id, epoch.blockIds.last)
 
   protected[cassandra] val epochInsertStatement: SimpleStatement =
     insertInto(Const.CassandraKeyspace, node_epochs_table)

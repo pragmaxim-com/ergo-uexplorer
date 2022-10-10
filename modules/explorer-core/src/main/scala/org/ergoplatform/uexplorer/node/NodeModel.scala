@@ -1,8 +1,16 @@
 package org.ergoplatform.uexplorer.node
 
 import cats.data.NonEmptyList
-import io.circe.{Decoder, DecodingFailure, HCursor, Json}
-import org.ergoplatform.uexplorer.{BlockId, BoxId, HexString, RegisterId, SigmaType, TokenId, TxId}
+import eu.timepit.refined.api.RefType.tagRefType.unsafeWrap
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto.*
+import eu.timepit.refined.refineV
+import eu.timepit.refined.string.{HexStringSpec, MatchesRegex}
+import io.circe.parser.*
+import io.circe.refined.*
+import io.circe.syntax.*
+import io.circe.*
+import org.ergoplatform.uexplorer.*
 
 import scala.util.{Failure, Success, Try}
 
@@ -56,9 +64,9 @@ final case class ApiFullBlock(
 )
 
 object ApiFullBlock {
-  import io.circe.generic.auto._
+  import io.circe.generic.auto.*
 
-  implicit val decoder: Decoder[ApiFullBlock] = { c: HCursor =>
+  implicit val decoder: Decoder[ApiFullBlock] = { (c: HCursor) =>
     for {
       header       <- c.downField("header").as[ApiHeader]
       transactions <- c.downField("blockTransactions").as[ApiBlockTransactions]
@@ -93,7 +101,7 @@ final case class ApiHeader(
 
 object ApiHeader {
 
-  implicit val decoder: Decoder[ApiHeader] = { c: HCursor =>
+  implicit val decoder: Decoder[ApiHeader] = { (c: HCursor) =>
     for {
       id               <- c.downField("id").as[BlockId]
       parentId         <- c.downField("parentId").as[BlockId]
@@ -142,7 +150,7 @@ final case class ApiPowSolutions(pk: HexString, w: HexString, n: HexString, d: S
 
 object ApiPowSolutions {
 
-  implicit val jsonDecoder: Decoder[ApiPowSolutions] = { c: HCursor =>
+  implicit val jsonDecoder: Decoder[ApiPowSolutions] = { (c: HCursor) =>
     for {
       pk <- c.downField("pk").as[HexString]
       w  <- c.downField("w").as[HexString]
@@ -156,7 +164,7 @@ final case class ApiSpendingProof(proofBytes: Option[HexString], extension: Json
 
 object ApiSpendingProof {
 
-  implicit val decoder: Decoder[ApiSpendingProof] = { c: HCursor =>
+  implicit val decoder: Decoder[ApiSpendingProof] = { (c: HCursor) =>
     for {
       proofBytes <- c.downField("proofBytes").as[String].flatMap { s =>
                       Try(HexString.fromStringUnsafe(s)) match {

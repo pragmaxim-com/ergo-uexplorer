@@ -5,13 +5,20 @@ import akka.actor.typed.ActorSystem
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.CqlSession
+import com.datastax.oss.driver.api.core.config.{DriverConfig, DriverConfigLoader}
+import com.datastax.oss.driver.api.core.context.DriverContext
+import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig
+import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.api.Backend
-import org.ergoplatform.uexplorer.indexer.cassandra.entity._
+import org.ergoplatform.uexplorer.indexer.cassandra.entity.*
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.Inserted
 
+import java.net.InetSocketAddress
+import java.util.concurrent.{CompletableFuture, CompletionStage}
+import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.DurationInt
 
 class CassandraBackend(parallelism: Int)(implicit
@@ -45,7 +52,7 @@ class CassandraBackend(parallelism: Int)(implicit
       // format: on
 }
 
-object CassandraBackend {
+object CassandraBackend extends LazyLogging {
 
   import akka.stream.alpakka.cassandra.CassandraSessionSettings
   import akka.stream.alpakka.cassandra.scaladsl.{CassandraSession, CassandraSessionRegistry}
@@ -54,9 +61,28 @@ object CassandraBackend {
   import scala.concurrent.Await
 
   def apply(parallelism: Int)(implicit system: ActorSystem[Nothing]): CassandraBackend = {
-    val cassandraSession: CassandraSession =
-      CassandraSessionRegistry.get(system).sessionFor(CassandraSessionSettings())
-    implicit val cqlSession: CqlSession = Await.result(cassandraSession.underlying(), 5.seconds)
+    implicit val cqlSession: CqlSession =
+      CqlSession
+        .builder()
+        .withConfigLoader(new CassandraConfigLoader(system.settings.config.getConfig("datastax-java-driver")))
+        .build()
+    logger.info(s"Cassandra session created")
     new CassandraBackend(parallelism)
   }
+
+  class CassandraConfigLoader(config: Config) extends DriverConfigLoader {
+
+    private val driverConfig: DriverConfig = new TypesafeDriverConfig(config)
+
+    override def getInitialConfig: DriverConfig = driverConfig
+
+    override def onDriverInit(context: DriverContext): Unit = ()
+
+    override def reload(): CompletionStage[java.lang.Boolean] = CompletableFuture.completedFuture(false)
+
+    override def supportsReloading(): Boolean = false
+
+    override def close(): Unit = ()
+  }
+
 }
