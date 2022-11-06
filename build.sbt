@@ -53,11 +53,6 @@ lazy val root = (project in file("."))
     name := "ergo-uexplorer"
   ).aggregate(core, indexer, graphql)
 
-lazy val playground =
-  Utils.mkModule("playground", "playground")
-    .settings(commonSettings)
-    .settings(libraryDependencies ++= circe("3") ++ refined("3"))
-
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .settings(commonSettings)
