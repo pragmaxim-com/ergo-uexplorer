@@ -5,11 +5,11 @@ import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, Pay2SAddress}
 import scorex.crypto.hash.Sha256
 import scorex.util.encode.Base16
 import sigmastate.Values.FalseLeaf
-import sigmastate._
+import sigmastate.*
 import sigmastate.serialization.ErgoTreeSerializer
 
-import scala.util.{Failure, Try}
-import eu.timepit.refined.auto._
+import scala.util.{Failure, Success, Try}
+import eu.timepit.refined.auto.*
 
 object ErgoTreeParser {
 
@@ -31,5 +31,5 @@ object ErgoTreeParser {
       .flatMap { bytes =>
         enc.fromProposition(treeSerializer.deserializeErgoTree(bytes))
       }
-      .transform(_ => Try(Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress), Failure(_))
+      .recover(_ => Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress)
 }

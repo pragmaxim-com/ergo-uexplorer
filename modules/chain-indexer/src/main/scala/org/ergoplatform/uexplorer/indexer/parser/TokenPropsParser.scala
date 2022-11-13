@@ -20,7 +20,7 @@ object TokenPropsParser {
     for {
       name <- registers.get(RegisterId.R4).flatMap(parse)
       description = registers.get(RegisterId.R5).flatMap(parse).getOrElse("")
-      decimals    = registers.get(RegisterId.R6).flatMap(parse).map(_.toInt).getOrElse(0)
+      decimals    = registers.get(RegisterId.R6).flatMap(parse).flatMap(_.toIntOption).getOrElse(0)
     } yield TokenProps(name, description, decimals)
   }
 

@@ -1,13 +1,13 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
-import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.db.{BlockInfo, Block}
-import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
+import org.ergoplatform.uexplorer.db.{Block, BlockInfo}
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor._
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.*
 import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockCache
+import org.ergoplatform.uexplorer.indexer.{MapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.*
 
 import scala.collection.immutable.{SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
@@ -16,9 +16,10 @@ import scala.util.{Failure, Success, Try}
 case class ProgressState(
   lastBlockIdInEpoch: SortedMap[Int, BlockId],
   invalidEpochs: SortedMap[Int, InvalidEpochCandidate],
-  blockCache: BlockCache
+  blockCache: BlockCache,
+  utxoState: UtxoState
 ) {
-  import ProgressState._
+  import ProgressState.*
 
   def getFinishedEpoch(currentEpochIndex: Int): (MaybeNewEpoch, ProgressState) =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
@@ -46,8 +47,10 @@ case class ProgressState(
               blockCache.byHeight -- heightsToRemove
             )
 
-          val newBlockCache = removeEpochFromCache(Epoch.heightRangeForEpochIndex(previousEpochIndex))
-          val newEpoch      = candidate.getEpoch
+          val newBlockCache = removeEpochFromCache(
+            Epoch.heightRangeForEpochIndex(previousEpochIndex)
+          ) // TODO remove current besides last
+          val newEpoch = candidate.getEpoch
           val newP =
             ProgressState(
               lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),

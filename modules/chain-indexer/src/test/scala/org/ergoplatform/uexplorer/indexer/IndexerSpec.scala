@@ -5,7 +5,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor
+import org.ergoplatform.uexplorer.indexer.progress.{ProgressMonitor, UtxoHolder}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -31,6 +31,9 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
 
   implicit val progressMonitorRef: ActorRef[ProgressMonitor.MonitorRequest] =
     testKit.spawn(new ProgressMonitor().initialBehavior, "Monitor")
+
+  implicit val utxoHolderRef: ActorRef[UtxoHolder.HolderRequest] =
+    testKit.spawn(UtxoHolder.initialBehavior, "UtxoHolder")
 
   implicit val testingBackend: SttpBackendStub[Future, WebSockets] = SttpBackendStub.asynchronousFuture
     .whenRequestMatches { r =>
