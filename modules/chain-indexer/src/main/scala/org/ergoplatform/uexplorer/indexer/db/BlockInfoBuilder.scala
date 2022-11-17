@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer.db
 
 import org.ergoplatform.uexplorer.Address
 import org.ergoplatform.uexplorer.db.BlockInfo
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlockInfo
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
@@ -60,8 +60,8 @@ object BlockInfoBuilder {
     }
   }
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[CachedBlockInfo])(implicit
-                                                                        protocolSettings: ProtocolSettings
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BufferedBlockInfo])(implicit
+                                                                          protocolSettings: ProtocolSettings
   ): Try[BlockInfo] =
     minerRewardAddress(apiBlock)(protocolSettings).map { minerAddress =>
       val (reward, fee) = minerRewardAndFee(apiBlock)(protocolSettings)

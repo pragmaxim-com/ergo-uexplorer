@@ -60,7 +60,7 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
             Behaviors.same
         }
       case GetBlock(blockId, replyTo) =>
-        replyTo ! IsBlockCached(p.blockCache.byId.contains(blockId))
+        replyTo ! IsBlockCached(p.blockBuffer.byId.contains(blockId))
         Behaviors.same
       case GetChainState(replyTo) =>
         replyTo ! p
@@ -108,7 +108,7 @@ object ProgressMonitor {
 
   case class BestBlockInserted(flatBlock: Block) extends Inserted
 
-  case class ForkInserted(newFork: List[Block], supersededFork: List[CachedBlockInfo]) extends Inserted
+  case class ForkInserted(newFork: List[Block], supersededFork: List[BufferedBlockInfo]) extends Inserted
 
   sealed trait MaybeNewEpoch extends MonitorResponse
 

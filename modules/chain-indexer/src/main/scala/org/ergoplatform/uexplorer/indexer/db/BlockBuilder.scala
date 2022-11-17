@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer.db
 
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlockInfo
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.{Address, HexString, SigmaType, TokenId, TokenType}
 import io.circe.generic.auto.*
@@ -19,8 +19,8 @@ import scala.util.Try
 
 object BlockBuilder {
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[CachedBlockInfo])(implicit
-                                                                        protocolSettings: ProtocolSettings
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BufferedBlockInfo])(implicit
+                                                                          protocolSettings: ProtocolSettings
   ): Try[Block] = {
     val apiHeader       = apiBlock.header
     val apiExtension    = apiBlock.extension
@@ -183,7 +183,7 @@ object BlockBuilder {
       currentBlockInfo: BlockInfo,
       currentTimestamp: Long,
       currentHeight: Int,
-      prevBlock: CachedBlockInfo
+      prevBlock: BufferedBlockInfo
     ): BlockInfo =
       currentBlockInfo.copy(
         blockChainTotalSize = prevBlock.info.blockChainTotalSize + currentBlockInfo.blockSize,

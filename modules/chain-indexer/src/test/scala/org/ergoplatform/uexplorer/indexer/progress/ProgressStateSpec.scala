@@ -22,7 +22,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
     ProgressState(
       TreeMap.empty,
       TreeMap.empty,
-      BlockCache(Map.empty, TreeMap.empty),
+      BlockBuffer(Map.empty, TreeMap.empty),
       UtxoState.empty
     )
   implicit private val protocol: ProtocolSettings = ChainIndexerConf.loadDefaultOrThrow.protocol
@@ -48,7 +48,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
     "ProgressState state should" - {
       "allow for updating epoch indexes" - {
         "when db has no epochs yet" in {
-          ProgressState.load(TreeMap.empty, UtxoState.empty) shouldBe emptyState
+          ProgressState.empty shouldBe emptyState
         }
         "when has epochs" in {
           val e0b1      = getBlock(1023)
@@ -59,11 +59,11 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           val e1b1Block = BlockBuilder(e1b1, None).get
           val e1b2      = getBlock(2048)
           val e1b2Block = BlockBuilder(e1b2, None).get
-          val e0b2Info = CachedBlockInfo.fromBlock(
-            BlockBuilder(e0b2, Option(CachedBlockInfo.fromBlock(e0b1Block))).get
+          val e0b2Info = BufferedBlockInfo.fromBlock(
+            BlockBuilder(e0b2, Option(BufferedBlockInfo.fromBlock(e0b1Block))).get
           )
-          val e1b2Info = CachedBlockInfo.fromBlock(
-            BlockBuilder(e1b2, Option(CachedBlockInfo.fromBlock(e1b1Block))).get
+          val e1b2Info = BufferedBlockInfo.fromBlock(
+            BlockBuilder(e1b2, Option(BufferedBlockInfo.fromBlock(e1b1Block))).get
           )
 
           val e0InputIds = List(e0b1Block, e0b2Block).flatMap(_.inputs.map(_.boxId))
@@ -98,7 +98,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           actualProgressState shouldBe ProgressState(
             lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
             TreeMap.empty,
-            BlockCache(
+            BlockBuffer(
               Map(e0b2.header.id -> e0b2Info, e1b2.header.id -> e1b2Info),
               TreeMap(1024       -> e0b2Info, 2048           -> e1b2Info)
             ),
@@ -119,9 +119,9 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           newState shouldBe ProgressState(
             TreeMap.empty,
             TreeMap.empty,
-            BlockCache(
-              Map(firstApiBlock.header.id -> CachedBlockInfo.fromBlock(firstFlatBlock)),
-              TreeMap(1                   -> CachedBlockInfo.fromBlock(firstFlatBlock))
+            BlockBuffer(
+              Map(firstApiBlock.header.id -> BufferedBlockInfo.fromBlock(firstFlatBlock)),
+              TreeMap(1                   -> BufferedBlockInfo.fromBlock(firstFlatBlock))
             ),
             newState.utxoState
           )
@@ -129,7 +129,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
         "after an existing block" in {
           val e0b1                    = getBlock(1024)
           val e0b1Block               = BlockBuilder(e0b1, None).get
-          val e0b1Info                = CachedBlockInfo.fromBlock(e0b1Block)
+          val e0b1Info                = BufferedBlockInfo.fromBlock(e0b1Block)
           val lastBlockIdByEpochIndex = TreeMap(0 -> e0b1Info)
           val utxos = e0b1Block.outputs
             .map(b => b.boxId -> b.address)
@@ -149,7 +149,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           newState shouldBe ProgressState(
             lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
             TreeMap.empty,
-            BlockCache(
+            BlockBuffer(
               Map(e0b1.header.id -> e0b1Info),
               TreeMap(1024       -> e0b1Info)
             ),
@@ -158,13 +158,13 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
 
           val e1b1                       = getBlock(1025)
           val e1b1Block                  = BlockBuilder(e1b1, Some(e0b1Info)).get
-          val e1b1Info                   = CachedBlockInfo.fromBlock(e1b1Block)
+          val e1b1Info                   = BufferedBlockInfo.fromBlock(e1b1Block)
           val (blockInserted, newState2) = newState.insertBestBlock(e1b1).get
           blockInserted.flatBlock shouldBe e1b1Block
           newState2 shouldBe ProgressState(
             TreeMap(0 -> e0b1Info.headerId),
             TreeMap.empty,
-            BlockCache(
+            BlockBuffer(
               Map(e1b1.header.id -> e1b1Info, e0b1.header.id -> e0b1Info),
               TreeMap(1024       -> e0b1Info, 1025           -> e1b1Info)
             ),
@@ -193,18 +193,18 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
             utxos.groupBy(_._2).view.mapValues(_.map(_._1).toSet).toMap,
             Set.empty
           )
-        val s               = ProgressState.load(TreeMap(0 -> CachedBlockInfo.fromBlock(commonFlatBlock)), utxoState)
+        val s               = ProgressState.load(TreeMap(0 -> BufferedBlockInfo.fromBlock(commonFlatBlock)), utxoState)
         val b1              = getBlock(1025)
-        val b1FlatBlock     = BlockBuilder(b1, Option(CachedBlockInfo.fromBlock(commonFlatBlock))).get
+        val b1FlatBlock     = BlockBuilder(b1, Option(BufferedBlockInfo.fromBlock(commonFlatBlock))).get
         val b2              = getBlock(1026)
-        val b2FlatBlock     = BlockBuilder(b2, Option(CachedBlockInfo.fromBlock(b1FlatBlock))).get
+        val b2FlatBlock     = BlockBuilder(b2, Option(BufferedBlockInfo.fromBlock(b1FlatBlock))).get
         val b3              = getBlock(1027)
-        val b3FlatBlock     = BlockBuilder(b3, Option(CachedBlockInfo.fromBlock(b2FlatBlock))).get
+        val b3FlatBlock     = BlockBuilder(b3, Option(BufferedBlockInfo.fromBlock(b2FlatBlock))).get
         val b1Fork          = forkBlock(b1, "7975b60515b881504ec471affb84234123ac5491d0452da0eaf5fb96948f18e7")
-        val b1ForkFlatBlock = BlockBuilder(b1Fork, Option(CachedBlockInfo.fromBlock(commonFlatBlock))).get
+        val b1ForkFlatBlock = BlockBuilder(b1Fork, Option(BufferedBlockInfo.fromBlock(commonFlatBlock))).get
         val b2Fork =
           forkBlock(b2, "4077fcf3359c15c3ad3797a78fff342166f09a7f1b22891a18030dcd8604b087", Option(b1Fork.header.id))
-        val b2ForkFlatBlock           = BlockBuilder(b2Fork, Option(CachedBlockInfo.fromBlock(b1ForkFlatBlock))).get
+        val b2ForkFlatBlock           = BlockBuilder(b2Fork, Option(BufferedBlockInfo.fromBlock(b1ForkFlatBlock))).get
         val (_, s2)                   = s.insertBestBlock(b1Fork).get
         val (_, s3)                   = s2.insertBestBlock(b2Fork).get
         val (forkInserted, newState4) = s3.insertWinningFork(List(b1, b2, b3)).get
@@ -212,24 +212,24 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
         forkInserted.supersededFork.size shouldBe 2
         forkInserted.newFork shouldBe List(b1FlatBlock, b2FlatBlock, b3FlatBlock)
         forkInserted.supersededFork shouldBe List(
-          CachedBlockInfo.fromBlock(b1ForkFlatBlock),
-          CachedBlockInfo.fromBlock(b2ForkFlatBlock)
+          BufferedBlockInfo.fromBlock(b1ForkFlatBlock),
+          BufferedBlockInfo.fromBlock(b2ForkFlatBlock)
         )
         newState4 shouldBe ProgressState(
           TreeMap(0 -> commonBlock.header.id),
           TreeMap.empty,
-          BlockCache(
+          BlockBuffer(
             Map(
-              commonBlock.header.id -> CachedBlockInfo.fromBlock(commonFlatBlock),
-              b1.header.id          -> CachedBlockInfo.fromBlock(b1FlatBlock),
-              b2.header.id          -> CachedBlockInfo.fromBlock(b2FlatBlock),
-              b3.header.id          -> CachedBlockInfo.fromBlock(b3FlatBlock)
+              commonBlock.header.id -> BufferedBlockInfo.fromBlock(commonFlatBlock),
+              b1.header.id          -> BufferedBlockInfo.fromBlock(b1FlatBlock),
+              b2.header.id          -> BufferedBlockInfo.fromBlock(b2FlatBlock),
+              b3.header.id          -> BufferedBlockInfo.fromBlock(b3FlatBlock)
             ),
             TreeMap(
-              1024 -> CachedBlockInfo.fromBlock(commonFlatBlock),
-              1025 -> CachedBlockInfo.fromBlock(b1FlatBlock),
-              1026 -> CachedBlockInfo.fromBlock(b2FlatBlock),
-              1027 -> CachedBlockInfo.fromBlock(b3FlatBlock)
+              1024 -> BufferedBlockInfo.fromBlock(commonFlatBlock),
+              1025 -> BufferedBlockInfo.fromBlock(b1FlatBlock),
+              1026 -> BufferedBlockInfo.fromBlock(b2FlatBlock),
+              1027 -> BufferedBlockInfo.fromBlock(b3FlatBlock)
             )
           ),
           newState4.utxoState

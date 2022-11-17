@@ -1,13 +1,13 @@
 package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.stream.scaladsl.{Sink, Source}
-import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement, Row, SimpleStatement}
+import com.datastax.oss.driver.api.core.cql.{AsyncResultSet, BoundStatement, PreparedStatement, Row, SimpleStatement}
 import com.datastax.oss.driver.api.core.data.TupleValue
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlockInfo
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.{db, Address, BlockId, BoxId}
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
@@ -27,60 +27,52 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
 
   private val blockInfoSelectPreparedStatement = cqlSession.prepare(blockInfoSelectStatement)
 
-  def getCachedBlockInfo(
-    headerId: BlockId
-  ): Future[CachedBlockInfo] =
+  private def blockInfoByEpochIndex(
+    epochIndex: Int,
+    headerId: String
+  ): Future[(Int, BufferedBlockInfo)] =
     cqlSession
-      .executeAsync(blockInfoSelectBinder(blockInfoSelectPreparedStatement)(headerId))
+      .executeAsync(blockInfoSelectBinder(blockInfoSelectPreparedStatement)(BlockId.fromStringUnsafe(headerId)))
       .toScala
       .map(_.one())
-      .map(r => blockInfoRowReader(r))
+      .map(r => epochIndex -> blockInfoRowReader(r))
+
+  private def getBoxes(rs: AsyncResultSet) = {
+    val r          = rs.one()
+    val epochIndex = r.getInt(epoch_index)
+    print(s"$epochIndex, ")
+    val inputBoxIds = r.getList(input_box_ids, classOf[String]).asScala.map(BoxId(_))
+    val outputBoxIdsWithAddress = r.getList(output_box_ids_with_address, classOf[TupleValue]).asScala.map { tuple =>
+      BoxId(tuple.getString(0)) -> Address.fromStringUnsafe(tuple.getString(1))
+    }
+    ArraySeq.from[BoxId](inputBoxIds) -> ArraySeq.from[(BoxId, Address)](outputBoxIdsWithAddress)
+  }
 
   def getCachedState: Future[ProgressState] = {
-    logger.info(s"Loading epoch cache from db ")
-    val sortedEpochIndexesF =
-      Source
-        .fromPublisher(
-          cqlSession.executeReactive(
-            s"SELECT $epoch_index, $last_header_id FROM ${Const.CassandraKeyspace}.$node_epochs_table;"
-          )
-        )
-        .mapAsync(1) { row =>
-          getCachedBlockInfo(BlockId.fromStringUnsafe(row.getString(last_header_id)))
-            .map(row.getInt(epoch_index) -> _)
-        }
-        .runWith(Sink.seq[(Int, CachedBlockInfo)])
-        .map(infoByIndex => TreeMap(infoByIndex: _*))
-        .andThen { case Success(infoByIndex) =>
-          val rangeOpt = infoByIndex.headOption.map(head => s": from ${head._1} to ${infoByIndex.last._1}").getOrElse("")
-          logger.info(s"Loaded ${infoByIndex.size} epochs $rangeOpt")
-        }
-
+    logger.info(s"Loading epoch cache from db")
     Source
-      .future(sortedEpochIndexesF)
-      .mapConcat(identity)
-      .mapAsync(1) { case (epochIndex, _) =>
-        cqlSession
-          .executeAsync(
-            s"SELECT $epoch_index, $input_box_ids, $output_box_ids_with_address FROM ${Const.CassandraKeyspace}.$node_epochs_table WHERE $epoch_index = $epochIndex;"
-          )
-          .toScala
-      }
-      .map { rs =>
-        val r          = rs.one()
-        val epochIndex = r.getInt(epoch_index)
-        print(s"$epochIndex, ")
-        val inputBoxIds = r.getList(input_box_ids, classOf[String]).asScala.map(BoxId(_))
-        val outputBoxIdsWithAddress = r.getList(output_box_ids_with_address, classOf[TupleValue]).asScala.map { tuple =>
-          BoxId(tuple.getString(0)) -> Address.fromStringUnsafe(tuple.getString(1))
-        }
-        ArraySeq.from[BoxId](inputBoxIds) -> ArraySeq.from[(BoxId, Address)](outputBoxIdsWithAddress)
-      }
-      .runFold[UtxoState](UtxoState.empty) { case (s, (inputs, outputs)) => UtxoState.mergeEpoch(s, inputs, outputs) }
-      .flatMap { utxoState =>
-        sortedEpochIndexesF.map { cachedBlockInfoByEpochIndex =>
-          ProgressState.load(cachedBlockInfoByEpochIndex, utxoState)
-        }
+      .fromPublisher(
+        cqlSession.executeReactive(
+          s"SELECT $epoch_index, $last_header_id FROM ${Const.CassandraKeyspace}.$node_epochs_table;"
+        )
+      )
+      .mapAsync(1)(row => blockInfoByEpochIndex(row.getInt(epoch_index), row.getString(last_header_id)))
+      .runWith(Sink.seq[(Int, BufferedBlockInfo)])
+      .map(infoByIndex => TreeMap(infoByIndex: _*))
+      .flatMap { infoByIndex =>
+        val rangeOpt = infoByIndex.headOption.map(head => s": from ${head._1} to ${infoByIndex.last._1}").getOrElse("")
+        logger.info(s"Loaded ${infoByIndex.size} epochs $rangeOpt")
+        Source(infoByIndex)
+          .mapAsync(1) { case (epochIndex, _) =>
+            cqlSession
+              .executeAsync(
+                s"SELECT $epoch_index, $input_box_ids, $output_box_ids_with_address FROM ${Const.CassandraKeyspace}.$node_epochs_table WHERE $epoch_index = $epochIndex;"
+              )
+              .toScala
+          }
+          .map(getBoxes)
+          .runFold[UtxoState](UtxoState.empty) { case (s, (inputs, outputs)) => s.mergeEpochFromBoxes(inputs, outputs) }
+          .map(utxoState => ProgressState.load(infoByIndex, utxoState))
       }
   }
 }
@@ -105,10 +97,10 @@ object CassandraEpochReader extends CassandraPersistenceSupport {
   protected[cassandra] def blockInfoSelectBinder(preparedStatement: PreparedStatement)(headerId: BlockId): BoundStatement =
     preparedStatement.bind().setString(Headers.header_id, headerId)
 
-  protected[cassandra] def blockInfoRowReader(row: Row): CachedBlockInfo = {
+  protected[cassandra] def blockInfoRowReader(row: Row): BufferedBlockInfo = {
     import Headers.BlockInfo._
     val blockInfoUdt = row.getUdtValue(Headers.BlockInfo.udtName)
-    CachedBlockInfo(
+    BufferedBlockInfo(
       BlockId.fromStringUnsafe(row.getString(Headers.header_id)),
       BlockId.fromStringUnsafe(row.getString(Headers.parent_id)),
       row.getLong(Headers.timestamp),

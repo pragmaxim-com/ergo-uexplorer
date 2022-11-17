@@ -6,7 +6,7 @@ import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.*
 import org.ergoplatform.uexplorer.indexer.progress.{ProgressState, UtxoState}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlockInfo
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BufferedBlockInfo
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.compat.immutable.ArraySeq
@@ -25,22 +25,22 @@ trait Backend {
 
 class InMemoryBackend extends Backend {
 
-  private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, CachedBlockInfo]()
+  private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BufferedBlockInfo]()
   private val boxesByEpochIndex         = new ConcurrentHashMap[Int, (Iterable[BoxId], Iterable[(BoxId, Address)])]()
-  private val blocksById                = new ConcurrentHashMap[BlockId, CachedBlockInfo]()
-  private val blocksByHeight            = new ConcurrentHashMap[Int, CachedBlockInfo]()
+  private val blocksById                = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
+  private val blocksByHeight            = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
   override def blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]
       .mapConcat {
         case BestBlockInserted(flatBlock) =>
-          blocksByHeight.put(flatBlock.header.height, CachedBlockInfo.fromBlock(flatBlock))
-          blocksById.put(flatBlock.header.id, CachedBlockInfo.fromBlock(flatBlock))
+          blocksByHeight.put(flatBlock.header.height, BufferedBlockInfo.fromBlock(flatBlock))
+          blocksById.put(flatBlock.header.id, BufferedBlockInfo.fromBlock(flatBlock))
           List(flatBlock)
         case ForkInserted(winningFork, _) =>
           winningFork.foreach { flatBlock =>
-            blocksByHeight.put(flatBlock.header.height, CachedBlockInfo.fromBlock(flatBlock))
-            blocksById.put(flatBlock.header.id, CachedBlockInfo.fromBlock(flatBlock))
+            blocksByHeight.put(flatBlock.header.height, BufferedBlockInfo.fromBlock(flatBlock))
+            blocksById.put(flatBlock.header.id, BufferedBlockInfo.fromBlock(flatBlock))
           }
           winningFork
       }
@@ -67,7 +67,7 @@ class InMemoryBackend extends Backend {
     Future.successful(
       ProgressState.load(
         TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*),
-        UtxoState.mergeEpoch(UtxoState.empty, inputs, outputs)
+        UtxoState.empty.mergeEpochFromBoxes(inputs, outputs)
       )
     )
   }

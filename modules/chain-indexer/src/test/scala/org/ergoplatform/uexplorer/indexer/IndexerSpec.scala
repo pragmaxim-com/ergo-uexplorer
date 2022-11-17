@@ -57,7 +57,7 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
   val indexer         = new Indexer(inMemoryBackend, blockClient)
 
   "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {
-    ProgressMonitor.initialize(ProgressState.load(TreeMap.empty, UtxoState.empty)).flatMap { _ =>
+    ProgressMonitor.initialize(ProgressState.empty).flatMap { _ =>
       indexer.sync.flatMap { progress =>
         progress.getLastCachedBlock.map(_.height).get shouldBe 4150
         progress.invalidEpochs shouldBe empty
