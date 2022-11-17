@@ -1,7 +1,8 @@
 # uExplorer
 
 Supplementary, lightweight Ergo explorer with CassandraDB backend :
-  - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`10GB RAM`
+  - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`12GB RAM`
+  - utxo state of all addresses accessible in real-time
   - [stargate](https://stargate.io/) graphql server over cassandra schema
   - shares the same model and schema as [Ergo explorer](https://github.com/ergoplatform/explorer-backend)
   - resilient
@@ -13,17 +14,17 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
 
 **Requirements:**
   - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
-  - `10GB+` of RAM and `4vCPU+` for rapid sync from local Ergo Node
+  - `12GB+` of RAM and `4vCPU+` for rapid sync from local Ergo Node
       - `start-indexing.sh` script asks you if you are syncing chain from scratch or not
       - ergo-node = 1GB
       - cassandraDB = 8GB
-      - chain-indexer = 512MB
-  - `5GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
+      - chain-indexer = 2GB
+  - `8GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
       - `start-querying.sh`
       - ergo-node = 1GB
       - cassandraDB = 2GB
       - stargate = 1GB
-      - chain-indexer = 512MB
+      - chain-indexer = 2GB
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks automatically falls back to peer-network if local node is not available
 
@@ -46,7 +47,7 @@ $ docker build . -t pragmaxim/uexplorer-chain-indexer:latest
   ├── start-indexing.sh             # starts indexing, feel free to start up services individually
   ├── start-querying.sh             # applies indexes and starts stargate for graphql querying
   ├── stop-all.sh                   # safely stops everything running
-  └── stop-gracefully-cassandra.sh  # cassandra must be stopped gracefully
+  └── drain-cassandra.sh            # cassandra must be stopped gracefully
 ```
 
 ### Run
@@ -56,18 +57,9 @@ $ cd docker
 $ start-indexing.sh
 $ docker compose logs uexplorer-chain-indexer
 11:43:19 Initiating indexing of 816 epochs ...
-11:43:21 Persisted Epochs: 1[0], Blocks cache size (heights): 1538[1 - 1538]
-11:43:23 Persisted Epochs: 2[0 - 1], Blocks cache size (heights): 1538[1025 - 2562]
-11:43:24 Persisted Epochs: 3[0 - 2], Blocks cache size (heights): 1538[2049 - 3586]
-.......................................................................
-13:09:50 Persisted Epochs: 814[0 - 813], Blocks cache size (heights): 1538[832513 - 834050]
-13:09:57 Persisted Epochs: 815[0 - 814], Blocks cache size (heights): 1544[833537 - 835080]
-13:10:07 Initiating polling...
-13:10:08 Going to index 644 blocks starting at height 835585
-13:11:51 Persisted Epochs: 816[0 - 815], Blocks cache size (heights): 1536[834561 - 836096]
-13:12:59 Going to index 3 blocks starting at height 836229
-13:13:44 Going to index 1 blocks starting at height 836232
-13:14:35 Going to index 1 blocks starting at height 836233
+11:43:21 New epoch 0 created, utxo count: 1025, non-empty-address count: 122, persisted Epochs: 1[0], Blocks cache size (heights): 33[1 - 1538]
+11:43:22 New epoch 1 created, utxo count: 2049, non-empty-address count: 134, persisted Epochs: 2[0 - 1], Blocks cache size (heights): 33[1025 - 2562]
+11:43:23 New epoch 2 created, utxo count: 3073, non-empty-address count: 235, persisted Epochs: 3[0 - 2], Blocks cache size (heights): 33[2049 - 3586]
 
 $ start-querying.sh
 ```

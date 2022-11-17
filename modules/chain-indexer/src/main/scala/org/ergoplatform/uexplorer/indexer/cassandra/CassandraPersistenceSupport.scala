@@ -3,15 +3,17 @@ package org.ergoplatform.uexplorer.indexer.cassandra
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.CqlSession
-import com.datastax.oss.driver.api.core.cql._
+import com.datastax.oss.driver.api.core.cql.*
 
-import scala.jdk.CollectionConverters._
-import scala.compat.java8.FutureConverters._
+import scala.jdk.CollectionConverters.*
+import scala.compat.java8.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.Const
+
+import scala.collection.immutable.ArraySeq
 
 trait CassandraPersistenceSupport extends LazyLogging {
 
@@ -49,7 +51,7 @@ trait CassandraPersistenceSupport extends LazyLogging {
     parallelism: Int,
     batchType: BatchType = DefaultBatchType.LOGGED,
     simpleStatement: SimpleStatement,
-    statementBinder: (T, PreparedStatement) => List[BoundStatement]
+    statementBinder: (T, PreparedStatement) => ArraySeq[BoundStatement]
   )(implicit cqlSession: CqlSession): Flow[T, T, NotUsed] =
     Flow
       .lazyFutureFlow(() =>
@@ -57,11 +59,11 @@ trait CassandraPersistenceSupport extends LazyLogging {
           Flow[T]
             .mapAsync(parallelism) { element =>
               statementBinder(element, preparedStatement) match {
-                case Nil =>
+                case statements if statements.isEmpty =>
                   Future.successful(element)
-                case statement :: Nil =>
+                case statements if statements.length == 1 =>
                   cqlSession
-                    .executeAsync(statement)
+                    .executeAsync(statements.head)
                     .toScala
                     .map(_ => element)
                 case statements =>
@@ -79,7 +81,9 @@ trait CassandraPersistenceSupport extends LazyLogging {
 trait EpochPersistenceSupport {
   protected[cassandra] val node_epochs_table = "node_epochs"
 
-  protected[cassandra] val epoch_index    = "epoch_index"
-  protected[cassandra] val last_header_id = "last_header_id"
+  protected[cassandra] val epoch_index                 = "epoch_index"
+  protected[cassandra] val last_header_id              = "last_header_id"
+  protected[cassandra] val input_box_ids               = "input_box_ids"
+  protected[cassandra] val output_box_ids_with_address = "output_box_ids_with_address"
 
 }

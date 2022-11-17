@@ -6,7 +6,9 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, P
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
-import eu.timepit.refined.auto._
+import eu.timepit.refined.auto.*
+
+import scala.collection.immutable.ArraySeq
 
 trait CassandraOutputsWriter { this: CassandraBackend =>
   import Outputs._
@@ -19,7 +21,7 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
       outputInsertBinder
     )
 
-  protected[cassandra] def outputInsertBinder: (Block, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def outputInsertBinder: (Block, PreparedStatement) => ArraySeq[BoundStatement] = {
     case (block, statement) =>
       block.outputs.map { output =>
         statement

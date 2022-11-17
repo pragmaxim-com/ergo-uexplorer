@@ -5,6 +5,8 @@ import org.ergoplatform.uexplorer.{BlockId, HexString}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
+import scala.collection.immutable.ArraySeq
+
 class EpochSpec extends AnyFreeSpec with TestSupport with Matchers {
 
   val preGenesisBlockId = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
@@ -34,9 +36,9 @@ class EpochSpec extends AnyFreeSpec with TestSupport with Matchers {
   "epoch constructor should" - {
 
     "succeed with valid relations and index" in {
-      val firstEpoch  = EpochCandidate(epochRelationsByHeight(1 to 1024))
-      val secondEpoch = EpochCandidate(epochRelationsByHeight(1025 to 2048))
-      val thirdEpoch  = EpochCandidate(epochRelationsByHeight(2049 to 3072))
+      val firstEpoch  = EpochCandidate(epochRelationsByHeight(1 to 1024), ArraySeq.empty, ArraySeq.empty)
+      val secondEpoch = EpochCandidate(epochRelationsByHeight(1025 to 2048), ArraySeq.empty, ArraySeq.empty)
+      val thirdEpoch  = EpochCandidate(epochRelationsByHeight(2049 to 3072), ArraySeq.empty, ArraySeq.empty)
       firstEpoch.toOption.get.isComplete shouldBe true
       secondEpoch.toOption.get.isComplete shouldBe true
       thirdEpoch.toOption.get.isComplete shouldBe true
@@ -44,19 +46,21 @@ class EpochSpec extends AnyFreeSpec with TestSupport with Matchers {
 
     "fail with" - {
       "invalid epoch index" in {
-        assertThrows[UnexpectedStateError](EpochCandidate(epochRelationsByHeight(-4 to 1019)))
+        assertThrows[UnexpectedStateError](
+          EpochCandidate(epochRelationsByHeight(-4 to 1019), ArraySeq.empty, ArraySeq.empty)
+        )
       }
       "invalid height range size" in {
-        val epoch = EpochCandidate(epochRelationsByHeight(2 to 1024))
+        val epoch = EpochCandidate(epochRelationsByHeight(2 to 1024), ArraySeq.empty, ArraySeq.empty)
         epoch.swap.toOption.get.isComplete shouldBe false
       }
       "invalid sequence" in {
-        val epoch = EpochCandidate(epochRelationsByHeight((512 to 1 by -1) ++ (513 to 1024)))
+        val epoch = EpochCandidate(epochRelationsByHeight((512 to 1 by -1) ++ (513 to 1024)), ArraySeq.empty, ArraySeq.empty)
         epoch.swap.toOption.get.isComplete shouldBe false
       }
       "invalid relations" in {
         val invalidRels = (1025 to 2048).map(height => height -> BlockRel(idGen.sample.get, preGenesisBlockId))
-        val epoch       = EpochCandidate(invalidRels)
+        val epoch       = EpochCandidate(invalidRels, ArraySeq.empty, ArraySeq.empty)
         epoch.swap.toOption.get.isComplete shouldBe false
       }
     }

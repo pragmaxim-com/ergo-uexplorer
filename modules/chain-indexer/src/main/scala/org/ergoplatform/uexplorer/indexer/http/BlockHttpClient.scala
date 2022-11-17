@@ -8,7 +8,7 @@ import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.progress.{ProgressMonitor, UtxoHolder}
+import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.*
 import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport}
 import retry.Policy
@@ -16,7 +16,6 @@ import sttp.capabilities.WebSockets
 import sttp.client3.*
 import sttp.client3.circe.*
 import io.circe.refined.*
-import org.ergoplatform.uexplorer.indexer.progress.UtxoHolder.HolderRequest
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -25,7 +24,6 @@ import scala.concurrent.duration.DurationInt
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   s: ActorSystem[Nothing],
   progressMonitor: ActorRef[MonitorRequest],
-  utxoHolder: ActorRef[HolderRequest],
   sttpB: SttpBackend[Future, _]
 ) extends ResiliencySupport {
 
@@ -95,12 +93,6 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
               ProgressMonitor.insertWinningFork(winningFork)
           }
       }
-      .mapAsync(1) {
-        case BestBlockInserted(bestBlock) =>
-          UtxoHolder.addBestBlock(bestBlock).map[Inserted](_ => BestBlockInserted(bestBlock))
-        case ForkInserted(newFork, supersededFork) =>
-          UtxoHolder.addFork(newFork, supersededFork).map[Inserted](_ => ForkInserted(newFork, supersededFork))
-      }
 
   def close(): Future[Unit] =
     sttpB.close()
@@ -113,15 +105,14 @@ object BlockHttpClient {
     conf: ChainIndexerConf
   )(implicit
     ctx: ActorContext[_],
-    progressMonitor: ActorRef[MonitorRequest],
-    utxoHolder: ActorRef[HolderRequest]
+    progressMonitor: ActorRef[MonitorRequest]
   ): Future[BlockHttpClient] = {
     val futureSttpBackend = HttpClientFutureBackend()
     val metadataClient    = MetadataHttpClient(conf)(futureSttpBackend, ctx.system)
     val nodePoolRef       = ctx.spawn(NodePool.behavior, "NodePool")
     val backend           = SttpNodePoolBackend[WebSockets](nodePoolRef)(ctx.system, futureSttpBackend)
     backend.keepNodePoolUpdated(metadataClient).map { _ =>
-      new BlockHttpClient(metadataClient)(ctx.system, progressMonitor, utxoHolder, backend)
+      new BlockHttpClient(metadataClient)(ctx.system, progressMonitor, backend)
     }
   }
 }

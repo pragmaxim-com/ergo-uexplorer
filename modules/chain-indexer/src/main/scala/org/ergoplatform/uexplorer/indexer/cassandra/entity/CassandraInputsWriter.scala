@@ -5,7 +5,9 @@ import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
-import eu.timepit.refined.auto._
+import eu.timepit.refined.auto.*
+
+import scala.collection.immutable.ArraySeq
 
 trait CassandraInputsWriter { this: CassandraBackend =>
   import Inputs._
@@ -18,7 +20,7 @@ trait CassandraInputsWriter { this: CassandraBackend =>
       inputInsertBinder
     )
 
-  protected[cassandra] def inputInsertBinder: (Block, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def inputInsertBinder: (Block, PreparedStatement) => ArraySeq[BoundStatement] = {
     case (block, statement) =>
       block.inputs.map { input =>
         val partialStatement =

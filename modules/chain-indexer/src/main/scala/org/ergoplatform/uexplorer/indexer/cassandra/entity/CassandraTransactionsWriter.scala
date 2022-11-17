@@ -6,7 +6,9 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, P
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
-import eu.timepit.refined.auto._
+import eu.timepit.refined.auto.*
+
+import scala.collection.immutable.ArraySeq
 
 trait CassandraTransactionsWriter extends LazyLogging { this: CassandraBackend =>
   import Transactions._
@@ -19,7 +21,7 @@ trait CassandraTransactionsWriter extends LazyLogging { this: CassandraBackend =
       transactionsInsertBinder
     )
 
-  protected[cassandra] def transactionsInsertBinder: (Block, PreparedStatement) => List[BoundStatement] = {
+  protected[cassandra] def transactionsInsertBinder: (Block, PreparedStatement) => ArraySeq[BoundStatement] = {
     case (block, statement) =>
       block.txs.map { tx =>
         // format: off

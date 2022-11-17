@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.parser
 
-import org.ergoplatform.uexplorer.{ErgoTreeTemplateHash, HexString}
+import org.ergoplatform.uexplorer.{Address, ErgoTreeTemplateHash, HexString}
 import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, Pay2SAddress}
 import scorex.crypto.hash.Sha256
 import scorex.util.encode.Base16
@@ -25,11 +25,12 @@ object ErgoTreeParser {
 
   @inline def ergoTreeToAddress(
     ergoTree: HexString
-  )(implicit enc: ErgoAddressEncoder): Try[ErgoAddress] =
+  )(implicit enc: ErgoAddressEncoder): Try[Address] =
     Base16
       .decode(ergoTree)
       .flatMap { bytes =>
         enc.fromProposition(treeSerializer.deserializeErgoTree(bytes))
       }
       .recover(_ => Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress)
+      .map(t => Address.fromStringUnsafe(t.toString))
 }

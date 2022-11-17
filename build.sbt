@@ -42,8 +42,8 @@ def assemblySettings(moduleName: String) = Seq(
   },
   scriptClasspath := Seq((assembly / assemblyJarName).value),
   Universal / javaOptions ++= Seq(
-    "-J-Xmx512m",
-    "-J-Xms256m",
+    "-J-Xmx2G",
+    "-J-Xms512m",
     "-J-Xss40m",
   )
 )

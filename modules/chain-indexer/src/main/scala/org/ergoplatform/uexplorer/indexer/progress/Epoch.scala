@@ -1,9 +1,16 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
-import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.indexer.{Const, UnexpectedStateError}
 
-case class Epoch(index: Int, blockIds: Vector[BlockId])
+import scala.collection.immutable.ArraySeq
+
+case class Epoch(
+  index: Int,
+  blockIds: Vector[BlockId],
+  inputIds: ArraySeq[BoxId],
+  addressByOutputIds: ArraySeq[(BoxId, Address)]
+)
 
 object Epoch {
 

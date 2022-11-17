@@ -12,8 +12,7 @@ import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.*
-import org.ergoplatform.uexplorer.indexer.progress.UtxoHolder.HolderRequest
-import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor, ProgressState, UtxoHolder}
+import org.ergoplatform.uexplorer.indexer.progress.{Epoch, ProgressMonitor, ProgressState}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -22,8 +21,7 @@ import scala.util.Failure
 
 class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
   val s: ActorSystem[Nothing],
-  progressMonitorRef: ActorRef[MonitorRequest],
-  utxoHolder: ActorRef[HolderRequest]
+  progressMonitorRef: ActorRef[MonitorRequest]
 ) extends AkkaStreamSupport
   with LazyLogging {
 
@@ -36,12 +34,6 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
             .map(e => block -> Option(e))
         case block =>
           Future.successful(block -> Option.empty)
-      }
-      .mapAsync(1) {
-        case (block, Some(NewEpochCreated(epoch))) =>
-          UtxoHolder.persistEpoch(epoch.index).map(_ => block -> Some(NewEpochCreated(epoch)))
-        case (block, maybeNewEpoch) =>
-          Future.successful(block, maybeNewEpoch)
       }
 
   val indexingFlow: Flow[Int, (Block, Option[MaybeNewEpoch]), NotUsed] =
@@ -66,15 +58,13 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       newProgress <- ProgressMonitor.getChainState
     } yield newProgress
 
-  def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] = {
-    logger.info("Loading existing epoch data from db ...")
+  def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
     for {
-      lastBlockInfoByEpochIndex <- backend.getLastBlockInfoByEpochIndex
-      progress                  <- ProgressMonitor.updateState(lastBlockInfoByEpochIndex)
+      progress <- backend.getCachedState
+      _        <- ProgressMonitor.initialize(progress)
       _ = logger.info(s"Initiating indexing, current state : $progress")
       newProgress <- schedule(initialDelay, pollingInterval)(sync).run()
     } yield newProgress
-  }
 }
 
 object Indexer extends LazyLogging {
@@ -82,10 +72,9 @@ object Indexer extends LazyLogging {
   def runWith(
     conf: ChainIndexerConf
   )(implicit ctx: ActorContext[Nothing]): Future[Done] = {
-    implicit val system: ActorSystem[Nothing]           = ctx.system
-    implicit val protocol: ProtocolSettings             = conf.protocol
-    implicit val monitorRef: ActorRef[MonitorRequest]   = ctx.spawn(new ProgressMonitor().initialBehavior, "Monitor")
-    implicit val utxoHolderRef: ActorRef[HolderRequest] = ctx.spawn(UtxoHolder.initialBehavior, "UtxoHolder")
+    implicit val system: ActorSystem[Nothing]         = ctx.system
+    implicit val protocol: ProtocolSettings           = conf.protocol
+    implicit val monitorRef: ActorRef[MonitorRequest] = ctx.spawn(new ProgressMonitor().initialBehavior, "Monitor")
     BlockHttpClient.withNodePoolBackend(conf).flatMap { blockHttpClient =>
       val indexer =
         conf.backendType match {

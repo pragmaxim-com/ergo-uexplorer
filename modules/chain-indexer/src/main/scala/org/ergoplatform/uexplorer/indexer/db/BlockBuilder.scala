@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer.db
 
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlock
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.CachedBlockInfo
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.{Address, HexString, SigmaType, TokenId, TokenType}
 import io.circe.generic.auto.*
@@ -14,12 +14,13 @@ import org.ergoplatform.uexplorer.indexer.parser.{ErgoTreeParser, RegistersParse
 import eu.timepit.refined.auto.*
 import io.circe.Encoder
 
+import scala.collection.immutable.ArraySeq
 import scala.util.Try
 
 object BlockBuilder {
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[CachedBlock])(implicit
-    protocolSettings: ProtocolSettings
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[CachedBlockInfo])(implicit
+                                                                        protocolSettings: ProtocolSettings
   ): Try[Block] = {
     val apiHeader       = apiBlock.header
     val apiExtension    = apiBlock.extension
@@ -64,7 +65,7 @@ object BlockBuilder {
         )
       }
 
-    val txs: List[Transaction] = {
+    val txs: ArraySeq[Transaction] = {
       val lastTxGlobalIndex = prevBlock.map(_.info.maxTxGix).getOrElse(-1L)
       val headerId          = apiBlock.header.id
       val height            = apiBlock.header.height
@@ -80,7 +81,7 @@ object BlockBuilder {
     }
     val inputs =
       apiTransactions.transactions.flatMap { apiTx =>
-        apiTx.inputs.toList.zipWithIndex.map { case (i, index) =>
+        apiTx.inputs.zipWithIndex.map { case (i, index) =>
           Input(
             i.boxId,
             apiTx.id,
@@ -112,7 +113,7 @@ object BlockBuilder {
       implicit val e: ErgoAddressEncoder = protocolSettings.addressEncoder
       apiTransactions.transactions.zipWithIndex
         .flatMap { case (tx, tix) =>
-          tx.outputs.toList.zipWithIndex
+          tx.outputs.zipWithIndex
             .map { case (o, oix) => ((o, tx.id), oix, tix) }
         }
         .sortBy { case (_, oix, tix) => (tix, oix) }
@@ -120,7 +121,7 @@ object BlockBuilder {
         .zipWithIndex
         .traverse { case ((o, outIndex, txId), blockIndex) =>
           for {
-            address            <- ErgoTreeParser.ergoTreeToAddress(o.ergoTree).map(t => Address.fromStringUnsafe(t.toString))
+            address            <- ErgoTreeParser.ergoTreeToAddress(o.ergoTree)
             scriptTemplateHash <- ErgoTreeParser.deriveErgoTreeTemplateHash(o.ergoTree)
             registersJson = RegistersParser.expand(o.additionalRegisters).asJson
             globalIndex   = lastOutputGlobalIndex + blockIndex + 1
@@ -182,7 +183,7 @@ object BlockBuilder {
       currentBlockInfo: BlockInfo,
       currentTimestamp: Long,
       currentHeight: Int,
-      prevBlock: CachedBlock
+      prevBlock: CachedBlockInfo
     ): BlockInfo =
       currentBlockInfo.copy(
         blockChainTotalSize = prevBlock.info.blockChainTotalSize + currentBlockInfo.blockSize,

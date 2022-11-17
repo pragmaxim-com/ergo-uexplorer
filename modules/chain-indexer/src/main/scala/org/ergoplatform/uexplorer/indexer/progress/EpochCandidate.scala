@@ -1,10 +1,10 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
-import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.indexer.Const
-import org.ergoplatform.uexplorer.indexer.progress.Epoch._
+import org.ergoplatform.uexplorer.indexer.progress.Epoch.*
 
-import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 
 trait EpochCandidate {
   def epochIndex: Int
@@ -18,16 +18,23 @@ case class InvalidEpochCandidate(epochIndex: Int, invalidHeightsAsc: TreeSet[Int
   def isComplete = false
 }
 
-case class ValidEpochCandidate(epochIndex: Int, relsByHeight: TreeMap[Int, BlockRel]) extends EpochCandidate {
+case class ValidEpochCandidate(
+  epochIndex: Int,
+  relsByHeight: TreeMap[Int, BlockRel],
+  inputIds: ArraySeq[BoxId],
+  addressByOutputIds: ArraySeq[(BoxId, Address)]
+) extends EpochCandidate {
   def isComplete = true
 
-  def getEpoch: Epoch = Epoch(epochIndex, relsByHeight.toVector.map(_._2.headerId))
+  def getEpoch: Epoch = Epoch(epochIndex, relsByHeight.toVector.map(_._2.headerId), inputIds, addressByOutputIds)
 }
 
 object EpochCandidate {
 
   def apply(
-    rels: Seq[(Int, BlockRel)]
+    rels: Seq[(Int, BlockRel)],
+    inputIds: ArraySeq[BoxId],
+    addressByOutputIds: ArraySeq[(BoxId, Address)]
   ): Either[InvalidEpochCandidate, ValidEpochCandidate] = {
     val sortedRels         = TreeMap[Int, BlockRel](rels: _*)
     val epochIndex         = sortedRels.headOption.map(tuple => epochIndexForHeight(tuple._1)).getOrElse(-1)
@@ -66,7 +73,7 @@ object EpochCandidate {
         )
       )
     } else {
-      Right(ValidEpochCandidate(epochIndex, sortedRels))
+      Right(ValidEpochCandidate(epochIndex, sortedRels, inputIds, addressByOutputIds))
     }
   }
 }

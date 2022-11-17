@@ -5,7 +5,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
-import org.ergoplatform.uexplorer.indexer.progress.{ProgressMonitor, UtxoHolder}
+import org.ergoplatform.uexplorer.indexer.progress.{ProgressMonitor, ProgressState, UtxoState}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -14,6 +14,7 @@ import sttp.capabilities.WebSockets
 import sttp.client3.*
 import sttp.client3.testing.SttpBackendStub
 
+import scala.collection.immutable.TreeMap
 import scala.concurrent.Future
 
 class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
@@ -31,9 +32,6 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
 
   implicit val progressMonitorRef: ActorRef[ProgressMonitor.MonitorRequest] =
     testKit.spawn(new ProgressMonitor().initialBehavior, "Monitor")
-
-  implicit val utxoHolderRef: ActorRef[UtxoHolder.HolderRequest] =
-    testKit.spawn(UtxoHolder.initialBehavior, "UtxoHolder")
 
   implicit val testingBackend: SttpBackendStub[Future, WebSockets] = SttpBackendStub.asynchronousFuture
     .whenRequestMatches { r =>
@@ -59,14 +57,16 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
   val indexer         = new Indexer(inMemoryBackend, blockClient)
 
   "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {
-    indexer.sync.flatMap { progress =>
-      progress.getLastCachedBlock.map(_.height).get shouldBe 4150
-      progress.invalidEpochs shouldBe empty
-      progress.findMissingIndexes shouldBe empty
-      indexer.sync.map { progress =>
-        progress.getLastCachedBlock.map(_.height).get shouldBe 4200
+    ProgressMonitor.initialize(ProgressState.load(TreeMap.empty, UtxoState.empty)).flatMap { _ =>
+      indexer.sync.flatMap { progress =>
+        progress.getLastCachedBlock.map(_.height).get shouldBe 4150
         progress.invalidEpochs shouldBe empty
         progress.findMissingIndexes shouldBe empty
+        indexer.sync.map { progress =>
+          progress.getLastCachedBlock.map(_.height).get shouldBe 4200
+          progress.invalidEpochs shouldBe empty
+          progress.findMissingIndexes shouldBe empty
+        }
       }
     }
   }

@@ -132,7 +132,9 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_tokens
 
 CREATE TABLE IF NOT EXISTS uexplorer.node_epochs
 (
-    epoch_index     INT,
-    last_header_id  VARCHAR,
+    epoch_index                 INT,
+    last_header_id              VARCHAR,
+    input_box_ids               frozen<list<VARCHAR>>,
+    output_box_ids_with_address frozen<list<tuple<VARCHAR, VARCHAR>>>,
     PRIMARY KEY (epoch_index)
 );

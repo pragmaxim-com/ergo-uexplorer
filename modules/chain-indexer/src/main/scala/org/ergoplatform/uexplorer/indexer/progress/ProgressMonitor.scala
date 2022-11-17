@@ -1,14 +1,15 @@
 package org.ergoplatform.uexplorer.indexer.progress
 
+import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.pattern.StatusReply
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState._
+import org.ergoplatform.uexplorer.indexer.progress.ProgressState.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import scala.collection.immutable.TreeMap
@@ -21,7 +22,14 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
 
   def initialBehavior: Behavior[MonitorRequest] =
     Behaviors.setup[MonitorRequest] { _ =>
-      initialized(ProgressState(TreeMap.empty, TreeMap.empty, BlockCache(Map.empty, TreeMap.empty)))
+      Behaviors.receiveMessage[MonitorRequest] {
+        case Initialize(newState, replyTo) =>
+          replyTo ! Done
+          initialized(newState)
+        case unexpected =>
+          logger.error(s"Message $unexpected unexpected")
+          Behaviors.same
+      }
     }
 
   def initialized(p: ProgressState): Behaviors.Receive[MonitorRequest] =
@@ -54,18 +62,17 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
       case GetBlock(blockId, replyTo) =>
         replyTo ! IsBlockCached(p.blockCache.byId.contains(blockId))
         Behaviors.same
-      case UpdateChainState(persistedEpochIndexes, replyTo) =>
-        val newProgress = p.updateState(persistedEpochIndexes)
-        replyTo ! newProgress
-        initialized(newProgress)
       case GetChainState(replyTo) =>
         replyTo ! p
         Behaviors.same
       case FinishEpoch(epochIndex, replyTo) =>
-        val (maybeNewEpoch, newProgress) = p.getFinishedEpoch(epochIndex)
+        val (maybeNewEpoch, newProgress) = p.finishEpoch(epochIndex)
         logger.info(s"$maybeNewEpoch, $newProgress")
         replyTo ! maybeNewEpoch
         initialized(newProgress)
+      case unexpected =>
+        logger.error(s"Message $unexpected unexpected")
+        Behaviors.same
     }
 }
 
@@ -86,8 +93,7 @@ object ProgressMonitor {
 
   case class GetBlock(blockId: BlockId, replyTo: ActorRef[IsBlockCached]) extends MonitorRequest
 
-  case class UpdateChainState(lastBlockByEpochIndex: TreeMap[Int, CachedBlock], replyTo: ActorRef[ProgressState])
-    extends MonitorRequest
+  case class Initialize(progressState: ProgressState, replyTo: ActorRef[Done]) extends MonitorRequest
 
   case class GetChainState(replyTo: ActorRef[ProgressState]) extends MonitorRequest
 
@@ -102,7 +108,7 @@ object ProgressMonitor {
 
   case class BestBlockInserted(flatBlock: Block) extends Inserted
 
-  case class ForkInserted(newFork: List[Block], supersededFork: List[CachedBlock]) extends Inserted
+  case class ForkInserted(newFork: List[Block], supersededFork: List[CachedBlockInfo]) extends Inserted
 
   sealed trait MaybeNewEpoch extends MonitorResponse
 
@@ -142,10 +148,10 @@ object ProgressMonitor {
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[IsBlockCached] =
     ref.ask(ref => GetBlock(blockId, ref))
 
-  def updateState(
-    lastBlockByEpochIndex: TreeMap[Int, CachedBlock]
-  )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[ProgressState] =
-    ref.ask(ref => UpdateChainState(lastBlockByEpochIndex, ref))
+  def initialize(
+    progressState: ProgressState
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[Done] =
+    ref.ask[Done](ref => Initialize(progressState, ref))(1.minute, s.scheduler)
 
   def getChainState(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[ProgressState] =
     ref.ask(ref => GetChainState(ref))

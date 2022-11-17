@@ -1,7 +1,9 @@
 package org.ergoplatform.uexplorer.db
 
 import io.circe.Json
-import org.ergoplatform.uexplorer._
+import org.ergoplatform.uexplorer.*
+
+import scala.collection.immutable.ArraySeq
 
 final case class AdProof(
   headerId: BlockId,
@@ -21,13 +23,13 @@ final case class Block(
   header: Header,
   extension: BlockExtension,
   adProofOpt: Option[AdProof],
-  txs: List[Transaction],
-  inputs: List[Input],
-  dataInputs: List[DataInput],
-  outputs: List[Output],
-  assets: List[Asset],
-  registers: List[BoxRegister],
-  tokens: List[Token],
+  txs: ArraySeq[Transaction],
+  inputs: ArraySeq[Input],
+  dataInputs: ArraySeq[DataInput],
+  outputs: ArraySeq[Output],
+  assets: ArraySeq[Asset],
+  registers: ArraySeq[BoxRegister],
+  tokens: ArraySeq[Token],
   info: BlockInfo
 )
 

@@ -9,7 +9,7 @@ import org.ergoplatform.uexplorer.indexer.{MapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
 
-import scala.collection.immutable.{SortedMap, SortedSet, TreeMap, TreeSet}
+import scala.collection.immutable.{List, SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
 
@@ -21,11 +21,18 @@ case class ProgressState(
 ) {
   import ProgressState.*
 
-  def getFinishedEpoch(currentEpochIndex: Int): (MaybeNewEpoch, ProgressState) =
+  private def removeEpochFromCache(heightsToRemove: Seq[Int]): BlockCache =
+    BlockCache(
+      blockCache.byId -- heightsToRemove.flatMap(blockCache.byHeight.get).map(_.headerId),
+      blockCache.byHeight -- heightsToRemove
+    )
+
+  def finishEpoch(currentEpochIndex: Int): (MaybeNewEpoch, ProgressState) =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
       NewEpochExisted(currentEpochIndex) -> this
     } else {
-      val previousEpochIndex = currentEpochIndex - 1
+      val previousEpochIndex                           = currentEpochIndex - 1
+      val ((inputIds, outputIdsWithAddress), newState) = utxoState.finishEpoch(currentEpochIndex)
       val epochCandidate =
         EpochCandidate(
           Epoch
@@ -33,36 +40,34 @@ case class ProgressState(
             .map { height =>
               val info = blockCache.byHeight(height)
               height -> BlockRel(info.headerId, info.parentId)
-            }
+            },
+          inputIds,
+          outputIdsWithAddress
         )
       epochCandidate match {
         case Right(candidate) if currentEpochIndex == 0 =>
           val newEpoch = candidate.getEpoch
-          val newP     = copy(lastBlockIdInEpoch = lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last))
+          val newP = copy(
+            lastBlockIdInEpoch = lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
+            blockCache         = removeEpochFromCache(Epoch.heightRangeForEpochIndex(currentEpochIndex)),
+            utxoState          = newState
+          )
           NewEpochCreated(newEpoch) -> newP
         case Right(candidate) if lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
-          def removeEpochFromCache(heightsToRemove: Seq[Int]): BlockCache =
-            BlockCache(
-              blockCache.byId -- heightsToRemove.flatMap(blockCache.byHeight.get).map(_.headerId),
-              blockCache.byHeight -- heightsToRemove
-            )
-
-          val newBlockCache = removeEpochFromCache(
-            Epoch.heightRangeForEpochIndex(previousEpochIndex)
-          ) // TODO remove current besides last
           val newEpoch = candidate.getEpoch
           val newP =
             ProgressState(
               lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
               invalidEpochs,
-              newBlockCache
+              removeEpochFromCache(Epoch.heightRangeForEpochIndex(currentEpochIndex)),
+              newState
             )
           NewEpochCreated(newEpoch) -> newP
         case Right(candidate) =>
-          val Epoch(curIndex, curHeaders) = candidate.getEpoch
+          val Epoch(curIndex, curHeaders, inputIds, outputIdsWithAddress) = candidate.getEpoch
           val error =
             s"Prev epoch $previousEpochIndex header ${lastBlockIdInEpoch.get(previousEpochIndex)} " +
-            s"does not match current epoch $curIndex header ${curHeaders.head}"
+            s"does not match current epoch $curIndex header ${curHeaders.head} with ${inputIds.size} inputs and ${outputIdsWithAddress.size} outputs"
           val invalidHeights =
             TreeSet(Epoch.heightRangeForEpochIndex(previousEpochIndex).last, candidate.relsByHeight.head._1)
           val invalidEpochCandidate = InvalidEpochCandidate(curIndex, invalidHeights, error)
@@ -85,10 +90,15 @@ case class ProgressState(
     } else
       BlockBuilder(bestBlock, blockCache.byId.get(bestBlock.header.parentId))
         .map { flatBlock =>
-          BestBlockInserted(flatBlock) -> copy(blockCache =
-            BlockCache(
-              blockCache.byId.updated(flatBlock.header.id, CachedBlock.fromBlock(flatBlock)),
-              blockCache.byHeight.updated(flatBlock.header.height, CachedBlock.fromBlock(flatBlock))
+          BestBlockInserted(flatBlock) -> copy(
+            blockCache = BlockCache(
+              blockCache.byId.updated(flatBlock.header.id, CachedBlockInfo.fromBlock(flatBlock)),
+              blockCache.byHeight.updated(flatBlock.header.height, CachedBlockInfo.fromBlock(flatBlock))
+            ),
+            utxoState = utxoState.addBestBlock(
+              flatBlock.header.height,
+              flatBlock.inputs.map(_.boxId),
+              flatBlock.outputs.map(o => o.boxId -> o.address)
             )
           )
         }
@@ -104,7 +114,7 @@ case class ProgressState(
       )
     } else
       winningFork
-        .foldLeft(Try(ListBuffer.empty[Block] -> ListBuffer.empty[CachedBlock])) {
+        .foldLeft(Try(ListBuffer.empty[Block] -> ListBuffer.empty[CachedBlockInfo])) {
           case (f @ Failure(_), _) =>
             f
           case (Success((newBlocksAcc, toRemoveAcc)), apiBlock) =>
@@ -112,7 +122,7 @@ case class ProgressState(
               apiBlock,
               Some(
                 newBlocksAcc.lastOption
-                  .collect { case b if b.header.id == apiBlock.header.parentId => CachedBlock.fromBlock(b) }
+                  .collect { case b if b.header.id == apiBlock.header.parentId => CachedBlockInfo.fromBlock(b) }
                   .getOrElse(blockCache.byId(apiBlock.header.parentId))
               )
             ).map { newBlock =>
@@ -128,23 +138,19 @@ case class ProgressState(
           val newBlockCache =
             BlockCache(
               (blockCache.byId -- supersededBlocks.map(_.headerId)) ++ newBlocks
-                .map(b => b.header.id -> CachedBlock.fromBlock(b)),
-              blockCache.byHeight ++ newBlocks.map(b => b.header.height -> CachedBlock.fromBlock(b))
+                .map(b => b.header.id -> CachedBlockInfo.fromBlock(b)),
+              blockCache.byHeight ++ newBlocks.map(b => b.header.height -> CachedBlockInfo.fromBlock(b))
             )
-          ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(blockCache = newBlockCache)
+          val newForkByHeight =
+            newBlocks.map(b => b.header.height -> (b.inputs.map(_.boxId), b.outputs.map(o => o.boxId -> o.address))).toMap
+          val newUtxoState = utxoState.addFork(newForkByHeight, supersededBlocks.map(_.height).toList)
+          ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(
+            blockCache = newBlockCache,
+            utxoState  = newUtxoState
+          )
         }
 
-  def updateState(persistedEpochIndexes: TreeMap[Int, CachedBlock]): ProgressState = {
-    val newEpochIndexes = lastBlockIdInEpoch ++ persistedEpochIndexes.view.mapValues(_.headerId)
-    val newBlockCache =
-      BlockCache(
-        blockCache.byId ++ persistedEpochIndexes.toSeq.map(i => i._2.headerId -> i._2),
-        blockCache.byHeight ++ persistedEpochIndexes.map(i => i._2.height -> i._2)
-      )
-    ProgressState(newEpochIndexes, invalidEpochs, newBlockCache)
-  }
-
-  def getLastCachedBlock: Option[CachedBlock] = blockCache.byHeight.lastOption.map(_._2)
+  def getLastCachedBlock: Option[CachedBlockInfo] = blockCache.byHeight.lastOption.map(_._2)
 
   def persistedEpochIndexes: SortedSet[Int] = lastBlockIdInEpoch.keySet
 
@@ -181,24 +187,37 @@ case class ProgressState(
       if (xs.isEmpty) ""
       else xs.lastOption.filterNot(xs.headOption.contains).map(h => s" - $h]").getOrElse("]")
 
+    s"utxo count: ${utxoState.addressById.size}, non-empty-address count: ${utxoState.utxosByAddress.size}, " +
     s"persisted Epochs: ${existingEpochs.size}${headStr(existingEpochs)}${lastStr(existingEpochs)}, " +
     s"blocks cache size (heights): ${cachedHeights.size}${headStr(cachedHeights)}${lastStr(cachedHeights)}, " +
-    s"invalid Epochs: ${invalidEpochs.size}${headStr(invalidEpochs.keySet)}${lastStr(invalidEpochs.keySet)}"
+    s"invalid Epochs: ${invalidEpochs.size}${headStr(invalidEpochs.keySet)}${lastStr(invalidEpochs.keySet)}, " +
+    s"inputs without address: ${utxoState.inputsWithoutAddress}"
   }
 
 }
 
 object ProgressState {
 
-  case class CachedBlock(headerId: BlockId, parentId: BlockId, timestamp: Long, height: Int, info: BlockInfo)
+  case class CachedBlockInfo(headerId: BlockId, parentId: BlockId, timestamp: Long, height: Int, info: BlockInfo)
 
-  object CachedBlock {
+  def load(cachedBlockInfoByEpochIndex: TreeMap[Int, CachedBlockInfo], utxoState: UtxoState): ProgressState =
+    ProgressState(
+      cachedBlockInfoByEpochIndex.map { case (epochIndex, blockInfo) => epochIndex -> blockInfo.headerId },
+      TreeMap.empty,
+      BlockCache(
+        cachedBlockInfoByEpochIndex.toSeq.map(i => i._2.headerId -> i._2).toMap,
+        cachedBlockInfoByEpochIndex.map(i => i._2.height -> i._2)
+      ),
+      utxoState
+    )
 
-    def fromBlock(b: Block): CachedBlock =
-      CachedBlock(b.header.id, b.header.parentId, b.header.timestamp, b.header.height, b.info)
+  object CachedBlockInfo {
+
+    def fromBlock(b: Block): CachedBlockInfo =
+      CachedBlockInfo(b.header.id, b.header.parentId, b.header.timestamp, b.header.height, b.info)
   }
 
-  case class BlockCache(byId: Map[BlockId, CachedBlock], byHeight: SortedMap[Int, CachedBlock]) {
+  case class BlockCache(byId: Map[BlockId, CachedBlockInfo], byHeight: SortedMap[Int, CachedBlockInfo]) {
     def isEmpty: Boolean = byId.isEmpty || byHeight.isEmpty
 
     def heights: SortedSet[Int] = byHeight.keySet

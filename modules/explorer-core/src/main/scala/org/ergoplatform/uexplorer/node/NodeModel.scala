@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.node
 
-import cats.data.NonEmptyList
 import eu.timepit.refined.api.RefType.tagRefType.unsafeWrap
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto.*
@@ -12,6 +11,7 @@ import io.circe.syntax.*
 import io.circe.*
 import org.ergoplatform.uexplorer.*
 
+import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
 
 final case class ApiAdProof(
@@ -33,7 +33,7 @@ final case class ApiBlockExtension(
 
 final case class ApiBlockTransactions(
   headerId: BlockId,
-  transactions: List[ApiTransaction]
+  transactions: ArraySeq[ApiTransaction]
 )
 
 final case class ApiDataInput(boxId: BoxId)
@@ -181,9 +181,9 @@ final case class ApiInput(boxId: BoxId, spendingProof: ApiSpendingProof)
 
 final case class ApiTransaction(
   id: TxId,
-  inputs: NonEmptyList[ApiInput],
+  inputs: ArraySeq[ApiInput],
   dataInputs: List[ApiDataInput],
-  outputs: NonEmptyList[ApiOutput],
+  outputs: ArraySeq[ApiOutput],
   size: Int
 )
 
