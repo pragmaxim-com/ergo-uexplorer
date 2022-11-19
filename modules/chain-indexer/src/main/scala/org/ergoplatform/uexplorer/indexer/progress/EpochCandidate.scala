@@ -22,7 +22,7 @@ case class ValidEpochCandidate(
   epochIndex: Int,
   relsByHeight: TreeMap[Int, BlockRel],
   inputIds: ArraySeq[BoxId],
-  addressByOutputIds: ArraySeq[(BoxId, Address)]
+  addressByOutputIds: ArraySeq[(BoxId, Address, Long)]
 ) extends EpochCandidate {
   def isComplete = true
 
@@ -34,7 +34,7 @@ object EpochCandidate {
   def apply(
     rels: Seq[(Int, BlockRel)],
     inputIds: ArraySeq[BoxId],
-    addressByOutputIds: ArraySeq[(BoxId, Address)]
+    addressByOutputIds: ArraySeq[(BoxId, Address, Long)]
   ): Either[InvalidEpochCandidate, ValidEpochCandidate] = {
     val sortedRels         = TreeMap[Int, BlockRel](rels: _*)
     val epochIndex         = sortedRels.headOption.map(tuple => epochIndexForHeight(tuple._1)).getOrElse(-1)

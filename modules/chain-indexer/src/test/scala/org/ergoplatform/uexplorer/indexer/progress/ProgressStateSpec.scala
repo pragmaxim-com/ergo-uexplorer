@@ -52,17 +52,17 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           val e0In = List(e0b1Block, e0b2Block).flatMap(_.inputs.map(_.boxId))
           val e1In = List(e1b1Block, e1b2Block).flatMap(_.inputs.map(_.boxId))
 
-          val e0Out = List(e0b1Block, e0b2Block).flatMap(_.outputs.map(b => b.boxId -> b.address))
-          val e1Out = List(e1b1Block, e1b2Block).flatMap(_.outputs.map(b => b.boxId -> b.address))
+          val e0Out = List(e0b1Block, e0b2Block).flatMap(_.outputs.map(b => (b.boxId, b.address, b.value)))
+          val e1Out = List(e1b1Block, e1b2Block).flatMap(_.outputs.map(b => (b.boxId, b.address, b.value)))
 
           val lastBlockIdByEpochIndex = TreeMap(0 -> e0b2BlockInfo, 1 -> e1b2BlockInfo)
-          val utxos                   = (e0Out ++ e1Out).filterNot(b => e0In.contains(b._1) || e1In.contains(b._1)).toMap
+          val utxos                   = (e0Out ++ e1Out).filterNot(b => e0In.contains(b._1) || e1In.contains(b._1))
 
           val utxoState =
             UtxoState(
               TreeMap.empty,
-              utxos,
-              utxos.groupBy(_._2).view.mapValues(_.keySet).toMap,
+              utxos.map(o => o._1 -> o._2).toMap,
+              utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
               (e0In ++ e1In).filterNot(b => e0Out.map(_._1).contains(b) || e1Out.map(_._1).contains(b)).toSet
             )
           val actualProgressState = ProgressState.load(
@@ -107,14 +107,13 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
 
           val utxos =
             e0b1Block.outputs
-              .map(b => b.boxId -> b.address)
+              .map(b => (b.boxId, b.address, b.value))
               .filterNot(b => e0b1Block.inputs.map(_.boxId).contains(b._1))
-              .toMap
           val utxoState =
             UtxoState(
               TreeMap.empty,
-              utxos,
-              utxos.groupBy(_._2).view.mapValues(_.keySet).toMap,
+              utxos.map(o => o._1 -> o._2).toMap,
+              utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
               e0b1Block.inputs.map(_.boxId).filterNot(b => e0b1Block.outputs.map(_._1).contains(b)).toSet
             )
           val newState = ProgressState.load(lastBlockIdByEpochIndex, utxoState)
@@ -155,15 +154,14 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
         val commonBlock     = BlockBuilder(getBlock(1024), None).get
         val commonBlockInfo = BufferedBlockInfo.fromBlock(commonBlock)
         val utxos = commonBlock.outputs
-          .map(b => b.boxId -> b.address)
+          .map(b => (b.boxId, b.address, b.value))
           .filterNot(b => commonBlock.inputs.map(_.boxId).contains(b._1))
-          .toMap
 
         val utxoState =
           UtxoState(
             TreeMap.empty,
-            utxos,
-            utxos.groupBy(_._2).view.mapValues(_.keySet).toMap,
+            utxos.map(o => o._1 -> o._2).toMap,
+            utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
             Set.empty
           )
         val s               = ProgressState.load(TreeMap(0 -> commonBlockInfo), utxoState)

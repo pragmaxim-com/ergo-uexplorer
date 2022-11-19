@@ -56,7 +56,7 @@ trait CassandraEpochWriter extends LazyLogging {
 object CassandraEpochWriter extends EpochPersistenceSupport {
 
   protected[cassandra] def epochInsertBinder(epoch: Epoch)(stmt: PreparedStatement): BoundStatement = {
-    val tupleType = DataTypes.tupleOf(DataTypes.TEXT, DataTypes.TEXT)
+    val tupleType = DataTypes.tupleOf(DataTypes.TEXT, DataTypes.TEXT, DataTypes.BIGINT)
     stmt
       .bind()
       .setInt(epoch_index, epoch.index)
@@ -64,8 +64,8 @@ object CassandraEpochWriter extends EpochPersistenceSupport {
       .setList(input_box_ids, epoch.inputIds.map(_.unwrapped).asJava, classOf[String])
       .setList(
         output_box_ids_with_address,
-        epoch.addressByOutputIds.map { case (boxId, address) =>
-          tupleType.newValue(boxId.unwrapped, address.toString)
+        epoch.addressByOutputIds.map { case (boxId, address, value) =>
+          tupleType.newValue(boxId.unwrapped, address.toString, value)
         }.asJava,
         classOf[TupleValue]
       )

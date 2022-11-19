@@ -127,7 +127,7 @@ object ProgressMonitor {
   case class NewEpochExisted(epochIndex: Int) extends MaybeNewEpoch {
 
     override def toString: String =
-      s"New epoch $epochIndex existed"
+      s"Epoch $epochIndex already existed"
   }
 
   /** API */

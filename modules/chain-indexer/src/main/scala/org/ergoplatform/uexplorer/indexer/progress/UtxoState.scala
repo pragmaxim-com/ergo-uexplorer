@@ -17,34 +17,28 @@ import scala.concurrent.Future
 import scala.util.{Success, Try}
 
 case class UtxoState(
-  tempBoxesByHeightBuffer: TreeMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address)])],
+  tempBoxesByHeightBuffer: TreeMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])],
   addressById: Map[BoxId, Address],
-  utxosByAddress: Map[Address, Set[BoxId]],
+  utxosByAddress: Map[Address, Map[BoxId, Long]],
   inputsWithoutAddress: Set[BoxId]
 ) {
 
-  private def idsByAddress(boxIds: ArraySeq[(BoxId, Address)]) =
-    boxIds
-      .groupBy(_._2)
-      .view
-      .mapValues(_.map(_._1).toSet)
-
-  def bufferBestBlock(height: Int, inputs: ArraySeq[BoxId], outputs: ArraySeq[(BoxId, Address)]): UtxoState =
+  def bufferBestBlock(height: Int, inputs: ArraySeq[BoxId], outputs: ArraySeq[(BoxId, Address, Long)]): UtxoState =
     copy(tempBoxesByHeightBuffer = tempBoxesByHeightBuffer.updated(height, inputs -> outputs))
 
   def bufferFork(
-    newForkByHeight: Map[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address)])],
+    newForkByHeight: Map[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])],
     supersededForkHeights: List[Int]
   ): UtxoState = {
     val boxesByHeightWoSupersededFork = tempBoxesByHeightBuffer.removedAll(supersededForkHeights)
     copy(tempBoxesByHeightBuffer = boxesByHeightWoSupersededFork ++ newForkByHeight)
   }
 
-  def mergeEpochFromBuffer(heightRange: Seq[Int]): ((ArraySeq[BoxId], ArraySeq[(BoxId, Address)]), UtxoState) = {
+  def mergeEpochFromBuffer(heightRange: Seq[Int]): ((ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]), UtxoState) = {
     val (inputIdsArr, outputIdsWithAddressArr) =
       tempBoxesByHeightBuffer
         .range(heightRange.head, heightRange.last + 1)
-        .foldLeft((ArraySeq.newBuilder[BoxId], ArraySeq.newBuilder[(BoxId, Address)])) {
+        .foldLeft((ArraySeq.newBuilder[BoxId], ArraySeq.newBuilder[(BoxId, Address, Long)])) {
           case ((inputBoxIdsAcc, outputBoxIdsWithAddressAcc), (_, (inputBoxIds, outputBoxIdsWithAddress))) =>
             (inputBoxIdsAcc ++= inputBoxIds, outputBoxIdsWithAddressAcc ++= outputBoxIdsWithAddress)
         }
@@ -53,30 +47,38 @@ case class UtxoState(
       .copy(tempBoxesByHeightBuffer = tempBoxesByHeightBuffer.removedAll(heightRange))
   }
 
-  def mergeEpochFromBoxes(inputs: ArraySeq[BoxId], outputs: ArraySeq[(BoxId, Address)]): UtxoState = {
+  def mergeEpochFromBoxes(inputs: ArraySeq[BoxId], outputs: ArraySeq[(BoxId, Address, Long)]): UtxoState = {
     val boxIdsByAddressWithOutputs =
-      idsByAddress(outputs).foldLeft(utxosByAddress) { case (acc, (address, outputIds)) =>
-        acc.putOrRemove(address) {
-          case None                 => Some(outputIds)
-          case Some(existingBoxIds) => Some(existingBoxIds ++ outputIds)
+      outputs
+        .groupBy(_._2)
+        .view
+        .mapValues(_.map(t => t._1 -> t._3).toMap)
+        .foldLeft(utxosByAddress) { case (acc, (address, outputIds)) =>
+          acc.putOrRemove(address) {
+            case None                 => Some(outputIds)
+            case Some(existingBoxIds) => Some(existingBoxIds ++ outputIds)
+          }
         }
-      }
-    val addressesByOutputId = outputs.toMap
+    val addressesByOutputId = outputs.map(t => t._1 -> t._2).toMap
     val (inputsWithAddress, inputsWoAddress) =
       inputs.partition(i => addressById.contains(i) || addressesByOutputId.contains(i))
     val inputIdsWithAddress =
       inputsWithAddress.map(boxId => boxId -> addressById.getOrElse(boxId, addressesByOutputId(boxId)))
     val boxIdsByAddressWoInputs =
-      idsByAddress(inputIdsWithAddress).foldLeft(boxIdsByAddressWithOutputs) { case (acc, (address, inputIds)) =>
-        acc.putOrRemove(address) {
-          case None                 => None
-          case Some(existingBoxIds) => Option(existingBoxIds -- inputIds).filter(_.nonEmpty)
+      inputIdsWithAddress
+        .groupBy(_._2)
+        .view
+        .mapValues(_.map(_._1).toSet)
+        .foldLeft(boxIdsByAddressWithOutputs) { case (acc, (address, inputIds)) =>
+          acc.putOrRemove(address) {
+            case None                 => None
+            case Some(existingBoxIds) => Option(existingBoxIds -- inputIds).filter(_.nonEmpty)
+          }
         }
-      }
 
     UtxoState(
       tempBoxesByHeightBuffer,
-      (addressById ++ outputs) -- inputs,
+      (addressById ++ addressesByOutputId) -- inputs,
       boxIdsByAddressWoInputs,
       inputsWithoutAddress ++ inputsWoAddress
     )

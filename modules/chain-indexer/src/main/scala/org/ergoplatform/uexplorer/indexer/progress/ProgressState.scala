@@ -74,7 +74,7 @@ case class ProgressState(
             utxoState = utxoState.bufferBestBlock(
               block.header.height,
               block.inputs.map(_.boxId),
-              block.outputs.map(o => o.boxId -> o.address)
+              block.outputs.map(o => (o.boxId, o.address, o.value))
             )
           )
         }
@@ -113,7 +113,9 @@ case class ProgressState(
         .map { case (newBlocks, supersededBlocks) =>
           val newBlockBuffer = blockBuffer.addFork(newBlocks, supersededBlocks)
           val newForkByHeight =
-            newBlocks.map(b => b.header.height -> (b.inputs.map(_.boxId), b.outputs.map(o => o.boxId -> o.address))).toMap
+            newBlocks
+              .map(b => b.header.height -> (b.inputs.map(_.boxId), b.outputs.map(o => (o.boxId, o.address, o.value))))
+              .toMap
           val newUtxoState = utxoState.bufferFork(newForkByHeight, supersededBlocks.map(_.height).toList)
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(
             blockBuffer = newBlockBuffer,

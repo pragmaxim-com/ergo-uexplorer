@@ -26,7 +26,7 @@ trait Backend {
 class InMemoryBackend extends Backend {
 
   private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BufferedBlockInfo]()
-  private val boxesByEpochIndex         = new ConcurrentHashMap[Int, (Iterable[BoxId], Iterable[(BoxId, Address)])]()
+  private val boxesByEpochIndex         = new ConcurrentHashMap[Int, (Iterable[BoxId], Iterable[(BoxId, Address, Long)])]()
   private val blocksById                = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
   private val blocksByHeight            = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
@@ -61,7 +61,7 @@ class InMemoryBackend extends Backend {
 
   override def getCachedState: Future[ProgressState] = {
     val (inputs, outputs) =
-      boxesByEpochIndex.asScala.foldLeft((ArraySeq.empty[BoxId], ArraySeq.empty[(BoxId, Address)])) {
+      boxesByEpochIndex.asScala.foldLeft((ArraySeq.empty[BoxId], ArraySeq.empty[(BoxId, Address, Long)])) {
         case ((iAcc, oAcc), (_, (i, o))) => (iAcc ++ i, oAcc ++ o)
       }
     Future.successful(

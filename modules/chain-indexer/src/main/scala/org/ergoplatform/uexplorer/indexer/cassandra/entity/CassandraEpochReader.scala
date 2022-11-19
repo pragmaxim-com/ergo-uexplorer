@@ -43,13 +43,12 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
     print(s"$epochIndex, ")
     val inputBoxIds = r.getList(input_box_ids, classOf[String]).asScala.map(BoxId(_))
     val outputBoxIdsWithAddress = r.getList(output_box_ids_with_address, classOf[TupleValue]).asScala.map { tuple =>
-      BoxId(tuple.getString(0)) -> Address.fromStringUnsafe(tuple.getString(1))
+      (BoxId(tuple.getString(0)), Address.fromStringUnsafe(tuple.getString(1)), tuple.getLong(2))
     }
-    ArraySeq.from[BoxId](inputBoxIds) -> ArraySeq.from[(BoxId, Address)](outputBoxIdsWithAddress)
+    ArraySeq.from[BoxId](inputBoxIds) -> ArraySeq.from[(BoxId, Address, Long)](outputBoxIdsWithAddress)
   }
 
-  def getCachedState: Future[ProgressState] = {
-    logger.info(s"Loading epoch cache from db")
+  def getCachedState: Future[ProgressState] =
     Source
       .fromPublisher(
         cqlSession.executeReactive(
@@ -61,7 +60,7 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
       .map(infoByIndex => TreeMap(infoByIndex: _*))
       .flatMap { infoByIndex =>
         val rangeOpt = infoByIndex.headOption.map(head => s": from ${head._1} to ${infoByIndex.last._1}").getOrElse("")
-        logger.info(s"Loaded ${infoByIndex.size} epochs $rangeOpt")
+        logger.info(s"Loading ${infoByIndex.size} epochs $rangeOpt from database")
         Source(infoByIndex)
           .mapAsync(1) { case (epochIndex, _) =>
             cqlSession
@@ -74,7 +73,6 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
           .runFold[UtxoState](UtxoState.empty) { case (s, (inputs, outputs)) => s.mergeEpochFromBoxes(inputs, outputs) }
           .map(utxoState => ProgressState.load(infoByIndex, utxoState))
       }
-  }
 }
 
 object CassandraEpochReader extends CassandraPersistenceSupport {
