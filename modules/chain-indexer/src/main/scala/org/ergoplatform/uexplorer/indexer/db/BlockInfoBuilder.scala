@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer.db
 
 import org.ergoplatform.uexplorer.Address
 import org.ergoplatform.uexplorer.db.BlockInfo
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BufferedBlockInfo
+import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}

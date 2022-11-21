@@ -7,7 +7,7 @@ import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BufferedBlockInfo
+import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.{db, Address, BlockId, BoxId}
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
@@ -16,7 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.indexer.progress.{ProgressState, UtxoState}
+import org.ergoplatform.uexplorer.indexer.chain.{ChainState, UtxoState}
 
 import scala.jdk.CollectionConverters.*
 
@@ -48,7 +48,7 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
     ArraySeq.from[BoxId](inputBoxIds) -> ArraySeq.from[(BoxId, Address, Long)](outputBoxIdsWithAddress)
   }
 
-  def getCachedState: Future[ProgressState] =
+  def getCachedState: Future[ChainState] =
     Source
       .fromPublisher(
         cqlSession.executeReactive(
@@ -71,7 +71,7 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
           }
           .map(getBoxes)
           .runFold[UtxoState](UtxoState.empty) { case (s, (inputs, outputs)) => s.mergeEpochFromBoxes(inputs, outputs) }
-          .map(utxoState => ProgressState.load(infoByIndex, utxoState))
+          .map(utxoState => ChainState.load(infoByIndex, utxoState))
       }
 }
 

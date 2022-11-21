@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.progress
+package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.indexer.{Const, UnexpectedStateError}

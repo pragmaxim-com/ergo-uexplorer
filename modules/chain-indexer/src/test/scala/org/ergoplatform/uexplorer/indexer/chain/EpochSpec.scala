@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.progress
+package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.uexplorer.indexer.{TestSupport, UnexpectedStateError}
 import org.ergoplatform.uexplorer.{BlockId, HexString}

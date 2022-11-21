@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.progress
+package org.ergoplatform.uexplorer.indexer.chain
 
 import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.*
+import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import scala.collection.immutable.TreeMap
@@ -17,12 +17,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
-class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
-  import ProgressMonitor._
+class ChainSyncer(implicit protocol: ProtocolSettings) extends LazyLogging {
+  import ChainSyncer._
 
-  def initialBehavior: Behavior[MonitorRequest] =
-    Behaviors.setup[MonitorRequest] { _ =>
-      Behaviors.receiveMessage[MonitorRequest] {
+  def initialBehavior: Behavior[ChainSyncerRequest] =
+    Behaviors.setup[ChainSyncerRequest] { _ =>
+      Behaviors.receiveMessage[ChainSyncerRequest] {
         case Initialize(newState, replyTo) =>
           replyTo ! Done
           initialized(newState)
@@ -32,41 +32,41 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
       }
     }
 
-  def initialized(p: ProgressState): Behaviors.Receive[MonitorRequest] =
-    Behaviors.receiveMessage[MonitorRequest] {
+  def initialized(s: ChainState): Behaviors.Receive[ChainSyncerRequest] =
+    Behaviors.receiveMessage[ChainSyncerRequest] {
       case InsertBestBlock(bestBlock, replyTo) =>
-        p.insertBestBlock(bestBlock) match {
+        s.insertBestBlock(bestBlock) match {
           case Success((bestBlockInserted, newProgress)) =>
             replyTo ! StatusReply.success(bestBlockInserted)
             initialized(newProgress)
           case Failure(ex) =>
             val h = bestBlock.header
-            logger.warn(s"Unexpected insert ${h.id} at ${h.height}, parent ${h.parentId} : $p", ex)
+            logger.warn(s"Unexpected insert ${h.id} at ${h.height}, parent ${h.parentId} : $s", ex)
             replyTo ! StatusReply.error(ex)
             Behaviors.same
         }
       case InsertWinningFork(fork, replyTo) =>
-        p.insertWinningFork(fork) match {
+        s.insertWinningFork(fork) match {
           case Success((winningForkInserted, newProgress)) =>
             replyTo ! StatusReply.success(winningForkInserted)
             initialized(newProgress)
           case Failure(ex) =>
             val h = fork.head.header
             logger.warn(
-              s"Unexpected fork size ${fork.size} starting ${h.id} at ${h.height}, parent ${h.parentId} : $p",
+              s"Unexpected fork size ${fork.size} starting ${h.id} at ${h.height}, parent ${h.parentId} : $s",
               ex
             )
             replyTo ! StatusReply.error(ex)
             Behaviors.same
         }
       case GetBlock(blockId, replyTo) =>
-        replyTo ! IsBlockCached(p.blockBuffer.byId.contains(blockId))
+        replyTo ! IsBlockCached(s.blockBuffer.byId.contains(blockId))
         Behaviors.same
       case GetChainState(replyTo) =>
-        replyTo ! p
+        replyTo ! s
         Behaviors.same
       case FinishEpoch(epochIndex, replyTo) =>
-        val (maybeNewEpoch, newProgress) = p.finishEpoch(epochIndex)
+        val (maybeNewEpoch, newProgress) = s.finishEpoch(epochIndex)
         logger.info(s"$maybeNewEpoch, $newProgress")
         replyTo ! maybeNewEpoch
         initialized(newProgress)
@@ -76,14 +76,14 @@ class ProgressMonitor(implicit protocol: ProtocolSettings) extends LazyLogging {
     }
 }
 
-object ProgressMonitor {
+object ChainSyncer {
 
   implicit private val timeout: Timeout = 3.seconds
 
   /** REQUEST */
-  sealed trait MonitorRequest
+  sealed trait ChainSyncerRequest
 
-  sealed trait Insertable extends MonitorRequest {
+  sealed trait Insertable extends ChainSyncerRequest {
     def replyTo: ActorRef[StatusReply[Inserted]]
   }
 
@@ -91,26 +91,26 @@ object ProgressMonitor {
 
   case class InsertWinningFork(blocks: List[ApiFullBlock], replyTo: ActorRef[StatusReply[Inserted]]) extends Insertable
 
-  case class GetBlock(blockId: BlockId, replyTo: ActorRef[IsBlockCached]) extends MonitorRequest
+  case class GetBlock(blockId: BlockId, replyTo: ActorRef[IsBlockCached]) extends ChainSyncerRequest
 
-  case class Initialize(progressState: ProgressState, replyTo: ActorRef[Done]) extends MonitorRequest
+  case class Initialize(chainState: ChainState, replyTo: ActorRef[Done]) extends ChainSyncerRequest
 
-  case class GetChainState(replyTo: ActorRef[ProgressState]) extends MonitorRequest
+  case class GetChainState(replyTo: ActorRef[ChainState]) extends ChainSyncerRequest
 
-  case class FinishEpoch(epochIndex: Int, replyTo: ActorRef[MaybeNewEpoch]) extends MonitorRequest
+  case class FinishEpoch(epochIndex: Int, replyTo: ActorRef[MaybeNewEpoch]) extends ChainSyncerRequest
 
   /** RESPONSE */
-  sealed trait MonitorResponse
+  sealed trait ChainSyncerResponse
 
-  case class IsBlockCached(present: Boolean) extends MonitorResponse
+  case class IsBlockCached(present: Boolean) extends ChainSyncerResponse
 
-  sealed trait Inserted extends MonitorResponse
+  sealed trait Inserted extends ChainSyncerResponse
 
   case class BestBlockInserted(flatBlock: Block) extends Inserted
 
   case class ForkInserted(newFork: List[Block], supersededFork: List[BufferedBlockInfo]) extends Inserted
 
-  sealed trait MaybeNewEpoch extends MonitorResponse
+  sealed trait MaybeNewEpoch extends ChainSyncerResponse
 
   case class NewEpochCreated(epoch: Epoch) extends MaybeNewEpoch {
 
@@ -135,29 +135,29 @@ object ProgressMonitor {
 
   def insertWinningFork(
     winningFork: List[ApiFullBlock]
-  )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[Inserted] =
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainSyncerRequest]): Future[Inserted] =
     ref.askWithStatus(ref => InsertWinningFork(winningFork, ref))
 
   def insertBestBlock(
     bestBlock: ApiFullBlock
-  )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[Inserted] =
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainSyncerRequest]): Future[Inserted] =
     ref.askWithStatus(ref => InsertBestBlock(bestBlock, ref))
 
   def containsBlock(
     blockId: BlockId
-  )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[IsBlockCached] =
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainSyncerRequest]): Future[IsBlockCached] =
     ref.ask(ref => GetBlock(blockId, ref))
 
   def initialize(
-    progressState: ProgressState
-  )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[Done] =
-    ref.ask[Done](ref => Initialize(progressState, ref))(1.minute, s.scheduler)
+    chainState: ChainState
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainSyncerRequest]): Future[Done] =
+    ref.ask[Done](ref => Initialize(chainState, ref))(1.minute, s.scheduler)
 
-  def getChainState(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[ProgressState] =
+  def getChainState(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainSyncerRequest]): Future[ChainState] =
     ref.ask(ref => GetChainState(ref))
 
   def finishEpoch(
     epochIndex: Int
-  )(implicit s: ActorSystem[Nothing], ref: ActorRef[MonitorRequest]): Future[MaybeNewEpoch] =
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainSyncerRequest]): Future[MaybeNewEpoch] =
     ref.ask(ref => FinishEpoch(epochIndex, ref))
 }

@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.progress
+package org.ergoplatform.uexplorer.indexer.chain
 
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import io.circe.parser.*
@@ -7,7 +7,7 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.parser.ErgoTreeParser
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.*
+import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.{Rest, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId}
@@ -16,7 +16,7 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.collection.immutable.TreeMap
 
-class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
+class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
 
   implicit private val protocol: ProtocolSettings = ChainIndexerConf.loadDefaultOrThrow.protocol
   implicit private val e: ErgoAddressEncoder      = protocol.addressEncoder
@@ -65,11 +65,11 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
               utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
               (e0In ++ e1In).filterNot(b => e0Out.map(_._1).contains(b) || e1Out.map(_._1).contains(b)).toSet
             )
-          val actualProgressState = ProgressState.load(
+          val actualProgressState = ChainState.load(
             lastBlockIdByEpochIndex,
             utxoState
           )
-          actualProgressState shouldBe ProgressState(
+          actualProgressState shouldBe ChainState(
             lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
             TreeMap.empty,
             BlockBuffer(
@@ -81,16 +81,16 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
         }
       }
       "throw when inserting block without parent being applied first" in {
-        assertThrows[UnexpectedStateError](ProgressState.empty.insertBestBlock(getBlock(1025)).get)
+        assertThrows[UnexpectedStateError](ChainState.empty.insertBestBlock(getBlock(1025)).get)
 
       }
       "allow for inserting new block" - {
         "after genesis" in {
           val firstApiBlock             = getBlock(1)
           val firstFlatBlock            = BlockBuilder(firstApiBlock, None).get
-          val (blockInserted, newState) = ProgressState.empty.insertBestBlock(firstApiBlock).get
+          val (blockInserted, newState) = ChainState.empty.insertBestBlock(firstApiBlock).get
           blockInserted.flatBlock shouldBe firstFlatBlock
-          newState shouldBe ProgressState(
+          newState shouldBe ChainState(
             TreeMap.empty,
             TreeMap.empty,
             BlockBuffer(
@@ -116,8 +116,8 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
               utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
               e0b1Block.inputs.map(_.boxId).filterNot(b => e0b1Block.outputs.map(_._1).contains(b)).toSet
             )
-          val newState = ProgressState.load(lastBlockIdByEpochIndex, utxoState)
-          newState shouldBe ProgressState(
+          val newState = ChainState.load(lastBlockIdByEpochIndex, utxoState)
+          newState shouldBe ChainState(
             lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
             TreeMap.empty,
             BlockBuffer(
@@ -132,7 +132,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           val e1b1Info                   = BufferedBlockInfo.fromBlock(e1b1Block)
           val (blockInserted, newState2) = newState.insertBestBlock(e1b1).get
           blockInserted.flatBlock shouldBe e1b1Block
-          newState2 shouldBe ProgressState(
+          newState2 shouldBe ChainState(
             TreeMap(0 -> e0b1Info.headerId),
             TreeMap.empty,
             BlockBuffer(
@@ -145,9 +145,9 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
       }
 
       "throw when inserting an empty fork, one-sized fork or unchained fork" in {
-        assertThrows[UnexpectedStateError](ProgressState.empty.insertWinningFork(List.empty).get)
-        assertThrows[UnexpectedStateError](ProgressState.empty.insertWinningFork(List(getBlock(1024))).get)
-        assertThrows[UnexpectedStateError](ProgressState.empty.insertWinningFork(List(getBlock(1024), getBlock(1026))).get)
+        assertThrows[UnexpectedStateError](ChainState.empty.insertWinningFork(List.empty).get)
+        assertThrows[UnexpectedStateError](ChainState.empty.insertWinningFork(List(getBlock(1024))).get)
+        assertThrows[UnexpectedStateError](ChainState.empty.insertWinningFork(List(getBlock(1024), getBlock(1026))).get)
       }
 
       "allow for inserting new fork" in {
@@ -164,7 +164,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
             utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
             Set.empty
           )
-        val s               = ProgressState.load(TreeMap(0 -> commonBlockInfo), utxoState)
+        val s               = ChainState.load(TreeMap(0 -> commonBlockInfo), utxoState)
         val b1ApiBlock      = getBlock(1025)
         val b1FlatBlock     = BlockBuilder(b1ApiBlock, Option(commonBlockInfo)).get
         val b1FlatBlockInfo = BufferedBlockInfo.fromBlock(b1FlatBlock)
@@ -189,7 +189,7 @@ class ProgressStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher
           BufferedBlockInfo.fromBlock(b1ForkFlatBlock),
           BufferedBlockInfo.fromBlock(b2ForkFlatBlock)
         )
-        newState4 shouldBe ProgressState(
+        newState4 shouldBe ChainState(
           TreeMap(0 -> commonBlock.header.id),
           TreeMap.empty,
           BlockBuffer(

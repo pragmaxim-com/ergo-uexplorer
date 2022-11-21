@@ -10,8 +10,8 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, EpochPersistenceSupport}
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.*
-import org.ergoplatform.uexplorer.indexer.progress.{Epoch, InvalidEpochCandidate}
+import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
+import org.ergoplatform.uexplorer.indexer.chain.{Epoch, InvalidEpochCandidate}
 
 import scala.compat.java8.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global

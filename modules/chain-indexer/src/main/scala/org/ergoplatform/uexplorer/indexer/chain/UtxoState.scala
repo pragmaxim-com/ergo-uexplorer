@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.progress
+package org.ergoplatform.uexplorer.indexer.chain
 
 import akka.{Done, NotUsed}
 import akka.actor.typed.{ActorRef, ActorSystem}
@@ -7,7 +7,7 @@ import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.{Address, BoxId}
-import org.ergoplatform.uexplorer.indexer.progress.Epoch
+import org.ergoplatform.uexplorer.indexer.chain.Epoch
 import org.ergoplatform.uexplorer.indexer.*
 
 import java.nio.file.{Path, Paths}

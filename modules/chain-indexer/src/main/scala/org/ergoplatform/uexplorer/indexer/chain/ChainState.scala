@@ -1,10 +1,10 @@
-package org.ergoplatform.uexplorer.indexer.progress
+package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.uexplorer.db.{Block, BlockInfo}
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.*
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BlockBuffer
+import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
+import org.ergoplatform.uexplorer.indexer.chain.ChainState.BlockBuffer
 import org.ergoplatform.uexplorer.indexer.{MapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
@@ -13,15 +13,15 @@ import scala.collection.immutable.{List, SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
 
-case class ProgressState(
+case class ChainState(
   lastBlockIdInEpoch: SortedMap[Int, BlockId],
   invalidEpochs: SortedMap[Int, InvalidEpochCandidate],
   blockBuffer: BlockBuffer,
   utxoState: UtxoState
 ) {
-  import ProgressState.*
+  import ChainState.*
 
-  def finishEpoch(currentEpochIndex: Int): (MaybeNewEpoch, ProgressState) =
+  def finishEpoch(currentEpochIndex: Int): (MaybeNewEpoch, ChainState) =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
       NewEpochExisted(currentEpochIndex) -> this
     } else {
@@ -36,7 +36,7 @@ case class ProgressState(
         case Right(candidate)
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
           val newEpoch = candidate.getEpoch
-          NewEpochCreated(newEpoch) -> ProgressState(
+          NewEpochCreated(newEpoch) -> ChainState(
             lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
             invalidEpochs,
             blockBuffer.flushEpoch(heightRange),
@@ -59,7 +59,7 @@ case class ProgressState(
 
   def insertBestBlock(
     bestBlock: ApiFullBlock
-  )(implicit protocol: ProtocolSettings): Try[(BestBlockInserted, ProgressState)] =
+  )(implicit protocol: ProtocolSettings): Try[(BestBlockInserted, ChainState)] =
     if (!hasParent(bestBlock)) {
       Failure(
         new UnexpectedStateError(
@@ -81,7 +81,7 @@ case class ProgressState(
 
   def insertWinningFork(
     winningFork: List[ApiFullBlock]
-  )(implicit protocol: ProtocolSettings): Try[(ForkInserted, ProgressState)] =
+  )(implicit protocol: ProtocolSettings): Try[(ForkInserted, ChainState)] =
     if (!hasParentAndIsChained(winningFork)) {
       Failure(
         new UnexpectedStateError(
@@ -169,14 +169,14 @@ case class ProgressState(
 
 }
 
-object ProgressState {
+object ChainState {
 
   case class BufferedBlockInfo(headerId: BlockId, parentId: BlockId, timestamp: Long, height: Int, info: BlockInfo)
 
-  def empty: ProgressState = load(TreeMap.empty, UtxoState.empty)
+  def empty: ChainState = load(TreeMap.empty, UtxoState.empty)
 
-  def load(bufferedInfoByEpochIndex: TreeMap[Int, BufferedBlockInfo], utxoState: UtxoState): ProgressState =
-    ProgressState(
+  def load(bufferedInfoByEpochIndex: TreeMap[Int, BufferedBlockInfo], utxoState: UtxoState): ChainState =
+    ChainState(
       bufferedInfoByEpochIndex.map { case (epochIndex, blockInfo) => epochIndex -> blockInfo.headerId },
       TreeMap.empty,
       BlockBuffer(

@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer.db
 
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.indexer.progress.ProgressState.BufferedBlockInfo
+import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.{Address, HexString, SigmaType, TokenId, TokenType}
 import io.circe.generic.auto.*

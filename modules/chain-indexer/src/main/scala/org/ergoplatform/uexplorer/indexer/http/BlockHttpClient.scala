@@ -5,11 +5,11 @@ import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
-import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.{BlockId, TxId}
+import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.*
+import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer
+import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport}
 import retry.Policy
 import sttp.capabilities.WebSockets
@@ -17,20 +17,40 @@ import sttp.client3.*
 import sttp.client3.circe.*
 import io.circe.refined.*
 
+import scala.collection.immutable.ArraySeq
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   s: ActorSystem[Nothing],
-  progressMonitor: ActorRef[MonitorRequest],
+  chainSyncer: ActorRef[ChainSyncerRequest],
   sttpB: SttpBackend[Future, _]
 ) extends ResiliencySupport {
 
   private val proxyUri            = uri"http://proxy"
   private val retryPolicy: Policy = retry.Backoff(3, 1.second)
 
-  def getBestBlockHeight: Future[Int] = metadataHttpClient.getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
+  def getBestBlockHeight: Future[Int] =
+    metadataHttpClient.getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
+
+  def getUnconfirmedTxs: Future[Map[TxId, ApiTransaction]] = {
+    import io.circe.generic.auto.*
+    retryPolicy.apply { () =>
+      basicRequest
+        .get(proxyUri.addPath("transactions", "unconfirmed"))
+        .response(asJson[List[ApiTransaction]])
+        .readTimeout(5.seconds)
+        .send(sttpB)
+        .map(_.body)
+        .flatMap {
+          case Right(txs) =>
+            Future.successful(txs.map(tx => tx.id -> tx).toMap)
+          case Left(error) =>
+            Future.failed(new Exception(s"Getting unconfirmed transactions failed", error))
+        }
+    }(retry.Success.always, global)
+  }
 
   def getBlockIdForHeight(height: Int): Future[BlockId] =
     retryPolicy.apply { () =>
@@ -65,7 +85,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
     block: ApiFullBlock,
     acc: List[ApiFullBlock]
   ): Future[List[ApiFullBlock]] =
-    ProgressMonitor
+    ChainSyncer
       .containsBlock(block.header.parentId)
       .flatMap {
         case IsBlockCached(true) =>
@@ -88,9 +108,9 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
         getBestBlockOrBranch(block, List.empty)
           .flatMap {
             case bestBlock :: Nil =>
-              ProgressMonitor.insertBestBlock(bestBlock)
+              ChainSyncer.insertBestBlock(bestBlock)
             case winningFork =>
-              ProgressMonitor.insertWinningFork(winningFork)
+              ChainSyncer.insertWinningFork(winningFork)
           }
       }
 
@@ -105,14 +125,14 @@ object BlockHttpClient {
     conf: ChainIndexerConf
   )(implicit
     ctx: ActorContext[_],
-    progressMonitor: ActorRef[MonitorRequest]
+    chainSyncer: ActorRef[ChainSyncerRequest]
   ): Future[BlockHttpClient] = {
     val futureSttpBackend = HttpClientFutureBackend()
     val metadataClient    = MetadataHttpClient(conf)(futureSttpBackend, ctx.system)
     val nodePoolRef       = ctx.spawn(NodePool.behavior, "NodePool")
     val backend           = SttpNodePoolBackend[WebSockets](nodePoolRef)(ctx.system, futureSttpBackend)
     backend.keepNodePoolUpdated(metadataClient).map { _ =>
-      new BlockHttpClient(metadataClient)(ctx.system, progressMonitor, backend)
+      new BlockHttpClient(metadataClient)(ctx.system, chainSyncer, backend)
     }
   }
 }

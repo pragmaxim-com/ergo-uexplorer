@@ -14,7 +14,7 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.*
-import org.ergoplatform.uexplorer.indexer.progress.ProgressMonitor.Inserted
+import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.Inserted
 
 import java.net.InetSocketAddress
 import java.util.concurrent.{CompletableFuture, CompletionStage}
