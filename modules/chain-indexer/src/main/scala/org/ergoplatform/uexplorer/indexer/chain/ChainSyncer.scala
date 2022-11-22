@@ -36,9 +36,9 @@ class ChainSyncer(implicit protocol: ProtocolSettings) extends LazyLogging {
     Behaviors.receiveMessage[ChainSyncerRequest] {
       case InsertBestBlock(bestBlock, replyTo) =>
         s.insertBestBlock(bestBlock) match {
-          case Success((bestBlockInserted, newProgress)) =>
+          case Success((bestBlockInserted, newChainState)) =>
             replyTo ! StatusReply.success(bestBlockInserted)
-            initialized(newProgress)
+            initialized(newChainState)
           case Failure(ex) =>
             val h = bestBlock.header
             logger.warn(s"Unexpected insert ${h.id} at ${h.height}, parent ${h.parentId} : $s", ex)
@@ -47,9 +47,9 @@ class ChainSyncer(implicit protocol: ProtocolSettings) extends LazyLogging {
         }
       case InsertWinningFork(fork, replyTo) =>
         s.insertWinningFork(fork) match {
-          case Success((winningForkInserted, newProgress)) =>
+          case Success((winningForkInserted, newChainState)) =>
             replyTo ! StatusReply.success(winningForkInserted)
-            initialized(newProgress)
+            initialized(newChainState)
           case Failure(ex) =>
             val h = fork.head.header
             logger.warn(
@@ -66,10 +66,10 @@ class ChainSyncer(implicit protocol: ProtocolSettings) extends LazyLogging {
         replyTo ! s
         Behaviors.same
       case FinishEpoch(epochIndex, replyTo) =>
-        val (maybeNewEpoch, newProgress) = s.finishEpoch(epochIndex)
-        logger.info(s"$maybeNewEpoch, $newProgress")
+        val (maybeNewEpoch, newChainState) = s.finishEpoch(epochIndex)
+        logger.info(s"$maybeNewEpoch, $newChainState")
         replyTo ! maybeNewEpoch
-        initialized(newProgress)
+        initialized(newChainState)
       case unexpected =>
         logger.error(s"Message $unexpected unexpected")
         Behaviors.same

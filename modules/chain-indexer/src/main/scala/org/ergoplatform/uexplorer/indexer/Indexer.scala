@@ -13,7 +13,8 @@ import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf,
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, Epoch}
-
+import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
+import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.{MempoolState, MempoolSyncerRequest, NewTransactions}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -21,7 +22,8 @@ import scala.util.Failure
 
 class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
   val s: ActorSystem[Nothing],
-  chainSyncerRef: ActorRef[ChainSyncerRequest]
+  chainSyncerRef: ActorRef[ChainSyncerRequest],
+  mempoolSyncerRef: ActorRef[MempoolSyncerRequest]
 ) extends AkkaStreamSupport
   with LazyLogging {
 
@@ -45,26 +47,37 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       .via(backend.epochWriteFlow)
       .withAttributes(supervisionStrategy(Resiliency.decider))
 
-  def sync: Future[ChainState] =
+  def syncMempool(chainState: ChainState, bestBlockHeight: Int): Future[NewTransactions] =
+    if (chainState.blockBuffer.byHeight.lastOption.map(_._1).exists(_ >= bestBlockHeight)) {
+      for {
+        txs    <- blockHttpClient.getUnconfirmedTxs
+        newTxs <- MempoolSyncer.updateTransactions(txs)
+      } yield newTxs
+    } else {
+      Future.successful(NewTransactions(Map.empty))
+    }
+
+  def sync: Future[(ChainState, MempoolState)] =
     for {
       chainState <- ChainSyncer.getChainState
       fromHeight = chainState.getLastCachedBlock.map(_.height).getOrElse(0) + 1
-      toHeight <- blockHttpClient.getBestBlockHeight
+      bestBlockHeight <- blockHttpClient.getBestBlockHeight
       pastHeights = chainState.findMissingIndexes.flatMap(Epoch.heightRangeForEpochIndex)
       _           = if (pastHeights.nonEmpty) logger.error(s"Going to index $pastHeights missing blocks")
-      _           = if (toHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $toHeight")
-      _           = if (toHeight == fromHeight) logger.info(s"Going to index block $toHeight")
-      _           <- Source(pastHeights).concat(Source(fromHeight to toHeight)).via(indexingFlow).run()
-      newProgress <- ChainSyncer.getChainState
-    } yield newProgress
+      _           = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
+      _           = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
+      _               <- Source(pastHeights).concat(Source(fromHeight to bestBlockHeight)).via(indexingFlow).run()
+      newChainState   <- ChainSyncer.getChainState
+      _               <- syncMempool(newChainState, bestBlockHeight)
+      newMempoolState <- MempoolSyncer.getMempoolState
+    } yield (newChainState, newMempoolState)
 
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
     for {
       chainState <- backend.getCachedState
       _          <- ChainSyncer.initialize(chainState)
-      _ = logger.info(s"Initiating indexing, current state : $chainState")
-      newProgress <- schedule(initialDelay, pollingInterval)(sync).run()
-    } yield newProgress
+      done       <- schedule(initialDelay, pollingInterval)(sync).run()
+    } yield done
 }
 
 object Indexer extends LazyLogging {
@@ -75,6 +88,8 @@ object Indexer extends LazyLogging {
     implicit val system: ActorSystem[Nothing]                 = ctx.system
     implicit val protocol: ProtocolSettings                   = conf.protocol
     implicit val chainSyncerRef: ActorRef[ChainSyncerRequest] = ctx.spawn(new ChainSyncer().initialBehavior, "ChainSyncer")
+    implicit val mempoolSyncerRef: ActorRef[MempoolSyncerRequest] =
+      ctx.spawn(MempoolSyncer.behavior(MempoolState(Map.empty)), "MempoolSyncer")
     BlockHttpClient.withNodePoolBackend(conf).flatMap { blockHttpClient =>
       val indexer =
         conf.backendType match {

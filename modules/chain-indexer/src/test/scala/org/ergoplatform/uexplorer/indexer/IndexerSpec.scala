@@ -5,7 +5,9 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
-import org.ergoplatform.uexplorer.indexer.chain.{ChainSyncer, ChainState, UtxoState}
+import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, UtxoState}
+import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
+import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.MempoolState
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -31,7 +33,10 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
   }
 
   implicit val chainSyncerRef: ActorRef[ChainSyncer.ChainSyncerRequest] =
-    testKit.spawn(new ChainSyncer().initialBehavior, "Monitor")
+    testKit.spawn(new ChainSyncer().initialBehavior, "ChainSyncer")
+
+  implicit val mempoolSyncerSyncerRef: ActorRef[MempoolSyncer.MempoolSyncerRequest] =
+    testKit.spawn(MempoolSyncer.behavior(MempoolState(Map.empty)), "MempoolSyncer")
 
   implicit val testingBackend: SttpBackendStub[Future, WebSockets] = SttpBackendStub.asynchronousFuture
     .whenRequestMatches { r =>
@@ -42,6 +47,8 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
       (1 to 100).map(_ => Response.ok(getPeerInfo(Rest.info.poll))): _*
     )
     .whenRequestMatchesPartial({
+      case r if r.uri.path.endsWith(List("transactions", "unconfirmed")) =>
+        Response.ok(getUnconfirmedTxs)
       case r if r.uri.path.endsWith(List("peers", "connected")) =>
         Response.ok(getConnectedPeers)
       case r if r.uri.path.startsWith(List("blocks", "at")) =>
@@ -58,14 +65,16 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
 
   "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {
     ChainSyncer.initialize(ChainState.empty).flatMap { _ =>
-      indexer.sync.flatMap { chainState =>
+      indexer.sync.flatMap { case (chainState, mempoolState) =>
         chainState.getLastCachedBlock.map(_.height).get shouldBe 4150
         chainState.invalidEpochs shouldBe empty
         chainState.findMissingIndexes shouldBe empty
-        indexer.sync.map { chainState =>
-          chainState.getLastCachedBlock.map(_.height).get shouldBe 4200
-          chainState.invalidEpochs shouldBe empty
-          chainState.findMissingIndexes shouldBe empty
+        mempoolState.underlyingTxs.keySet.size shouldBe 9
+        indexer.sync.map { case (newChainState, newMempoolState) =>
+          newChainState.getLastCachedBlock.map(_.height).get shouldBe 4200
+          newChainState.invalidEpochs shouldBe empty
+          newChainState.findMissingIndexes shouldBe empty
+          newMempoolState.underlyingTxs.keySet.size shouldBe 9
         }
       }
     }
