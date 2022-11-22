@@ -51,7 +51,7 @@ def assemblySettings(moduleName: String) = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, indexer, graphql)
+  ).aggregate(core, indexer)
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
@@ -65,14 +65,4 @@ lazy val indexer =
     .settings(commonSettings)
     .settings(assemblySettings("chain-indexer"))
     .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ logging ++ Seq(ergoWallet, pureConfig)).settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)))
-    .dependsOn(core)
-
-
-lazy val graphql =
-  Utils.mkModule("graphql-gateway", "graphql-gateway")
-    .enablePlugins(JavaAppPackaging)
-    .settings(commonSettings)
-    .settings(scalacOptions ++= Seq("-explain-types", "-Ykind-projector"))
-    .settings(assemblySettings("graphql-gateway"))
-    .settings(libraryDependencies ++= caliban ++ cql4s ++ logging)
     .dependsOn(core)

@@ -17,17 +17,6 @@ object Dependencies {
   val ergoWallet = "org.ergoplatform"      %% "ergo-wallet"     % Version.ergo cross CrossVersion.for3Use2_13
   val pureConfig = "com.github.pureconfig" %% "pureconfig-core" % "0.17.1"
 
-  lazy val cql4s = Seq(
-    "solutions.epifab" %% "cql4s-core" % Version.cql4s,
-    "solutions.epifab" %% "cql4s-zio"  % Version.cql4s
-  )
-
-  lazy val caliban = Seq(
-    "com.github.ghostdogpr" %% "caliban"            % Version.caliban,
-    "com.github.ghostdogpr" %% "caliban-zio-http"   % Version.caliban,
-    "com.github.ghostdogpr" %% "caliban-federation" % Version.caliban
-  )
-
   lazy val cassandraDb = List(
     "com.lightbend.akka" %% "akka-stream-alpakka-cassandra" % Version.alpakka cross CrossVersion.for3Use2_13,
     "com.datastax.oss"    % "java-driver-core"              % Version.cassandraDriver,
