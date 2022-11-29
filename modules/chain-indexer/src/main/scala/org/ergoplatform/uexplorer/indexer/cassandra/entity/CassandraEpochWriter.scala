@@ -55,28 +55,27 @@ trait CassandraEpochWriter extends LazyLogging {
 
 object CassandraEpochWriter extends EpochPersistenceSupport {
 
-  protected[cassandra] def epochInsertBinder(epoch: Epoch)(stmt: PreparedStatement): BoundStatement = {
-    val tupleType = DataTypes.tupleOf(DataTypes.TEXT, DataTypes.TEXT, DataTypes.BIGINT)
+  protected[cassandra] def epochInsertBinder(epoch: Epoch)(stmt: PreparedStatement): BoundStatement =
     stmt
       .bind()
       .setInt(epoch_index, epoch.index)
       .setString(last_header_id, epoch.blockIds.last)
       .setList(input_box_ids, epoch.inputIds.map(_.unwrapped).asJava, classOf[String])
-      .setList(
-        output_box_ids_with_address,
-        epoch.addressByOutputIds.map { case (boxId, address, value) =>
-          tupleType.newValue(boxId.unwrapped, address.toString, value)
+      .setMap(
+        utxos_by_address,
+        epoch.utxosByAddress.map { case (address, valueByBoxId) =>
+          address.toString -> valueByBoxId.map { case (boxId, value) => boxId.unwrapped -> value }.toMap.asJava
         }.asJava,
-        classOf[TupleValue]
+        classOf[String],
+        classOf[java.util.Map[String, Long]]
       )
-  }
 
   protected[cassandra] val epochInsertStatement: SimpleStatement =
     insertInto(Const.CassandraKeyspace, node_epochs_table)
       .value(epoch_index, bindMarker(epoch_index))
       .value(last_header_id, bindMarker(last_header_id))
       .value(input_box_ids, bindMarker(input_box_ids))
-      .value(output_box_ids_with_address, bindMarker(output_box_ids_with_address))
+      .value(utxos_by_address, bindMarker(utxos_by_address))
       .build()
       .setIdempotent(true)
 

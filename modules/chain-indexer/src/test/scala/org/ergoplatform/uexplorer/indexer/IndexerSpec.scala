@@ -65,12 +65,12 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
 
   "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {
     ChainSyncer.initialize(ChainState.empty).flatMap { _ =>
-      indexer.sync.flatMap { case (chainState, mempoolState) =>
+      indexer.sync(List.empty).flatMap { case (chainState, mempoolState) =>
         chainState.getLastCachedBlock.map(_.height).get shouldBe 4150
         chainState.invalidEpochs shouldBe empty
         chainState.findMissingIndexes shouldBe empty
         mempoolState.underlyingTxs.keySet.size shouldBe 9
-        indexer.sync.map { case (newChainState, newMempoolState) =>
+        indexer.sync(List.empty).map { case (newChainState, newMempoolState) =>
           newChainState.getLastCachedBlock.map(_.height).get shouldBe 4200
           newChainState.invalidEpochs shouldBe empty
           newChainState.findMissingIndexes shouldBe empty

@@ -19,11 +19,11 @@ while true; do
           elif [ "$MEM_TOTAL" -lt 12000000 ]
           then
             echo "Please close all memory intensive processes like Browser, IDE, etc. (OOM killer might kick in) until syncing finishes"
-          elif [ "$MEM_TOTAL" -gt 30000000 ]
+          elif [ "$MEM_TOTAL" -gt 16000000 ]
           then
-            export CASSANDRA_HEAP_NEWSIZE=5G
-            export CASSANDRA_MAX_HEAP_SIZE=20G
-            export ERGO_MAX_HEAP=4G
+            export CASSANDRA_HEAP_NEWSIZE=2G
+            export CASSANDRA_MAX_HEAP_SIZE=12G
+            export ERGO_MAX_HEAP=2G
             V_CPU_COUNT=$(nproc --all)
             if [ "$V_CPU_COUNT" -ge 16 ]; then export BACKEND_INDEXING_PARALLELISM=2; fi
           fi

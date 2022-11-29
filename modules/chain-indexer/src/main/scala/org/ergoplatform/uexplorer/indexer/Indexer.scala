@@ -12,13 +12,17 @@ import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
-import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, Epoch}
+import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, Epoch, UtxoState}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.{MempoolState, MempoolSyncerRequest, NewTransactions}
+import org.ergoplatform.uexplorer.plugin.Plugin
+
+import scala.jdk.CollectionConverters.*
+import java.util.ServiceLoader
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.util.Failure
+import scala.util.{Failure, Try}
 
 class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
   val s: ActorSystem[Nothing],
@@ -57,7 +61,14 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       Future.successful(NewTransactions(Map.empty))
     }
 
-  def sync: Future[(ChainState, MempoolState)] =
+  def executePlugins(plugins: List[Plugin], newTxs: NewTransactions, utxoState: UtxoState): Future[Unit] =
+    Future
+      .sequence(
+        plugins.map(_.execute(newTxs.txs, utxoState.addressByUtxo, utxoState.utxosByAddress))
+      )
+      .map(_ => ())
+
+  def sync(plugins: List[Plugin]): Future[(ChainState, MempoolState)] =
     for {
       chainState <- ChainSyncer.getChainState
       fromHeight = chainState.getLastCachedBlock.map(_.height).getOrElse(0) + 1
@@ -68,7 +79,8 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       _           = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
       _               <- Source(pastHeights).concat(Source(fromHeight to bestBlockHeight)).via(indexingFlow).run()
       newChainState   <- ChainSyncer.getChainState
-      _               <- syncMempool(newChainState, bestBlockHeight)
+      newTransactions <- syncMempool(newChainState, bestBlockHeight)
+      _               <- executePlugins(plugins, newTransactions, newChainState.utxoState)
       newMempoolState <- MempoolSyncer.getMempoolState
     } yield (newChainState, newMempoolState)
 
@@ -76,11 +88,14 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
     for {
       chainState <- backend.getCachedState
       _          <- ChainSyncer.initialize(chainState)
-      done       <- schedule(initialDelay, pollingInterval)(sync).run()
+      plugins    <- Future.fromTry(Indexer.loadPlugins)
+      done       <- schedule(initialDelay, pollingInterval)(sync(plugins)).run()
     } yield done
 }
 
 object Indexer extends LazyLogging {
+
+  def loadPlugins: Try[List[Plugin]] = Try(ServiceLoader.load(classOf[Plugin]).iterator().asScala.toList)
 
   def runWith(
     conf: ChainIndexerConf

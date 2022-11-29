@@ -24,10 +24,8 @@ object Dependencies {
     "io.netty"            % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64"
   )
 
-  val logging = Seq(
-    "org.slf4j"      % "slf4j-api"       % "2.0.3",
-    "ch.qos.logback" % "logback-classic" % "1.4.3"
-  )
+  val loggingApi = "org.slf4j"      % "slf4j-api"       % "2.0.3"
+  val logback    = "ch.qos.logback" % "logback-classic" % "1.4.3"
 
   def lightBend(v: String) = Seq(
     "com.typesafe.akka"          % s"akka-actor_$v"               % Version.akka,

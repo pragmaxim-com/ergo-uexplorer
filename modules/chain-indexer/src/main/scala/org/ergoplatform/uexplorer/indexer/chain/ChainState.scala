@@ -25,13 +25,13 @@ case class ChainState(
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
       NewEpochExisted(currentEpochIndex) -> this
     } else {
-      val previousEpochIndex                           = currentEpochIndex - 1
-      val heightRange                                  = Epoch.heightRangeForEpochIndex(currentEpochIndex)
-      val ((inputIds, outputIdsWithAddress), newState) = utxoState.mergeEpochFromBuffer(heightRange)
+      val previousEpochIndex   = currentEpochIndex - 1
+      val heightRange          = Epoch.heightRangeForEpochIndex(currentEpochIndex)
+      val (inputIds, newState) = utxoState.mergeEpochFromBuffer(heightRange)
       EpochCandidate(
         blockBuffer.blockRelationsByHeight(heightRange),
         inputIds,
-        outputIdsWithAddress
+        newState.utxosByAddress
       ) match {
         case Right(candidate)
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
@@ -160,7 +160,7 @@ case class ChainState(
       if (xs.isEmpty) ""
       else xs.lastOption.filterNot(xs.headOption.contains).map(h => s" - $h]").getOrElse("]")
 
-    s"utxo count: ${utxoState.addressById.size}, non-empty-address count: ${utxoState.utxosByAddress.size}, " +
+    s"utxo count: ${utxoState.addressByUtxo.size}, non-empty-address count: ${utxoState.utxosByAddress.size}, " +
     s"persisted Epochs: ${existingEpochs.size}${headStr(existingEpochs)}${lastStr(existingEpochs)}, " +
     s"blocks cache size (heights): ${cachedHeights.size}${headStr(cachedHeights)}${lastStr(cachedHeights)}, " +
     s"invalid Epochs: ${invalidEpochs.size}${headStr(invalidEpochs.keySet)}${lastStr(invalidEpochs.keySet)}, " +

@@ -13,6 +13,7 @@ package object indexer {
         case Some(v) => underlying updated (k, v)
       }
 
+    def adjust(k: K)(f: Option[V] => V): Map[K, V] = underlying.updated(k, f(underlying.get(k)))
   }
 
   class UnexpectedStateError(msg: String, cause: Option[Throwable] = None) extends RuntimeException(msg, cause.orNull)

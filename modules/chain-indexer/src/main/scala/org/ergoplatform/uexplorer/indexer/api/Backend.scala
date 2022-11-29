@@ -26,7 +26,7 @@ trait Backend {
 class InMemoryBackend extends Backend {
 
   private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BufferedBlockInfo]()
-  private val boxesByEpochIndex         = new ConcurrentHashMap[Int, (Iterable[BoxId], Iterable[(BoxId, Address, Long)])]()
+  private val boxesByEpochIndex         = new ConcurrentHashMap[Int, (Iterable[BoxId], Map[Address, Map[BoxId, Long]])]()
   private val blocksById                = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
   private val blocksByHeight            = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
@@ -49,7 +49,7 @@ class InMemoryBackend extends Backend {
     Flow[(Block, Option[MaybeNewEpoch])]
       .map {
         case (block, Some(NewEpochCreated(epoch))) =>
-          boxesByEpochIndex.put(epoch.index, (epoch.inputIds, epoch.addressByOutputIds))
+          boxesByEpochIndex.put(epoch.index, (epoch.inputIds, epoch.utxosByAddress))
           lastBlockInfoByEpochIndex.put(
             epoch.index,
             blocksById.get(epoch.blockIds.last)
@@ -61,7 +61,7 @@ class InMemoryBackend extends Backend {
 
   override def getCachedState: Future[ChainState] = {
     val (inputs, outputs) =
-      boxesByEpochIndex.asScala.foldLeft((ArraySeq.empty[BoxId], ArraySeq.empty[(BoxId, Address, Long)])) {
+      boxesByEpochIndex.asScala.foldLeft((ArraySeq.empty[BoxId], Map.empty[Address, Map[BoxId, Long]])) {
         case ((iAcc, oAcc), (_, (i, o))) => (iAcc ++ i, oAcc ++ o)
       }
     Future.successful(

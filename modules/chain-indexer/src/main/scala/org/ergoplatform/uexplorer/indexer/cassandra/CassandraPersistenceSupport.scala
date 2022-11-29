@@ -81,9 +81,9 @@ trait CassandraPersistenceSupport extends LazyLogging {
 trait EpochPersistenceSupport {
   protected[cassandra] val node_epochs_table = "node_epochs"
 
-  protected[cassandra] val epoch_index                 = "epoch_index"
-  protected[cassandra] val last_header_id              = "last_header_id"
-  protected[cassandra] val input_box_ids               = "input_box_ids"
-  protected[cassandra] val output_box_ids_with_address = "output_box_ids_with_address"
+  protected[cassandra] val epoch_index      = "epoch_index"
+  protected[cassandra] val last_header_id   = "last_header_id"
+  protected[cassandra] val input_box_ids    = "input_box_ids"
+  protected[cassandra] val utxos_by_address = "utxos_by_address"
 
 }

@@ -9,7 +9,7 @@ case class Epoch(
   index: Int,
   blockIds: Vector[BlockId],
   inputIds: ArraySeq[BoxId],
-  addressByOutputIds: ArraySeq[(BoxId, Address, Long)]
+  utxosByAddress: Map[Address, Map[BoxId, Long]]
 )
 
 object Epoch {

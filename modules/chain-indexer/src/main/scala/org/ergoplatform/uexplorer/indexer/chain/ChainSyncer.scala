@@ -78,7 +78,7 @@ class ChainSyncer(implicit protocol: ProtocolSettings) extends LazyLogging {
 
 object ChainSyncer {
 
-  implicit private val timeout: Timeout = 3.seconds
+  implicit private val timeout: Timeout = 10.seconds
 
   /** REQUEST */
   sealed trait ChainSyncerRequest

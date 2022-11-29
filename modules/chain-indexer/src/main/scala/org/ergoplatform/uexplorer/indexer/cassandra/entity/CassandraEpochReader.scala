@@ -42,10 +42,14 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
     val epochIndex = r.getInt(epoch_index)
     print(s"$epochIndex, ")
     val inputBoxIds = r.getList(input_box_ids, classOf[String]).asScala.map(BoxId(_))
-    val outputBoxIdsWithAddress = r.getList(output_box_ids_with_address, classOf[TupleValue]).asScala.map { tuple =>
-      (BoxId(tuple.getString(0)), Address.fromStringUnsafe(tuple.getString(1)), tuple.getLong(2))
-    }
-    ArraySeq.from[BoxId](inputBoxIds) -> ArraySeq.from[(BoxId, Address, Long)](outputBoxIdsWithAddress)
+    val outputBoxIdsWithAddress =
+      r.getMap(utxos_by_address, classOf[String], classOf[java.util.Map[String, Long]])
+        .asScala
+        .map { case (addr, valueByBoxId) =>
+          Address.fromStringUnsafe(addr) -> valueByBoxId.asScala.map { case (boxId, value) => BoxId(boxId) -> value }.toMap
+        }
+        .toMap
+    ArraySeq.from[BoxId](inputBoxIds) -> outputBoxIdsWithAddress
   }
 
   def getCachedState: Future[ChainState] =
@@ -65,7 +69,7 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
           .mapAsync(1) { case (epochIndex, _) =>
             cqlSession
               .executeAsync(
-                s"SELECT $epoch_index, $input_box_ids, $output_box_ids_with_address FROM ${Const.CassandraKeyspace}.$node_epochs_table WHERE $epoch_index = $epochIndex;"
+                s"SELECT $epoch_index, $input_box_ids, $utxos_by_address FROM ${Const.CassandraKeyspace}.$node_epochs_table WHERE $epoch_index = $epochIndex;"
               )
               .toScala
           }

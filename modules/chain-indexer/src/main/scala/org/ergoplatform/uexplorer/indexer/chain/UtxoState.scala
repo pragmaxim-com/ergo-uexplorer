@@ -18,7 +18,7 @@ import scala.util.{Success, Try}
 
 case class UtxoState(
   tempBoxesByHeightBuffer: TreeMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])],
-  addressById: Map[BoxId, Address],
+  addressByUtxo: Map[BoxId, Address],
   utxosByAddress: Map[Address, Map[BoxId, Long]],
   inputsWithoutAddress: Set[BoxId]
 ) {
@@ -34,36 +34,38 @@ case class UtxoState(
     copy(tempBoxesByHeightBuffer = boxesByHeightWoSupersededFork ++ newForkByHeight)
   }
 
-  def mergeEpochFromBuffer(heightRange: Seq[Int]): ((ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]), UtxoState) = {
-    val (inputIdsArr, outputIdsWithAddressArr) =
+  def mergeEpochFromBuffer(heightRange: Seq[Int]): (ArraySeq[BoxId], UtxoState) = {
+    val (inputIdsArr, utxosByAddressMap) =
       tempBoxesByHeightBuffer
         .range(heightRange.head, heightRange.last + 1)
-        .foldLeft((ArraySeq.newBuilder[BoxId], ArraySeq.newBuilder[(BoxId, Address, Long)])) {
-          case ((inputBoxIdsAcc, outputBoxIdsWithAddressAcc), (_, (inputBoxIds, outputBoxIdsWithAddress))) =>
-            (inputBoxIdsAcc ++= inputBoxIds, outputBoxIdsWithAddressAcc ++= outputBoxIdsWithAddress)
+        .foldLeft((ArraySeq.newBuilder[BoxId], Map.empty[Address, Map[BoxId, Long]])) {
+          case ((inputBoxIdsAcc, utxosByAddressAcc), (_, (inputBoxIds, outputBoxIdsWithAddress))) =>
+            (
+              inputBoxIdsAcc ++= inputBoxIds,
+              outputBoxIdsWithAddress
+                .foldLeft(utxosByAddressAcc) { case (acc, (boxId, address, value)) =>
+                  acc.adjust(address)(_.fold(Map(boxId -> value))(_.updated(boxId, value)))
+                }
+            )
         }
-    val epochBoxes = inputIdsArr.result() -> outputIdsWithAddressArr.result()
-    epochBoxes -> mergeEpochFromBoxes(epochBoxes._1, epochBoxes._2)
+    val inputIds = inputIdsArr.result()
+    inputIds -> mergeEpochFromBoxes(inputIds, utxosByAddressMap)
       .copy(tempBoxesByHeightBuffer = tempBoxesByHeightBuffer.removedAll(heightRange))
   }
 
-  def mergeEpochFromBoxes(inputs: ArraySeq[BoxId], outputs: ArraySeq[(BoxId, Address, Long)]): UtxoState = {
+  def mergeEpochFromBoxes(inputs: ArraySeq[BoxId], outputs: Map[Address, Map[BoxId, Long]]): UtxoState = {
     val boxIdsByAddressWithOutputs =
       outputs
-        .groupBy(_._2)
-        .view
-        .mapValues(_.map(t => t._1 -> t._3).toMap)
         .foldLeft(utxosByAddress) { case (acc, (address, outputIds)) =>
           acc.putOrRemove(address) {
             case None                 => Some(outputIds)
             case Some(existingBoxIds) => Some(existingBoxIds ++ outputIds)
           }
         }
-    val addressesByOutputId = outputs.map(t => t._1 -> t._2).toMap
     val (inputsWithAddress, inputsWoAddress) =
-      inputs.partition(i => addressById.contains(i) || addressesByOutputId.contains(i))
+      inputs.partition(i => addressByUtxo.contains(i) || outputs.exists(_._2.contains(i)))
     val inputIdsWithAddress =
-      inputsWithAddress.map(boxId => boxId -> addressById.getOrElse(boxId, addressesByOutputId(boxId)))
+      inputsWithAddress.map(boxId => boxId -> addressByUtxo.getOrElse(boxId, outputs.find(_._2.contains(boxId)).get._1))
     val boxIdsByAddressWoInputs =
       inputIdsWithAddress
         .groupBy(_._2)
@@ -76,9 +78,12 @@ case class UtxoState(
           }
         }
 
+    val newAddressByUtxo = outputs.iterator.flatMap { case (address, valueByUtxos) =>
+      valueByUtxos.keySet.map(_ -> address)
+    }
     UtxoState(
       tempBoxesByHeightBuffer,
-      (addressById ++ addressesByOutputId) -- inputs,
+      (addressByUtxo ++ newAddressByUtxo) -- inputs,
       boxIdsByAddressWoInputs,
       inputsWithoutAddress ++ inputsWoAddress
     )
