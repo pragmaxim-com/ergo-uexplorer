@@ -7,7 +7,7 @@ volumes:
 
 services:
   cassandra:
-    image: cassandra:4.0.6
+    image: cassandra:4.0.7
     container_name: cassandra
     restart: "on-failure"
     networks:
@@ -28,7 +28,7 @@ services:
       start_period: 90s
       retries: 18
   cassandra-init-tables:
-    image: cassandra:4.0.6
+    image: cassandra:4.0.7
     container_name: cassandra-init-tables
     restart: "no"
     depends_on:
