@@ -28,7 +28,7 @@ trait CassandraPersistenceSupport extends LazyLogging {
       .setIdempotent(true)
   }
 
-  protected[cassandra] def storeBlockFlow[T](
+  protected[cassandra] def storeFlow[T](
     parallelism: Int,
     simpleStatement: SimpleStatement,
     statementBinder: (T, PreparedStatement) => BoundStatement
@@ -47,7 +47,7 @@ trait CassandraPersistenceSupport extends LazyLogging {
       )
       .mapMaterializedValue(_ => NotUsed)
 
-  protected[cassandra] def storeBlockBatchFlow[T](
+  protected[cassandra] def storeBatchFlow[T](
     parallelism: Int,
     batchType: BatchType = DefaultBatchType.LOGGED,
     simpleStatement: SimpleStatement,
@@ -61,6 +61,16 @@ trait CassandraPersistenceSupport extends LazyLogging {
               statementBinder(element, preparedStatement) match {
                 case statements if statements.isEmpty =>
                   Future.successful(element)
+                case statements if statements.length >= 65535 =>
+                  Future
+                    .sequence(
+                      statements.grouped(10000).map { batchStatement =>
+                        cqlSession
+                          .executeAsync(BatchStatement.newInstance(batchType).addAll(batchStatement.asJava))
+                          .toScala
+                      }
+                    )
+                    .map(_ => element)
                 case statements if statements.length == 1 =>
                   cqlSession
                     .executeAsync(statements.head)
@@ -79,11 +89,14 @@ trait CassandraPersistenceSupport extends LazyLogging {
 }
 
 trait EpochPersistenceSupport {
-  protected[cassandra] val node_epochs_table = "node_epochs"
+  protected[cassandra] val node_epoch_last_headers_table = "node_epoch_last_headers"
+  protected[cassandra] val node_epochs_inputs_table      = "node_epoch_inputs"
+  protected[cassandra] val node_epochs_outputs_table     = "node_epoch_outputs"
 
-  protected[cassandra] val epoch_index      = "epoch_index"
-  protected[cassandra] val last_header_id   = "last_header_id"
-  protected[cassandra] val input_box_ids    = "input_box_ids"
-  protected[cassandra] val utxos_by_address = "utxos_by_address"
+  protected[cassandra] val epoch_index    = "epoch_index"
+  protected[cassandra] val last_header_id = "last_header_id"
+  protected[cassandra] val box_id         = "box_id"
+  protected[cassandra] val address        = "address"
+  protected[cassandra] val value          = "value"
 
 }

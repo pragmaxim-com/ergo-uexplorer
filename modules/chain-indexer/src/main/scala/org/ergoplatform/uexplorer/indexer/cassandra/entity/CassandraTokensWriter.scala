@@ -16,7 +16,7 @@ trait CassandraTokensWriter extends LazyLogging {
   import Tokens._
 
   def tokensWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
-    storeBlockBatchFlow(
+    storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
       buildInsertStatement(columns, node_tokens_table),

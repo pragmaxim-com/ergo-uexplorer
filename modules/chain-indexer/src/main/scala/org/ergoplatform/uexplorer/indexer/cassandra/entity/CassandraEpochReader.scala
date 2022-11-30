@@ -17,7 +17,8 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, UtxoState}
-
+import org.ergoplatform.uexplorer.indexer.MapPimp
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
 trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
@@ -37,26 +38,12 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
       .map(_.one())
       .map(r => epochIndex -> blockInfoRowReader(r))
 
-  private def getBoxes(rs: AsyncResultSet) = {
-    val r          = rs.one()
-    val epochIndex = r.getInt(epoch_index)
-    print(s"$epochIndex, ")
-    val inputBoxIds = r.getList(input_box_ids, classOf[String]).asScala.map(BoxId(_))
-    val outputBoxIdsWithAddress =
-      r.getMap(utxos_by_address, classOf[String], classOf[java.util.Map[String, Long]])
-        .asScala
-        .map { case (addr, valueByBoxId) =>
-          Address.fromStringUnsafe(addr) -> valueByBoxId.asScala.map { case (boxId, value) => BoxId(boxId) -> value }.toMap
-        }
-        .toMap
-    ArraySeq.from[BoxId](inputBoxIds) -> outputBoxIdsWithAddress
-  }
-
-  def getCachedState: Future[ChainState] =
+  def getCachedState: Future[ChainState] = {
+    logger.info(s"Loading epoch indexes ...")
     Source
       .fromPublisher(
         cqlSession.executeReactive(
-          s"SELECT $epoch_index, $last_header_id FROM ${Const.CassandraKeyspace}.$node_epochs_table;"
+          s"SELECT $epoch_index, $last_header_id FROM ${Const.CassandraKeyspace}.$node_epoch_last_headers_table;"
         )
       )
       .mapAsync(1)(row => blockInfoByEpochIndex(row.getInt(epoch_index), row.getString(last_header_id)))
@@ -67,16 +54,39 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
         logger.info(s"Loading ${infoByIndex.size} epochs $rangeOpt from database")
         Source(infoByIndex)
           .mapAsync(1) { case (epochIndex, _) =>
-            cqlSession
-              .executeAsync(
-                s"SELECT $epoch_index, $input_box_ids, $utxos_by_address FROM ${Const.CassandraKeyspace}.$node_epochs_table WHERE $epoch_index = $epochIndex;"
+            Source
+              .fromPublisher(
+                cqlSession
+                  .executeReactive(
+                    s"SELECT $epoch_index, $box_id FROM ${Const.CassandraKeyspace}.$node_epochs_inputs_table WHERE $epoch_index = $epochIndex;"
+                  )
               )
-              .toScala
+              .runFold(ArrayBuffer.newBuilder[BoxId]) { case (acc, r) => acc.addOne(BoxId(r.getString(box_id))) }
+              .map(r => epochIndex -> ArraySeq.from(r.result().toArray))
           }
-          .map(getBoxes)
-          .runFold[UtxoState](UtxoState.empty) { case (s, (inputs, outputs)) => s.mergeEpochFromBoxes(inputs, outputs) }
+          .mapAsync(1) { case (epochIndex, inputIds) =>
+            Source
+              .fromPublisher(
+                cqlSession
+                  .executeReactive(
+                    s"SELECT $epoch_index, $address, $box_id, $value FROM ${Const.CassandraKeyspace}.$node_epochs_outputs_table WHERE $epoch_index = $epochIndex;"
+                  )
+              )
+              .runFold(Map.empty[Address, Map[BoxId, Long]]) { case (acc, r) =>
+                val addr  = Address.fromStringUnsafe(r.getString(address))
+                val boxId = BoxId(r.getString(box_id))
+                val v     = r.getLong(value)
+                acc.adjust(addr)(_.fold(Map(boxId -> v))(_.updated(boxId, v)))
+              }
+              .map(outputIds => (epochIndex, inputIds, outputIds))
+          }
+          .runFold(UtxoState.empty) { case (s, (epochIdx, inputs, outputs)) =>
+            logger.info(s"$epochIdx: inputBoxes[${inputs.size}], utxo-addresses[${outputs.size}]")
+            s.mergeEpochFromBoxes(inputs, outputs)
+          }
           .map(utxoState => ChainState.load(infoByIndex, utxoState))
       }
+  }
 }
 
 object CassandraEpochReader extends CassandraPersistenceSupport {

@@ -14,7 +14,7 @@ trait CassandraTransactionsWriter extends LazyLogging { this: CassandraBackend =
   import Transactions._
 
   def transactionsWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
-    storeBlockBatchFlow(
+    storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
       buildInsertStatement(columns, node_transactions_table),

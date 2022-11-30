@@ -18,7 +18,7 @@ trait Backend {
 
   def blockWriteFlow: Flow[Inserted, Block, NotUsed]
 
-  def epochWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
+  def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
 
   def getCachedState: Future[ChainState]
 }
@@ -45,7 +45,7 @@ class InMemoryBackend extends Backend {
           winningFork
       }
 
-  override def epochWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
+  override def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(Block, Option[MaybeNewEpoch])]
       .map {
         case (block, Some(NewEpochCreated(epoch))) =>

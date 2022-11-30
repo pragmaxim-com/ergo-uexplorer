@@ -16,7 +16,7 @@ trait CassandraRegistersWriter extends LazyLogging {
   import Registers._
 
   def registersWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
-    storeBlockBatchFlow(
+    storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
       buildInsertStatement(columns, node_registers_table),

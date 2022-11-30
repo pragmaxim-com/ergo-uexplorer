@@ -48,7 +48,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       .async
       .via(backend.blockWriteFlow)
       .via(blockToEpochFlow)
-      .via(backend.epochWriteFlow)
+      .via(backend.epochsWriteFlow)
       .withAttributes(supervisionStrategy(Resiliency.decider))
 
   def syncMempool(chainState: ChainState, bestBlockHeight: Int): Future[NewTransactions] =

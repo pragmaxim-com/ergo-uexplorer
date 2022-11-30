@@ -16,7 +16,7 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
   import Headers._
 
   def headerWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
-    storeBlockFlow(
+    storeFlow(
       parallelism,
       buildInsertStatement(columns, node_headers_table),
       headerInsertBinder

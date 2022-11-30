@@ -13,7 +13,7 @@ trait CassandraInputsWriter { this: CassandraBackend =>
   import Inputs._
 
   def inputsWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
-    storeBlockBatchFlow(
+    storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
       buildInsertStatement(columns, node_inputs_table),

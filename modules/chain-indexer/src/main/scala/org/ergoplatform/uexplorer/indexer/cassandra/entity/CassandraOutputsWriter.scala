@@ -14,7 +14,7 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
   import Outputs._
 
   def outputsWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
-    storeBlockBatchFlow(
+    storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
       buildInsertStatement(columns, node_outputs_table),

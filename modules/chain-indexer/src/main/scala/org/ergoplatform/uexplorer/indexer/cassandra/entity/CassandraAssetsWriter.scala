@@ -16,7 +16,7 @@ trait CassandraAssetsWriter extends LazyLogging {
   import Assets._
 
   def assetsWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
-    storeBlockBatchFlow(
+    storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
       buildInsertStatement(columns, node_assets_table),
