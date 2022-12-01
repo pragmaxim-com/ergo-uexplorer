@@ -35,8 +35,8 @@ case class UtxoState(
     copy(tempBoxesByHeightBuffer = boxesByHeightWoSupersededFork ++ newForkByHeight)
   }
 
-  def mergeEpochFromBuffer(heightRange: Seq[Int]): (ArraySeq[BoxId], UtxoState) = {
-    val (inputIdsArr, utxosByAddressMap) =
+  def mergeEpochFromBuffer(heightRange: Seq[Int]): UtxoState = {
+    val (inputsBuilder, outputs) =
       tempBoxesByHeightBuffer
         .range(heightRange.head, heightRange.last + 1)
         .foldLeft((ArraySeq.newBuilder[BoxId], Map.empty[Address, mutable.Map[BoxId, Long]])) {
@@ -49,12 +49,7 @@ case class UtxoState(
                 }
             )
         }
-    val inputIds = inputIdsArr.result()
-    inputIds -> mergeEpochFromBoxes(inputIds, utxosByAddressMap)
-      .copy(tempBoxesByHeightBuffer = tempBoxesByHeightBuffer.removedAll(heightRange))
-  }
-
-  def mergeEpochFromBoxes(inputs: ArraySeq[BoxId], outputs: Map[Address, mutable.Map[BoxId, Long]]): UtxoState = {
+    val inputs = inputsBuilder.result()
     val (newAddressByUtxo, boxIdsByAddressWithOutputs) =
       outputs
         .foldLeft(addressByUtxo -> utxosByAddress) { case ((addressByUtxoAcc, utxosByAddressAcc), (address, valueByUtxos)) =>
@@ -87,7 +82,7 @@ case class UtxoState(
           }
         }
     UtxoState(
-      tempBoxesByHeightBuffer,
+      tempBoxesByHeightBuffer.removedAll(heightRange),
       newAddressByUtxo -- inputs,
       utxosByAddressWoInputs,
       inputsWithoutAddress ++ inputsWoAddress.result()

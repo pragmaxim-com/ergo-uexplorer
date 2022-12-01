@@ -30,22 +30,8 @@ trait CassandraEpochWriter extends LazyLogging {
     storeBatchFlow(
       parallelism = 1,
       batchType   = DefaultBatchType.LOGGED,
-      buildInsertStatement(List(epoch_index, box_id), node_epochs_inputs_table),
-      epochInputsInsertBinder
-    ).via(
-      storeBatchFlow(
-        parallelism = 1,
-        batchType   = DefaultBatchType.LOGGED,
-        buildInsertStatement(List(epoch_index, address, box_id, value), node_epochs_outputs_table),
-        epochOutputsInsertBinder
-      )
-    ).via(
-      storeBatchFlow(
-        parallelism = 1,
-        batchType   = DefaultBatchType.LOGGED,
-        buildInsertStatement(List(epoch_index, last_header_id), node_epoch_last_headers_table),
-        epochLastHeadersInsertBinder
-      )
+      buildInsertStatement(List(epoch_index, last_header_id), node_epoch_last_headers_table),
+      epochLastHeadersInsertBinder
     )
 }
 
@@ -66,38 +52,6 @@ object CassandraEpochWriter extends EpochPersistenceSupport with LazyLogging {
     case ((_, Some(NewEpochExisted(epochIndex))), _) =>
       logger.debug(s"Skipping persistence of epoch $epochIndex as it already existed")
       ArraySeq.empty
-    case _ =>
-      ArraySeq.empty
-  }
-
-  protected[cassandra] def epochInputsInsertBinder
-    : ((Block, Option[MaybeNewEpoch]), PreparedStatement) => ArraySeq[BoundStatement] = {
-    case ((_, Some(NewEpochCreated(epoch))), stmt) =>
-      epoch.inputIds.map { boxId =>
-        stmt
-          .bind()
-          .setInt(epoch_index, epoch.index)
-          .setString(box_id, boxId.unwrapped)
-      }
-    case _ =>
-      ArraySeq.empty
-  }
-
-  protected[cassandra] def epochOutputsInsertBinder
-    : ((Block, Option[MaybeNewEpoch]), PreparedStatement) => ArraySeq[BoundStatement] = {
-    case ((_, Some(NewEpochCreated(epoch))), stmt) =>
-      ArraySeq.from(
-        epoch.utxosByAddress.flatMap { case (addr, valueByBox) =>
-          valueByBox.map { case (boxId, v) =>
-            stmt
-              .bind()
-              .setInt(epoch_index, epoch.index)
-              .setString(address, addr)
-              .setString(box_id, boxId.unwrapped)
-              .setLong(value, v)
-          }
-        }.toArray
-      )
     case _ =>
       ArraySeq.empty
   }

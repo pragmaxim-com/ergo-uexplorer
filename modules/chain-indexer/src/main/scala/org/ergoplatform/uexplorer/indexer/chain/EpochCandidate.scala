@@ -21,21 +21,17 @@ case class InvalidEpochCandidate(epochIndex: Int, invalidHeightsAsc: TreeSet[Int
 
 case class ValidEpochCandidate(
   epochIndex: Int,
-  relsByHeight: TreeMap[Int, BlockRel],
-  inputIds: ArraySeq[BoxId],
-  utxosByAddress: Map[Address, mutable.Map[BoxId, Long]]
+  relsByHeight: TreeMap[Int, BlockRel]
 ) extends EpochCandidate {
   def isComplete = true
 
-  def getEpoch: Epoch = Epoch(epochIndex, relsByHeight.toVector.map(_._2.headerId), inputIds, utxosByAddress)
+  def getEpoch: Epoch = Epoch(epochIndex, relsByHeight.toVector.map(_._2.headerId))
 }
 
 object EpochCandidate {
 
   def apply(
-    rels: Seq[(Int, BlockRel)],
-    inputIds: ArraySeq[BoxId],
-    utxosByAddress: Map[Address, mutable.Map[BoxId, Long]]
+    rels: Seq[(Int, BlockRel)]
   ): Either[InvalidEpochCandidate, ValidEpochCandidate] = {
     val sortedRels         = TreeMap[Int, BlockRel](rels: _*)
     val epochIndex         = sortedRels.headOption.map(tuple => epochIndexForHeight(tuple._1)).getOrElse(-1)
@@ -74,7 +70,7 @@ object EpochCandidate {
         )
       )
     } else {
-      Right(ValidEpochCandidate(epochIndex, sortedRels, inputIds, utxosByAddress))
+      Right(ValidEpochCandidate(epochIndex, sortedRels))
     }
   }
 }

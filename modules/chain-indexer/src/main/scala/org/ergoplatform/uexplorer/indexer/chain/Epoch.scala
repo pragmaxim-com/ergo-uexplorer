@@ -8,9 +8,7 @@ import scala.collection.mutable
 
 case class Epoch(
   index: Int,
-  blockIds: Vector[BlockId],
-  inputIds: ArraySeq[BoxId],
-  utxosByAddress: Map[Address, mutable.Map[BoxId, Long]]
+  blockIds: Vector[BlockId]
 )
 
 object Epoch {

@@ -25,14 +25,10 @@ case class ChainState(
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
       NewEpochExisted(currentEpochIndex) -> this
     } else {
-      val previousEpochIndex   = currentEpochIndex - 1
-      val heightRange          = Epoch.heightRangeForEpochIndex(currentEpochIndex)
-      val (inputIds, newState) = utxoState.mergeEpochFromBuffer(heightRange)
-      EpochCandidate(
-        blockBuffer.blockRelationsByHeight(heightRange),
-        inputIds,
-        newState.utxosByAddress
-      ) match {
+      val previousEpochIndex = currentEpochIndex - 1
+      val heightRange        = Epoch.heightRangeForEpochIndex(currentEpochIndex)
+      val newState           = utxoState.mergeEpochFromBuffer(heightRange)
+      EpochCandidate(blockBuffer.blockRelationsByHeight(heightRange)) match {
         case Right(candidate)
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
           val newEpoch = candidate.getEpoch
@@ -43,10 +39,10 @@ case class ChainState(
             newState
           )
         case Right(candidate) =>
-          val Epoch(curIndex, curHeaders, inputIds, outputIdsWithAddress) = candidate.getEpoch
+          val Epoch(curIndex, _) = candidate.getEpoch
           val error =
             s"Prev epoch $previousEpochIndex header ${lastBlockIdInEpoch.get(previousEpochIndex)} " +
-            s"does not match current epoch $curIndex header ${curHeaders.head} with ${inputIds.size} inputs and ${outputIdsWithAddress.size} outputs"
+            s"does not match current epoch $curIndex header"
           val invalidHeights =
             TreeSet(Epoch.heightRangeForEpochIndex(previousEpochIndex).last, candidate.relsByHeight.head._1)
           val invalidEpochCandidate = InvalidEpochCandidate(curIndex, invalidHeights, error)

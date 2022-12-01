@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
+import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Sink, Source}
 import com.datastax.oss.driver.api.core.cql.{AsyncResultSet, BoundStatement, PreparedStatement, Row, SimpleStatement}
 import com.datastax.oss.driver.api.core.data.TupleValue
@@ -16,7 +17,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.indexer.chain.{ChainState, UtxoState}
+import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch, UtxoState}
 import org.ergoplatform.uexplorer.indexer.MutableMapPimp
 import org.ergoplatform.uexplorer.indexer.MapPimp
 
@@ -53,41 +54,55 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
       .runWith(Sink.seq[(Int, BufferedBlockInfo)])
       .map(infoByIndex => TreeMap(infoByIndex: _*))
       .flatMap { infoByIndex =>
-        val rangeOpt = infoByIndex.headOption.map(head => s": from ${head._1} to ${infoByIndex.last._1}").getOrElse("")
-        logger.info(s"Loading ${infoByIndex.size} epochs $rangeOpt from database")
-        Source(infoByIndex)
-          .mapAsync(1) { case (epochIndex, _) =>
-            Source
-              .fromPublisher(
-                cqlSession
-                  .executeReactive(
-                    s"SELECT $epoch_index, $box_id FROM ${Const.CassandraKeyspace}.$node_epochs_inputs_table WHERE $epoch_index = $epochIndex;"
+        if (infoByIndex.isEmpty) {
+          Future.successful(ChainState.load(infoByIndex, UtxoState.empty))
+        } else {
+          val heightRangeForAllEpochs = infoByIndex.iterator.flatMap(i => Epoch.heightRangeForEpochIndex(i._1)).toIndexedSeq
+          logger.info(
+            s"Loading ${infoByIndex.size} epochs from ${infoByIndex.head._1} to ${infoByIndex.last._1} from database"
+          )
+          Source(heightRangeForAllEpochs)
+            .mapAsync(1) { height =>
+              cqlSession
+                .executeAsync(
+                  s"SELECT ${Headers.header_id} FROM ${Const.CassandraKeyspace}.${Headers.node_headers_table} WHERE ${Headers.height} = $height;"
+                )
+                .toScala
+                .map(rs => height -> rs.one().getString(Headers.header_id))
+            }
+            .mapAsync(2) { case (height, headerId) =>
+              val outputsF =
+                Source
+                  .fromPublisher(
+                    cqlSession.executeReactive(
+                      s"SELECT $box_id, $address, $value FROM ${Const.CassandraKeyspace}.${Outputs.node_outputs_table} WHERE ${Outputs.header_id} = '$headerId';"
+                    )
                   )
-              )
-              .runFold(ArrayBuffer.newBuilder[BoxId]) { case (acc, r) => acc.addOne(BoxId(r.getString(box_id))) }
-              .map(r => epochIndex -> ArraySeq.from(r.result().toArray))
-          }
-          .mapAsync(1) { case (epochIndex, inputIds) =>
-            Source
-              .fromPublisher(
-                cqlSession
-                  .executeReactive(
-                    s"SELECT $epoch_index, $address, $box_id, $value FROM ${Const.CassandraKeyspace}.$node_epochs_outputs_table WHERE $epoch_index = $epochIndex;"
+                  .runFold(ArraySeq.newBuilder[(BoxId, Address, Long)]) { case (acc, r) =>
+                    acc.addOne(
+                      (BoxId(r.getString(box_id)), Address.fromStringUnsafe(r.getString(address)), r.getLong(value))
+                    )
+                  }
+              val inputsF =
+                Source
+                  .fromPublisher(
+                    cqlSession.executeReactive(
+                      s"SELECT $box_id FROM ${Const.CassandraKeyspace}.${Inputs.node_inputs_table} WHERE ${Outputs.header_id} = '$headerId';"
+                    )
                   )
-              )
-              .runFold(Map.empty[Address, mutable.Map[BoxId, Long]]) { case (acc, r) =>
-                val addr  = Address.fromStringUnsafe(r.getString(address))
-                val boxId = BoxId(r.getString(box_id))
-                val v     = r.getLong(value)
-                acc.adjust(addr)(_.fold(mutable.Map(boxId -> v)) { x => x.put(boxId, v); x })
-              }
-              .map(outputIds => (epochIndex, inputIds, outputIds))
-          }
-          .runFold(UtxoState.empty) { case (s, (epochIdx, inputs, outputs)) =>
-            logger.info(s"$epochIdx: inputBoxes[${inputs.size}], utxo-addresses[${outputs.size}]")
-            s.mergeEpochFromBoxes(inputs, outputs)
-          }
-          .map(utxoState => ChainState.load(infoByIndex, utxoState))
+                  .runFold(ArraySeq.newBuilder[BoxId]) { case (acc, r) =>
+                    acc.addOne(BoxId(r.getString(box_id)))
+                  }
+              inputsF.flatMap(inputs => outputsF.map(outputs => (height, inputs.result(), outputs.result())))
+            }
+            .buffer(16, OverflowStrategy.backpressure)
+            .runFold(UtxoState.empty) { case (s, (height, inputs, outputs)) =>
+              s.bufferBestBlock(height, inputs, outputs)
+            }
+            .map { utxoState =>
+              ChainState.load(infoByIndex, utxoState.mergeEpochFromBuffer(heightRangeForAllEpochs))
+            }
+        }
       }
   }
 }

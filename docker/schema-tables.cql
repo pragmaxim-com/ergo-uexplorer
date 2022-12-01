@@ -136,19 +136,3 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_epoch_last_headers
     last_header_id VARCHAR,
     PRIMARY KEY (epoch_index)
 );
-
-CREATE TABLE IF NOT EXISTS uexplorer.node_epoch_inputs
-(
-    epoch_index    INT,
-    box_id         VARCHAR,
-    PRIMARY KEY ((epoch_index), box_id)
-);
-
-CREATE TABLE IF NOT EXISTS uexplorer.node_epoch_outputs
-(
-    epoch_index INT,
-    address     VARCHAR,
-    box_id      VARCHAR,
-    value       BIGINT,
-    PRIMARY KEY ((epoch_index), address, box_id)
-);
