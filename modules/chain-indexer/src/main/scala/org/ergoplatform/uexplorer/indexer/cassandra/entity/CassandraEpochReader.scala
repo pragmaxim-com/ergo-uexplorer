@@ -17,7 +17,10 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, UtxoState}
+import org.ergoplatform.uexplorer.indexer.MutableMapPimp
 import org.ergoplatform.uexplorer.indexer.MapPimp
+
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
@@ -72,11 +75,11 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
                     s"SELECT $epoch_index, $address, $box_id, $value FROM ${Const.CassandraKeyspace}.$node_epochs_outputs_table WHERE $epoch_index = $epochIndex;"
                   )
               )
-              .runFold(Map.empty[Address, Map[BoxId, Long]]) { case (acc, r) =>
+              .runFold(Map.empty[Address, mutable.Map[BoxId, Long]]) { case (acc, r) =>
                 val addr  = Address.fromStringUnsafe(r.getString(address))
                 val boxId = BoxId(r.getString(box_id))
                 val v     = r.getLong(value)
-                acc.adjust(addr)(_.fold(Map(boxId -> v))(_.updated(boxId, v)))
+                acc.adjust(addr)(_.fold(mutable.Map(boxId -> v)) { x => x.put(boxId, v); x })
               }
               .map(outputIds => (epochIndex, inputIds, outputIds))
           }

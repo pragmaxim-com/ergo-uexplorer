@@ -5,6 +5,7 @@ import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.chain.Epoch.*
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
+import scala.collection.mutable
 
 trait EpochCandidate {
   def epochIndex: Int
@@ -22,7 +23,7 @@ case class ValidEpochCandidate(
   epochIndex: Int,
   relsByHeight: TreeMap[Int, BlockRel],
   inputIds: ArraySeq[BoxId],
-  utxosByAddress: Map[Address, Map[BoxId, Long]]
+  utxosByAddress: Map[Address, mutable.Map[BoxId, Long]]
 ) extends EpochCandidate {
   def isComplete = true
 
@@ -34,7 +35,7 @@ object EpochCandidate {
   def apply(
     rels: Seq[(Int, BlockRel)],
     inputIds: ArraySeq[BoxId],
-    utxosByAddress: Map[Address, Map[BoxId, Long]]
+    utxosByAddress: Map[Address, mutable.Map[BoxId, Long]]
   ): Either[InvalidEpochCandidate, ValidEpochCandidate] = {
     val sortedRels         = TreeMap[Int, BlockRel](rels: _*)
     val epochIndex         = sortedRels.headOption.map(tuple => epochIndexForHeight(tuple._1)).getOrElse(-1)

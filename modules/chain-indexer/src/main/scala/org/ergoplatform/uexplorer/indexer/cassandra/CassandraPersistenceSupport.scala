@@ -61,7 +61,7 @@ trait CassandraPersistenceSupport extends LazyLogging {
               statementBinder(element, preparedStatement) match {
                 case statements if statements.isEmpty =>
                   Future.successful(element)
-                case statements if statements.length >= 65535 =>
+                case statements if statements.length >= 10000 =>
                   Future
                     .sequence(
                       statements.grouped(10000).map { batchStatement =>

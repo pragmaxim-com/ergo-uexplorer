@@ -30,21 +30,21 @@ trait CassandraEpochWriter extends LazyLogging {
     storeBatchFlow(
       parallelism = 1,
       batchType   = DefaultBatchType.LOGGED,
-      buildInsertStatement(List(epoch_index, last_header_id), node_epoch_last_headers_table),
-      epochLastHeadersInsertBinder
-    ).via(
-      storeBatchFlow(
-        parallelism = 1,
-        batchType   = DefaultBatchType.LOGGED,
-        buildInsertStatement(List(epoch_index, box_id), node_epochs_inputs_table),
-        epochInputsInsertBinder
-      )
+      buildInsertStatement(List(epoch_index, box_id), node_epochs_inputs_table),
+      epochInputsInsertBinder
     ).via(
       storeBatchFlow(
         parallelism = 1,
         batchType   = DefaultBatchType.LOGGED,
         buildInsertStatement(List(epoch_index, address, box_id, value), node_epochs_outputs_table),
         epochOutputsInsertBinder
+      )
+    ).via(
+      storeBatchFlow(
+        parallelism = 1,
+        batchType   = DefaultBatchType.LOGGED,
+        buildInsertStatement(List(epoch_index, last_header_id), node_epoch_last_headers_table),
+        epochLastHeadersInsertBinder
       )
     )
 }

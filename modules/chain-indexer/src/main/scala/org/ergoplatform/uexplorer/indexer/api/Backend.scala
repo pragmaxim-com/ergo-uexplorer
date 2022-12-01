@@ -11,6 +11,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.TreeMap
+import scala.collection.mutable
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 
@@ -26,7 +27,7 @@ trait Backend {
 class InMemoryBackend extends Backend {
 
   private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BufferedBlockInfo]()
-  private val boxesByEpochIndex         = new ConcurrentHashMap[Int, (Iterable[BoxId], Map[Address, Map[BoxId, Long]])]()
+  private val boxesByEpochIndex         = new ConcurrentHashMap[Int, (Iterable[BoxId], Map[Address, mutable.Map[BoxId, Long]])]()
   private val blocksById                = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
   private val blocksByHeight            = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
@@ -61,7 +62,7 @@ class InMemoryBackend extends Backend {
 
   override def getCachedState: Future[ChainState] = {
     val (inputs, outputs) =
-      boxesByEpochIndex.asScala.foldLeft((ArraySeq.empty[BoxId], Map.empty[Address, Map[BoxId, Long]])) {
+      boxesByEpochIndex.asScala.foldLeft((ArraySeq.empty[BoxId], Map.empty[Address, mutable.Map[BoxId, Long]])) {
         case ((iAcc, oAcc), (_, (i, o))) => (iAcc ++ i, oAcc ++ o)
       }
     Future.successful(

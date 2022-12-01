@@ -13,13 +13,14 @@ import org.ergoplatform.uexplorer.indexer.*
 import java.nio.file.{Path, Paths}
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.TreeMap
+import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.{Success, Try}
 
 case class UtxoState(
   tempBoxesByHeightBuffer: TreeMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])],
   addressByUtxo: Map[BoxId, Address],
-  utxosByAddress: Map[Address, Map[BoxId, Long]],
+  utxosByAddress: Map[Address, mutable.Map[BoxId, Long]],
   inputsWithoutAddress: Set[BoxId]
 ) {
 
@@ -38,13 +39,13 @@ case class UtxoState(
     val (inputIdsArr, utxosByAddressMap) =
       tempBoxesByHeightBuffer
         .range(heightRange.head, heightRange.last + 1)
-        .foldLeft((ArraySeq.newBuilder[BoxId], Map.empty[Address, Map[BoxId, Long]])) {
+        .foldLeft((ArraySeq.newBuilder[BoxId], Map.empty[Address, mutable.Map[BoxId, Long]])) {
           case ((inputBoxIdsAcc, utxosByAddressAcc), (_, (inputBoxIds, outputBoxIdsWithAddress))) =>
             (
               inputBoxIdsAcc ++= inputBoxIds,
               outputBoxIdsWithAddress
                 .foldLeft(utxosByAddressAcc) { case (acc, (boxId, address, value)) =>
-                  acc.adjust(address)(_.fold(Map(boxId -> value))(_.updated(boxId, value)))
+                  acc.adjust(address)(_.fold(mutable.Map(boxId -> value)) { x => x.put(boxId, value); x })
                 }
             )
         }
@@ -53,39 +54,43 @@ case class UtxoState(
       .copy(tempBoxesByHeightBuffer = tempBoxesByHeightBuffer.removedAll(heightRange))
   }
 
-  def mergeEpochFromBoxes(inputs: ArraySeq[BoxId], outputs: Map[Address, Map[BoxId, Long]]): UtxoState = {
-    val boxIdsByAddressWithOutputs =
+  def mergeEpochFromBoxes(inputs: ArraySeq[BoxId], outputs: Map[Address, mutable.Map[BoxId, Long]]): UtxoState = {
+    val (newAddressByUtxo, boxIdsByAddressWithOutputs) =
       outputs
-        .foldLeft(utxosByAddress) { case (acc, (address, outputIds)) =>
-          acc.putOrRemove(address) {
-            case None                 => Some(outputIds)
-            case Some(existingBoxIds) => Some(existingBoxIds ++ outputIds)
-          }
+        .foldLeft(addressByUtxo -> utxosByAddress) { case ((addressByUtxoAcc, utxosByAddressAcc), (address, valueByUtxos)) =>
+          (
+            addressByUtxoAcc ++ valueByUtxos.keysIterator.map(_ -> address),
+            utxosByAddressAcc.putOrRemove(address) {
+              case None                 => Some(valueByUtxos)
+              case Some(existingBoxIds) => Some(existingBoxIds ++ valueByUtxos)
+            }
+          )
         }
     val (inputsWithAddress, inputsWoAddress) =
-      inputs.partition(i => addressByUtxo.contains(i) || outputs.exists(_._2.contains(i)))
-    val inputIdsWithAddress =
-      inputsWithAddress.map(boxId => boxId -> addressByUtxo.getOrElse(boxId, outputs.find(_._2.contains(boxId)).get._1))
-    val boxIdsByAddressWoInputs =
-      inputIdsWithAddress
-        .groupBy(_._2)
+      inputs.foldLeft(ArraySeq.newBuilder[(Address, BoxId)] -> ArraySeq.newBuilder[BoxId]) {
+        case ((inputsWithAddressAcc, inputsWoAddressAcc), boxId) =>
+          if (newAddressByUtxo.contains(boxId))
+            inputsWithAddressAcc.addOne(newAddressByUtxo(boxId) -> boxId) -> inputsWoAddressAcc
+          else
+            inputsWithAddressAcc -> inputsWoAddressAcc.addOne(boxId)
+      }
+    val utxosByAddressWoInputs =
+      inputsWithAddress
+        .result()
+        .groupBy(_._1)
         .view
-        .mapValues(_.map(_._1).toSet)
+        .mapValues(_.map(_._2))
         .foldLeft(boxIdsByAddressWithOutputs) { case (acc, (address, inputIds)) =>
           acc.putOrRemove(address) {
             case None                 => None
-            case Some(existingBoxIds) => Option(existingBoxIds -- inputIds).filter(_.nonEmpty)
+            case Some(existingBoxIds) => Option(existingBoxIds --= inputIds).filter(_.nonEmpty)
           }
         }
-
-    val newAddressByUtxo = outputs.iterator.flatMap { case (address, valueByUtxos) =>
-      valueByUtxos.keySet.map(_ -> address)
-    }
     UtxoState(
       tempBoxesByHeightBuffer,
-      (addressByUtxo ++ newAddressByUtxo) -- inputs,
-      boxIdsByAddressWoInputs,
-      inputsWithoutAddress ++ inputsWoAddress
+      newAddressByUtxo -- inputs,
+      utxosByAddressWoInputs,
+      inputsWithoutAddress ++ inputsWoAddress.result()
     )
   }
 }

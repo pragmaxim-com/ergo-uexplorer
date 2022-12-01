@@ -15,6 +15,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.collection.immutable.TreeMap
+import scala.collection.mutable
 
 class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
 
@@ -62,7 +63,7 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
             UtxoState(
               TreeMap.empty,
               utxos.map(o => o._1 -> o._2).toMap,
-              utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
+              utxos.groupBy(_._2).view.mapValues(x => mutable.Map(x.map(o => o._1 -> o._3): _*)).toMap,
               (e0In ++ e1In).filterNot(b => e0Out.map(_._1).contains(b) || e1Out.map(_._1).contains(b)).toSet
             )
           val actualProgressState = ChainState.load(
@@ -113,7 +114,7 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
             UtxoState(
               TreeMap.empty,
               utxos.map(o => o._1 -> o._2).toMap,
-              utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
+              utxos.groupBy(_._2).view.mapValues(x => mutable.Map(x.map(o => o._1 -> o._3): _*)).toMap,
               e0b1Block.inputs.map(_.boxId).filterNot(b => e0b1Block.outputs.map(_._1).contains(b)).toSet
             )
           val newState = ChainState.load(lastBlockIdByEpochIndex, utxoState)
@@ -161,7 +162,7 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           UtxoState(
             TreeMap.empty,
             utxos.map(o => o._1 -> o._2).toMap,
-            utxos.groupBy(_._2).view.mapValues(_.map(o => o._1 -> o._3).toMap).toMap,
+            utxos.groupBy(_._2).view.mapValues(x => mutable.Map(x.map(o => o._1 -> o._3): _*)).toMap,
             Set.empty
           )
         val s               = ChainState.load(TreeMap(0 -> commonBlockInfo), utxoState)

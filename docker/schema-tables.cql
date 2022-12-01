@@ -152,4 +152,3 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_epoch_outputs
     value       BIGINT,
     PRIMARY KEY ((epoch_index), address, box_id)
 );
-

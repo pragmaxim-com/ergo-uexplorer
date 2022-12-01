@@ -4,12 +4,13 @@ import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.indexer.{Const, UnexpectedStateError}
 
 import scala.collection.immutable.ArraySeq
+import scala.collection.mutable
 
 case class Epoch(
   index: Int,
   blockIds: Vector[BlockId],
   inputIds: ArraySeq[BoxId],
-  utxosByAddress: Map[Address, Map[BoxId, Long]]
+  utxosByAddress: Map[Address, mutable.Map[BoxId, Long]]
 )
 
 object Epoch {
