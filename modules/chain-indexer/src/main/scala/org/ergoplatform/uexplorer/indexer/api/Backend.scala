@@ -66,19 +66,12 @@ class InMemoryBackend extends Backend {
           tuple
       }
 
-  override def getCachedState: Future[ChainState] = {
-    val state =
-      boxesByHeight.asScala.foldLeft(UtxoState.empty) { case (stateAcc, (height, (inputs, outputs))) =>
-        stateAcc.bufferBestBlock(height, inputs, outputs)
-      }
+  override def getCachedState: Future[ChainState] =
     Future.successful(
       ChainState.load(
         TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*),
-        state.mergeEpochFromBuffer(
-          lastBlockInfoByEpochIndex.asScala.keysIterator.flatMap(Epoch.heightRangeForEpochIndex).toIndexedSeq
-        )
+        UtxoState.empty.mergeEpochFromBuffer(boxesByHeight.asScala.iterator)
       )
     )
-  }
 
 }

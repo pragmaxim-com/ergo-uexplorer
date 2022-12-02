@@ -22,7 +22,7 @@ while true; do
           elif [ "$MEM_TOTAL" -gt 16000000 ]
           then
             export CASSANDRA_HEAP_NEWSIZE=2G
-            export CASSANDRA_MAX_HEAP_SIZE=10G
+            export CASSANDRA_MAX_HEAP_SIZE=9G
             export ERGO_MAX_HEAP=2G
             V_CPU_COUNT=$(nproc --all)
             if [ "$V_CPU_COUNT" -ge 16 ]; then export BACKEND_INDEXING_PARALLELISM=2; fi
@@ -30,7 +30,7 @@ while true; do
           break;;
         [Nn]* )
           export CASSANDRA_HEAP_NEWSIZE=512M
-          export CASSANDRA_MAX_HEAP_SIZE=2G
+          export CASSANDRA_MAX_HEAP_SIZE=1G
           break;;
         * ) echo "y/n ?";;
     esac

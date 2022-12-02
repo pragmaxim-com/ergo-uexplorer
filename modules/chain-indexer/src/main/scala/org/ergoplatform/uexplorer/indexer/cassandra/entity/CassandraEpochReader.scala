@@ -21,6 +21,7 @@ import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch, UtxoState}
 import org.ergoplatform.uexplorer.indexer.MutableMapPimp
 import org.ergoplatform.uexplorer.indexer.MapPimp
 
+import scala.collection.compat.immutable.ArraySeq
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
@@ -30,17 +31,42 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
 
   import CassandraEpochReader._
 
-  private val blockInfoSelectPreparedStatement = cqlSession.prepare(blockInfoSelectStatement)
+  private lazy val blockInfoSelectWhereHeader = cqlSession.prepare(blockInfoSelectStatement)
+  private lazy val headerSelectWhereHeight    = cqlSession.prepare(headerSelectStatement)
+  private lazy val outputsSelectWhereHeader   = cqlSession.prepare(outputsSelectStatement)
+  private lazy val inputsSelectWhereHeader    = cqlSession.prepare(inputsSelectStatement)
 
   private def blockInfoByEpochIndex(
     epochIndex: Int,
     headerId: String
   ): Future[(Int, BufferedBlockInfo)] =
     cqlSession
-      .executeAsync(blockInfoSelectBinder(blockInfoSelectPreparedStatement)(BlockId.fromStringUnsafe(headerId)))
+      .executeAsync(blockInfoSelectWhereHeader.bind(headerId))
       .toScala
       .map(_.one())
       .map(r => epochIndex -> blockInfoRowReader(r))
+
+  private def getHeaderByHeight(height: Int): Future[(Int, String)] =
+    cqlSession
+      .executeAsync(headerSelectWhereHeight.bind(height))
+      .toScala
+      .map(rs => height -> rs.one().getString(Headers.header_id))
+
+  private def getOutputs(headerId: String) =
+    Source
+      .fromPublisher(cqlSession.executeReactive(outputsSelectWhereHeader.bind(headerId)))
+      .runFold(ArraySeq.newBuilder[(BoxId, Address, Long)]) { case (acc, r) =>
+        acc.addOne(
+          (BoxId(r.getString(box_id)), Address.fromStringUnsafe(r.getString(address)), r.getLong(value))
+        )
+      }
+
+  private def getInputs(headerId: String) =
+    Source
+      .fromPublisher(cqlSession.executeReactive(inputsSelectWhereHeader.bind(headerId)))
+      .runFold(ArraySeq.newBuilder[BoxId]) { case (acc, r) =>
+        acc.addOne(BoxId(r.getString(box_id)))
+      }
 
   def getCachedState: Future[ChainState] = {
     logger.info(s"Loading epoch indexes ...")
@@ -56,51 +82,33 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
       .flatMap { infoByIndex =>
         if (infoByIndex.isEmpty) {
           Future.successful(ChainState.load(infoByIndex, UtxoState.empty))
+        } else if (UtxoState.latestSnapshot.nonEmpty) {
+          Future.fromTry(UtxoState.getLatestSnapshotByIndex.map { case (epochIndex, utxoState) =>
+            ChainState.load(infoByIndex.takeWhile(_._1 <= epochIndex), utxoState)
+          })
         } else {
-          val heightRangeForAllEpochs = infoByIndex.iterator.flatMap(i => Epoch.heightRangeForEpochIndex(i._1)).toIndexedSeq
           logger.info(
-            s"Loading ${infoByIndex.size} epochs from ${infoByIndex.head._1} to ${infoByIndex.last._1} from database"
+            s"Loading ${infoByIndex.size} epochs from ${infoByIndex.firstKey} to ${infoByIndex.lastKey} from database"
           )
-          Source(heightRangeForAllEpochs)
-            .mapAsync(1) { height =>
-              cqlSession
-                .executeAsync(
-                  s"SELECT ${Headers.header_id} FROM ${Const.CassandraKeyspace}.${Headers.node_headers_table} WHERE ${Headers.height} = $height;"
-                )
-                .toScala
-                .map(rs => height -> rs.one().getString(Headers.header_id))
+          Source
+            .fromIterator(() => infoByIndex.keysIterator)
+            .mapConcat(Epoch.heightRangeForEpochIndex)
+            .mapAsync(1)(getHeaderByHeight)
+            .mapAsync(4) { case (height, headerId) =>
+              val outputsF = getOutputs(headerId)
+              getInputs(headerId)
+                .flatMap(inputs => outputsF.map(outputs => (height, (inputs.result(), outputs.result()))))
             }
-            .mapAsync(2) { case (height, headerId) =>
-              val outputsF =
-                Source
-                  .fromPublisher(
-                    cqlSession.executeReactive(
-                      s"SELECT $box_id, $address, $value FROM ${Const.CassandraKeyspace}.${Outputs.node_outputs_table} WHERE ${Outputs.header_id} = '$headerId';"
-                    )
-                  )
-                  .runFold(ArraySeq.newBuilder[(BoxId, Address, Long)]) { case (acc, r) =>
-                    acc.addOne(
-                      (BoxId(r.getString(box_id)), Address.fromStringUnsafe(r.getString(address)), r.getLong(value))
-                    )
-                  }
-              val inputsF =
-                Source
-                  .fromPublisher(
-                    cqlSession.executeReactive(
-                      s"SELECT $box_id FROM ${Const.CassandraKeyspace}.${Inputs.node_inputs_table} WHERE ${Outputs.header_id} = '$headerId';"
-                    )
-                  )
-                  .runFold(ArraySeq.newBuilder[BoxId]) { case (acc, r) =>
-                    acc.addOne(BoxId(r.getString(box_id)))
-                  }
-              inputsF.flatMap(inputs => outputsF.map(outputs => (height, inputs.result(), outputs.result())))
-            }
-            .buffer(16, OverflowStrategy.backpressure)
-            .runFold(UtxoState.empty) { case (s, (height, inputs, outputs)) =>
-              s.bufferBestBlock(height, inputs, outputs)
+            .buffer(32, OverflowStrategy.backpressure)
+            .grouped(Const.EpochLength)
+            .runFold(UtxoState.empty) { case (s, boxesByHeight) =>
+              val epochIndex = Epoch.epochIndexForHeight(boxesByHeight.head._1)
+              logger.info(s"Merging boxes of epoch $epochIndex into utxo state")
+              s.mergeEpochFromBuffer(boxesByHeight.iterator)
             }
             .map { utxoState =>
-              ChainState.load(infoByIndex, utxoState.mergeEpochFromBuffer(heightRangeForAllEpochs))
+              UtxoState.saveSnapshot(infoByIndex.lastKey, utxoState)
+              ChainState.load(infoByIndex, utxoState)
             }
         }
       }
@@ -124,8 +132,29 @@ object CassandraEpochReader extends CassandraPersistenceSupport {
       .isEqualTo(QueryBuilder.bindMarker(Headers.header_id))
       .build()
 
-  protected[cassandra] def blockInfoSelectBinder(preparedStatement: PreparedStatement)(headerId: BlockId): BoundStatement =
-    preparedStatement.bind().setString(Headers.header_id, headerId)
+  protected[cassandra] val headerSelectStatement: SimpleStatement =
+    QueryBuilder
+      .selectFrom(Const.CassandraKeyspace, Headers.node_headers_table)
+      .columns(Headers.header_id)
+      .whereColumn(Headers.height)
+      .isEqualTo(QueryBuilder.bindMarker(Headers.height))
+      .build()
+
+  protected[cassandra] val outputsSelectStatement: SimpleStatement =
+    QueryBuilder
+      .selectFrom(Const.CassandraKeyspace, Outputs.node_outputs_table)
+      .columns(Outputs.box_id, Outputs.address, Outputs.value)
+      .whereColumn(Outputs.header_id)
+      .isEqualTo(QueryBuilder.bindMarker(Outputs.header_id))
+      .build()
+
+  protected[cassandra] val inputsSelectStatement: SimpleStatement =
+    QueryBuilder
+      .selectFrom(Const.CassandraKeyspace, Inputs.node_inputs_table)
+      .columns(Outputs.box_id)
+      .whereColumn(Inputs.header_id)
+      .isEqualTo(QueryBuilder.bindMarker(Inputs.header_id))
+      .build()
 
   protected[cassandra] def blockInfoRowReader(row: Row): BufferedBlockInfo = {
     import Headers.BlockInfo._

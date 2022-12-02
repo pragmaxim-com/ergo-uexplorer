@@ -66,7 +66,7 @@ def chainIndexerAssemblySettings = Seq(
   },
   scriptClasspath := Seq((assembly / assemblyJarName).value),
   Universal / javaOptions ++= Seq(
-    "-J-Xmx6G",
+    "-J-Xmx4G",
     "-J-Xms512m",
     "-J-Xss40m",
   )

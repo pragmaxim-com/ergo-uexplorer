@@ -86,9 +86,10 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
 
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
     for {
+      plugins <- Future.fromTry(Indexer.loadPlugins)
+      _ = if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
       chainState <- backend.getCachedState
       _          <- ChainSyncer.initialize(chainState)
-      plugins    <- Future.fromTry(Indexer.loadPlugins)
       done       <- schedule(initialDelay, pollingInterval)(sync(plugins)).run()
     } yield done
 }

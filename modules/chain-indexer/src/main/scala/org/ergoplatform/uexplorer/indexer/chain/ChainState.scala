@@ -9,7 +9,7 @@ import org.ergoplatform.uexplorer.indexer.{MapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
 
-import scala.collection.immutable.{List, SortedMap, SortedSet, TreeMap, TreeSet}
+import scala.collection.immutable.{ArraySeq, List, SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Success, Try}
 
@@ -17,6 +17,7 @@ case class ChainState(
   lastBlockIdInEpoch: SortedMap[Int, BlockId],
   invalidEpochs: SortedMap[Int, InvalidEpochCandidate],
   blockBuffer: BlockBuffer,
+  boxesByHeightBuffer: TreeMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])],
   utxoState: UtxoState
 ) {
   import ChainState.*
@@ -27,7 +28,8 @@ case class ChainState(
     } else {
       val previousEpochIndex = currentEpochIndex - 1
       val heightRange        = Epoch.heightRangeForEpochIndex(currentEpochIndex)
-      val newState           = utxoState.mergeEpochFromBuffer(heightRange)
+      val boxesByHeightSlice = boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
+      val newState = utxoState.mergeEpochFromBuffer(boxesByHeightSlice.iterator)
       EpochCandidate(blockBuffer.blockRelationsByHeight(heightRange)) match {
         case Right(candidate)
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
@@ -36,6 +38,7 @@ case class ChainState(
             lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
             invalidEpochs,
             blockBuffer.flushEpoch(heightRange),
+            boxesByHeightBuffer -- boxesByHeightSlice.keysIterator,
             newState
           )
         case Right(candidate) =>
@@ -67,10 +70,9 @@ case class ChainState(
         .map { block =>
           BestBlockInserted(block) -> copy(
             blockBuffer = blockBuffer.addBlock(block),
-            utxoState = utxoState.bufferBestBlock(
+            boxesByHeightBuffer = boxesByHeightBuffer.updated(
               block.header.height,
-              block.inputs.map(_.boxId),
-              block.outputs.map(o => (o.boxId, o.address, o.value))
+              block.inputs.map(_.boxId) -> block.outputs.map(o => (o.boxId, o.address, o.value))
             )
           )
         }
@@ -112,10 +114,10 @@ case class ChainState(
             newBlocks
               .map(b => b.header.height -> (b.inputs.map(_.boxId), b.outputs.map(o => (o.boxId, o.address, o.value))))
               .toMap
-          val newUtxoState = utxoState.bufferFork(newForkByHeight, supersededBlocks.map(_.height).toList)
+
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(
-            blockBuffer = newBlockBuffer,
-            utxoState   = newUtxoState
+            blockBuffer         = newBlockBuffer,
+            boxesByHeightBuffer = boxesByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++ newForkByHeight
           )
         }
 
@@ -179,6 +181,7 @@ object ChainState {
         bufferedInfoByEpochIndex.toSeq.map(i => i._2.headerId -> i._2).toMap,
         bufferedInfoByEpochIndex.map(i => i._2.height -> i._2)
       ),
+      TreeMap.empty,
       utxoState
     )
 
