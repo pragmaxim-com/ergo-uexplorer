@@ -75,6 +75,11 @@ object UtxoState extends LazyLogging {
 
   private lazy val snapshotDir = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "snapshots").toFile
 
+  def clearAllSnapshots: Unit =
+    if (snapshotDir.exists()) {
+      snapshotDir.listFiles().foreach(_.delete())
+    }
+
   def latestSnapshot: Option[(Int, File)] =
     if (snapshotDir.exists()) {
       val snapshots = snapshotDir.listFiles().collect {

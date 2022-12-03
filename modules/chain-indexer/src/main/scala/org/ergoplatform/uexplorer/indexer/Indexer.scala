@@ -31,7 +31,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
 ) extends AkkaStreamSupport
   with LazyLogging {
 
-  val blockToEpochFlow: Flow[Block, (Block, Option[MaybeNewEpoch]), NotUsed] =
+  private val blockToEpochFlow: Flow[Block, (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[Block]
       .mapAsync(1) {
         case block if Epoch.heightAtFlushPoint(block.header.height) =>
@@ -42,7 +42,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
           Future.successful(block -> Option.empty)
       }
 
-  val indexingFlow: Flow[Int, (Block, Option[MaybeNewEpoch]), NotUsed] =
+  private val indexingFlow: Flow[Int, (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[Int]
       .via(blockHttpClient.blockCachingFlow)
       .async
@@ -68,16 +68,31 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       )
       .map(_ => ())
 
+  def verifyStateIntegrity(chainState: ChainState): Future[Done] = {
+    val pastHeights = chainState.findMissingIndexes.flatMap(Epoch.heightRangeForEpochIndex)
+    if (pastHeights.nonEmpty) {
+      logger.error(s"Going to index missing blocks at heights : ${pastHeights.mkString(", ")}")
+      Source(pastHeights)
+        .via(indexingFlow)
+        .run()
+        .transform { _ =>
+          UtxoState.clearAllSnapshots
+          Failure(new UnexpectedStateError("App restart is needed to reload UtxoState"))
+        }
+    } else {
+      logger.info(s"Chain state is valid")
+      Future.successful(Done)
+    }
+  }
+
   def sync(plugins: List[Plugin]): Future[(ChainState, MempoolState)] =
     for {
       chainState <- ChainSyncer.getChainState
       fromHeight = chainState.getLastCachedBlock.map(_.height).getOrElse(0) + 1
       bestBlockHeight <- blockHttpClient.getBestBlockHeight
-      pastHeights = chainState.findMissingIndexes.flatMap(Epoch.heightRangeForEpochIndex)
-      _           = if (pastHeights.nonEmpty) logger.error(s"Going to index $pastHeights missing blocks")
-      _           = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
-      _           = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
-      _               <- Source(pastHeights).concat(Source(fromHeight to bestBlockHeight)).via(indexingFlow).run()
+      _ = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
+      _ = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
+      _               <- Source(fromHeight to bestBlockHeight).via(indexingFlow).run()
       newChainState   <- ChainSyncer.getChainState
       newTransactions <- syncMempool(newChainState, bestBlockHeight)
       _               <- executePlugins(plugins, newTransactions, newChainState.utxoState)
@@ -90,6 +105,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
       _ = if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
       chainState <- backend.getChainState
       _          <- ChainSyncer.initialize(chainState)
+      _          <- verifyStateIntegrity(chainState)
       done       <- schedule(initialDelay, pollingInterval)(sync(plugins)).run()
     } yield done
 }
