@@ -46,9 +46,6 @@ object CassandraEpochWriter extends EpochPersistenceSupport with LazyLogging {
           .setInt(epoch_index, epoch.index)
           .setString(last_header_id, epoch.blockIds.last)
       )
-    case ((_, Some(NewEpochFailed(InvalidEpochCandidate(epochIndex, invalidHeightsAsc, error)))), _) =>
-      logger.error(s"Epoch $epochIndex is invalid due to $error at heights ${invalidHeightsAsc.mkString(",")}")
-      ArraySeq.empty
     case ((_, Some(NewEpochExisted(epochIndex))), _) =>
       logger.debug(s"Skipping persistence of epoch $epochIndex as it already existed")
       ArraySeq.empty

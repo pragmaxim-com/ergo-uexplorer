@@ -71,7 +71,6 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           )
           actualProgressState shouldBe ChainState(
             lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
-            TreeMap.empty,
             BlockBuffer(
               Map(e0b2Block.header.id -> e0b2BlockInfo, e1b2Block.header.id -> e1b2BlockInfo),
               TreeMap(1024            -> e0b2BlockInfo, 2048                -> e1b2BlockInfo)
@@ -114,7 +113,6 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           val newState = ChainState.load(lastBlockIdByEpochIndex, utxoState)
           newState shouldBe ChainState(
             lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
-            TreeMap.empty,
             BlockBuffer(
               Map(e0b1Block.header.id -> e0b1Info),
               TreeMap(1024            -> e0b1Info)

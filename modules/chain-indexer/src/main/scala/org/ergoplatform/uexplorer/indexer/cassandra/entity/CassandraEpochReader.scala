@@ -68,7 +68,7 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
         acc.addOne(BoxId(r.getString(box_id)))
       }
 
-  def getCachedState: Future[ChainState] = {
+  def getChainState: Future[ChainState] = {
     logger.info(s"Loading epoch indexes ...")
     Source
       .fromPublisher(

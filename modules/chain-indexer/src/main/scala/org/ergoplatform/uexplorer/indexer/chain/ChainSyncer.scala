@@ -66,10 +66,16 @@ class ChainSyncer(implicit protocol: ProtocolSettings) extends LazyLogging {
         replyTo ! s
         Behaviors.same
       case FinishEpoch(epochIndex, replyTo) =>
-        val (maybeNewEpoch, newChainState) = s.finishEpoch(epochIndex)
-        logger.info(s"$maybeNewEpoch, $newChainState")
-        replyTo ! maybeNewEpoch
-        initialized(newChainState)
+        s.finishEpoch(epochIndex) match {
+          case Success((maybeNewEpoch, newChainState)) =>
+            logger.info(s"$maybeNewEpoch, $newChainState")
+            replyTo ! StatusReply.success(maybeNewEpoch)
+            initialized(newChainState)
+          case Failure(ex) =>
+            logger.error(s"Unable to finish epoch due to", ex)
+            replyTo ! StatusReply.error(ex)
+            Behaviors.same
+        }
       case unexpected =>
         logger.error(s"Message $unexpected unexpected")
         Behaviors.same
@@ -97,7 +103,7 @@ object ChainSyncer {
 
   case class GetChainState(replyTo: ActorRef[ChainState]) extends ChainSyncerRequest
 
-  case class FinishEpoch(epochIndex: Int, replyTo: ActorRef[MaybeNewEpoch]) extends ChainSyncerRequest
+  case class FinishEpoch(epochIndex: Int, replyTo: ActorRef[StatusReply[MaybeNewEpoch]]) extends ChainSyncerRequest
 
   /** RESPONSE */
   sealed trait ChainSyncerResponse
@@ -116,12 +122,6 @@ object ChainSyncer {
 
     override def toString: String =
       s"New epoch ${epoch.index} created"
-  }
-
-  case class NewEpochFailed(epochCandidate: InvalidEpochCandidate) extends MaybeNewEpoch {
-
-    override def toString: String =
-      s"New epoch ${epochCandidate.epochIndex} failed due to : ${epochCandidate.error}"
   }
 
   case class NewEpochExisted(epochIndex: Int) extends MaybeNewEpoch {
@@ -159,5 +159,5 @@ object ChainSyncer {
   def finishEpoch(
     epochIndex: Int
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainSyncerRequest]): Future[MaybeNewEpoch] =
-    ref.ask(ref => FinishEpoch(epochIndex, ref))
+    ref.askWithStatus(ref => FinishEpoch(epochIndex, ref))
 }

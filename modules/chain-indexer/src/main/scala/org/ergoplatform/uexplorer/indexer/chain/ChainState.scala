@@ -15,16 +15,15 @@ import scala.util.{Failure, Success, Try}
 
 case class ChainState(
   lastBlockIdInEpoch: SortedMap[Int, BlockId],
-  invalidEpochs: SortedMap[Int, InvalidEpochCandidate],
   blockBuffer: BlockBuffer,
   boxesByHeightBuffer: TreeMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])],
   utxoState: UtxoState
 ) {
   import ChainState.*
 
-  def finishEpoch(currentEpochIndex: Int): (MaybeNewEpoch, ChainState) =
+  def finishEpoch(currentEpochIndex: Int): Try[(MaybeNewEpoch, ChainState)] =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
-      NewEpochExisted(currentEpochIndex) -> this
+      Success(NewEpochExisted(currentEpochIndex) -> this)
     } else {
       val previousEpochIndex = currentEpochIndex - 1
       val heightRange        = Epoch.heightRangeForEpochIndex(currentEpochIndex)
@@ -34,25 +33,24 @@ case class ChainState(
         case Right(candidate)
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
           val newEpoch = candidate.getEpoch
-          NewEpochCreated(newEpoch) -> ChainState(
-            lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
-            invalidEpochs,
-            blockBuffer.flushEpoch(heightRange),
-            boxesByHeightBuffer -- boxesByHeightSlice.keysIterator,
-            newState
+          Success(
+            NewEpochCreated(newEpoch) -> ChainState(
+              lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
+              blockBuffer.flushEpoch(heightRange),
+              boxesByHeightBuffer -- boxesByHeightSlice.keysIterator,
+              newState
+            )
           )
         case Right(candidate) =>
           val Epoch(curIndex, _) = candidate.getEpoch
-          val error =
-            s"Prev epoch $previousEpochIndex header ${lastBlockIdInEpoch.get(previousEpochIndex)} " +
-            s"does not match current epoch $curIndex header"
           val invalidHeights =
             TreeSet(Epoch.heightRangeForEpochIndex(previousEpochIndex).last, candidate.relsByHeight.head._1)
-          val invalidEpochCandidate = InvalidEpochCandidate(curIndex, invalidHeights, error)
-          val newP                  = copy(invalidEpochs = invalidEpochs.updated(candidate.epochIndex, invalidEpochCandidate))
-          NewEpochFailed(invalidEpochCandidate) -> newP
+          val error =
+            s"Prev epoch $previousEpochIndex header ${lastBlockIdInEpoch.get(previousEpochIndex)} " +
+            s"does not match current epoch $curIndex header, invalid heights: ${invalidHeights.mkString(",")}"
+          Failure(new IllegalStateException(error))
         case Left(candidate) =>
-          NewEpochFailed(candidate) -> copy(invalidEpochs = invalidEpochs.updated(candidate.epochIndex, candidate))
+          Failure(new IllegalStateException(candidate.error))
       }
     }
 
@@ -161,7 +159,6 @@ case class ChainState(
     s"utxo count: ${utxoState.addressByUtxo.size}, non-empty-address count: ${utxoState.utxosByAddress.size}, " +
     s"persisted Epochs: ${existingEpochs.size}${headStr(existingEpochs)}${lastStr(existingEpochs)}, " +
     s"blocks cache size (heights): ${cachedHeights.size}${headStr(cachedHeights)}${lastStr(cachedHeights)}, " +
-    s"invalid Epochs: ${invalidEpochs.size}${headStr(invalidEpochs.keySet)}${lastStr(invalidEpochs.keySet)}, " +
     s"inputs without address: ${utxoState.inputsWithoutAddress.size}"
   }
 
@@ -176,7 +173,6 @@ object ChainState {
   def load(bufferedInfoByEpochIndex: TreeMap[Int, BufferedBlockInfo], utxoState: UtxoState): ChainState =
     ChainState(
       bufferedInfoByEpochIndex.map { case (epochIndex, blockInfo) => epochIndex -> blockInfo.headerId },
-      TreeMap.empty,
       BlockBuffer(
         bufferedInfoByEpochIndex.toSeq.map(i => i._2.headerId -> i._2).toMap,
         bufferedInfoByEpochIndex.map(i => i._2.height -> i._2)
