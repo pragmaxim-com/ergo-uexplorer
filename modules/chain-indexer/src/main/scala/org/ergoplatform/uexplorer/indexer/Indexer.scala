@@ -88,7 +88,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient)(implicit
     for {
       plugins <- Future.fromTry(Indexer.loadPlugins)
       _ = if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
-      chainState <- backend.getCachedState
+      chainState <- backend.getChainState
       _          <- ChainSyncer.initialize(chainState)
       done       <- schedule(initialDelay, pollingInterval)(sync(plugins)).run()
     } yield done

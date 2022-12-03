@@ -29,7 +29,7 @@ case class ChainState(
       val previousEpochIndex = currentEpochIndex - 1
       val heightRange        = Epoch.heightRangeForEpochIndex(currentEpochIndex)
       val boxesByHeightSlice = boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
-      val newState = utxoState.mergeEpochFromBuffer(boxesByHeightSlice.iterator)
+      val newState           = utxoState.mergeEpochFromBuffer(boxesByHeightSlice.iterator)
       EpochCandidate(blockBuffer.blockRelationsByHeight(heightRange)) match {
         case Right(candidate)
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>

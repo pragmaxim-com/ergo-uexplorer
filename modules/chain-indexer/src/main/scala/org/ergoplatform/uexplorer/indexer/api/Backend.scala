@@ -21,7 +21,7 @@ trait Backend {
 
   def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
 
-  def getCachedState: Future[ChainState]
+  def getChainState: Future[ChainState]
 }
 
 class InMemoryBackend extends Backend {
@@ -66,7 +66,7 @@ class InMemoryBackend extends Backend {
           tuple
       }
 
-  override def getCachedState: Future[ChainState] =
+  override def getChainState: Future[ChainState] =
     Future.successful(
       ChainState.load(
         TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*),
