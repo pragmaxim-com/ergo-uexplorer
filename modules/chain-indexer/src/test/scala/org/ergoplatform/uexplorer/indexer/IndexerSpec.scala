@@ -5,9 +5,10 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
-import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, UtxoState}
+import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.MempoolState
+import org.ergoplatform.uexplorer.indexer.utxo.{SnapshotManager, UtxoState}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -61,15 +62,16 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
 
   val blockClient     = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val inMemoryBackend = new InMemoryBackend
-  val indexer         = new Indexer(inMemoryBackend, blockClient)
+  val snapshotManager = new SnapshotManager()
+  val indexer         = new Indexer(inMemoryBackend, blockClient, snapshotManager)
 
   "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {
     ChainSyncer.initialize(ChainState.empty).flatMap { _ =>
-      indexer.sync(List.empty).flatMap { case (chainState, mempoolState) =>
+      indexer.periodicSync(List.empty).flatMap { case (chainState, mempoolState) =>
         chainState.getLastCachedBlock.map(_.height).get shouldBe 4150
         chainState.findMissingIndexes shouldBe empty
         mempoolState.underlyingTxs.keySet.size shouldBe 9
-        indexer.sync(List.empty).map { case (newChainState, newMempoolState) =>
+        indexer.periodicSync(List.empty).map { case (newChainState, newMempoolState) =>
           newChainState.getLastCachedBlock.map(_.height).get shouldBe 4200
           newChainState.findMissingIndexes shouldBe empty
           newMempoolState.underlyingTxs.keySet.size shouldBe 9

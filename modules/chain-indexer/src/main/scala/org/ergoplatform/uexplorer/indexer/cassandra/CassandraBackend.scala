@@ -36,7 +36,8 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraOutputsWriter
   with CassandraBlockUpdater
   with CassandraEpochWriter
-  with CassandraEpochReader {
+  with CassandraEpochReader
+  with CassandraUtxoReader {
 
   val blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]

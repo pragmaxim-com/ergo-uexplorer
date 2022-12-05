@@ -8,6 +8,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BlockBuffer
 import org.ergoplatform.uexplorer.indexer.{MapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.{ArraySeq, List, SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer

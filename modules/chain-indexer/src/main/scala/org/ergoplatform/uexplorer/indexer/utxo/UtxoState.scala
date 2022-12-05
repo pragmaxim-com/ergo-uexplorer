@@ -1,16 +1,16 @@
-package org.ergoplatform.uexplorer.indexer.chain
+package org.ergoplatform.uexplorer.indexer.utxo
 
-import akka.{Done, NotUsed}
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.pattern.StatusReply
 import akka.stream.scaladsl.Source
+import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.{Address, BoxId}
-import org.ergoplatform.uexplorer.indexer.chain.Epoch
 import org.ergoplatform.uexplorer.indexer.*
+import org.ergoplatform.uexplorer.indexer.chain.Epoch
+import org.ergoplatform.uexplorer.{Address, BoxId}
 
-import java.io.{File, FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
+import java.io.*
 import java.nio.file.{Path, Paths}
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.TreeMap
@@ -72,54 +72,4 @@ case class UtxoState(
 
 object UtxoState extends LazyLogging {
   def empty: UtxoState = UtxoState(Map.empty, Map.empty, Set.empty)
-
-  private lazy val snapshotDir = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "snapshots").toFile
-
-  def clearAllSnapshots: Unit =
-    if (snapshotDir.exists()) {
-      snapshotDir.listFiles().foreach(_.delete())
-    }
-
-  def latestSnapshot: Option[(Int, File)] =
-    if (snapshotDir.exists()) {
-      val snapshots = snapshotDir.listFiles().collect {
-        case file if file.getName.toIntOption.nonEmpty => file.getName.toInt -> file
-      }
-      TreeMap(snapshots: _*).lastOption
-    } else None
-
-  def saveSnapshot(latestEpochIndex: Int, utxoState: UtxoState): Try[Unit] =
-    Try(snapshotDir.mkdirs()).map { _ =>
-      val snapshotFile = snapshotDir.toPath.resolve(latestEpochIndex.toString).toFile
-      logger.info(s"Saving snapshot at epoch $latestEpochIndex to ${snapshotFile.getPath}")
-      snapshotFile.delete()
-      snapshotFile.createNewFile()
-      val fileOutStream   = new FileOutputStream(snapshotFile)
-      val objectOutStream = new ObjectOutputStream(fileOutStream)
-      try objectOutStream.writeObject(utxoState)
-      catch {
-        case NonFatal(ex) =>
-          logger.error(s"Unable to save snapshot ${snapshotFile.getPath}", ex)
-          throw ex
-      } finally {
-        objectOutStream.close()
-        fileOutStream.close()
-      }
-    }
-
-  def getLatestSnapshotByIndex: Try[(Int, UtxoState)] =
-    Try(latestSnapshot.get).map { case (latestEpochIndex, snapshotFile) =>
-      logger.info(s"Loading snapshot at epoch $latestEpochIndex from ${snapshotFile.getPath}")
-      val fileInput   = new FileInputStream(snapshotFile)
-      val objectInput = new ObjectInputStream(fileInput)
-      try latestEpochIndex -> objectInput.readObject.asInstanceOf[UtxoState]
-      catch {
-        case NonFatal(ex) =>
-          logger.error(s"Unable to load snapshot ${snapshotFile.getPath}", ex)
-          throw ex
-      } finally {
-        objectInput.close()
-        fileInput.close()
-      }
-    }
 }

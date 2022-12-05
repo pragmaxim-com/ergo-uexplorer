@@ -5,8 +5,9 @@ import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
-import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch, UtxoState}
+import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.compat.immutable.ArraySeq
@@ -21,7 +22,9 @@ trait Backend {
 
   def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
 
-  def getChainState: Future[ChainState]
+  def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState]
+
+  def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]]
 }
 
 class InMemoryBackend extends Backend {
@@ -66,12 +69,10 @@ class InMemoryBackend extends Backend {
           tuple
       }
 
-  override def getChainState: Future[ChainState] =
-    Future.successful(
-      ChainState.load(
-        TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*),
-        UtxoState.empty.mergeEpochFromBuffer(boxesByHeight.asScala.iterator)
-      )
-    )
+  override def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState] =
+    Future.successful(UtxoState.empty.mergeEpochFromBuffer(boxesByHeight.asScala.iterator))
+
+  def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]] =
+    Future.successful(TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*))
 
 }
