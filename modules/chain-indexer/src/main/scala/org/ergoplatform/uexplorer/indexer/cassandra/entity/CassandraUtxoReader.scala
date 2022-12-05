@@ -20,7 +20,7 @@ import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
 import org.ergoplatform.uexplorer.indexer.MutableMapPimp
 import org.ergoplatform.uexplorer.indexer.MapPimp
-import org.ergoplatform.uexplorer.indexer.utxo.{Snapshot, UtxoState}
+import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoState}
 
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.mutable
@@ -68,7 +68,7 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
         .fromIterator(() => epochIndexes)
         .mapConcat(Epoch.heightRangeForEpochIndex)
         .mapAsync(1)(getHeaderByHeight)
-        .mapAsync(4) { case (height, headerId) =>
+        .mapAsync(2) { case (height, headerId) =>
           val outputsF = getOutputs(headerId)
           getInputs(headerId)
             .flatMap(inputs => outputsF.map(outputs => (height, (inputs.result(), outputs.result()))))

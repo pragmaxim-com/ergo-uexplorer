@@ -8,7 +8,7 @@ import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMag
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.MempoolState
-import org.ergoplatform.uexplorer.indexer.utxo.{SnapshotManager, UtxoState}
+import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshotManager, UtxoState}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -62,7 +62,7 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
 
   val blockClient     = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val inMemoryBackend = new InMemoryBackend
-  val snapshotManager = new SnapshotManager()
+  val snapshotManager = new UtxoSnapshotManager()
   val indexer         = new Indexer(inMemoryBackend, blockClient, snapshotManager)
 
   "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {

@@ -4,6 +4,8 @@ import java.io.BufferedInputStream
 import java.util.zip.GZIPInputStream
 import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.io.Source
+import io.circe.parser.*
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 object Rest {
 
@@ -41,5 +43,9 @@ object Rest {
         println(block)
       blockIds.byHeight(height) -> block
     }
+
+    def getByHeight(height: Int): ApiFullBlock =
+      parse(byHeight(height)).flatMap(_.as[ApiFullBlock]).toOption.get
+
   }
 }

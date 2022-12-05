@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
-import io.circe.parser.*
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
@@ -23,9 +22,6 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
   implicit private val protocol: ProtocolSettings = ChainIndexerConf.loadDefaultOrThrow.protocol
   implicit private val e: ErgoAddressEncoder      = protocol.addressEncoder
 
-  private def getBlock(height: Int): ApiFullBlock =
-    parse(Rest.blocks.byHeight(height)).flatMap(_.as[ApiFullBlock]).toOption.get
-
   private def forkBlock(
     apiFullBlock: ApiFullBlock,
     newBlockId: String,
@@ -43,12 +39,12 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
     "ProgressState state should" - {
       "allow for updating epoch indexes" - {
         "when has epochs" in {
-          val e0b1Block     = BlockBuilder(getBlock(1023), None).get
-          val e0b2Block     = BlockBuilder(getBlock(1024), Option(BufferedBlockInfo.fromBlock(e0b1Block))).get
+          val e0b1Block     = BlockBuilder(Rest.blocks.getByHeight(1023), None).get
+          val e0b2Block     = BlockBuilder(Rest.blocks.getByHeight(1024), Option(BufferedBlockInfo.fromBlock(e0b1Block))).get
           val e0b2BlockInfo = BufferedBlockInfo.fromBlock(e0b2Block)
 
-          val e1b1Block     = BlockBuilder(getBlock(2047), None).get
-          val e1b2Block     = BlockBuilder(getBlock(2048), Option(BufferedBlockInfo.fromBlock(e1b1Block))).get
+          val e1b1Block     = BlockBuilder(Rest.blocks.getByHeight(2047), None).get
+          val e1b2Block     = BlockBuilder(Rest.blocks.getByHeight(2048), Option(BufferedBlockInfo.fromBlock(e1b1Block))).get
           val e1b2BlockInfo = BufferedBlockInfo.fromBlock(e1b2Block)
 
           val e0In = List(e0b1Block, e0b2Block).flatMap(_.inputs.map(_.boxId))
@@ -82,12 +78,12 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
         }
       }
       "throw when inserting block without parent being applied first" in {
-        assertThrows[UnexpectedStateError](ChainState.empty.insertBestBlock(getBlock(1025)).get)
+        assertThrows[UnexpectedStateError](ChainState.empty.insertBestBlock(Rest.blocks.getByHeight(1025)).get)
 
       }
       "allow for inserting new block" - {
         "after genesis" in {
-          val firstApiBlock             = getBlock(1)
+          val firstApiBlock             = Rest.blocks.getByHeight(1)
           val firstFlatBlock            = BlockBuilder(firstApiBlock, None).get
           val (blockInserted, newState) = ChainState.empty.insertBestBlock(firstApiBlock).get
           blockInserted.flatBlock shouldBe firstFlatBlock
@@ -97,7 +93,7 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           )
         }
         "after an existing block" in {
-          val e0b1Block               = BlockBuilder(getBlock(1024), None).get
+          val e0b1Block               = BlockBuilder(Rest.blocks.getByHeight(1024), None).get
           val e0b1Info                = BufferedBlockInfo.fromBlock(e0b1Block)
           val lastBlockIdByEpochIndex = TreeMap(0 -> e0b1Info)
 
@@ -122,7 +118,7 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
             utxoState
           )
 
-          val e1b1                       = getBlock(1025)
+          val e1b1                       = Rest.blocks.getByHeight(1025)
           val e1b1Block                  = BlockBuilder(e1b1, Some(e0b1Info)).get
           val e1b1Info                   = BufferedBlockInfo.fromBlock(e1b1Block)
           val (blockInserted, newState2) = newState.insertBestBlock(e1b1).get
@@ -137,12 +133,14 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
 
       "throw when inserting an empty fork, one-sized fork or unchained fork" in {
         assertThrows[UnexpectedStateError](ChainState.empty.insertWinningFork(List.empty).get)
-        assertThrows[UnexpectedStateError](ChainState.empty.insertWinningFork(List(getBlock(1024))).get)
-        assertThrows[UnexpectedStateError](ChainState.empty.insertWinningFork(List(getBlock(1024), getBlock(1026))).get)
+        assertThrows[UnexpectedStateError](ChainState.empty.insertWinningFork(List(Rest.blocks.getByHeight(1024))).get)
+        assertThrows[UnexpectedStateError](
+          ChainState.empty.insertWinningFork(List(Rest.blocks.getByHeight(1024), Rest.blocks.getByHeight(1026))).get
+        )
       }
 
       "allow for inserting new fork" in {
-        val commonBlock     = BlockBuilder(getBlock(1024), None).get
+        val commonBlock     = BlockBuilder(Rest.blocks.getByHeight(1024), None).get
         val commonBlockInfo = BufferedBlockInfo.fromBlock(commonBlock)
         val utxos = commonBlock.outputs
           .map(b => (b.boxId, b.address, b.value))
@@ -155,13 +153,13 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
             Set.empty
           )
         val s               = ChainState.load(TreeMap(0 -> commonBlockInfo), utxoState)
-        val b1ApiBlock      = getBlock(1025)
+        val b1ApiBlock      = Rest.blocks.getByHeight(1025)
         val b1FlatBlock     = BlockBuilder(b1ApiBlock, Option(commonBlockInfo)).get
         val b1FlatBlockInfo = BufferedBlockInfo.fromBlock(b1FlatBlock)
-        val b2ApiBlock      = getBlock(1026)
+        val b2ApiBlock      = Rest.blocks.getByHeight(1026)
         val b2FlatBlock     = BlockBuilder(b2ApiBlock, Option(b1FlatBlockInfo)).get
         val b2FlatBlockInfo = BufferedBlockInfo.fromBlock(b2FlatBlock)
-        val b3              = getBlock(1027)
+        val b3              = Rest.blocks.getByHeight(1027)
         val b3FlatBlock     = BlockBuilder(b3, Option(b2FlatBlockInfo)).get
         val b3FlatBlockInfo = BufferedBlockInfo.fromBlock(b3FlatBlock)
         val b1Fork          = forkBlock(b1ApiBlock, "7975b60515b881504ec471affb84234123ac5491d0452da0eaf5fb96948f18e7")

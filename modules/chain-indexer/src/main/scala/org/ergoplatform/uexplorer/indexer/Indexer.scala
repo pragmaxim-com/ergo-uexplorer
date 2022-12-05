@@ -15,7 +15,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, Epoch}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.{MempoolState, MempoolSyncerRequest, NewTransactions}
-import org.ergoplatform.uexplorer.indexer.utxo.{Snapshot, SnapshotManager, UtxoState}
+import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoSnapshotManager, UtxoState}
 import org.ergoplatform.uexplorer.plugin.Plugin
 
 import scala.jdk.CollectionConverters.*
@@ -25,10 +25,10 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Try}
 
-class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManager: SnapshotManager)(implicit
-  val s: ActorSystem[Nothing],
-  chainSyncerRef: ActorRef[ChainSyncerRequest],
-  mempoolSyncerRef: ActorRef[MempoolSyncerRequest]
+class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManager: UtxoSnapshotManager)(implicit
+                                                                                                        val s: ActorSystem[Nothing],
+                                                                                                        chainSyncerRef: ActorRef[ChainSyncerRequest],
+                                                                                                        mempoolSyncerRef: ActorRef[MempoolSyncerRequest]
 ) extends AkkaStreamSupport
   with LazyLogging {
 
@@ -106,7 +106,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
     newEpochOpt   <- Source(fromHeight to bestBlockHeight).via(indexingFlow).runWith(Sink.lastOption)
     newChainState <- ChainSyncer.getChainState
     _ = newEpochOpt.foreach(newEpoch =>
-          snapshotManager.saveSnapshot(Snapshot.Deserialized(newEpoch.epoch.index, newChainState.utxoState))
+          snapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(newEpoch.epoch.index, newChainState.utxoState))
         )
   } yield newChainState
 
@@ -143,7 +143,7 @@ object Indexer extends LazyLogging {
     implicit val mempoolSyncerRef: ActorRef[MempoolSyncerRequest] =
       ctx.spawn(MempoolSyncer.behavior(MempoolState(Map.empty)), "MempoolSyncer")
     BlockHttpClient.withNodePoolBackend(conf).flatMap { blockHttpClient =>
-      val snapshotManager = new SnapshotManager()
+      val snapshotManager = new UtxoSnapshotManager()
       val indexer =
         conf.backendType match {
           case CassandraDb(parallelism) =>
