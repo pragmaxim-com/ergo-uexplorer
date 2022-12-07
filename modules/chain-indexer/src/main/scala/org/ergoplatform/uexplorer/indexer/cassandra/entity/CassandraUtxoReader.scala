@@ -6,7 +6,7 @@ import com.datastax.oss.driver.api.core.cql.{AsyncResultSet, BoundStatement, Pre
 import com.datastax.oss.driver.api.core.data.TupleValue
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.Const
+import org.ergoplatform.uexplorer.indexer.{Const, MapPimp, MutableMapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.{db, Address, BlockId, BoxId}
@@ -18,8 +18,6 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
-import org.ergoplatform.uexplorer.indexer.MutableMapPimp
-import org.ergoplatform.uexplorer.indexer.MapPimp
 import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoState}
 
 import scala.collection.compat.immutable.ArraySeq
@@ -36,11 +34,11 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
   private lazy val outputsSelectWhereHeader = cqlSession.prepare(outputsSelectStatement)
   private lazy val inputsSelectWhereHeader  = cqlSession.prepare(inputsSelectStatement)
 
-  private def getHeaderByHeight(height: Int): Future[(Int, String)] =
+  private def getHeaderByHeight(height: Int): Future[(Int, Option[String])] =
     cqlSession
       .executeAsync(headerSelectWhereHeight.bind(height))
       .toScala
-      .map(rs => height -> rs.one().getString(Headers.header_id))
+      .map(rs => height -> Option(rs.one()).map(_.getString(Headers.header_id)))
 
   private def getOutputs(headerId: String) =
     Source
@@ -68,10 +66,13 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
         .fromIterator(() => epochIndexes)
         .mapConcat(Epoch.heightRangeForEpochIndex)
         .mapAsync(1)(getHeaderByHeight)
-        .mapAsync(2) { case (height, headerId) =>
-          val outputsF = getOutputs(headerId)
-          getInputs(headerId)
-            .flatMap(inputs => outputsF.map(outputs => (height, (inputs.result(), outputs.result()))))
+        .mapAsync(2) {
+          case (height, None) =>
+            Future.failed(new UnexpectedStateError(s"There is no header for height $height"))
+          case (height, Some(headerId)) =>
+            val outputsF = getOutputs(headerId)
+            getInputs(headerId)
+              .flatMap(inputs => outputsF.map(outputs => (height, (inputs.result(), outputs.result()))))
         }
         .buffer(32, OverflowStrategy.backpressure)
         .grouped(Const.EpochLength)

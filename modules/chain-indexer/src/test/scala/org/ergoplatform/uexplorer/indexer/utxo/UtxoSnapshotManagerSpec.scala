@@ -1,16 +1,20 @@
 package org.ergoplatform.uexplorer.indexer.utxo
 
+import akka.actor.testkit.typed.scaladsl.ActorTestKit
+import akka.actor.typed.ActorSystem
 import org.ergoplatform.uexplorer.indexer.Rest
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
-import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.freespec.{AnyFreeSpec, AsyncFreeSpec}
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.Paths
 
-class UtxoSnapshotManagerSpec extends AnyFreeSpec with Matchers {
+class UtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
 
+  private val testKit                             = ActorTestKit()
   implicit private val protocol: ProtocolSettings = ChainIndexerConf.loadDefaultOrThrow.protocol
+  implicit private val sys: ActorSystem[_]        = testKit.internalSystem
 
   private val utxoSnapshotManager =
     new UtxoSnapshotManager(
@@ -33,9 +37,11 @@ class UtxoSnapshotManagerSpec extends AnyFreeSpec with Matchers {
       utxosByAddress,
       Set.empty
     )
-    utxoSnapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(1, utxoState)).get
-    val snapshot = utxoSnapshotManager.getLatestSnapshotByIndex.get
-    snapshot.epochIndex shouldBe 1
-    snapshot.utxoState shouldBe utxoState
+    utxoSnapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(1, utxoState)).flatMap { _ =>
+      utxoSnapshotManager.getLatestSnapshotByIndex.map { snapshot =>
+        snapshot.get.epochIndex shouldBe 1
+        snapshot.get.utxoState shouldBe utxoState
+      }
+    }
   }
 }

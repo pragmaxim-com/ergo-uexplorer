@@ -1,68 +1,101 @@
 package org.ergoplatform.uexplorer.indexer.utxo
 
+import akka.actor.typed.ActorSystem
+import akka.stream.IOResult
+import akka.stream.scaladsl.{FileIO, Framing, Source}
+import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.{Address, BoxId}
 
 import java.io.{File, FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
-import java.nio.file.Paths
+import java.nio.file.{Files, Path, Paths}
+import java.util.Comparator
 import scala.collection.immutable.TreeMap
+import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
+import scala.jdk.CollectionConverters.*
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object UtxoSnapshot {
-  case class Serialized(epochIndex: Int, file: File)
+  case class Serialized(epochIndex: Int, utxoStateDir: File)
   case class Deserialized(epochIndex: Int, utxoState: UtxoState)
 }
 
 class UtxoSnapshotManager(
-  snapshotDir: File = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "snapshots").toFile
-) extends LazyLogging {
+  rootSnapshotDir: File = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "snapshots").toFile
+)(implicit s: ActorSystem[Nothing])
+  extends LazyLogging {
 
   def clearAllSnapshots: Unit =
-    if (snapshotDir.exists()) {
-      snapshotDir.listFiles().foreach(_.delete())
+    if (rootSnapshotDir.exists()) {
+      Files.walk(rootSnapshotDir.toPath).sorted(Comparator.reverseOrder[Path]).iterator.asScala.map(_.toFile.delete())
     }
 
   def latestSerializedSnapshot: Option[UtxoSnapshot.Serialized] =
-    if (snapshotDir.exists()) {
-      val snapshots = snapshotDir.listFiles().collect {
+    if (rootSnapshotDir.exists()) {
+      val snapshots = rootSnapshotDir.listFiles().collect {
         case file if file.getName.toIntOption.nonEmpty => UtxoSnapshot.Serialized(file.getName.toInt, file)
       }
       snapshots.sortBy(_.epochIndex).lastOption
     } else None
 
-  def saveSnapshot(snapshot: UtxoSnapshot.Deserialized): Try[Unit] =
-    Try(snapshotDir.mkdirs()).map { _ =>
-      val snapshotFile = snapshotDir.toPath.resolve(snapshot.epochIndex.toString).toFile
-      logger.info(s"Saving snapshot at epoch ${snapshot.epochIndex} to ${snapshotFile.getPath}")
-      snapshotFile.delete()
-      snapshotFile.createNewFile()
-      val fileOutStream   = new FileOutputStream(snapshotFile)
-      val objectOutStream = new ObjectOutputStream(fileOutStream)
-      try objectOutStream.writeObject(snapshot.utxoState)
-      catch {
-        case NonFatal(ex) =>
-          logger.error(s"Unable to save snapshot ${snapshotFile.getPath}", ex)
-          throw ex
-      } finally {
-        objectOutStream.close()
-        fileOutStream.close()
+  def saveSnapshot(snapshot: UtxoSnapshot.Deserialized): Future[Unit] =
+    Future(rootSnapshotDir.mkdirs()).flatMap { _ =>
+      val snapshotDir = rootSnapshotDir.toPath.resolve(snapshot.epochIndex.toString).toFile
+      logger.info(s"Saving snapshot at epoch ${snapshot.epochIndex} to ${snapshotDir.getPath}")
+      if (snapshotDir.exists()) {
+        Option(snapshotDir.listFiles()).foreach(_.foreach(_.delete()))
       }
+      snapshotDir.mkdirs()
+      Source
+        .fromIterator(() => snapshot.utxoState.addressByUtxo.iterator)
+        .map { case (boxId, address) => ByteString(s"$boxId $address\n") }
+        .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("addressByUtxo")))
+        .flatMap { _ =>
+          Source
+            .fromIterator(() => snapshot.utxoState.utxosByAddress.iterator)
+            .map { case (address, utxos) =>
+              ByteString(s"$address ${utxos.map { case (b, v) => s"$b:$v" }.mkString(",")}\n")
+            }
+            .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("utxosByAddress")))
+            .map(_ => ())
+        }
     }
 
-  def getLatestSnapshotByIndex: Try[UtxoSnapshot.Deserialized] =
-    Try(latestSerializedSnapshot.get).map { case UtxoSnapshot.Serialized(latestEpochIndex, snapshotFile) =>
-      logger.info(s"Loading snapshot at epoch $latestEpochIndex from ${snapshotFile.getPath}")
-      val fileInput   = new FileInputStream(snapshotFile)
-      val objectInput = new ObjectInputStream(fileInput)
-      try UtxoSnapshot.Deserialized(latestEpochIndex, objectInput.readObject.asInstanceOf[UtxoState])
-      catch {
-        case NonFatal(ex) =>
-          logger.error(s"Unable to load snapshot ${snapshotFile.getPath}", ex)
-          throw ex
-      } finally {
-        objectInput.close()
-        fileInput.close()
+  def getLatestSnapshotByIndex: Future[Option[UtxoSnapshot.Deserialized]] =
+    latestSerializedSnapshot
+      .map { case UtxoSnapshot.Serialized(latestEpochIndex, snapshotDir) =>
+        logger.info(s"Loading snapshot at epoch $latestEpochIndex from ${snapshotDir.getPath}")
+        FileIO
+          .fromPath(f = snapshotDir.toPath.resolve("addressByUtxo"))
+          .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = Int.MaxValue))
+          .map(line => line.utf8String.split(' '))
+          .map(arr => BoxId(arr(0)) -> Address.fromStringUnsafe(arr(1)))
+          .runFold(Map.newBuilder[BoxId, Address]) { case (acc, tuple) =>
+            acc.addOne(tuple)
+          }
+          .map(_.result())
+          .flatMap { addressByUtxo =>
+            FileIO
+              .fromPath(f = snapshotDir.toPath.resolve("utxosByAddress"))
+              .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = Int.MaxValue))
+              .map(line => line.utf8String.split(' '))
+              .map(arr =>
+                Address.fromStringUnsafe(arr(0)) -> arr(1)
+                  .split(",")
+                  .map(_.split(':'))
+                  .map(arr => BoxId(arr(0)) -> arr(1).toLong)
+                  .toMap
+              )
+              .runFold(Map.newBuilder[Address, Map[BoxId, Long]]) { case (acc, tuple) =>
+                acc.addOne(tuple)
+              }
+              .map(_.result())
+              .map(utxosByAddress =>
+                Option(UtxoSnapshot.Deserialized(latestEpochIndex, UtxoState(addressByUtxo, utxosByAddress, Set.empty)))
+              )
+          }
       }
-    }
-
+      .getOrElse(Future.successful(None))
 }

@@ -26,9 +26,9 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Try}
 
 class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManager: UtxoSnapshotManager)(implicit
-                                                                                                        val s: ActorSystem[Nothing],
-                                                                                                        chainSyncerRef: ActorRef[ChainSyncerRequest],
-                                                                                                        mempoolSyncerRef: ActorRef[MempoolSyncerRequest]
+  val s: ActorSystem[Nothing],
+  chainSyncerRef: ActorRef[ChainSyncerRequest],
+  mempoolSyncerRef: ActorRef[MempoolSyncerRequest]
 ) extends AkkaStreamSupport
   with LazyLogging {
 
@@ -91,10 +91,11 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
     backend.loadBlockInfoByEpochIndex
       .flatMap { blockInfoByEpochIndex =>
         snapshotManager.getLatestSnapshotByIndex
-          .collect {
-            case snapshot if snapshot.epochIndex == blockInfoByEpochIndex.lastKey => Future.successful(snapshot.utxoState)
+          .flatMap {
+            _.collect {
+              case snapshot if snapshot.epochIndex == blockInfoByEpochIndex.lastKey => Future.successful(snapshot.utxoState)
+            }.getOrElse(backend.loadUtxoState(blockInfoByEpochIndex.keysIterator))
           }
-          .getOrElse(backend.loadUtxoState(blockInfoByEpochIndex.keysIterator))
           .map(utxoState => ChainState.load(blockInfoByEpochIndex, utxoState))
       }
 
