@@ -12,7 +12,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.{db, Address, BlockId, BoxId}
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
-import scala.compat.java8.FutureConverters.*
+import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -37,7 +37,7 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
   private def getHeaderByHeight(height: Int): Future[(Int, Option[String])] =
     cqlSession
       .executeAsync(headerSelectWhereHeight.bind(height))
-      .toScala
+      .asScala
       .map(rs => height -> Option(rs.one()).map(_.getString(Headers.header_id)))
 
   private def getOutputs(headerId: String) =

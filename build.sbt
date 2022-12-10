@@ -37,6 +37,12 @@ def getPluginJars(modulesDir: File): List[File] =
 
 def pluginAssemblySettings(moduleName: String) = Seq(
   assembly / assemblyJarName := s"$moduleName.jar",
+  assembly / assemblyMergeStrategy := {
+    case "logback.xml" => MergeStrategy.first
+    case other if other.contains("module-info.class") => MergeStrategy.discard
+    case other if other.contains("io.netty.versions") => MergeStrategy.first
+    case other => (assembly / assemblyMergeStrategy).value(other)
+  },
   Universal / mappings := {
     val universalMappings = (Universal / mappings).value
     val fatJar = (Compile / assembly).value
@@ -80,14 +86,14 @@ lazy val root = (project in file("."))
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= cats("3") ++ circe("3") ++ refined("3"))
+    .settings(libraryDependencies ++= cats("3") ++ circe("3") ++ refined("3") ++ Seq(ergoWallet))
 
 lazy val `alert-plugin` =
   Utils.mkModule("alert-plugin", "alert-plugin")
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(pluginAssemblySettings("alert-plugin"))
-    .settings(libraryDependencies += loggingApi)
+    .settings(libraryDependencies ++= scalatest("3") ++ Seq(retry("3"), discord4j, loggingApi, logback))
     .dependsOn(core)
 
 lazy val indexer =
@@ -95,5 +101,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ Seq(loggingApi, logback, ergoWallet, pureConfig)).settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)))
+    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ Seq(retry("3"), loggingApi, logback, pureConfig))
+    .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)))
     .dependsOn(core, `alert-plugin`)

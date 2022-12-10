@@ -6,7 +6,7 @@ import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.cql.*
 
 import scala.jdk.CollectionConverters.*
-import scala.compat.java8.FutureConverters.*
+import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
@@ -35,12 +35,12 @@ trait CassandraPersistenceSupport extends LazyLogging {
   )(implicit cqlSession: CqlSession): Flow[T, T, NotUsed] =
     Flow
       .lazyFutureFlow(() =>
-        cqlSession.prepareAsync(simpleStatement).toScala.map { preparedStatement =>
+        cqlSession.prepareAsync(simpleStatement).asScala.map { preparedStatement =>
           Flow[T]
             .mapAsync(parallelism) { element =>
               cqlSession
                 .executeAsync(statementBinder(element, preparedStatement))
-                .toScala
+                .asScala
                 .map(_ => element)
             }
         }
@@ -55,7 +55,7 @@ trait CassandraPersistenceSupport extends LazyLogging {
   )(implicit cqlSession: CqlSession): Flow[T, T, NotUsed] =
     Flow
       .lazyFutureFlow(() =>
-        cqlSession.prepareAsync(simpleStatement).toScala.map { preparedStatement =>
+        cqlSession.prepareAsync(simpleStatement).asScala.map { preparedStatement =>
           Flow[T]
             .mapAsync(parallelism) { element =>
               statementBinder(element, preparedStatement) match {
@@ -67,19 +67,19 @@ trait CassandraPersistenceSupport extends LazyLogging {
                       statements.grouped(10000).map { batchStatement =>
                         cqlSession
                           .executeAsync(BatchStatement.newInstance(batchType).addAll(batchStatement.asJava))
-                          .toScala
+                          .asScala
                       }
                     )
                     .map(_ => element)
                 case statements if statements.length == 1 =>
                   cqlSession
                     .executeAsync(statements.head)
-                    .toScala
+                    .asScala
                     .map(_ => element)
                 case statements =>
                   cqlSession
                     .executeAsync(BatchStatement.newInstance(batchType).addAll(statements.asJava))
-                    .toScala
+                    .asScala
                     .map(_ => element)
               }
             }

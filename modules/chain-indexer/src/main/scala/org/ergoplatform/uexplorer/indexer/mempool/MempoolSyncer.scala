@@ -40,9 +40,9 @@ object MempoolSyncer extends LazyLogging {
 
   case class MempoolState(underlyingTxs: Map[TxId, ApiTransaction]) {
 
-    def getNewTxs(newTxs: Map[TxId, ApiTransaction]): NewTransactions = NewTransactions(
-      newTxs.keySet.diff(underlyingTxs.keySet).foldLeft(Map.empty[TxId, ApiTransaction]) { case (acc, txId) =>
-        acc.updated(txId, newTxs(txId))
+    def getNewTxs(allTxs: Map[TxId, ApiTransaction]): NewTransactions = NewTransactions(
+      allTxs.keySet.diff(underlyingTxs.keySet).foldLeft(Map.empty[TxId, ApiTransaction]) { case (acc, txId) =>
+        acc.updated(txId, allTxs(txId))
       }
     )
 

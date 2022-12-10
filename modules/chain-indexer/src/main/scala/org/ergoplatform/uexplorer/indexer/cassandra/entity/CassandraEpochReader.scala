@@ -18,7 +18,7 @@ import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.compat.java8.FutureConverters.*
+import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -37,7 +37,7 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
   ): Future[(Int, BufferedBlockInfo)] =
     cqlSession
       .executeAsync(blockInfoSelectWhereHeader.bind(headerId))
-      .toScala
+      .asScala
       .map(_.one())
       .map(r => epochIndex -> blockInfoRowReader(r))
 

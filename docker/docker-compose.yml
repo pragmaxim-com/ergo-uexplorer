@@ -61,5 +61,7 @@ services:
       # override in case you run your own Cassandra deployment
       - CASSANDRA_SEED_HOST=cassandra
       - CASSANDRA_SEED_PORT=9042
+      - DISCORD_ALERT_CHANNEL=${DISCORD_ALERT_CHANNEL:-}
+      - DISCORD_TOKEN=${DISCORD_TOKEN:-}
 networks:
   backend:

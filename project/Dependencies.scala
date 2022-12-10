@@ -24,6 +24,7 @@ object Dependencies {
     "io.netty"            % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64"
   )
 
+  val discord4j  = "com.discord4j"  % "discord4j-core"  % "3.2.3"
   val loggingApi = "org.slf4j"      % "slf4j-api"       % "2.0.3"
   val logback    = "ch.qos.logback" % "logback-classic" % "1.4.3"
 
@@ -61,10 +62,11 @@ object Dependencies {
     "eu.timepit" % s"refined-cats_$v" % "0.10.1"
   )
 
+  def retry(v: String) = "com.softwaremill.retry" % s"retry_$v" % "0.3.6"
+
   def sttp(v: String) = List(
     "com.softwaremill.sttp.client3" % s"core_$v"  % Version.sttp,
-    "com.softwaremill.sttp.client3" % s"circe_$v" % Version.sttp,
-    "com.softwaremill.retry"        % s"retry_$v" % "0.3.6"
+    "com.softwaremill.sttp.client3" % s"circe_$v" % Version.sttp
   )
 
   def monocle(v: String) =

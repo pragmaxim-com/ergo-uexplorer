@@ -123,6 +123,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
     for {
       plugins <- Future.fromTry(Indexer.loadPlugins)
+      _       <- Future.fromTry(Try(plugins.map(_.init.get)))
       _ = if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
       chainState <- loadChainState
       _          <- ChainSyncer.initialize(chainState)

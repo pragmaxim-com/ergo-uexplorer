@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.parser
+package org.ergoplatform.uexplorer.parser
 
 import cats.Eval
 import cats.data.OptionT

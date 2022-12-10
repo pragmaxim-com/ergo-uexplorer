@@ -9,7 +9,9 @@ import io.circe.parser.*
 import io.circe.refined.*
 import io.circe.syntax.*
 import io.circe.*
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 
 import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
@@ -66,7 +68,7 @@ final case class ApiFullBlock(
 object ApiFullBlock {
   import io.circe.generic.auto.*
 
-  implicit val decoder: Decoder[ApiFullBlock] = { (c: HCursor) =>
+  implicit def decoder(implicit enc: ErgoAddressEncoder): Decoder[ApiFullBlock] = { (c: HCursor) =>
     for {
       header       <- c.downField("header").as[ApiHeader]
       transactions <- c.downField("blockTransactions").as[ApiBlockTransactions]
@@ -142,9 +144,29 @@ final case class ApiOutput(
   value: Long,
   creationHeight: Int,
   ergoTree: HexString,
+  address: Address,
+  scriptTemplateHash: ErgoTreeTemplateHash,
   assets: List[ApiAsset],
   additionalRegisters: Map[RegisterId, HexString]
 )
+
+object ApiOutput {
+  import io.circe.generic.auto.*
+
+  implicit def jsonDecoder(implicit enc: ErgoAddressEncoder): Decoder[ApiOutput] = { (c: HCursor) =>
+    for {
+      boxId               <- c.downField("boxId").as[BoxId]
+      value               <- c.downField("value").as[Long]
+      creationHeight      <- c.downField("creationHeight").as[Int]
+      ergoTree            <- c.downField("ergoTree").as[HexString]
+      address             <- Right(ErgoTreeParser.ergoTreeToAddress(ergoTree))
+      scriptTemplateHash  <- ErgoTreeParser.deriveErgoTreeTemplateHash(ergoTree)
+      assets              <- c.downField("assets").as[List[ApiAsset]]
+      additionalRegisters <- c.downField("additionalRegisters").as[Map[RegisterId, HexString]]
+    } yield ApiOutput(boxId, value, creationHeight, ergoTree, address, scriptTemplateHash, assets, additionalRegisters)
+  }
+
+}
 
 final case class ApiPowSolutions(pk: HexString, w: HexString, n: HexString, d: String)
 
@@ -186,6 +208,21 @@ final case class ApiTransaction(
   outputs: ArraySeq[ApiOutput],
   size: Int
 )
+
+object ApiTransaction {
+  import io.circe.generic.auto.*
+
+  implicit def jsonDecoder(implicit enc: ErgoAddressEncoder): Decoder[ApiTransaction] = { (c: HCursor) =>
+    for {
+      id         <- c.downField("id").as[TxId]
+      inputs     <- c.downField("inputs").as[ArraySeq[ApiInput]]
+      dataInputs <- c.downField("dataInputs").as[List[ApiDataInput]]
+      outputs    <- c.downField("outputs").as[ArraySeq[ApiOutput]]
+      size       <- c.downField("size").as[Int]
+    } yield ApiTransaction(id, inputs, dataInputs, outputs, size)
+  }
+
+}
 
 final case class ExpandedRegister(
   serializedValue: HexString,

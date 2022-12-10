@@ -5,14 +5,12 @@ import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.{Address, HexString, SigmaType, TokenId, TokenType}
-import io.circe.generic.auto.*
 import io.circe.refined.*
-import cats.syntax.traverse.*
 import io.circe.syntax.*
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.parser.{ErgoTreeParser, RegistersParser, TokenPropsParser}
 import eu.timepit.refined.auto.*
 import io.circe.Encoder
+import org.ergoplatform.uexplorer.parser.{RegistersParser, TokenPropsParser}
 
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
@@ -20,7 +18,7 @@ import scala.util.Try
 object BlockBuilder {
 
   def apply(apiBlock: ApiFullBlock, prevBlock: Option[BufferedBlockInfo])(implicit
-                                                                          protocolSettings: ProtocolSettings
+    protocolSettings: ProtocolSettings
   ): Try[Block] = {
     val apiHeader       = apiBlock.header
     val apiExtension    = apiBlock.extension
@@ -46,8 +44,6 @@ object BlockBuilder {
         apiHeader.votes,
         mainChain = false
       )
-
-    val infoTry = BlockInfoBuilder(apiBlock, prevBlock)
 
     val extension =
       BlockExtension(
@@ -106,11 +102,11 @@ object BlockBuilder {
         }
       }
 
-    val outputsTry = {
+    val outputs = {
+      import io.circe.generic.auto.*
       summon[Encoder[HexString]]
       summon[Encoder[ExpandedRegister]]
-      val lastOutputGlobalIndex          = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
-      implicit val e: ErgoAddressEncoder = protocolSettings.addressEncoder
+      val lastOutputGlobalIndex = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
       apiTransactions.transactions.zipWithIndex
         .flatMap { case (tx, tix) =>
           tx.outputs.zipWithIndex
@@ -119,13 +115,8 @@ object BlockBuilder {
         .sortBy { case (_, oix, tix) => (tix, oix) }
         .map { case ((o, txId), oix, _) => (o, oix, txId) }
         .zipWithIndex
-        .traverse { case ((o, outIndex, txId), blockIndex) =>
-          for {
-            address            <- ErgoTreeParser.ergoTreeToAddress(o.ergoTree)
-            scriptTemplateHash <- ErgoTreeParser.deriveErgoTreeTemplateHash(o.ergoTree)
-            registersJson = RegistersParser.expand(o.additionalRegisters).asJson
-            globalIndex   = lastOutputGlobalIndex + blockIndex + 1
-          } yield Output(
+        .map { case ((o, outIndex, txId), blockIndex) =>
+          Output(
             o.boxId,
             txId,
             apiTransactions.headerId,
@@ -133,11 +124,11 @@ object BlockBuilder {
             o.creationHeight,
             header.height,
             outIndex,
-            globalIndex,
+            lastOutputGlobalIndex + blockIndex + 1,
             o.ergoTree,
-            scriptTemplateHash,
-            address,
-            registersJson,
+            o.scriptTemplateHash,
+            o.address,
+            RegistersParser.expand(o.additionalRegisters).asJson,
             header.timestamp,
             mainChain = false
           )
@@ -217,12 +208,11 @@ object BlockBuilder {
         }
     }
 
-    for {
-      info    <- infoTry
-      outputs <- outputsTry
-    } yield updateMainChain(
-      Block(header, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers, tokens, info),
-      mainChain = true
-    )
+    BlockInfoBuilder(apiBlock, prevBlock).map { info =>
+      updateMainChain(
+        Block(header, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers, tokens, info),
+        mainChain = true
+      )
+    }
   }
 }

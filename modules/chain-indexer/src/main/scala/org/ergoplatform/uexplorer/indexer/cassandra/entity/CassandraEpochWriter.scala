@@ -13,7 +13,7 @@ import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, EpochPers
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.chain.{Epoch, InvalidEpochCandidate}
 
-import scala.compat.java8.FutureConverters.*
+import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import eu.timepit.refined.auto.*
