@@ -6,6 +6,7 @@ import akka.stream.ActorAttributes.supervisionStrategy
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.{Address, BoxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
@@ -14,12 +15,14 @@ import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, Epoch}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.{MempoolState, MempoolSyncerRequest, NewTransactions}
+import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.{MempoolState, MempoolStateChanges, MempoolSyncerRequest}
 import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoSnapshotManager, UtxoState}
 import org.ergoplatform.uexplorer.plugin.Plugin
+import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 
 import scala.jdk.CollectionConverters.*
 import java.util.ServiceLoader
+import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -53,20 +56,34 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
       .mapConcat(_._2.collect { case e @ NewEpochCreated(_) => e }.toList)
       .withAttributes(supervisionStrategy(Resiliency.decider))
 
-  def syncMempool(chainState: ChainState, bestBlockHeight: Int): Future[NewTransactions] =
+  def syncMempool(chainState: ChainState, bestBlockHeight: Int): Future[MempoolStateChanges] =
     if (chainState.blockBuffer.byHeight.lastOption.map(_._1).exists(_ >= bestBlockHeight)) {
       for {
-        txs    <- blockHttpClient.getUnconfirmedTxs
-        newTxs <- MempoolSyncer.updateTransactions(txs)
-      } yield newTxs
+        txs          <- blockHttpClient.getUnconfirmedTxs
+        stateChanges <- MempoolSyncer.updateTransactions(txs)
+      } yield stateChanges
     } else {
-      Future.successful(NewTransactions(Map.empty))
+      Future.successful(MempoolStateChanges(List.empty))
     }
 
-  def executePlugins(plugins: List[Plugin], newTxs: NewTransactions, utxoState: UtxoState): Future[Unit] =
+  def executePlugins(plugins: List[Plugin], utxoState: UtxoState, stateChanges: MempoolStateChanges): Future[Unit] =
     Future
       .sequence(
-        plugins.map(_.execute(newTxs.txs, utxoState.addressByUtxo, utxoState.utxosByAddress))
+        stateChanges.stateTransitionByTx.flatMap { case (newTx, poolTxs) =>
+          val (inputs, outputs) =
+            poolTxs.values.foldLeft((ArraySeq.newBuilder[BoxId], ArraySeq.newBuilder[(BoxId, Address, Long)])) {
+              case ((iAcc, oAcc), tx) =>
+                iAcc.addAll(tx.inputs.map(_.boxId)) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
+            }
+          val utxoStateWithPool = utxoState.mergeEpochFromBuffer(List((0, (inputs.result(), outputs.result()))).iterator)
+          plugins.map(
+            _.execute(
+              newTx,
+              UtxoStateWithoutPool(utxoState.addressByUtxo, utxoState.utxosByAddress),
+              UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress)
+            )
+          )
+        }
       )
       .map(_ => ())
 
@@ -111,14 +128,13 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
         )
   } yield newChainState
 
-  def periodicSync(plugins: List[Plugin]): Future[(ChainState, MempoolState)] =
+  def periodicSync(plugins: List[Plugin]): Future[(ChainState, MempoolStateChanges)] =
     for {
       bestBlockHeight <- blockHttpClient.getBestBlockHeight
       chainState      <- syncChain(bestBlockHeight)
-      newTransactions <- syncMempool(chainState, bestBlockHeight)
-      _               <- executePlugins(plugins, newTransactions, chainState.utxoState)
-      newMempoolState <- MempoolSyncer.getMempoolState
-    } yield (chainState, newMempoolState)
+      stateChanges    <- syncMempool(chainState, bestBlockHeight)
+      _               <- executePlugins(plugins, chainState.utxoState, stateChanges)
+    } yield (chainState, stateChanges)
 
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
     for {
@@ -143,7 +159,7 @@ object Indexer extends LazyLogging {
     implicit val protocol: ProtocolSettings                   = conf.protocol
     implicit val chainSyncerRef: ActorRef[ChainSyncerRequest] = ctx.spawn(new ChainSyncer().initialBehavior, "ChainSyncer")
     implicit val mempoolSyncerRef: ActorRef[MempoolSyncerRequest] =
-      ctx.spawn(MempoolSyncer.behavior(MempoolState(Map.empty)), "MempoolSyncer")
+      ctx.spawn(MempoolSyncer.behavior(MempoolState(ListMap.empty)), "MempoolSyncer")
     BlockHttpClient.withNodePoolBackend(conf).flatMap { blockHttpClient =>
       val snapshotManager = new UtxoSnapshotManager()
       val indexer =

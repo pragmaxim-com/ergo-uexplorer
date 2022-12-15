@@ -18,7 +18,7 @@ import sttp.client3.circe.*
 import io.circe.refined.*
 import org.ergoplatform.ErgoAddressEncoder
 
-import scala.collection.immutable.ArraySeq
+import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -37,7 +37,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   def getBestBlockHeight: Future[Int] =
     metadataHttpClient.getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
 
-  def getUnconfirmedTxs: Future[Map[TxId, ApiTransaction]] =
+  def getUnconfirmedTxs: Future[ListMap[TxId, ApiTransaction]] =
     retryPolicy.apply { () =>
       basicRequest
         .get(proxyUri.addPath("transactions", "unconfirmed"))
@@ -47,7 +47,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
         .map(_.body)
         .flatMap {
           case Right(txs) =>
-            Future.successful(txs.map(tx => tx.id -> tx).toMap)
+            Future.successful(ListMap.from(txs.iterator.map(tx => tx.id -> tx)))
           case Left(error) =>
             Future.failed(new Exception(s"Getting unconfirmed transactions failed", error))
         }

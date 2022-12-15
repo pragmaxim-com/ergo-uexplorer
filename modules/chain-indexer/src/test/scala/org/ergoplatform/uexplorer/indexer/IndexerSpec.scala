@@ -17,7 +17,7 @@ import sttp.capabilities.WebSockets
 import sttp.client3.*
 import sttp.client3.testing.SttpBackendStub
 
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.Future
 
 class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
@@ -37,7 +37,7 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
     testKit.spawn(new ChainSyncer().initialBehavior, "ChainSyncer")
 
   implicit val mempoolSyncerSyncerRef: ActorRef[MempoolSyncer.MempoolSyncerRequest] =
-    testKit.spawn(MempoolSyncer.behavior(MempoolState(Map.empty)), "MempoolSyncer")
+    testKit.spawn(MempoolSyncer.behavior(MempoolState(ListMap.empty)), "MempoolSyncer")
 
   implicit val testingBackend: SttpBackendStub[Future, WebSockets] = SttpBackendStub.asynchronousFuture
     .whenRequestMatches { r =>
@@ -70,11 +70,11 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
       indexer.periodicSync(List.empty).flatMap { case (chainState, mempoolState) =>
         chainState.getLastCachedBlock.map(_.height).get shouldBe 4150
         chainState.findMissingIndexes shouldBe empty
-        mempoolState.underlyingTxs.keySet.size shouldBe 9
+        mempoolState.stateTransitionByTx.size shouldBe 9
         indexer.periodicSync(List.empty).map { case (newChainState, newMempoolState) =>
           newChainState.getLastCachedBlock.map(_.height).get shouldBe 4200
           newChainState.findMissingIndexes shouldBe empty
-          newMempoolState.underlyingTxs.keySet.size shouldBe 9
+          newMempoolState.stateTransitionByTx.size shouldBe 0
         }
       }
     }

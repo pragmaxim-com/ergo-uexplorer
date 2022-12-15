@@ -7,10 +7,12 @@ import discord4j.core.`object`.entity.channel.MessageChannel
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin
+import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.{Flux, Mono}
 import retry.Policy
 
+import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -74,15 +76,13 @@ class AlertPlugin extends Plugin {
   }
 
   def execute(
-    newMempoolTxs: Map[TxId, ApiTransaction],
-    addressByUtxo: Map[BoxId, Address],
-    utxosByAddress: Map[Address, Map[BoxId, Long]]
+    newTx: ApiTransaction,
+    utxoStateWoPool: UtxoStateWithoutPool,
+    utxoStateWithPool: UtxoStateWithPool
   ): Future[Unit] =
     sendMessages(
       detectors.flatMap { decoder =>
-        newMempoolTxs.values.flatMap { tx =>
-          decoder.inspect(tx, addressByUtxo, utxosByAddress)
-        }
+        decoder.inspect(newTx, utxoStateWoPool, utxoStateWithPool)
       }
     )
 }

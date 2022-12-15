@@ -10,20 +10,17 @@ import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.*
 import org.ergoplatform.uexplorer.node.ApiTransaction
 
 import concurrent.duration.DurationInt
+import scala.collection.immutable.ListMap
 import scala.concurrent.Future
 
 object MempoolSyncer extends LazyLogging {
 
   def behavior(mempoolState: MempoolState): Behavior[MempoolSyncerRequest] =
     Behaviors.setup[MempoolSyncerRequest] { _ =>
-      Behaviors.receiveMessage[MempoolSyncerRequest] {
-        case UpdateTxs(txs, replyTo) =>
-          val newTxs = mempoolState.getNewTxs(txs)
-          replyTo ! newTxs
-          behavior(mempoolState.appendNewTxs(newTxs.txs))
-        case GetMempoolState(replyTo) =>
-          replyTo ! mempoolState
-          Behaviors.same
+      Behaviors.receiveMessage[MempoolSyncerRequest] { case UpdateTxs(allTxs, replyTo) =>
+        val (newState, stateChange) = mempoolState.applyStateChange(allTxs)
+        replyTo ! stateChange
+        behavior(newState)
       }
     }
 
@@ -32,30 +29,35 @@ object MempoolSyncer extends LazyLogging {
   sealed trait MempoolSyncerRequest
   sealed trait MempoolSyncerResponse
 
-  case class NewTransactions(txs: Map[TxId, ApiTransaction]) extends MempoolSyncerResponse
-  case class UpdateTxs(txs: Map[TxId, ApiTransaction], replyTo: ActorRef[NewTransactions]) extends MempoolSyncerRequest
-  case class GetMempoolState(replyTo: ActorRef[MempoolState]) extends MempoolSyncerRequest
+  case class MempoolStateChanges(stateTransitionByTx: List[(ApiTransaction, ListMap[TxId, ApiTransaction])])
+    extends MempoolSyncerResponse
+
+  case class UpdateTxs(allTxs: ListMap[TxId, ApiTransaction], replyTo: ActorRef[MempoolStateChanges])
+    extends MempoolSyncerRequest
 
   import akka.actor.typed.scaladsl.AskPattern._
 
-  case class MempoolState(underlyingTxs: Map[TxId, ApiTransaction]) {
+  case class MempoolState(underlyingTxs: ListMap[TxId, ApiTransaction]) {
 
-    def getNewTxs(allTxs: Map[TxId, ApiTransaction]): NewTransactions = NewTransactions(
-      allTxs.keySet.diff(underlyingTxs.keySet).foldLeft(Map.empty[TxId, ApiTransaction]) { case (acc, txId) =>
-        acc.updated(txId, allTxs(txId))
-      }
-    )
-
-    def appendNewTxs(newTxs: Map[TxId, ApiTransaction]): MempoolState =
-      MempoolState(underlyingTxs ++ newTxs)
+    def applyStateChange(allTxs: ListMap[TxId, ApiTransaction]): (MempoolState, MempoolStateChanges) = {
+      val newTxIds = allTxs.keySet.diff(underlyingTxs.keySet)
+      val newTxs   = allTxs.filter(t => newTxIds.contains(t._1))
+      val newState = MempoolState(underlyingTxs ++ newTxs)
+      val stateChanges =
+        newTxs.foldLeft(Vector.empty[(ApiTransaction, ListMap[TxId, ApiTransaction])]) {
+          case (changes, newTx) if changes.isEmpty =>
+            changes :+ (newTx._2, underlyingTxs)
+          case (changes, newTx) =>
+            val newUnderlying = changes.last._2.updated(changes.last._1.id, changes.last._1)
+            changes :+ (newTx._2, newUnderlying)
+        }
+      newState -> MempoolStateChanges(stateChanges.toList)
+    }
   }
 
-  def getMempoolState(implicit s: ActorSystem[Nothing], ref: ActorRef[GetMempoolState]): Future[MempoolState] =
-    ref.ask(ref => GetMempoolState(ref))
-
   def updateTransactions(
-    txs: Map[TxId, ApiTransaction]
-  )(implicit s: ActorSystem[Nothing], ref: ActorRef[UpdateTxs]): Future[NewTransactions] =
+    txs: ListMap[TxId, ApiTransaction]
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[UpdateTxs]): Future[MempoolStateChanges] =
     ref.ask(ref => UpdateTxs(txs, ref))
 
 }
