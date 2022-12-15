@@ -25,13 +25,13 @@ case class UtxoState(
   inputsWithoutAddress: Set[BoxId]
 ) {
 
-  def mergeEpochFromBuffer(
-    boxesByHeight: Iterator[(Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]))]
+  def mergeBoxes(
+    boxesByHeight: Iterator[(ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])]
   ): UtxoState = {
-    val (inputsBuilder, newAddressByUtxo, boxIdsByAddressWithOutputs) =
+    val (inputsBuilder, newAddressByUtxo, newUtxosByAddress) =
       boxesByHeight
         .foldLeft((ArraySeq.newBuilder[BoxId], addressByUtxo, utxosByAddress)) {
-          case ((inputBoxIdsAcc, addressByUtxoAcc, utxosByAddressAcc), (_, (inputBoxIds, outputBoxIdsWithAddress))) =>
+          case ((inputBoxIdsAcc, addressByUtxoAcc, utxosByAddressAcc), (inputBoxIds, outputBoxIdsWithAddress)) =>
             (
               inputBoxIdsAcc.addAll(inputBoxIds),
               addressByUtxoAcc ++ outputBoxIdsWithAddress.iterator.map(o => o._1 -> o._2),
@@ -56,7 +56,7 @@ case class UtxoState(
       }
     val utxosByAddressWoInputs =
       inputsWithAddress
-        .foldLeft(boxIdsByAddressWithOutputs) { case (acc, (address, inputIds)) =>
+        .foldLeft(newUtxosByAddress) { case (acc, (address, inputIds)) =>
           acc.putOrRemove(address) {
             case None                 => None
             case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)

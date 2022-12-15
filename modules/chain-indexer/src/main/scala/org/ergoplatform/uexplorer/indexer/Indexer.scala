@@ -66,7 +66,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
       Future.successful(MempoolStateChanges(List.empty))
     }
 
-  def executePlugins(plugins: List[Plugin], utxoState: UtxoState, stateChanges: MempoolStateChanges): Future[Unit] =
+  def executePlugins(plugins: List[Plugin], chainState: ChainState, stateChanges: MempoolStateChanges): Future[Unit] =
     Future
       .sequence(
         stateChanges.stateTransitionByTx.flatMap { case (newTx, poolTxs) =>
@@ -75,11 +75,13 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
               case ((iAcc, oAcc), tx) =>
                 iAcc.addAll(tx.inputs.map(_.boxId)) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
             }
-          val utxoStateWithPool = utxoState.mergeEpochFromBuffer(List((0, (inputs.result(), outputs.result()))).iterator)
+          val utxoStateWoPool = chainState.utxoStateWithMergedBoxes
+          val utxoStateWithPool =
+            utxoStateWoPool.mergeBoxes(List((inputs.result(), outputs.result())).iterator)
           plugins.map(
             _.execute(
               newTx,
-              UtxoStateWithoutPool(utxoState.addressByUtxo, utxoState.utxosByAddress),
+              UtxoStateWithoutPool(utxoStateWoPool.addressByUtxo, utxoStateWoPool.utxosByAddress),
               UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress)
             )
           )
@@ -133,7 +135,7 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
       bestBlockHeight <- blockHttpClient.getBestBlockHeight
       chainState      <- syncChain(bestBlockHeight)
       stateChanges    <- syncMempool(chainState, bestBlockHeight)
-      _               <- executePlugins(plugins, chainState.utxoState, stateChanges)
+      _               <- executePlugins(plugins, chainState, stateChanges)
     } yield (chainState, stateChanges)
 
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =

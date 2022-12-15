@@ -30,7 +30,9 @@ object MempoolSyncer extends LazyLogging {
   sealed trait MempoolSyncerResponse
 
   case class MempoolStateChanges(stateTransitionByTx: List[(ApiTransaction, ListMap[TxId, ApiTransaction])])
-    extends MempoolSyncerResponse
+    extends MempoolSyncerResponse {
+    
+  }
 
   case class UpdateTxs(allTxs: ListMap[TxId, ApiTransaction], replyTo: ActorRef[MempoolStateChanges])
     extends MempoolSyncerRequest

@@ -22,6 +22,9 @@ case class ChainState(
 ) {
   import ChainState.*
 
+  def utxoStateWithMergedBoxes: UtxoState = 
+    utxoState.mergeBoxes(boxesByHeightBuffer.iterator.map(_._2))
+  
   def finishEpoch(currentEpochIndex: Int): Try[(MaybeNewEpoch, ChainState)] =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
       Success(NewEpochExisted(currentEpochIndex) -> this)
@@ -29,7 +32,7 @@ case class ChainState(
       val previousEpochIndex = currentEpochIndex - 1
       val heightRange        = Epoch.heightRangeForEpochIndex(currentEpochIndex)
       val boxesByHeightSlice = boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
-      val newState           = utxoState.mergeEpochFromBuffer(boxesByHeightSlice.iterator)
+      val newState           = utxoState.mergeBoxes(boxesByHeightSlice.valuesIterator)
       EpochCandidate(blockBuffer.blockRelationsByHeight(heightRange)) match {
         case Right(candidate)
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
