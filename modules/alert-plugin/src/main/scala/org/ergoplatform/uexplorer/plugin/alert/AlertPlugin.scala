@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.plugin.alert
 
 import discord4j.common.util.Snowflake
-import discord4j.core.DiscordClient
+import discord4j.core.{DiscordClient, GatewayDiscordClient}
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.channel.MessageChannel
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
@@ -25,8 +25,9 @@ class AlertPlugin extends Plugin {
 
   private val retryPolicy: Policy = retry.Backoff(3, 3.second)
 
-  private var discordToken: String          = null
-  private var discordAlertChannelId: String = null
+  private var discordToken: String                 = null
+  private var discordAlertChannelId: String        = null
+  private var client: Future[GatewayDiscordClient] = null
 
   // message can have max 2000 characters
   private def sendMessages(msgs: List[String]): Future[Unit] =
@@ -34,11 +35,7 @@ class AlertPlugin extends Plugin {
       Future.successful(())
     else
       retryPolicy.apply { () =>
-        DiscordClient
-          .builder(discordToken)
-          .build
-          .login
-          .flux()
+        client
           .flatMap { client =>
             client
               .getChannelById(Snowflake.of(discordAlertChannelId))
@@ -54,26 +51,39 @@ class AlertPlugin extends Plugin {
                   }
               }
               .collectList()
-              .doFinally(_ => client.logout())
+              .toFuture
+              .asScala
           }
-          .count()
-          .toFuture
-          .asScala
           .map(_ => ())
       }(retry.Success.always, global)
 
-  private lazy val detectors = List(new HighTxValueDetector(20 * 1000 * 1000000000L))
+  private lazy val detectors = List(new HighTxValueDetector(100 * 1000 * 1000000000L))
 
   def name: String = "Alert Plugin"
 
-  def init: Try[Unit] = Try {
-    discordToken = Option(System.getenv("DISCORD_TOKEN"))
-      .filterNot(_ == "")
-      .getOrElse(throw new IllegalStateException("DISCORD_TOKEN must be exported"))
-    discordAlertChannelId = Option(System.getenv("DISCORD_ALERT_CHANNEL"))
-      .filterNot(_ == "")
-      .getOrElse(throw new IllegalStateException("DISCORD_ALERT_CHANNEL must be exported"))
-  }
+  def init: Future[Unit] = Future
+    .fromTry(
+      Try {
+        discordToken = Option(System.getenv("DISCORD_TOKEN"))
+          .filterNot(_ == "")
+          .getOrElse(throw new IllegalStateException("DISCORD_TOKEN must be exported"))
+        discordAlertChannelId = Option(System.getenv("DISCORD_ALERT_CHANNEL"))
+          .filterNot(_ == "")
+          .getOrElse(throw new IllegalStateException("DISCORD_ALERT_CHANNEL must be exported"))
+      }
+    )
+    .flatMap { _ =>
+      client = DiscordClient
+        .builder(discordToken)
+        .build
+        .login
+        .toFuture
+        .asScala
+      client.map(_ => ())
+    }
+
+  def close: Future[Unit] =
+    client.flatMap(_.logout().toFuture.asScala.map(_ => ()))
 
   def execute(
     newTx: ApiTransaction,

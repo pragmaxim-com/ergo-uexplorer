@@ -28,7 +28,12 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.{Failure, Try}
 
-class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManager: UtxoSnapshotManager)(implicit
+class Indexer(
+  backend: Backend,
+  blockHttpClient: BlockHttpClient,
+  snapshotManager: UtxoSnapshotManager,
+  plugins: List[Plugin]
+)(implicit
   val s: ActorSystem[Nothing],
   chainSyncerRef: ActorRef[ChainSyncerRequest],
   mempoolSyncerRef: ActorRef[MempoolSyncerRequest]
@@ -66,22 +71,14 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
       Future.successful(MempoolStateChanges(List.empty))
     }
 
-  def executePlugins(plugins: List[Plugin], chainState: ChainState, stateChanges: MempoolStateChanges): Future[Unit] =
+  def executePlugins(utxoState: UtxoState, stateChanges: MempoolStateChanges): Future[Unit] =
     Future
       .sequence(
-        stateChanges.stateTransitionByTx.flatMap { case (newTx, poolTxs) =>
-          val (inputs, outputs) =
-            poolTxs.values.foldLeft((ArraySeq.newBuilder[BoxId], ArraySeq.newBuilder[(BoxId, Address, Long)])) {
-              case ((iAcc, oAcc), tx) =>
-                iAcc.addAll(tx.inputs.map(_.boxId)) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
-            }
-          val utxoStateWoPool = chainState.utxoStateWithMergedBoxes
-          val utxoStateWithPool =
-            utxoStateWoPool.mergeBoxes(List((inputs.result(), outputs.result())).iterator)
+        stateChanges.utxoStateTransitionByTx(utxoState).flatMap { case (newTx, utxoStateWithPool) =>
           plugins.map(
             _.execute(
               newTx,
-              UtxoStateWithoutPool(utxoStateWoPool.addressByUtxo, utxoStateWoPool.utxosByAddress),
+              UtxoStateWithoutPool(utxoState.addressByUtxo, utxoState.utxosByAddress),
               UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress)
             )
           )
@@ -130,23 +127,20 @@ class Indexer(backend: Backend, blockHttpClient: BlockHttpClient, snapshotManage
         )
   } yield newChainState
 
-  def periodicSync(plugins: List[Plugin]): Future[(ChainState, MempoolStateChanges)] =
+  def periodicSync: Future[(ChainState, MempoolStateChanges)] =
     for {
       bestBlockHeight <- blockHttpClient.getBestBlockHeight
       chainState      <- syncChain(bestBlockHeight)
       stateChanges    <- syncMempool(chainState, bestBlockHeight)
-      _               <- executePlugins(plugins, chainState, stateChanges)
+      _               <- executePlugins(chainState.utxoStateWithMergedBoxes, stateChanges)
     } yield (chainState, stateChanges)
 
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
     for {
-      plugins <- Future.fromTry(Indexer.loadPlugins)
-      _       <- Future.fromTry(Try(plugins.map(_.init.get)))
-      _ = if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
       chainState <- loadChainState
       _          <- ChainSyncer.initialize(chainState)
       _          <- verifyStateIntegrity(chainState)
-      done       <- schedule(initialDelay, pollingInterval)(periodicSync(plugins)).run()
+      done       <- schedule(initialDelay, pollingInterval)(periodicSync).run()
     } yield done
 }
 
@@ -162,21 +156,27 @@ object Indexer extends LazyLogging {
     implicit val chainSyncerRef: ActorRef[ChainSyncerRequest] = ctx.spawn(new ChainSyncer().initialBehavior, "ChainSyncer")
     implicit val mempoolSyncerRef: ActorRef[MempoolSyncerRequest] =
       ctx.spawn(MempoolSyncer.behavior(MempoolState(ListMap.empty)), "MempoolSyncer")
-    BlockHttpClient.withNodePoolBackend(conf).flatMap { blockHttpClient =>
-      val snapshotManager = new UtxoSnapshotManager()
-      val indexer =
+    for {
+      blockHttpClient <- BlockHttpClient.withNodePoolBackend(conf)
+      plugins         <- Future.fromTry(Indexer.loadPlugins)
+      _ = if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
+      _ <- Future.sequence(plugins.map(_.init))
+      indexer =
         conf.backendType match {
           case CassandraDb(parallelism) =>
-            new Indexer(CassandraBackend(parallelism), blockHttpClient, snapshotManager)
+            new Indexer(CassandraBackend(parallelism), blockHttpClient, new UtxoSnapshotManager(), plugins)
           case InMemoryDb =>
-            new Indexer(new InMemoryBackend(), blockHttpClient, snapshotManager)
+            new Indexer(new InMemoryBackend(), blockHttpClient, new UtxoSnapshotManager(), plugins)
         }
-      indexer
-        .run(0.seconds, 5.seconds)
-        .andThen { case Failure(ex) =>
-          logger.error(s"Shutting down due to unexpected error", ex)
-          blockHttpClient.close().andThen { case _ => system.terminate() }
-        }
-    }
+      done <- indexer
+                .run(0.seconds, 5.seconds)
+                .andThen { case Failure(ex) =>
+                  logger.error(s"Shutting down due to unexpected error", ex)
+                  Future
+                    .sequence(blockHttpClient.close() :: plugins.map(_.close))
+                    .andThen { case _ => system.terminate() }
+                }
+
+    } yield done
   }
 }

@@ -12,7 +12,9 @@ trait Plugin {
 
   def name: String
 
-  def init: Try[Unit]
+  def init: Future[Unit]
+
+  def close: Future[Unit]
 
   def execute(
     newTx: ApiTransaction,

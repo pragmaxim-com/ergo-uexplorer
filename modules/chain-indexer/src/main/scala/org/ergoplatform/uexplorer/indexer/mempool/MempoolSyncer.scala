@@ -5,12 +5,13 @@ import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.TxId
+import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.*
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.node.ApiTransaction
 
 import concurrent.duration.DurationInt
-import scala.collection.immutable.ListMap
+import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.Future
 
 object MempoolSyncer extends LazyLogging {
@@ -31,7 +32,16 @@ object MempoolSyncer extends LazyLogging {
 
   case class MempoolStateChanges(stateTransitionByTx: List[(ApiTransaction, ListMap[TxId, ApiTransaction])])
     extends MempoolSyncerResponse {
-    
+
+    def utxoStateTransitionByTx(utxoState: UtxoState): Iterator[(ApiTransaction, UtxoState)] =
+      stateTransitionByTx.iterator.map { case (newTx, poolTxs) =>
+        val (inputs, outputs) =
+          poolTxs.values.foldLeft((ArraySeq.newBuilder[BoxId], ArraySeq.newBuilder[(BoxId, Address, Long)])) {
+            case ((iAcc, oAcc), tx) =>
+              iAcc.addAll(tx.inputs.map(_.boxId)) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
+          }
+        newTx -> utxoState.mergeBoxes(List((inputs.result(), outputs.result())).iterator)
+      }
   }
 
   case class UpdateTxs(allTxs: ListMap[TxId, ApiTransaction], replyTo: ActorRef[MempoolStateChanges])

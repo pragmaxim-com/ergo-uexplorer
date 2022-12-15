@@ -63,15 +63,15 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
   val blockClient     = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val inMemoryBackend = new InMemoryBackend
   val snapshotManager = new UtxoSnapshotManager()
-  val indexer         = new Indexer(inMemoryBackend, blockClient, snapshotManager)
+  val indexer         = new Indexer(inMemoryBackend, blockClient, snapshotManager, List.empty)
 
   "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {
     ChainSyncer.initialize(ChainState.empty).flatMap { _ =>
-      indexer.periodicSync(List.empty).flatMap { case (chainState, mempoolState) =>
+      indexer.periodicSync.flatMap { case (chainState, mempoolState) =>
         chainState.getLastCachedBlock.map(_.height).get shouldBe 4150
         chainState.findMissingIndexes shouldBe empty
         mempoolState.stateTransitionByTx.size shouldBe 9
-        indexer.periodicSync(List.empty).map { case (newChainState, newMempoolState) =>
+        indexer.periodicSync.map { case (newChainState, newMempoolState) =>
           newChainState.getLastCachedBlock.map(_.height).get shouldBe 4200
           newChainState.findMissingIndexes shouldBe empty
           newMempoolState.stateTransitionByTx.size shouldBe 0
