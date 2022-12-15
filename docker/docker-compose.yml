@@ -41,5 +41,27 @@ services:
     environment:
       - CQLSH_HOST=cassandra
     command: /bin/bash -c "echo loading cassandra keyspace && cqlsh -f /schema-tables.cql"
+  chain-indexer:
+    image: pragmaxim/uexplorer-chain-indexer:latest
+    container_name: chain-indexer
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      cassandra-init-tables:
+        condition: service_completed_successfully
+    networks:
+      - backend
+    volumes:
+      - ./chain-indexer.conf:/uexplorer/chain-indexer/conf/chain-indexer.conf
+    environment:
+      - BACKEND_INDEXING_PARALLELISM=${BACKEND_INDEXING_PARALLELISM:-1}
+      # override in case you run your own Ergo node deployment
+      - LOCAL_ERGO_NODE_HOST=172.17.0.1
+      - LOCAL_ERGO_NODE_PORT=9053
+      # override in case you run your own Cassandra deployment
+      - CASSANDRA_SEED_HOST=cassandra
+      - CASSANDRA_SEED_PORT=9042
+      - DISCORD_ALERT_CHANNEL=${DISCORD_ALERT_CHANNEL:-}
+      - DISCORD_TOKEN=${DISCORD_TOKEN:-}
 networks:
   backend:
