@@ -6,6 +6,7 @@ import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.io.Source
 import io.circe.parser.*
 import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.indexer.http.Codecs
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 object Rest {
@@ -36,7 +37,7 @@ object Rest {
     lazy val byHeight: SortedMap[Int, String] = loadCacheFromFile("blocks/block_ids.gz")
   }
 
-  object blocks {
+  object blocks extends Codecs {
     lazy val byHeight: SortedMap[Int, String] = loadCacheFromFile("blocks/blocks.gz")
 
     lazy val byId: SortedMap[String, String] = byHeight.map { case (height, block) =>

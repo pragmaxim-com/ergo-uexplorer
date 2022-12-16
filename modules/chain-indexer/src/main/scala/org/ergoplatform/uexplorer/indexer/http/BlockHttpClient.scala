@@ -28,7 +28,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   s: ActorSystem[Nothing],
   chainSyncer: ActorRef[ChainSyncerRequest],
   sttpB: SttpBackend[Future, _]
-) extends ResiliencySupport {
+) extends ResiliencySupport with Codecs {
 
   implicit private val addressEncoder: ErgoAddressEncoder = protocol.addressEncoder
   private val proxyUri                                    = uri"http://proxy"

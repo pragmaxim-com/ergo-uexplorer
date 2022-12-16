@@ -86,7 +86,7 @@ lazy val root = (project in file("."))
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= cats("3") ++ circe("3") ++ refined("3") ++ Seq(ergoWallet))
+    .settings(libraryDependencies ++= circe("3"))
 
 lazy val `alert-plugin` =
   Utils.mkModule("alert-plugin", "alert-plugin")
@@ -101,6 +101,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ Seq(retry("3"), loggingApi, logback, pureConfig))
+    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ Seq(retry("3"), ergoWallet, loggingApi, logback, pureConfig))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)))
     .dependsOn(core, `alert-plugin`)

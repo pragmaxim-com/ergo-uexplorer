@@ -10,7 +10,7 @@ import io.circe.syntax.*
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import eu.timepit.refined.auto.*
 import io.circe.Encoder
-import org.ergoplatform.uexplorer.parser.{RegistersParser, TokenPropsParser}
+import org.ergoplatform.uexplorer.indexer.parser.{RegistersParser, TokenPropsParser}
 
 import scala.collection.immutable.ArraySeq
 import scala.util.Try

@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.parser
+package org.ergoplatform.uexplorer.indexer.parser
 
 import org.ergoplatform.uexplorer.{HexString, RegisterId}
 import org.ergoplatform.uexplorer.node.{ExpandedRegister, RegisterValue, TokenProps}
