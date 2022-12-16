@@ -11,7 +11,7 @@ import io.circe.syntax.*
 import io.circe.*
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.parser.ErgoTreeParser
+import org.ergoplatform.uexplorer.parser.{ErgoTreeParser, RegistersParser}
 
 import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
@@ -147,7 +147,7 @@ final case class ApiOutput(
   address: Address,
   scriptTemplateHash: ErgoTreeTemplateHash,
   assets: List[ApiAsset],
-  additionalRegisters: Map[RegisterId, HexString]
+  additionalRegisters: Map[RegisterId, ExpandedRegister]
 )
 
 object ApiOutput {
@@ -163,7 +163,16 @@ object ApiOutput {
       scriptTemplateHash  <- ErgoTreeParser.deriveErgoTreeTemplateHash(ergoTree)
       assets              <- c.downField("assets").as[List[ApiAsset]]
       additionalRegisters <- c.downField("additionalRegisters").as[Map[RegisterId, HexString]]
-    } yield ApiOutput(boxId, value, creationHeight, ergoTree, address, scriptTemplateHash, assets, additionalRegisters)
+    } yield ApiOutput(
+      boxId,
+      value,
+      creationHeight,
+      ergoTree,
+      address,
+      scriptTemplateHash,
+      assets,
+      additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex)).toMap
+    )
   }
 
 }
@@ -226,8 +235,7 @@ object ApiTransaction {
 
 final case class ExpandedRegister(
   serializedValue: HexString,
-  sigmaType: Option[SigmaType],
-  renderedValue: Option[String]
+  regValue: Option[RegisterValue]
 )
 
 final case class RegisterValue(sigmaType: SigmaType, value: String)

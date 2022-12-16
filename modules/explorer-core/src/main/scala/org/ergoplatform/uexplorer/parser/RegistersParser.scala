@@ -77,24 +77,14 @@ object RegistersParser {
     goRender(ev).value.value
   }
 
-  def parseAny(raw: HexString): Try[RegisterValue] =
-    Try(ValueSerializer.deserialize(Base16.decode(raw).get)).flatMap {
-      case v: EvaluatedValue[_] =>
+  def parseAny(raw: HexString): ExpandedRegister =
+    Try(ValueSerializer.deserialize(Base16.decode(raw).get)) match {
+      case Success(v: EvaluatedValue[_]) =>
         renderEvaluatedValue(v)
-          .map { case (tp, vl) => Try(RegisterValue(tp, vl)) }
-          .getOrElse(Failure(new Exception(s"Failed to render constant value [$v] in register")))
-      case v =>
-        Failure(new Exception(s"Got non constant value [$v] in register"))
+          .map { case (tp, vl) => ExpandedRegister(raw, Some(RegisterValue(tp, vl))) }
+          .getOrElse(ExpandedRegister(raw, None))
+      case _ =>
+        ExpandedRegister(raw, None)
     }
-
-  /** Expand registers into `register_id -> expanded_register` form. */
-  inline def expand(registers: Map[RegisterId, HexString]): Map[RegisterId, ExpandedRegister] = {
-    val expanded =
-      for {
-        (idSig, serializedValue) <- registers.toList
-        rv = parseAny(serializedValue).toOption
-      } yield idSig -> ExpandedRegister(serializedValue, rv.map(_.sigmaType), rv.map(_.value))
-    expanded.toMap
-  }
 
 }

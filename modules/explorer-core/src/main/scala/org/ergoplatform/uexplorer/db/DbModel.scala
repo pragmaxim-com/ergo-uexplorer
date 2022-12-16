@@ -118,7 +118,6 @@ final case class Output(
   ergoTree: HexString, // serialized and hex-encoded ErgoTree
   ergoTreeTemplateHash: ErgoTreeTemplateHash, // hash of serialized and hex-encoded ErgoTree template
   address: Address, // an address derived from ergoTree
-  additionalRegisters: Json, // arbitrary key-value dictionary
   timestamp: Long, // time output appeared in the blockchain
   mainChain: Boolean // chain status, `true` if this output resides in main chain
 )

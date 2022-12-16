@@ -104,8 +104,6 @@ object BlockBuilder {
 
     val outputs = {
       import io.circe.generic.auto.*
-      summon[Encoder[HexString]]
-      summon[Encoder[ExpandedRegister]]
       val lastOutputGlobalIndex = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
       apiTransactions.transactions.zipWithIndex
         .flatMap { case (tx, tix) =>
@@ -128,7 +126,6 @@ object BlockBuilder {
             o.ergoTree,
             o.scriptTemplateHash,
             o.address,
-            RegistersParser.expand(o.additionalRegisters).asJson,
             header.timestamp,
             mainChain = false
           )
@@ -144,11 +141,18 @@ object BlockBuilder {
 
     val registers =
       for {
-        tx                            <- apiTransactions.transactions
-        out                           <- tx.outputs.toList
-        (id, rawValue)                <- out.additionalRegisters.toList
-        RegisterValue(typeSig, value) <- RegistersParser.parseAny(rawValue).toOption
-      } yield BoxRegister(id, out.boxId, typeSig, rawValue, value)
+        tx                     <- apiTransactions.transactions
+        out                    <- tx.outputs
+        (id, expandedRegister) <- out.additionalRegisters
+      } yield expandedRegister.regValue.map { rv =>
+        BoxRegister(
+          id,
+          out.boxId,
+          rv.sigmaType,
+          expandedRegister.serializedValue,
+          rv.value
+        )
+      }
 
     val tokens =
       apiTransactions.transactions.flatMap { tx =>
@@ -210,7 +214,7 @@ object BlockBuilder {
 
     BlockInfoBuilder(apiBlock, prevBlock).map { info =>
       updateMainChain(
-        Block(header, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers, tokens, info),
+        Block(header, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers.flatten, tokens, info),
         mainChain = true
       )
     }

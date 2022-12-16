@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.parser
 
 import org.ergoplatform.uexplorer.{HexString, RegisterId}
-import org.ergoplatform.uexplorer.node.{RegisterValue, TokenProps}
+import org.ergoplatform.uexplorer.node.{ExpandedRegister, RegisterValue, TokenProps}
 import scorex.util.encode.Base16
 import sigmastate.serialization.ValueSerializer
 import sigmastate.{SByte, SCollection}
@@ -15,14 +15,12 @@ object TokenPropsParser {
   private val StringCharset = "UTF-8"
   private val MaxStringLen  = 1000
 
-  def parse(registers: Map[RegisterId, HexString]): Option[TokenProps] = {
-    def parse(raw: HexString): Option[String] = RegistersParser.parseAny(raw).toOption.map(_.value)
+  def parse(registers: Map[RegisterId, ExpandedRegister]): Option[TokenProps] =
     for {
-      name <- registers.get(RegisterId.R4).flatMap(parse)
-      description = registers.get(RegisterId.R5).flatMap(parse).getOrElse("")
-      decimals    = registers.get(RegisterId.R6).flatMap(parse).flatMap(_.toIntOption).getOrElse(0)
+      name <- registers.get(RegisterId.R4).flatMap(_.regValue.map(_.value))
+      description = registers.get(RegisterId.R5).flatMap(_.regValue.map(_.value)).getOrElse("")
+      decimals    = registers.get(RegisterId.R6).flatMap(_.regValue.map(_.value)).flatMap(_.toIntOption).getOrElse(0)
     } yield TokenProps(name, description, decimals)
-  }
 
   private def looksLikeUTF8(utf8: Array[Byte]): Boolean = {
     val p = Pattern.compile(
