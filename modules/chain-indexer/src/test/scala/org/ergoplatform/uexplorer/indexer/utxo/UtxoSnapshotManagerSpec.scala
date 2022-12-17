@@ -36,8 +36,7 @@ class UtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
         .toMap
     val utxoState = UtxoState(
       addressByUtxo,
-      utxosByAddress,
-      Set.empty
+      utxosByAddress
     )
     utxoSnapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(1, utxoState)).flatMap { _ =>
       utxoSnapshotManager.getLatestSnapshotByIndex.map { snapshot =>

@@ -5,6 +5,8 @@ import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.indexer.chain.ChainState
+import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.*
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
@@ -34,13 +36,13 @@ object MempoolSyncer extends LazyLogging {
     extends MempoolSyncerResponse {
 
     def utxoStateTransitionByTx(utxoState: UtxoState): Iterator[(ApiTransaction, UtxoState)] =
-      stateTransitionByTx.iterator.map { case (newTx, poolTxs) =>
+      stateTransitionByTx.iterator.flatMap { case (newTx, poolTxs) =>
         val (inputs, outputs) =
           poolTxs.values.foldLeft((ArraySeq.newBuilder[BoxId], ArraySeq.newBuilder[(BoxId, Address, Long)])) {
             case ((iAcc, oAcc), tx) =>
               iAcc.addAll(tx.inputs.map(_.boxId)) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
           }
-        newTx -> utxoState.mergeBoxes(List((inputs.result(), outputs.result())).iterator)
+        utxoState.mergeBoxes(List((inputs.result(), outputs.result())).iterator).toOption.map(newTx -> _)
       }
   }
 
@@ -71,5 +73,21 @@ object MempoolSyncer extends LazyLogging {
     txs: ListMap[TxId, ApiTransaction]
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[UpdateTxs]): Future[MempoolStateChanges] =
     ref.ask(ref => UpdateTxs(txs, ref))
+
+  def syncMempool(
+    blockHttpClient: BlockHttpClient,
+    chainState: ChainState,
+    bestBlockHeight: Int
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[UpdateTxs]): Future[MempoolStateChanges] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    if (chainState.blockBuffer.byHeight.lastOption.map(_._1).exists(_ >= bestBlockHeight)) {
+      for {
+        txs          <- blockHttpClient.getUnconfirmedTxs
+        stateChanges <- updateTransactions(txs)
+      } yield stateChanges
+    } else {
+      Future.successful(MempoolStateChanges(List.empty))
+    }
+  }
 
 }

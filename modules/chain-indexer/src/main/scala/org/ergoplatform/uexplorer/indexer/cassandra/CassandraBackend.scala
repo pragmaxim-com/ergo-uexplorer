@@ -10,8 +10,8 @@ import com.datastax.oss.driver.api.core.context.DriverContext
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.Const
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.Inserted
@@ -20,6 +20,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.{CompletableFuture, CompletionStage}
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.DurationInt
+import CassandraBackend.BufferSize
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
@@ -43,12 +44,12 @@ class CassandraBackend(parallelism: Int)(implicit
     Flow[Inserted]
       // format: off
       .via(blockUpdaterFlow(parallelism))
-      .via(headerWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(transactionsWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(registersWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(tokensWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(inputsWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
-      .via(assetsWriteFlow(parallelism)).buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .via(headerWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
+      .via(transactionsWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
+      .via(registersWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
+      .via(tokensWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
+      .via(inputsWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
+      .via(assetsWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
       .via(outputsWriteFlow(parallelism))
       // format: on
 }
@@ -60,6 +61,7 @@ object CassandraBackend extends LazyLogging {
   import com.datastax.oss.driver.api.core.CqlSession
 
   import scala.concurrent.Await
+  val BufferSize = 32
 
   def apply(parallelism: Int)(implicit system: ActorSystem[Nothing]): CassandraBackend = {
     implicit val cqlSession: CqlSession =

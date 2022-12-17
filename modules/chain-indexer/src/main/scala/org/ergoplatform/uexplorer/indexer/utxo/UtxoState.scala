@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.*
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
-import org.ergoplatform.uexplorer.{Address, BoxId}
+import org.ergoplatform.uexplorer.{Address, BoxId, Const}
 
 import java.io.*
 import java.nio.file.{Path, Paths}
@@ -21,13 +21,12 @@ import scala.util.{Success, Try}
 
 case class UtxoState(
   addressByUtxo: Map[BoxId, Address],
-  utxosByAddress: Map[Address, Map[BoxId, Long]],
-  inputsWithoutAddress: Set[BoxId]
+  utxosByAddress: Map[Address, Map[BoxId, Long]]
 ) {
 
   def mergeBoxes(
     boxesByHeight: Iterator[(ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])]
-  ): UtxoState = {
+  ): Try[UtxoState] = {
     val (inputsBuilder, newAddressByUtxo, newUtxosByAddress) =
       boxesByHeight
         .foldLeft((ArraySeq.newBuilder[BoxId], addressByUtxo, utxosByAddress)) {
@@ -43,33 +42,36 @@ case class UtxoState(
         }
 
     val inputs = inputsBuilder.result()
-    val (inputsWithAddress, inputsWoAddress) =
-      inputs.foldLeft(mutable.Map.empty[Address, mutable.Set[BoxId]] -> ArraySeq.newBuilder[BoxId]) {
-        case ((inputsWithAddressAcc, inputsWoAddressAcc), boxId) =>
-          if (newAddressByUtxo.contains(boxId)) {
-            val address = newAddressByUtxo(boxId)
-            inputsWithAddressAcc.adjust(address)(
-              _.fold(mutable.Set(boxId))(_.addOne(boxId))
-            ) -> inputsWoAddressAcc
-          } else
-            inputsWithAddressAcc -> inputsWoAddressAcc.addOne(boxId)
-      }
-    val utxosByAddressWoInputs =
-      inputsWithAddress
-        .foldLeft(newUtxosByAddress) { case (acc, (address, inputIds)) =>
-          acc.putOrRemove(address) {
-            case None                 => None
-            case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)
-          }
+    Try {
+      inputs.foldLeft(mutable.Map.empty[Address, mutable.Set[BoxId]]) { case (inputsWithAddressAcc, boxId) =>
+        if (newAddressByUtxo.contains(boxId)) {
+          val address = newAddressByUtxo(boxId)
+          inputsWithAddressAcc.adjust(address)(
+            _.fold(mutable.Set(boxId))(_.addOne(boxId))
+          )
+        } else if (Const.genesisBoxes.contains(boxId)) {
+          inputsWithAddressAcc
+        } else {
+          throw new IllegalStateException(s"Input boxId $boxId is missing corresponding utxo in UtxoState")
         }
-    UtxoState(
-      newAddressByUtxo -- inputs,
-      utxosByAddressWoInputs,
-      inputsWithoutAddress ++ inputsWoAddress.result()
-    )
+      }
+    }.map { inputsWithAddress =>
+      val utxosByAddressWoInputs =
+        inputsWithAddress
+          .foldLeft(newUtxosByAddress) { case (acc, (address, inputIds)) =>
+            acc.putOrRemove(address) {
+              case None                 => None
+              case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)
+            }
+          }
+      UtxoState(
+        newAddressByUtxo -- inputs,
+        utxosByAddressWoInputs
+      )
+    }
   }
 }
 
 object UtxoState extends LazyLogging {
-  def empty: UtxoState = UtxoState(Map.empty, Map.empty, Set.empty)
+  def empty: UtxoState = UtxoState(Map.empty, Map.empty)
 }

@@ -103,7 +103,6 @@ object BlockBuilder {
       }
 
     val outputs = {
-      import io.circe.generic.auto.*
       val lastOutputGlobalIndex = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
       apiTransactions.transactions.zipWithIndex
         .flatMap { case (tx, tix) =>

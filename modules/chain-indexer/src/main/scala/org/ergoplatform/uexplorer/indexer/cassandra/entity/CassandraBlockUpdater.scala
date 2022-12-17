@@ -2,17 +2,17 @@ package org.ergoplatform.uexplorer.indexer.cassandra.entity
 
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
-import com.datastax.oss.driver.api.core.cql._
+import com.datastax.oss.driver.api.core.cql.*
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.{indexer, BlockId, Const}
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
-import org.ergoplatform.uexplorer.indexer.cassandra.entity.CassandraBlockUpdater._
+import org.ergoplatform.uexplorer.indexer.cassandra.entity.CassandraBlockUpdater.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.{BestBlockInserted, ForkInserted, Inserted}
-import scala.jdk.CollectionConverters._
-import scala.jdk.FutureConverters._
+
+import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -42,7 +42,9 @@ trait CassandraBlockUpdater extends LazyLogging {
         case (table, Some(key), blockId) =>
           Source
             .fromPublisher(
-              cqlSession.executeReactive(s"SELECT $key FROM ${Const.CassandraKeyspace}.$table WHERE header_id = '$blockId';")
+              cqlSession.executeReactive(
+                s"SELECT $key FROM ${indexer.Const.CassandraKeyspace}.$table WHERE header_id = '$blockId';"
+              )
             )
             .map(_.getString(key))
             .runWith(Sink.seq)
@@ -69,7 +71,7 @@ object CassandraBlockUpdater {
 
   private def updateMainChainBase(table: String) =
     QueryBuilder
-      .update(Const.CassandraKeyspace, table)
+      .update(indexer.Const.CassandraKeyspace, table)
       .setColumn("main_chain", QueryBuilder.bindMarker("main_chain"))
       .whereColumn("header_id")
       .isEqualTo(QueryBuilder.bindMarker("header_id"))

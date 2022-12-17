@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
-import org.ergoplatform.uexplorer.indexer.Const
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const}
 import org.ergoplatform.uexplorer.indexer.chain.Epoch.*
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}

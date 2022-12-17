@@ -6,10 +6,10 @@ import com.datastax.oss.driver.api.core.cql.{AsyncResultSet, BoundStatement, Pre
 import com.datastax.oss.driver.api.core.data.TupleValue
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.{Const, MapPimp, MutableMapPimp, UnexpectedStateError}
+import org.ergoplatform.uexplorer.indexer.{MapPimp, MutableMapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
-import org.ergoplatform.uexplorer.{db, Address, BlockId, BoxId}
+import org.ergoplatform.uexplorer.{db, indexer, Address, BlockId, BoxId, Const}
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.jdk.FutureConverters.*
@@ -76,10 +76,10 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
         }
         .buffer(32, OverflowStrategy.backpressure)
         .grouped(Const.EpochLength)
-        .runFold(UtxoState.empty) { case (s, boxesByHeight) =>
+        .runFoldAsync(UtxoState.empty) { case (s, boxesByHeight) =>
           val epochIndex = Epoch.epochIndexForHeight(boxesByHeight.head._1)
           logger.info(s"Merging boxes of epoch $epochIndex into utxo state")
-          s.mergeBoxes(boxesByHeight.iterator.map(_._2))
+          Future.fromTry(s.mergeBoxes(boxesByHeight.iterator.map(_._2)))
         }
     }
 }
@@ -88,7 +88,7 @@ object CassandraUtxoReader extends CassandraPersistenceSupport {
 
   protected[cassandra] val headerSelectStatement: SimpleStatement =
     QueryBuilder
-      .selectFrom(Const.CassandraKeyspace, Headers.node_headers_table)
+      .selectFrom(indexer.Const.CassandraKeyspace, Headers.node_headers_table)
       .columns(Headers.header_id)
       .whereColumn(Headers.height)
       .isEqualTo(QueryBuilder.bindMarker(Headers.height))
@@ -96,7 +96,7 @@ object CassandraUtxoReader extends CassandraPersistenceSupport {
 
   protected[cassandra] val outputsSelectStatement: SimpleStatement =
     QueryBuilder
-      .selectFrom(Const.CassandraKeyspace, Outputs.node_outputs_table)
+      .selectFrom(indexer.Const.CassandraKeyspace, Outputs.node_outputs_table)
       .columns(Outputs.box_id, Outputs.address, Outputs.value)
       .whereColumn(Outputs.header_id)
       .isEqualTo(QueryBuilder.bindMarker(Outputs.header_id))
@@ -104,7 +104,7 @@ object CassandraUtxoReader extends CassandraPersistenceSupport {
 
   protected[cassandra] val inputsSelectStatement: SimpleStatement =
     QueryBuilder
-      .selectFrom(Const.CassandraKeyspace, Inputs.node_inputs_table)
+      .selectFrom(indexer.Const.CassandraKeyspace, Inputs.node_inputs_table)
       .columns(Outputs.box_id)
       .whereColumn(Inputs.header_id)
       .isEqualTo(QueryBuilder.bindMarker(Inputs.header_id))

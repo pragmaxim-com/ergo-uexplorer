@@ -8,10 +8,12 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BlockBuffer
 import org.ergoplatform.uexplorer.indexer.{MapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.indexer.api.Backend
+import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshotManager, UtxoState}
 
 import scala.collection.immutable.{ArraySeq, List, SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 case class ChainState(
@@ -22,29 +24,31 @@ case class ChainState(
 ) {
   import ChainState.*
 
-  def utxoStateWithMergedBoxes: UtxoState = 
+  /** on-demand computation of UtxoState up to latest blocks which are not merged right away as we do not support rollback,
+    * instead we merge only winner-fork blocks into UtxoState
+    */
+  def utxoStateWithCurrentEpochBoxes: Try[UtxoState] =
     utxoState.mergeBoxes(boxesByHeightBuffer.iterator.map(_._2))
-  
+
   def finishEpoch(currentEpochIndex: Int): Try[(MaybeNewEpoch, ChainState)] =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
       Success(NewEpochExisted(currentEpochIndex) -> this)
     } else {
       val previousEpochIndex = currentEpochIndex - 1
       val heightRange        = Epoch.heightRangeForEpochIndex(currentEpochIndex)
-      val boxesByHeightSlice = boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
-      val newState           = utxoState.mergeBoxes(boxesByHeightSlice.valuesIterator)
       EpochCandidate(blockBuffer.blockRelationsByHeight(heightRange)) match {
         case Right(candidate)
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
-          val newEpoch = candidate.getEpoch
-          Success(
+          val newEpoch           = candidate.getEpoch
+          val boxesByHeightSlice = boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
+          utxoState.mergeBoxes(boxesByHeightSlice.valuesIterator).map { newState =>
             NewEpochCreated(newEpoch) -> ChainState(
               lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
               blockBuffer.flushEpoch(heightRange),
               boxesByHeightBuffer -- boxesByHeightSlice.keysIterator,
               newState
             )
-          )
+          }
         case Right(candidate) =>
           val Epoch(curIndex, _) = candidate.getEpoch
           val invalidHeights =
@@ -162,8 +166,7 @@ case class ChainState(
 
     s"utxo count: ${utxoState.addressByUtxo.size}, non-empty-address count: ${utxoState.utxosByAddress.size}, " +
     s"persisted Epochs: ${existingEpochs.size}${headStr(existingEpochs)}${lastStr(existingEpochs)}, " +
-    s"blocks cache size (heights): ${cachedHeights.size}${headStr(cachedHeights)}${lastStr(cachedHeights)}, " +
-    s"inputs without address: ${utxoState.inputsWithoutAddress.size}"
+    s"blocks cache size (heights): ${cachedHeights.size}${headStr(cachedHeights)}${lastStr(cachedHeights)}"
   }
 
 }
@@ -172,9 +175,9 @@ object ChainState {
 
   case class BufferedBlockInfo(headerId: BlockId, parentId: BlockId, timestamp: Long, height: Int, info: BlockInfo)
 
-  def empty: ChainState = load(TreeMap.empty, UtxoState.empty)
+  def empty: ChainState = apply(TreeMap.empty, UtxoState.empty)
 
-  def load(bufferedInfoByEpochIndex: TreeMap[Int, BufferedBlockInfo], utxoState: UtxoState): ChainState =
+  def apply(bufferedInfoByEpochIndex: TreeMap[Int, BufferedBlockInfo], utxoState: UtxoState): ChainState =
     ChainState(
       bufferedInfoByEpochIndex.map { case (epochIndex, blockInfo) => epochIndex -> blockInfo.headerId },
       BlockBuffer(
@@ -184,6 +187,27 @@ object ChainState {
       TreeMap.empty,
       utxoState
     )
+
+  def load(backend: Backend, snapshotManager: UtxoSnapshotManager): Future[ChainState] = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    backend.loadBlockInfoByEpochIndex
+      .flatMap {
+        case blockInfoByEpochIndex if blockInfoByEpochIndex.isEmpty =>
+          Future {
+            snapshotManager.clearAllSnapshots
+            ChainState.empty
+          }
+        case blockInfoByEpochIndex =>
+          snapshotManager.getLatestSnapshotByIndex
+            .flatMap {
+              _.collect {
+                case snapshot if snapshot.epochIndex == blockInfoByEpochIndex.lastKey =>
+                  Future.successful(snapshot.utxoState)
+              }.getOrElse(backend.loadUtxoState(blockInfoByEpochIndex.keysIterator))
+            }
+            .map(utxoState => ChainState(blockInfoByEpochIndex, utxoState))
+      }
+  }
 
   object BufferedBlockInfo {
 

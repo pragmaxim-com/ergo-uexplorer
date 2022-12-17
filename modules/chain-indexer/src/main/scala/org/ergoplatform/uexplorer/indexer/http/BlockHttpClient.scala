@@ -5,12 +5,12 @@ import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
-import org.ergoplatform.uexplorer.{BlockId, TxId}
+import org.ergoplatform.uexplorer.{BlockId, Const, TxId}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
-import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport}
+import org.ergoplatform.uexplorer.indexer.ResiliencySupport
 import retry.Policy
 import sttp.capabilities.WebSockets
 import sttp.client3.*
@@ -28,7 +28,8 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   s: ActorSystem[Nothing],
   chainSyncer: ActorRef[ChainSyncerRequest],
   sttpB: SttpBackend[Future, _]
-) extends ResiliencySupport with Codecs {
+) extends ResiliencySupport
+  with Codecs {
 
   implicit private val addressEncoder: ErgoAddressEncoder = protocol.addressEncoder
   private val proxyUri                                    = uri"http://proxy"
@@ -102,9 +103,9 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   def blockCachingFlow: Flow[Int, Inserted, NotUsed] =
     Flow[Int]
       .mapAsync(1)(getBlockIdForHeight)
-      .buffer(Const.BufferSize * 2, OverflowStrategy.backpressure)
+      .buffer(64, OverflowStrategy.backpressure)
       .mapAsync(1)(getBlockForId)
-      .buffer(Const.BufferSize, OverflowStrategy.backpressure)
+      .buffer(32, OverflowStrategy.backpressure)
       .mapAsync(1) { block =>
         getBestBlockOrBranch(block, List.empty)
           .flatMap {

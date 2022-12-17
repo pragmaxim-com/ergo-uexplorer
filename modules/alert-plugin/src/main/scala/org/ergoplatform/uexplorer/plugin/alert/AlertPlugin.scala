@@ -4,6 +4,7 @@ import discord4j.common.util.Snowflake
 import discord4j.core.{DiscordClient, GatewayDiscordClient}
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.channel.MessageChannel
+import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin
@@ -57,7 +58,9 @@ class AlertPlugin extends Plugin {
           .map(_ => ())
       }(retry.Success.always, global)
 
-  private lazy val detectors = List(new HighTxValueDetector(100 * 1000 * 1000000000L))
+  private lazy val detectors = List(
+    new HighValueDetector(200 * 1000, 500 * 1000)
+  )
 
   def name: String = "Alert Plugin"
 
@@ -85,14 +88,25 @@ class AlertPlugin extends Plugin {
   def close: Future[Unit] =
     client.flatMap(_.logout().toFuture.asScala.map(_ => ()))
 
-  def execute(
+  def processMempoolTx(
     newTx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool
   ): Future[Unit] =
     sendMessages(
-      detectors.flatMap { decoder =>
-        decoder.inspect(newTx, utxoStateWoPool, utxoStateWithPool)
+      detectors.flatMap { detector =>
+        detector.inspectNewPoolTx(newTx, utxoStateWoPool, utxoStateWithPool)
       }
     )
+
+  def processNewBlock(
+    newBlock: Block,
+    utxoStateWoPool: UtxoStateWithoutPool
+  ): Future[Unit] =
+    sendMessages(
+      detectors.flatMap { detector =>
+        detector.inspectNewBlock(newBlock, utxoStateWoPool)
+      }
+    )
+
 }

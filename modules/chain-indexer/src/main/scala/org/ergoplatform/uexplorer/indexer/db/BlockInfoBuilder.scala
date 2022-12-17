@@ -1,9 +1,8 @@
 package org.ergoplatform.uexplorer.indexer.db
 
-import org.ergoplatform.uexplorer.Address
+import org.ergoplatform.uexplorer.{indexer, Address, Const}
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
-import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
 import scorex.util.encode.Base16
@@ -11,7 +10,7 @@ import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
 
 import scala.util.Try
-import eu.timepit.refined.auto._
+import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 
 object BlockInfoBuilder {
@@ -47,7 +46,7 @@ object BlockInfoBuilder {
       else reward
     val fee = apiBlock.transactions.transactions
       .flatMap(_.outputs.toList)
-      .filter(_.ergoTree == Const.FeePropositionScriptHex)
+      .filter(_.ergoTree == indexer.Const.FeePropositionScriptHex)
       .map(_.value)
       .sum
     protocolSettings.networkPrefix.value.toByte match {
@@ -61,7 +60,7 @@ object BlockInfoBuilder {
   }
 
   def apply(apiBlock: ApiFullBlock, prevBlock: Option[BufferedBlockInfo])(implicit
-                                                                          protocolSettings: ProtocolSettings
+    protocolSettings: ProtocolSettings
   ): Try[BlockInfo] =
     minerRewardAddress(apiBlock)(protocolSettings).map { minerAddress =>
       val (reward, fee) = minerRewardAndFee(apiBlock)(protocolSettings)

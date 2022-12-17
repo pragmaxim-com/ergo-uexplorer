@@ -29,6 +29,7 @@ class UtxoSnapshotManager(
 
   def clearAllSnapshots: Unit =
     if (rootSnapshotDir.exists()) {
+      logger.info(s"Deleting all legacy snapshots")
       Files.walk(rootSnapshotDir.toPath).sorted(Comparator.reverseOrder[Path]).iterator.asScala.map(_.toFile.delete())
     }
 
@@ -93,7 +94,7 @@ class UtxoSnapshotManager(
               }
               .map(_.result())
               .map(utxosByAddress =>
-                Option(UtxoSnapshot.Deserialized(latestEpochIndex, UtxoState(addressByUtxo, utxosByAddress, Set.empty)))
+                Option(UtxoSnapshot.Deserialized(latestEpochIndex, UtxoState(addressByUtxo, utxosByAddress)))
               )
           }
       }

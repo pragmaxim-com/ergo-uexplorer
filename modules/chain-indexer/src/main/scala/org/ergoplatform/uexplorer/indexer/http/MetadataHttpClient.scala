@@ -3,10 +3,11 @@ package org.ergoplatform.uexplorer.indexer.http
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import io.circe.Decoder
+import org.ergoplatform.uexplorer.{indexer, Const}
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.{Const, ResiliencySupport}
+import org.ergoplatform.uexplorer.indexer.ResiliencySupport
 import retry.Policy
-import sttp.client3._
+import sttp.client3.*
 import sttp.client3.circe.asJson
 
 import scala.collection.immutable.{SortedSet, TreeSet}
@@ -15,7 +16,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
-class MetadataHttpClient[P](minNodeHeight: Int = Const.MinNodeHeight)(implicit
+class MetadataHttpClient[P](minNodeHeight: Int = indexer.Const.MinNodeHeight)(implicit
   remoteUri: RemoteNodeUriMagnet,
   localUri: LocalNodeUriMagnet,
   system: ActorSystem[Nothing],
@@ -33,7 +34,7 @@ class MetadataHttpClient[P](minNodeHeight: Int = Const.MinNodeHeight)(implicit
       .send(underlyingB)
       .map(_.body)
       .transform {
-        case Success(peer) if peer.fullHeight < minHeight - Const.AllowedHeightDiff || peer.stateType != "utxo" =>
+        case Success(peer) if peer.fullHeight < minHeight - indexer.Const.AllowedHeightDiff || peer.stateType != "utxo" =>
           logger.debug(s"Peer has empty fullHeight or it has not utxo state : $peer")
           Success(None)
         case Success(peer) =>
@@ -48,7 +49,7 @@ class MetadataHttpClient[P](minNodeHeight: Int = Const.MinNodeHeight)(implicit
       .map {
         case masterNodes if masterNodes.size > 1 =>
           val bestFullHeight = masterNodes.maxBy(_.fullHeight).fullHeight
-          masterNodes.filter(_.fullHeight >= bestFullHeight - Const.AllowedHeightDiff)
+          masterNodes.filter(_.fullHeight >= bestFullHeight - indexer.Const.AllowedHeightDiff)
         case masterNodes =>
           masterNodes
       }

@@ -51,40 +51,40 @@ class Indexer(
           Future.successful(block -> Option.empty)
       }
 
-  private val indexingFlow: Flow[Int, NewEpochCreated, NotUsed] =
+  private val indexingFlow: Flow[Int, (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[Int]
       .via(blockHttpClient.blockCachingFlow)
       .async
       .via(backend.blockWriteFlow)
       .via(blockToEpochFlow)
       .via(backend.epochsWriteFlow)
-      .mapConcat(_._2.collect { case e @ NewEpochCreated(_) => e }.toList)
       .withAttributes(supervisionStrategy(Resiliency.decider))
 
-  def syncMempool(chainState: ChainState, bestBlockHeight: Int): Future[MempoolStateChanges] =
-    if (chainState.blockBuffer.byHeight.lastOption.map(_._1).exists(_ >= bestBlockHeight)) {
-      for {
-        txs          <- blockHttpClient.getUnconfirmedTxs
-        stateChanges <- MempoolSyncer.updateTransactions(txs)
-      } yield stateChanges
-    } else {
-      Future.successful(MempoolStateChanges(List.empty))
+  private val indexingSink: Sink[(Block, Option[MaybeNewEpoch]), Future[(Option[Block], Option[NewEpochCreated])]] =
+    Sink.fold((Option.empty[Block], Option.empty[NewEpochCreated])) {
+      case ((_, _), (block, Some(e @ NewEpochCreated(_)))) =>
+        Option(block) -> Option(e)
+      case ((_, lastEpoch), (block, _)) =>
+        Option(block) -> lastEpoch
     }
 
-  def executePlugins(utxoState: UtxoState, stateChanges: MempoolStateChanges): Future[Unit] =
-    Future
-      .sequence(
-        stateChanges.utxoStateTransitionByTx(utxoState).flatMap { case (newTx, utxoStateWithPool) =>
-          plugins.map(
-            _.execute(
-              newTx,
-              UtxoStateWithoutPool(utxoState.addressByUtxo, utxoState.utxosByAddress),
-              UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress)
+  def executePlugins(chainState: ChainState, stateChanges: MempoolStateChanges, newBlockOpt: Option[Block]): Future[Unit] =
+    Future.fromTry(chainState.utxoStateWithCurrentEpochBoxes).flatMap { utxoState =>
+      val utxoStateWoPool = UtxoStateWithoutPool(utxoState.addressByUtxo, utxoState.utxosByAddress)
+      Future
+        .sequence(
+          stateChanges.utxoStateTransitionByTx(utxoState).flatMap { case (newTx, utxoStateWithPool) =>
+            plugins.map(
+              _.processMempoolTx(
+                newTx,
+                utxoStateWoPool,
+                UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress)
+              )
             )
-          )
-        }
-      )
-      .map(_ => ())
+          } ++ newBlockOpt.toList.flatMap(newBlock => plugins.map(_.processNewBlock(newBlock, utxoStateWoPool)))
+        )
+        .map(_ => ())
+    }
 
   def verifyStateIntegrity(chainState: ChainState): Future[Done] = {
     val pastHeights = chainState.findMissingIndexes.flatMap(Epoch.heightRangeForEpochIndex)
@@ -103,41 +103,32 @@ class Indexer(
     }
   }
 
-  def loadChainState: Future[ChainState] =
-    backend.loadBlockInfoByEpochIndex
-      .flatMap { blockInfoByEpochIndex =>
-        snapshotManager.getLatestSnapshotByIndex
-          .flatMap {
-            _.collect {
-              case snapshot if snapshot.epochIndex == blockInfoByEpochIndex.lastKey => Future.successful(snapshot.utxoState)
-            }.getOrElse(backend.loadUtxoState(blockInfoByEpochIndex.keysIterator))
-          }
-          .map(utxoState => ChainState.load(blockInfoByEpochIndex, utxoState))
-      }
+  def makeSnapshot(newEpochOpt: Option[NewEpochCreated], utxoState: UtxoState): Future[Unit] =
+    newEpochOpt.fold(Future.successful(())) { newEpoch =>
+      snapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(newEpoch.epoch.index, utxoState))
+    }
 
-  def syncChain(bestBlockHeight: Int): Future[ChainState] = for {
+  def syncChain(bestBlockHeight: Int): Future[(Option[Block], Option[NewEpochCreated])] = for {
     chainState <- ChainSyncer.getChainState
     fromHeight = chainState.getLastCachedBlock.map(_.height).getOrElse(0) + 1
     _          = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
     _          = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
-    newEpochOpt   <- Source(fromHeight to bestBlockHeight).via(indexingFlow).runWith(Sink.lastOption)
-    newChainState <- ChainSyncer.getChainState
-    _ = newEpochOpt.foreach(newEpoch =>
-          snapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(newEpoch.epoch.index, newChainState.utxoState))
-        )
-  } yield newChainState
+    lastElements <- Source(fromHeight to bestBlockHeight).via(indexingFlow).runWith(indexingSink)
+  } yield lastElements
 
   def periodicSync: Future[(ChainState, MempoolStateChanges)] =
     for {
-      bestBlockHeight <- blockHttpClient.getBestBlockHeight
-      chainState      <- syncChain(bestBlockHeight)
-      stateChanges    <- syncMempool(chainState, bestBlockHeight)
-      _               <- executePlugins(chainState.utxoStateWithMergedBoxes, stateChanges)
+      bestBlockHeight              <- blockHttpClient.getBestBlockHeight
+      (lastBlockOpt, lastEpochOpt) <- syncChain(bestBlockHeight)
+      chainState                   <- ChainSyncer.getChainState
+      _                            <- makeSnapshot(lastEpochOpt, chainState.utxoState)
+      stateChanges                 <- MempoolSyncer.syncMempool(blockHttpClient, chainState, bestBlockHeight)
+      _                            <- executePlugins(chainState, stateChanges, lastBlockOpt)
     } yield (chainState, stateChanges)
 
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
     for {
-      chainState <- loadChainState
+      chainState <- ChainState.load(backend, snapshotManager)
       _          <- ChainSyncer.initialize(chainState)
       _          <- verifyStateIntegrity(chainState)
       done       <- schedule(initialDelay, pollingInterval)(periodicSync).run()

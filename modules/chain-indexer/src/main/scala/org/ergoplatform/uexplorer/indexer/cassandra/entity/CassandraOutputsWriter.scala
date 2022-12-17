@@ -4,9 +4,9 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
+import org.ergoplatform.uexplorer.Const
 
 import scala.collection.immutable.ArraySeq
 

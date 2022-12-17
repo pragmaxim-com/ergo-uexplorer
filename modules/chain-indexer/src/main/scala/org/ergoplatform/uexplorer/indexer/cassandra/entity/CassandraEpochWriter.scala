@@ -8,7 +8,6 @@ import com.datastax.oss.driver.api.core.data.TupleValue
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.chain.{Epoch, InvalidEpochCandidate}
@@ -17,7 +16,7 @@ import scala.jdk.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.Address
+import org.ergoplatform.uexplorer.{Address, Const}
 
 import scala.collection.immutable.ArraySeq
 import scala.jdk.CollectionConverters.*

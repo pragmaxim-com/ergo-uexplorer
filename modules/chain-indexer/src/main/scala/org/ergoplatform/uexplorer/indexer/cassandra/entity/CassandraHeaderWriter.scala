@@ -8,9 +8,9 @@ import com.datastax.oss.driver.api.core.data.UdtValue
 import com.datastax.oss.driver.internal.core.`type`.UserDefinedTypeBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.Const
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
-import eu.timepit.refined.auto._
+import eu.timepit.refined.auto.*
+import org.ergoplatform.uexplorer.{indexer, Const}
 
 trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
   import Headers._
@@ -140,7 +140,7 @@ object Headers {
 
     // format: off
     private lazy val udt =
-      new UserDefinedTypeBuilder(Const.CassandraKeyspace, udtName)
+      new UserDefinedTypeBuilder(indexer.Const.CassandraKeyspace, udtName)
         .withField(block_size,              DataTypes.INT)
         .withField(block_coins,             DataTypes.BIGINT)
         .withField(block_mining_time,       DataTypes.BIGINT)

@@ -11,7 +11,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.Const
+import org.ergoplatform.uexplorer.{Const, indexer}
 
 import scala.collection.immutable.ArraySeq
 
@@ -19,7 +19,7 @@ trait CassandraPersistenceSupport extends LazyLogging {
 
   protected[cassandra] def buildInsertStatement(columns: Seq[String], table: String): SimpleStatement = {
     logger.info(s"Building insert statement for table $table with columns ${columns.mkString(", ")}")
-    val insertIntoTable = insertInto(Const.CassandraKeyspace, table)
+    val insertIntoTable = insertInto(indexer.Const.CassandraKeyspace, table)
     columns.tail
       .foldLeft(insertIntoTable.value(columns.head, bindMarker(columns.head))) { case (acc, column) =>
         acc.value(column, bindMarker(column))

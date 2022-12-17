@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
-import org.ergoplatform.uexplorer.indexer.{Const, UnexpectedStateError}
+import org.ergoplatform.uexplorer.{indexer, Address, BlockId, BoxId, Const}
+import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
 
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
@@ -26,6 +26,6 @@ object Epoch {
   }
 
   def heightAtFlushPoint(height: Int): Boolean =
-    Epoch.epochIndexForHeight(height) > 0 && height % Const.EpochLength == Const.FlushHeight
+    Epoch.epochIndexForHeight(height) > 0 && height % Const.EpochLength == indexer.Const.FlushHeight
 
 }

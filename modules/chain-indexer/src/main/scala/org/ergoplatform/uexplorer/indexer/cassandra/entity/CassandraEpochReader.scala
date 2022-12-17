@@ -7,12 +7,12 @@ import com.datastax.oss.driver.api.core.data.TupleValue
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.indexer.{Const, MapPimp, MutableMapPimp}
+import org.ergoplatform.uexplorer.indexer.{MapPimp, MutableMapPimp}
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
 import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoState}
-import org.ergoplatform.uexplorer.{db, Address, BlockId, BoxId}
+import org.ergoplatform.uexplorer.{db, indexer, Address, BlockId, BoxId, Const}
 
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
@@ -45,7 +45,7 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
     Source
       .fromPublisher(
         cqlSession.executeReactive(
-          s"SELECT $epoch_index, $last_header_id FROM ${Const.CassandraKeyspace}.$node_epoch_last_headers_table;"
+          s"SELECT $epoch_index, $last_header_id FROM ${indexer.Const.CassandraKeyspace}.$node_epoch_last_headers_table;"
         )
       )
       .mapAsync(1)(row => blockInfoByEpochIndex(row.getInt(epoch_index), row.getString(last_header_id)))
@@ -63,7 +63,7 @@ object CassandraEpochReader extends CassandraPersistenceSupport {
 
   protected[cassandra] val blockInfoSelectStatement: SimpleStatement =
     QueryBuilder
-      .selectFrom(Const.CassandraKeyspace, Headers.node_headers_table)
+      .selectFrom(indexer.Const.CassandraKeyspace, Headers.node_headers_table)
       .columns(
         Headers.header_id,
         Headers.parent_id,

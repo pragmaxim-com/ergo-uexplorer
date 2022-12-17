@@ -59,10 +59,9 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           val utxoState =
             UtxoState(
               utxos.map(o => o._1 -> o._2).toMap,
-              utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap,
-              (e0In ++ e1In).filterNot(b => e0Out.map(_._1).contains(b) || e1Out.map(_._1).contains(b)).toSet
+              utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap
             )
-          val actualProgressState = ChainState.load(
+          val actualProgressState = ChainState.apply(
             lastBlockIdByEpochIndex,
             utxoState
           )
@@ -104,10 +103,9 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           val utxoState =
             UtxoState(
               utxos.map(o => o._1 -> o._2).toMap,
-              utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap,
-              e0b1Block.inputs.map(_.boxId).filterNot(b => e0b1Block.outputs.map(_._1).contains(b)).toSet
+              utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap
             )
-          val newState = ChainState.load(lastBlockIdByEpochIndex, utxoState)
+          val newState = ChainState.apply(lastBlockIdByEpochIndex, utxoState)
           newState shouldBe ChainState(
             lastBlockIdByEpochIndex.map { case (k, v) => k -> v.headerId },
             BlockBuffer(
@@ -149,10 +147,9 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
         val utxoState =
           UtxoState(
             utxos.map(o => o._1 -> o._2).toMap,
-            utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap,
-            Set.empty
+            utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap
           )
-        val s               = ChainState.load(TreeMap(0 -> commonBlockInfo), utxoState)
+        val s               = ChainState.apply(TreeMap(0 -> commonBlockInfo), utxoState)
         val b1ApiBlock      = Rest.blocks.getByHeight(1025)
         val b1FlatBlock     = BlockBuilder(b1ApiBlock, Option(commonBlockInfo)).get
         val b1FlatBlockInfo = BufferedBlockInfo.fromBlock(b1FlatBlock)

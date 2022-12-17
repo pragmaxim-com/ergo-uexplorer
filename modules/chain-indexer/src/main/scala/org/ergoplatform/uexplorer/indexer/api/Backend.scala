@@ -70,7 +70,7 @@ class InMemoryBackend extends Backend {
       }
 
   override def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState] =
-    Future.successful(UtxoState.empty.mergeBoxes(TreeMap.from(boxesByHeight.asScala).valuesIterator))
+    Future.fromTry(UtxoState.empty.mergeBoxes(TreeMap.from(boxesByHeight.asScala).valuesIterator))
 
   def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]] =
     Future.successful(TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*))
