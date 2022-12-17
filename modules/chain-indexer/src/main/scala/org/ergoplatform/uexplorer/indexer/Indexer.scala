@@ -8,6 +8,7 @@ import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.{Address, BoxId}
 import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.indexer.Indexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
@@ -61,12 +62,12 @@ class Indexer(
       .via(backend.epochsWriteFlow)
       .withAttributes(supervisionStrategy(Resiliency.decider))
 
-  private val indexingSink: Sink[(Block, Option[MaybeNewEpoch]), Future[(Option[Block], Option[NewEpochCreated])]] =
-    Sink.fold((Option.empty[Block], Option.empty[NewEpochCreated])) {
-      case ((_, _), (block, Some(e @ NewEpochCreated(_)))) =>
-        Option(block) -> Option(e)
-      case ((_, lastEpoch), (block, _)) =>
-        Option(block) -> lastEpoch
+  private val indexingSink: Sink[(Block, Option[MaybeNewEpoch]), Future[ChainSyncResult]] =
+    Sink.fold(ChainSyncResult(Option.empty[Block], Option.empty[NewEpochCreated])) {
+      case (_, (block, Some(e @ NewEpochCreated(_)))) =>
+        ChainSyncResult(Option(block), Option(e))
+      case (ChainSyncResult(_, lastEpoch), (block, _)) =>
+        ChainSyncResult(Option(block), lastEpoch)
     }
 
   def verifyStateIntegrity(chainState: ChainState): Future[Done] = {
@@ -86,7 +87,7 @@ class Indexer(
     }
   }
 
-  def syncChain(bestBlockHeight: Int): Future[(Option[Block], Option[NewEpochCreated])] = for {
+  def syncChain(bestBlockHeight: Int): Future[ChainSyncResult] = for {
     chainState <- ChainSyncer.getChainState
     fromHeight = chainState.getLastCachedBlock.map(_.height).getOrElse(0) + 1
     _          = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
@@ -96,12 +97,12 @@ class Indexer(
 
   def periodicSync: Future[(ChainState, MempoolStateChanges)] =
     for {
-      bestBlockHeight              <- blockHttpClient.getBestBlockHeight
-      (lastBlockOpt, lastEpochOpt) <- syncChain(bestBlockHeight)
-      chainState                   <- ChainSyncer.getChainState
-      _                            <- snapshotManager.makeSnapshotOnEpoch(lastEpochOpt, chainState.utxoState)
-      stateChanges                 <- MempoolSyncer.syncMempool(blockHttpClient, chainState, bestBlockHeight)
-      _                            <- PluginManager.executePlugins(plugins, chainState, stateChanges, lastBlockOpt)
+      bestBlockHeight <- blockHttpClient.getBestBlockHeight
+      chainSyncResult <- syncChain(bestBlockHeight)
+      chainState      <- ChainSyncer.getChainState
+      _               <- snapshotManager.makeSnapshotOnEpoch(chainSyncResult.lastEpoch, chainState.utxoState)
+      stateChanges    <- MempoolSyncer.syncMempool(blockHttpClient, chainState, bestBlockHeight)
+      _               <- PluginManager.executePlugins(plugins, chainState, stateChanges, chainSyncResult.lastBlock)
     } yield (chainState, stateChanges)
 
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
@@ -114,6 +115,8 @@ class Indexer(
 }
 
 object Indexer extends LazyLogging {
+
+  case class ChainSyncResult(lastBlock: Option[Block], lastEpoch: Option[NewEpochCreated])
 
   def runWith(
     conf: ChainIndexerConf

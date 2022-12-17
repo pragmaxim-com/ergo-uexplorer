@@ -197,15 +197,17 @@ object ChainState {
             snapshotManager.clearAllSnapshots
             ChainState.empty
           }
-        case blockInfoByEpochIndex =>
+        case blockInfoByEpochIndex
+            if snapshotManager.latestSerializedSnapshot.exists(_.epochIndex == blockInfoByEpochIndex.lastKey) =>
           snapshotManager.getLatestSnapshotByIndex
-            .flatMap {
-              _.collect {
-                case snapshot if snapshot.epochIndex == blockInfoByEpochIndex.lastKey =>
-                  Future.successful(snapshot.utxoState)
-              }.getOrElse(backend.loadUtxoState(blockInfoByEpochIndex.keysIterator))
+            .map { snapshotOpt =>
+              ChainState(blockInfoByEpochIndex, snapshotOpt.get.utxoState)
             }
-            .map(utxoState => ChainState(blockInfoByEpochIndex, utxoState))
+        case blockInfoByEpochIndex =>
+          backend.loadUtxoState(blockInfoByEpochIndex.keysIterator).map { utxoState =>
+            snapshotManager.clearAllSnapshots
+            ChainState(blockInfoByEpochIndex, utxoState)
+          }
       }
   }
 
