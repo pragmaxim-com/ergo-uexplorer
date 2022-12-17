@@ -136,3 +136,7 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_epoch_last_headers
     last_header_id VARCHAR,
     PRIMARY KEY (epoch_index)
 );
+
+/* height index on header table is needed for UtxoState construction, let's build it on the fly */
+
+CREATE INDEX IF NOT EXISTS "node_headers__height" ON uexplorer.node_headers (height);

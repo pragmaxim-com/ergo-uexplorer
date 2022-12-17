@@ -1,5 +1,4 @@
 CREATE INDEX IF NOT EXISTS "node_headers__parent_id" ON uexplorer.node_headers (parent_id);
-CREATE INDEX IF NOT EXISTS "node_headers__height" ON uexplorer.node_headers (height);
 CREATE INDEX IF NOT EXISTS "node_headers__ts" ON uexplorer.node_headers (timestamp);
 
 CREATE INDEX IF NOT EXISTS "node_transactions__tx_id" ON uexplorer.node_transactions (tx_id);
