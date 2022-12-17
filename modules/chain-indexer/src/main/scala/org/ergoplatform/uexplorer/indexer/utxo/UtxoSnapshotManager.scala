@@ -5,6 +5,7 @@ import akka.stream.IOResult
 import akka.stream.scaladsl.{FileIO, Framing, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.NewEpochCreated
 import org.ergoplatform.uexplorer.{Address, BoxId}
 
 import java.io.{File, FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
@@ -40,6 +41,11 @@ class UtxoSnapshotManager(
       }
       snapshots.sortBy(_.epochIndex).lastOption
     } else None
+
+  def makeSnapshotOnEpoch(newEpochOpt: Option[NewEpochCreated], utxoState: UtxoState): Future[Unit] =
+    newEpochOpt.fold(Future.successful(())) { newEpoch =>
+      saveSnapshot(UtxoSnapshot.Deserialized(newEpoch.epoch.index, utxoState))
+    }
 
   def saveSnapshot(snapshot: UtxoSnapshot.Deserialized): Future[Unit] =
     Future(rootSnapshotDir.mkdirs()).flatMap { _ =>

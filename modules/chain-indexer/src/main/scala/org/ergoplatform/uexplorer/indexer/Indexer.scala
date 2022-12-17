@@ -16,6 +16,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, Epoch}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.{MempoolState, MempoolStateChanges, MempoolSyncerRequest}
+import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoSnapshotManager, UtxoState}
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
@@ -68,29 +69,11 @@ class Indexer(
         Option(block) -> lastEpoch
     }
 
-  def executePlugins(chainState: ChainState, stateChanges: MempoolStateChanges, newBlockOpt: Option[Block]): Future[Unit] =
-    Future.fromTry(chainState.utxoStateWithCurrentEpochBoxes).flatMap { utxoState =>
-      val utxoStateWoPool = UtxoStateWithoutPool(utxoState.addressByUtxo, utxoState.utxosByAddress)
-      Future
-        .sequence(
-          stateChanges.utxoStateTransitionByTx(utxoState).flatMap { case (newTx, utxoStateWithPool) =>
-            plugins.map(
-              _.processMempoolTx(
-                newTx,
-                utxoStateWoPool,
-                UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress)
-              )
-            )
-          } ++ newBlockOpt.toList.flatMap(newBlock => plugins.map(_.processNewBlock(newBlock, utxoStateWoPool)))
-        )
-        .map(_ => ())
-    }
-
   def verifyStateIntegrity(chainState: ChainState): Future[Done] = {
-    val pastHeights = chainState.findMissingIndexes.flatMap(Epoch.heightRangeForEpochIndex)
-    if (pastHeights.nonEmpty) {
-      logger.error(s"Going to index missing blocks at heights : ${pastHeights.mkString(", ")}")
-      Source(pastHeights)
+    val missingHeights = chainState.findMissingIndexes.flatMap(Epoch.heightRangeForEpochIndex)
+    if (missingHeights.nonEmpty) {
+      logger.error(s"Going to index missing blocks at heights : ${missingHeights.mkString(", ")}")
+      Source(missingHeights)
         .via(indexingFlow)
         .run()
         .transform { _ =>
@@ -102,11 +85,6 @@ class Indexer(
       Future.successful(Done)
     }
   }
-
-  def makeSnapshot(newEpochOpt: Option[NewEpochCreated], utxoState: UtxoState): Future[Unit] =
-    newEpochOpt.fold(Future.successful(())) { newEpoch =>
-      snapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(newEpoch.epoch.index, utxoState))
-    }
 
   def syncChain(bestBlockHeight: Int): Future[(Option[Block], Option[NewEpochCreated])] = for {
     chainState <- ChainSyncer.getChainState
@@ -121,9 +99,9 @@ class Indexer(
       bestBlockHeight              <- blockHttpClient.getBestBlockHeight
       (lastBlockOpt, lastEpochOpt) <- syncChain(bestBlockHeight)
       chainState                   <- ChainSyncer.getChainState
-      _                            <- makeSnapshot(lastEpochOpt, chainState.utxoState)
+      _                            <- snapshotManager.makeSnapshotOnEpoch(lastEpochOpt, chainState.utxoState)
       stateChanges                 <- MempoolSyncer.syncMempool(blockHttpClient, chainState, bestBlockHeight)
-      _                            <- executePlugins(chainState, stateChanges, lastBlockOpt)
+      _                            <- PluginManager.executePlugins(plugins, chainState, stateChanges, lastBlockOpt)
     } yield (chainState, stateChanges)
 
   def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
@@ -137,8 +115,6 @@ class Indexer(
 
 object Indexer extends LazyLogging {
 
-  def loadPlugins: Try[List[Plugin]] = Try(ServiceLoader.load(classOf[Plugin]).iterator().asScala.toList)
-
   def runWith(
     conf: ChainIndexerConf
   )(implicit ctx: ActorContext[Nothing]): Future[Done] = {
@@ -149,7 +125,7 @@ object Indexer extends LazyLogging {
       ctx.spawn(MempoolSyncer.behavior(MempoolState(ListMap.empty)), "MempoolSyncer")
     for {
       blockHttpClient <- BlockHttpClient.withNodePoolBackend(conf)
-      plugins         <- Future.fromTry(Indexer.loadPlugins)
+      plugins         <- Future.fromTry(PluginManager.loadPlugins)
       _ = if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
       _ <- Future.sequence(plugins.map(_.init))
       indexer =
