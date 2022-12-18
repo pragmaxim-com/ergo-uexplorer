@@ -40,11 +40,12 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
   def inspectNewBlock(
     newBlock: Block,
     utxoStateWoPool: UtxoStateWithoutPool
-  ): List[AlertMessage] =
-    Option(newBlock.outputs.iterator.map(_.value).sum)
+  ): List[AlertMessage] = {
+    val outputs = newBlock.outputs.collect { case o if o.address != Const.GenesisEmission.address => o.address -> o.value }
+    Option(outputs.iterator.map(_._2).sum)
       .filter(_ >= blockErgValueThreshold * nanoOrder)
       .map { value =>
-        val outputAddresses = newBlock.outputs.iterator.map(_.address).toSet
+        val outputAddresses = outputs.iterator.map(_._1).toSet
         val outputAddressesSum =
           outputAddresses.flatMap(utxoStateWoPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
             acc + valueByBox.values.sum
@@ -55,6 +56,7 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
       }
       .map(msg => s"https://explorer.ergoplatform.com/en/blocks/${newBlock.header.id} $msg")
       .toList
+  }
 }
 
 object HighValueDetector {
