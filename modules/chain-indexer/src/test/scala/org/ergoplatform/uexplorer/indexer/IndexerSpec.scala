@@ -69,11 +69,11 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
     ChainSyncer.initialize(ChainState.empty).flatMap { _ =>
       indexer.periodicSync.flatMap { case (chainState, mempoolState) =>
         chainState.getLastCachedBlock.map(_.height).get shouldBe 4150
-        chainState.findMissingIndexes shouldBe empty
+        chainState.findMissingEpochIndexes shouldBe empty
         mempoolState.stateTransitionByTx.size shouldBe 9
         indexer.periodicSync.map { case (newChainState, newMempoolState) =>
           newChainState.getLastCachedBlock.map(_.height).get shouldBe 4200
-          newChainState.findMissingIndexes shouldBe empty
+          newChainState.findMissingEpochIndexes shouldBe empty
           newMempoolState.stateTransitionByTx.size shouldBe 0
         }
       }

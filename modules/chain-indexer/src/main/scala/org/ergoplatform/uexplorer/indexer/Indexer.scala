@@ -6,28 +6,28 @@ import akka.stream.ActorAttributes.supervisionStrategy
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Address, BoxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Indexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
-import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer, Epoch}
+import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
+import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.{MempoolState, MempoolStateChanges, MempoolSyncerRequest}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoSnapshotManager, UtxoState}
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
+import org.ergoplatform.uexplorer.{Address, BoxId, Const}
 
-import scala.jdk.CollectionConverters.*
 import java.util.ServiceLoader
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Try}
 
 class Indexer(
@@ -42,8 +42,11 @@ class Indexer(
 ) extends AkkaStreamSupport
   with LazyLogging {
 
-  private val blockToEpochFlow: Flow[Block, (Block, Option[MaybeNewEpoch]), NotUsed] =
-    Flow[Block]
+  private val indexingSink: Sink[Int, Future[ChainSyncResult]] =
+    Flow[Int]
+      .via(blockHttpClient.blockCachingFlow)
+      .async
+      .via(backend.blockWriteFlow)
       .mapAsync(1) {
         case block if Epoch.heightAtFlushPoint(block.header.height) =>
           ChainSyncer
@@ -52,71 +55,47 @@ class Indexer(
         case block =>
           Future.successful(block -> Option.empty)
       }
-
-  private val indexingFlow: Flow[Int, (Block, Option[MaybeNewEpoch]), NotUsed] =
-    Flow[Int]
-      .via(blockHttpClient.blockCachingFlow)
-      .async
-      .via(backend.blockWriteFlow)
-      .via(blockToEpochFlow)
       .via(backend.epochsWriteFlow)
       .withAttributes(supervisionStrategy(Resiliency.decider))
-
-  private val indexingSink: Sink[(Block, Option[MaybeNewEpoch]), Future[ChainSyncResult]] =
-    Sink.fold(ChainSyncResult(Option.empty[Block], Option.empty[NewEpochCreated])) {
-      case (_, (block, Some(e @ NewEpochCreated(_)))) =>
-        ChainSyncResult(Option(block), Option(e))
-      case (ChainSyncResult(_, lastEpoch), (block, _)) =>
-        ChainSyncResult(Option(block), lastEpoch)
-    }
-
-  def verifyStateIntegrity(chainState: ChainState): Future[Done] = {
-    val missingHeights = chainState.findMissingIndexes.flatMap(Epoch.heightRangeForEpochIndex)
-    if (missingHeights.nonEmpty) {
-      logger.error(s"Going to index missing blocks at heights : ${missingHeights.mkString(", ")}")
-      Source(missingHeights)
-        .via(indexingFlow)
-        .run()
-        .transform { _ =>
-          snapshotManager.clearAllSnapshots
-          Failure(new UnexpectedStateError("App restart is needed to reload UtxoState"))
+      .toMat(
+        Sink
+          .fold((Option.empty[Block], Option.empty[NewEpochCreated])) {
+            case (_, (block, Some(e @ NewEpochCreated(_)))) =>
+              Option(block) -> Option(e)
+            case ((_, lastEpoch), (block, _)) =>
+              Option(block) -> lastEpoch
+          }
+      ) { case (_, mat) =>
+        mat.flatMap { case (lastBlock, lastEpoch) =>
+          ChainSyncer.getChainState.flatMap { chainState =>
+            snapshotManager.makeSnapshotOnEpoch(lastEpoch, chainState.utxoState).map { _ =>
+              ChainSyncResult(chainState, lastBlock)
+            }
+          }
         }
-    } else {
-      logger.info(s"Chain state is valid")
-      Future.successful(Done)
-    }
-  }
-
-  def syncChain(bestBlockHeight: Int): Future[ChainSyncResult] = for {
-    chainState <- ChainSyncer.getChainState
-    fromHeight = chainState.getLastCachedBlock.map(_.height).getOrElse(0) + 1
-    _          = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
-    _          = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
-    lastElements <- Source(fromHeight to bestBlockHeight).via(indexingFlow).runWith(indexingSink)
-  } yield lastElements
+      }
 
   def periodicSync: Future[(ChainState, MempoolStateChanges)] =
     for {
-      bestBlockHeight <- blockHttpClient.getBestBlockHeight
-      chainSyncResult <- syncChain(bestBlockHeight)
-      chainState      <- ChainSyncer.getChainState
-      _               <- snapshotManager.makeSnapshotOnEpoch(chainSyncResult.lastEpoch, chainState.utxoState)
-      stateChanges    <- MempoolSyncer.syncMempool(blockHttpClient, chainState, bestBlockHeight)
-      _               <- PluginManager.executePlugins(plugins, chainState, stateChanges, chainSyncResult.lastBlock)
+      ChainSyncResult(chainState, lastBlock) <- ChainSyncer.syncChain(blockHttpClient, indexingSink)
+      stateChanges                           <- MempoolSyncer.syncMempool(blockHttpClient, chainState)
+      _                                      <- PluginManager.executePlugins(plugins, chainState, stateChanges, lastBlock)
     } yield (chainState, stateChanges)
 
-  def run(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
-    for {
-      chainState <- ChainState.load(backend, snapshotManager)
-      _          <- ChainSyncer.initialize(chainState)
-      _          <- verifyStateIntegrity(chainState)
-      done       <- schedule(initialDelay, pollingInterval)(periodicSync).run()
-    } yield done
+  def validateAndSchedule(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
+    ChainSyncer.initFromDbAndDisk(backend, snapshotManager).flatMap {
+      case ChainValid =>
+        schedule(initialDelay, pollingInterval)(periodicSync).run()
+      case missingEpochs: MissingEpochs =>
+        Source(missingEpochs.missingHeights)
+          .runWith(indexingSink)
+          .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval))
+    }
 }
 
 object Indexer extends LazyLogging {
 
-  case class ChainSyncResult(lastBlock: Option[Block], lastEpoch: Option[NewEpochCreated])
+  case class ChainSyncResult(chainState: ChainState, lastBlock: Option[Block])
 
   def runWith(
     conf: ChainIndexerConf
@@ -139,7 +118,7 @@ object Indexer extends LazyLogging {
             new Indexer(new InMemoryBackend(), blockHttpClient, new UtxoSnapshotManager(), plugins)
         }
       done <- indexer
-                .run(0.seconds, 5.seconds)
+                .validateAndSchedule(0.seconds, 5.seconds)
                 .andThen { case Failure(ex) =>
                   logger.error(s"Shutting down due to unexpected error", ex)
                   Future

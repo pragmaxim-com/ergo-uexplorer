@@ -76,17 +76,18 @@ object MempoolSyncer extends LazyLogging {
 
   def syncMempool(
     blockHttpClient: BlockHttpClient,
-    chainState: ChainState,
-    bestBlockHeight: Int
+    chainState: ChainState
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[UpdateTxs]): Future[MempoolStateChanges] = {
     import scala.concurrent.ExecutionContext.Implicits.global
-    if (chainState.blockBuffer.byHeight.lastOption.map(_._1).exists(_ >= bestBlockHeight)) {
-      for {
-        txs          <- blockHttpClient.getUnconfirmedTxs
-        stateChanges <- updateTransactions(txs)
-      } yield stateChanges
-    } else {
-      Future.successful(MempoolStateChanges(List.empty))
+    blockHttpClient.getBestBlockHeight.flatMap { bestBlockHeight =>
+      if (chainState.blockBuffer.byHeight.lastOption.map(_._1).exists(_ >= bestBlockHeight)) {
+        for {
+          txs          <- blockHttpClient.getUnconfirmedTxs
+          stateChanges <- updateTransactions(txs)
+        } yield stateChanges
+      } else {
+        Future.successful(MempoolStateChanges(List.empty))
+      }
     }
   }
 

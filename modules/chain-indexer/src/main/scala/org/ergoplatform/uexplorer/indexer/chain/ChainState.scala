@@ -1,15 +1,15 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
+import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.db.{Block, BlockInfo}
+import org.ergoplatform.uexplorer.indexer.api.Backend
+import org.ergoplatform.uexplorer.indexer.chain.ChainState.BlockBuffer
+import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
-import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
-import org.ergoplatform.uexplorer.indexer.chain.ChainState.BlockBuffer
+import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshotManager, UtxoState}
 import org.ergoplatform.uexplorer.indexer.{MapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.indexer.api.Backend
-import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshotManager, UtxoState}
 
 import scala.collection.immutable.{ArraySeq, List, SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
@@ -147,7 +147,7 @@ case class ChainState(
         false
     }
 
-  def findMissingIndexes: TreeSet[Int] =
+  def findMissingEpochIndexes: TreeSet[Int] =
     if (lastBlockIdInEpoch.isEmpty || lastBlockIdInEpoch.size == 1)
       TreeSet.empty
     else
@@ -187,29 +187,6 @@ object ChainState {
       TreeMap.empty,
       utxoState
     )
-
-  def load(backend: Backend, snapshotManager: UtxoSnapshotManager): Future[ChainState] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-    backend.loadBlockInfoByEpochIndex
-      .flatMap {
-        case blockInfoByEpochIndex if blockInfoByEpochIndex.isEmpty =>
-          Future {
-            snapshotManager.clearAllSnapshots
-            ChainState.empty
-          }
-        case blockInfoByEpochIndex
-            if snapshotManager.latestSerializedSnapshot.exists(_.epochIndex == blockInfoByEpochIndex.lastKey) =>
-          snapshotManager.getLatestSnapshotByIndex
-            .map { snapshotOpt =>
-              ChainState(blockInfoByEpochIndex, snapshotOpt.get.utxoState)
-            }
-        case blockInfoByEpochIndex =>
-          backend.loadUtxoState(blockInfoByEpochIndex.keysIterator).map { utxoState =>
-            snapshotManager.clearAllSnapshots
-            ChainState(blockInfoByEpochIndex, utxoState)
-          }
-      }
-  }
 
   object BufferedBlockInfo {
 
