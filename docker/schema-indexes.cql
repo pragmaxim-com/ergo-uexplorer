@@ -12,8 +12,6 @@ CREATE INDEX IF NOT EXISTS "node_outputs__box_id" ON uexplorer.node_outputs (box
 CREATE INDEX IF NOT EXISTS "node_outputs__tx_id" ON uexplorer.node_outputs (tx_id);
 CREATE INDEX IF NOT EXISTS "node_outputs__timestamp" ON uexplorer.node_outputs (timestamp);
 CREATE INDEX IF NOT EXISTS "node_outputs__address" ON uexplorer.node_outputs (address);
-CREATE INDEX IF NOT EXISTS "node_outputs__ergo_tree" ON uexplorer.node_outputs (ergo_tree);
-CREATE INDEX IF NOT EXISTS "node_outputs__ergo_tree_template_hash" ON uexplorer.node_outputs (ergo_tree_template_hash);
 
 CREATE INDEX IF NOT EXISTS "node_assets__box_id" ON uexplorer.node_assets (box_id);
 CREATE INDEX IF NOT EXISTS "node_assets__token_id" ON uexplorer.node_assets (token_id);

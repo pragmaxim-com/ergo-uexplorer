@@ -18,7 +18,6 @@ services:
     volumes:
       - cassandra-volume:/var/lib/cassandra
     environment:
-      - HEAP_NEWSIZE=${CASSANDRA_HEAP_NEWSIZE:-1G}
       - MAX_HEAP_SIZE=${CASSANDRA_MAX_HEAP_SIZE:-4G}
       - CASSANDRA_CLUSTER_NAME=ergo-cluster
     healthcheck:

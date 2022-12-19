@@ -61,7 +61,7 @@ object CassandraBackend extends LazyLogging {
   import com.datastax.oss.driver.api.core.CqlSession
 
   import scala.concurrent.Await
-  val BufferSize = 32
+  val BufferSize = 16
 
   def apply(parallelism: Int)(implicit system: ActorSystem[Nothing]): CassandraBackend = {
     implicit val cqlSession: CqlSession =
