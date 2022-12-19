@@ -5,10 +5,11 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
-import org.ergoplatform.uexplorer.indexer.chain.{ChainState, ChainSyncer}
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.MempoolState
-import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshotManager, UtxoState}
+import org.ergoplatform.uexplorer.indexer.chain.{ChainIndexer, ChainLoader, ChainState, ChainStateHolder}
+import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
+import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolState
+import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -20,7 +21,7 @@ import sttp.client3.testing.SttpBackendStub
 import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.Future
 
-class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
+class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
 
   private val testKit                                           = ActorTestKit()
   implicit private val sys: ActorSystem[_]                      = testKit.internalSystem
@@ -33,18 +34,18 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
     sys.terminate()
   }
 
-  implicit val chainSyncerRef: ActorRef[ChainSyncer.ChainSyncerRequest] =
-    testKit.spawn(new ChainSyncer().initialBehavior, "ChainSyncer")
+  implicit val chainSyncerRef: ActorRef[ChainStateHolder.ChainStateHolderRequest] =
+    testKit.spawn(new ChainStateHolder().initialBehavior, "ChainSyncer")
 
-  implicit val mempoolSyncerSyncerRef: ActorRef[MempoolSyncer.MempoolSyncerRequest] =
-    testKit.spawn(MempoolSyncer.behavior(MempoolState(ListMap.empty)), "MempoolSyncer")
+  implicit val mempoolSyncerSyncerRef: ActorRef[MempoolStateHolder.MempoolStateHolderRequest] =
+    testKit.spawn(MempoolStateHolder.behavior(MempoolState(ListMap.empty)), "MempoolSyncer")
 
   implicit val testingBackend: SttpBackendStub[Future, WebSockets] = SttpBackendStub.asynchronousFuture
     .whenRequestMatches { r =>
       r.uri.path.endsWith(List("info"))
     }
     .thenRespondCyclicResponses(
-      (1 to 2).map(_ => Response.ok(getPeerInfo(Rest.info.sync))) ++
+      (1 to 3).map(_ => Response.ok(getPeerInfo(Rest.info.sync))) ++
       (1 to 100).map(_ => Response.ok(getPeerInfo(Rest.info.poll))): _*
     )
     .whenRequestMatchesPartial({
@@ -61,17 +62,22 @@ class IndexerSpec extends AsyncFreeSpec with TestSupport with Matchers with Befo
     })
 
   val blockClient     = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
-  val inMemoryBackend = new InMemoryBackend
-  val snapshotManager = new UtxoSnapshotManager()
-  val indexer         = new Indexer(inMemoryBackend, blockClient, snapshotManager, List.empty)
+  val backend         = new InMemoryBackend
+  val snapshotManager = new NoUtxoSnapshotManager()
+  val pluginManager   = new PluginManager(List.empty)
+  val chainIndexer    = new ChainIndexer(backend, blockClient, snapshotManager)
+  val mempoolSyncer   = new MempoolSyncer(blockClient)
+  val chainLoader     = new ChainLoader(backend, snapshotManager)
 
-  "Indexer should sync from 1 to 4150 and then from 4150 to 4200" in {
-    ChainSyncer.initialize(ChainState.empty).flatMap { _ =>
-      indexer.periodicSync.flatMap { case (chainState, mempoolState) =>
+  val scheduler = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, chainLoader)
+
+  "Scheduler should sync from 1 to 4150 and then from 4150 to 4200" in {
+    ChainStateHolder.initialize(ChainState.empty).flatMap { _ =>
+      scheduler.periodicSync.flatMap { case (chainState, mempoolState) =>
         chainState.getLastCachedBlock.map(_.height).get shouldBe 4150
         chainState.findMissingEpochIndexes shouldBe empty
         mempoolState.stateTransitionByTx.size shouldBe 9
-        indexer.periodicSync.map { case (newChainState, newMempoolState) =>
+        scheduler.periodicSync.map { case (newChainState, newMempoolState) =>
           newChainState.getLastCachedBlock.map(_.height).get shouldBe 4200
           newChainState.findMissingEpochIndexes shouldBe empty
           newMempoolState.stateTransitionByTx.size shouldBe 0

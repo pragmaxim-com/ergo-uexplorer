@@ -18,7 +18,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
-import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoState}
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.mutable

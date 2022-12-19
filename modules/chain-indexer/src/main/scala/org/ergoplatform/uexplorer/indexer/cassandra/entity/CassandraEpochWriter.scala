@@ -9,7 +9,7 @@ import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insert
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, EpochPersistenceSupport}
-import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
+import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.chain.{Epoch, InvalidEpochCandidate}
 
 import scala.jdk.FutureConverters.*

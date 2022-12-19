@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.indexer.http
 
-import akka.NotUsed
+import akka.{Done, NotUsed}
+import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.OverflowStrategy
@@ -8,8 +9,8 @@ import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.{BlockId, Const, TxId}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
-import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer
-import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
+import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder
+import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.ResiliencySupport
 import retry.Policy
 import sttp.capabilities.WebSockets
@@ -26,7 +27,7 @@ import scala.concurrent.duration.DurationInt
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   protocol: ProtocolSettings,
   s: ActorSystem[Nothing],
-  chainSyncer: ActorRef[ChainSyncerRequest],
+  chainSyncer: ActorRef[ChainStateHolderRequest],
   sttpB: SttpBackend[Future, _]
 ) extends ResiliencySupport
   with Codecs {
@@ -87,7 +88,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
     block: ApiFullBlock,
     acc: List[ApiFullBlock]
   ): Future[List[ApiFullBlock]] =
-    ChainSyncer
+    ChainStateHolder
       .containsBlock(block.header.parentId)
       .flatMap {
         case IsBlockCached(true) =>
@@ -110,9 +111,9 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
         getBestBlockOrBranch(block, List.empty)
           .flatMap {
             case bestBlock :: Nil =>
-              ChainSyncer.insertBestBlock(bestBlock)
+              ChainStateHolder.insertBestBlock(bestBlock)
             case winningFork =>
-              ChainSyncer.insertWinningFork(winningFork)
+              ChainStateHolder.insertWinningFork(winningFork)
           }
       }
 
@@ -128,14 +129,21 @@ object BlockHttpClient {
   )(implicit
     protocol: ProtocolSettings,
     ctx: ActorContext[_],
-    chainSyncer: ActorRef[ChainSyncerRequest]
+    chainSyncer: ActorRef[ChainStateHolderRequest]
   ): Future[BlockHttpClient] = {
     val futureSttpBackend = HttpClientFutureBackend()
     val metadataClient    = MetadataHttpClient(conf)(futureSttpBackend, ctx.system)
     val nodePoolRef       = ctx.spawn(NodePool.behavior, "NodePool")
     val backend           = SttpNodePoolBackend[WebSockets](nodePoolRef)(ctx.system, futureSttpBackend)
     backend.keepNodePoolUpdated(metadataClient).map { _ =>
-      new BlockHttpClient(metadataClient)(protocol, ctx.system, chainSyncer, backend)
+      val blockClient = new BlockHttpClient(metadataClient)(protocol, ctx.system, chainSyncer, backend)
+      CoordinatedShutdown(ctx.system).addTask(
+        CoordinatedShutdown.PhaseBeforeServiceUnbind,
+        "stop-sttp-backend"
+      ) { () =>
+        blockClient.close().map(_ => Done)
+      }
+      blockClient
     }
   }
 }

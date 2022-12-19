@@ -9,7 +9,7 @@ import org.ergoplatform.uexplorer.{indexer, BlockId, Const}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.CassandraBlockUpdater.*
-import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.{BestBlockInserted, ForkInserted, Inserted}
+import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.{BestBlockInserted, ForkInserted, Inserted}
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*

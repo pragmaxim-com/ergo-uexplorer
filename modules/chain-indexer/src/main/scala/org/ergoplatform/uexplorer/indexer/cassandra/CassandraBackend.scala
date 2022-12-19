@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.cassandra
 
-import akka.NotUsed
+import akka.{Done, NotUsed}
 import akka.actor.typed.ActorSystem
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
@@ -14,13 +14,18 @@ import org.ergoplatform.uexplorer.Const
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.*
-import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.Inserted
+import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.Inserted
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.jdk.FutureConverters.*
 import java.net.InetSocketAddress
 import java.util.concurrent.{CompletableFuture, CompletionStage}
 import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.DurationInt
 import CassandraBackend.BufferSize
+import akka.actor.CoordinatedShutdown
+
+import scala.concurrent.Future
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
@@ -39,6 +44,8 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraEpochWriter
   with CassandraEpochReader
   with CassandraUtxoReader {
+
+  def close(): Future[Unit] = cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
 
   val blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]
@@ -70,7 +77,14 @@ object CassandraBackend extends LazyLogging {
         .withConfigLoader(new CassandraConfigLoader(system.settings.config.getConfig("datastax-java-driver")))
         .build()
     logger.info(s"Cassandra session created")
-    new CassandraBackend(parallelism)
+    val backend = new CassandraBackend(parallelism)
+    CoordinatedShutdown(system).addTask(
+      CoordinatedShutdown.PhaseBeforeServiceUnbind,
+      "stop-cassandra-backend"
+    ) { () =>
+      backend.close().map(_ => Done)
+    }
+    backend
   }
 
   class CassandraConfigLoader(config: Config) extends DriverConfigLoader {

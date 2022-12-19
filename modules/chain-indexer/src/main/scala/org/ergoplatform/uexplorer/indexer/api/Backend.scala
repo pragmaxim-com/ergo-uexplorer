@@ -1,12 +1,15 @@
 package org.ergoplatform.uexplorer.indexer.api
 
 import akka.NotUsed
+import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.*
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
+import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
+import org.ergoplatform.uexplorer.indexer.config.{BackendType, CassandraDb, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import java.util.concurrent.ConcurrentHashMap
@@ -25,6 +28,19 @@ trait Backend {
   def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState]
 
   def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]]
+
+  def close(): Future[Unit]
+}
+
+object Backend {
+
+  def apply(backendType: BackendType)(implicit system: ActorSystem[Nothing]): Backend = backendType match {
+    case CassandraDb(parallelism) =>
+      CassandraBackend(parallelism)
+    case InMemoryDb =>
+      new InMemoryBackend()
+  }
+
 }
 
 class InMemoryBackend extends Backend {
@@ -33,6 +49,8 @@ class InMemoryBackend extends Backend {
   private val boxesByHeight             = new ConcurrentHashMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])]()
   private val blocksById                = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
   private val blocksByHeight            = new ConcurrentHashMap[Int, BufferedBlockInfo]()
+
+  def close(): Future[Unit] = Future.successful(())
 
   override def blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]

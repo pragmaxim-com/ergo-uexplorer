@@ -1,25 +1,27 @@
 package org.ergoplatform.uexplorer.indexer.plugin
 
 import akka.Done
+import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Source
+import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.chain.ChainState
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer.MempoolStateChanges
+import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolStateChanges
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
+
 import scala.jdk.CollectionConverters.*
 import java.util.ServiceLoader
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
 
-object PluginManager {
+class PluginManager(plugins: List[Plugin]) {
 
-  def loadPlugins: Try[List[Plugin]] = Try(ServiceLoader.load(classOf[Plugin]).iterator().asScala.toList)
+  def close(): Future[Unit] = Future.sequence(plugins.map(_.close)).map(_ => ())
 
   def executePlugins(
-    plugins: List[Plugin],
     chainState: ChainState,
     stateChanges: MempoolStateChanges,
     newBlockOpt: Option[Block]
@@ -50,4 +52,26 @@ object PluginManager {
         }
     }
 
+}
+
+object PluginManager extends LazyLogging {
+  def loadPlugins: Try[List[Plugin]] = Try(ServiceLoader.load(classOf[Plugin]).iterator().asScala.toList)
+
+  def initialize(implicit system: ActorSystem[Nothing]): Future[PluginManager] =
+    Future.fromTry(loadPlugins).flatMap { plugins =>
+      if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
+      Future
+        .sequence(plugins.map(_.init))
+        .map { _ =>
+          val pluginManager = new PluginManager(plugins)
+          CoordinatedShutdown(system).addTask(
+            CoordinatedShutdown.PhaseBeforeServiceUnbind,
+            "stop-plugin-manager"
+          ) { () =>
+            pluginManager.close().map(_ => Done)
+          }
+          logger.info("Plugins initialized")
+          pluginManager
+        }
+    }
 }

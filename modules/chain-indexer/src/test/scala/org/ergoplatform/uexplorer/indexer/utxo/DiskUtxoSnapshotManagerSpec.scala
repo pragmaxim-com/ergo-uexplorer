@@ -4,6 +4,7 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.ActorSystem
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.indexer.Rest
+import org.ergoplatform.uexplorer.indexer.api.UtxoSnapshot
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
 import org.scalatest.freespec.{AnyFreeSpec, AsyncFreeSpec}
@@ -11,7 +12,7 @@ import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.Paths
 
-class UtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
+class DiskUtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
 
   private val testKit                                     = ActorTestKit()
   implicit private val protocol: ProtocolSettings         = ChainIndexerConf.loadDefaultOrThrow.protocol
@@ -19,7 +20,7 @@ class UtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
   implicit private val sys: ActorSystem[_]                = testKit.internalSystem
 
   private val utxoSnapshotManager =
-    new UtxoSnapshotManager(
+    new DiskUtxoSnapshotManager(
       Paths.get(System.getProperty("java.io.tmpdir"), "ergo-snapshots").toFile
     )
 

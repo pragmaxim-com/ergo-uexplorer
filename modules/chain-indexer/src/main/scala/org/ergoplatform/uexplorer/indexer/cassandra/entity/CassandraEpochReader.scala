@@ -11,7 +11,7 @@ import org.ergoplatform.uexplorer.indexer.{MapPimp, MutableMapPimp}
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
-import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoState}
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.{db, indexer, Address, BlockId, BoxId, Const}
 
 import scala.collection.compat.immutable.ArraySeq

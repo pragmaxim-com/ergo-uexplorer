@@ -5,30 +5,28 @@ import akka.stream.IOResult
 import akka.stream.scaladsl.{FileIO, Framing, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.chain.ChainSyncer.NewEpochCreated
+import org.ergoplatform.uexplorer.indexer.api.{UtxoSnapshot, UtxoSnapshotManager}
+import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.NewEpochCreated
+import org.ergoplatform.uexplorer.indexer.chain.Epoch
 import org.ergoplatform.uexplorer.{Address, BoxId}
 
-import java.io.{File, FileInputStream, FileOutputStream, ObjectInputStream, ObjectOutputStream}
+import java.io.*
 import java.nio.file.{Files, Path, Paths}
 import java.util.Comparator
 import scala.collection.immutable.TreeMap
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import scala.util.control.NonFatal
-import scala.jdk.CollectionConverters.*
-import scala.concurrent.ExecutionContext.Implicits.global
 
-object UtxoSnapshot {
-  case class Serialized(epochIndex: Int, utxoStateDir: File)
-  case class Deserialized(epochIndex: Int, utxoState: UtxoState)
-}
-
-class UtxoSnapshotManager(
+class DiskUtxoSnapshotManager(
   rootSnapshotDir: File = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "snapshots").toFile
 )(implicit s: ActorSystem[Nothing])
-  extends LazyLogging {
+  extends UtxoSnapshotManager
+  with LazyLogging {
 
-  def clearAllSnapshots: Unit =
+  def clearAllSnapshots(): Unit =
     if (rootSnapshotDir.exists()) {
       logger.info(s"Deleting all legacy snapshots")
       Files.walk(rootSnapshotDir.toPath).sorted(Comparator.reverseOrder[Path]).iterator.asScala.map(_.toFile.delete())
@@ -42,9 +40,9 @@ class UtxoSnapshotManager(
       snapshots.sortBy(_.epochIndex).lastOption
     } else None
 
-  def makeSnapshotOnEpoch(newEpochOpt: Option[NewEpochCreated], utxoState: UtxoState): Future[Unit] =
+  def makeSnapshotOnEpoch(newEpochOpt: Option[Epoch], utxoState: UtxoState): Future[Unit] =
     newEpochOpt.fold(Future.successful(())) { newEpoch =>
-      saveSnapshot(UtxoSnapshot.Deserialized(newEpoch.epoch.index, utxoState))
+      saveSnapshot(UtxoSnapshot.Deserialized(newEpoch.index, utxoState))
     }
 
   def saveSnapshot(snapshot: UtxoSnapshot.Deserialized): Future[Unit] =
