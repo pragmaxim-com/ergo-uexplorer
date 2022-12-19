@@ -45,7 +45,10 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraEpochReader
   with CassandraUtxoReader {
 
-  def close(): Future[Unit] = cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
+  def close(): Future[Unit] = {
+    logger.info(s"Stopping Cassandra session")
+    cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
+  }
 
   val blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]

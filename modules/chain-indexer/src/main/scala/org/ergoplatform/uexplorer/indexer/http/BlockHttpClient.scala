@@ -117,8 +117,10 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
           }
       }
 
-  def close(): Future[Unit] =
+  def close(): Future[Unit] = {
+    logger.info(s"Stopping Block http client")
     sttpB.close()
+  }
 
 }
 
@@ -139,7 +141,7 @@ object BlockHttpClient {
       val blockClient = new BlockHttpClient(metadataClient)(protocol, ctx.system, chainSyncer, backend)
       CoordinatedShutdown(ctx.system).addTask(
         CoordinatedShutdown.PhaseBeforeServiceUnbind,
-        "stop-sttp-backend"
+        "stop-block-http-client"
       ) { () =>
         blockClient.close().map(_ => Done)
       }

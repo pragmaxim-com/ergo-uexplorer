@@ -1,5 +1,7 @@
 package org.ergoplatform.uexplorer.indexer.http
 
+import akka.Done
+import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import io.circe.Decoder
@@ -90,8 +92,10 @@ class MetadataHttpClient[P](minNodeHeight: Int = indexer.Const.MinNodeHeight)(im
       .mapConcat(_.toList)
       .runWith(Sink.collection[Peer, TreeSet[Peer]])
 
-  def close(): Future[Unit] =
+  def close(): Future[Unit] = {
+    logger.info(s"Stopping Metadata http client")
     underlyingB.close()
+  }
 }
 
 object MetadataHttpClient {
@@ -101,6 +105,13 @@ object MetadataHttpClient {
   )(implicit underlyingB: SttpBackend[Future, P], system: ActorSystem[Nothing]): MetadataHttpClient[P] = {
     implicit val localNodeUriMagnet: LocalNodeUriMagnet   = conf.localUriMagnet
     implicit val remoteNodeUriMagnet: RemoteNodeUriMagnet = conf.remoteUriMagnet
-    new MetadataHttpClient[P]()
+    val metadataClient                                    = new MetadataHttpClient[P]()
+    CoordinatedShutdown(system).addTask(
+      CoordinatedShutdown.PhaseBeforeServiceUnbind,
+      "stop-metadata-http-client"
+    ) { () =>
+      metadataClient.close().map(_ => Done)
+    }
+    metadataClient
   }
 }
