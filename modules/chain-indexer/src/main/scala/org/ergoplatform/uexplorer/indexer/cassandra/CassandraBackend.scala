@@ -66,8 +66,6 @@ class CassandraBackend(parallelism: Int)(implicit
 
 object CassandraBackend extends LazyLogging {
 
-  import akka.stream.alpakka.cassandra.CassandraSessionSettings
-  import akka.stream.alpakka.cassandra.scaladsl.{CassandraSession, CassandraSessionRegistry}
   import com.datastax.oss.driver.api.core.CqlSession
 
   import scala.concurrent.Await

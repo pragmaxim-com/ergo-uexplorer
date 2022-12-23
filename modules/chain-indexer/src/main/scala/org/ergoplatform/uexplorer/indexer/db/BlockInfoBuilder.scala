@@ -76,7 +76,9 @@ object BlockInfoBuilder {
       val lastGlobalTxIndex  = prevBlock.map(_.info.maxTxGix).getOrElse(-1L)
       val lastGlobalBoxIndex = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
       val maxGlobalTxIndex   = lastGlobalTxIndex + apiBlock.transactions.transactions.size
-      val maxGlobalBoxIndex  = lastGlobalBoxIndex + apiBlock.transactions.transactions.flatMap(_.outputs.toList).size
+      val maxGlobalBoxIndex = lastGlobalBoxIndex + apiBlock.transactions.transactions.foldLeft(0) { case (sum, tx) =>
+        sum + tx.outputs.size
+      }
 
       BlockInfo(
         blockSize       = apiBlock.size,
