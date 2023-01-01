@@ -27,6 +27,28 @@ services:
       timeout: 5s
       start_period: 90s
       retries: 18
+  janusgraph:
+    image: docker.io/janusgraph/janusgraph:1.0.0-rc1
+    container_name: janusgraph
+    restart: "on-failure"
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - backend
+    ports:
+      - "8182:8182"
+    environment:
+      JANUS_PROPS_TEMPLATE: cql
+      janusgraph.storage.hostname: cassandra
+      janusgraph.storage.batch-loading: true
+      janusgraph.storage.transactions: false
+      janusgraph.ids.block-size: 5000000
+    healthcheck:
+      test: [ "CMD", "bin/gremlin.sh", "-e", "scripts/remote-connect.groovy" ]
+      interval: 10s
+      timeout: 30s
+      retries: 3
   cassandra-init-tables:
     image: cassandra:4.1
     container_name: cassandra-init-tables

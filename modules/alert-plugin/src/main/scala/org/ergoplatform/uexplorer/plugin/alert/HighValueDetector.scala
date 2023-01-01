@@ -6,6 +6,8 @@ import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateLike, UtxoStateWithPool, UtxoStateWithoutPool}
 import org.ergoplatform.uexplorer.plugin.alert.Detector.AlertMessage
 import HighValueDetector.*
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+
 import java.text.DecimalFormat
 import scala.collection.immutable.ArraySeq
 
@@ -14,7 +16,8 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
   def inspectNewPoolTx(
     tx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
-    utxoStateWithPool: UtxoStateWithPool
+    utxoStateWithPool: UtxoStateWithPool,
+    graphTraversalSource: GraphTraversalSource
   ): List[AlertMessage] =
     Option(tx.outputs.iterator.map(_.value).sum)
       .filter(_ >= txErgValueThreshold * nanoOrder)
@@ -39,7 +42,8 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
 
   def inspectNewBlock(
     newBlock: Block,
-    utxoStateWoPool: UtxoStateWithoutPool
+    utxoStateWoPool: UtxoStateWithoutPool,
+    graphTraversalSource: GraphTraversalSource
   ): List[AlertMessage] = {
     val outputs = newBlock.outputs.collect { case o if o.address != Const.GenesisEmission.address => o.address -> o.value }
     Option(outputs.iterator.map(_._2).sum)

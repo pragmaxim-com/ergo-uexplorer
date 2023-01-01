@@ -140,7 +140,7 @@ object BlockHttpClient {
     backend.keepNodePoolUpdated(metadataClient).map { _ =>
       val blockClient = new BlockHttpClient(metadataClient)(protocol, ctx.system, chainSyncer, backend)
       CoordinatedShutdown(ctx.system).addTask(
-        CoordinatedShutdown.PhaseBeforeServiceUnbind,
+        CoordinatedShutdown.PhaseServiceUnbind,
         "stop-block-http-client"
       ) { () =>
         blockClient.close().map(_ => Done)

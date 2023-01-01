@@ -3,7 +3,8 @@ package org.ergoplatform.uexplorer.indexer.api
 import akka.NotUsed
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Flow
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, TxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
@@ -18,12 +19,17 @@ import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 trait Backend {
+
+  def graphTraversalSource: GraphTraversalSource
 
   def blockWriteFlow: Flow[Inserted, Block, NotUsed]
 
   def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
+
+  def boxesWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
 
   def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState]
 
@@ -34,11 +40,11 @@ trait Backend {
 
 object Backend {
 
-  def apply(backendType: BackendType)(implicit system: ActorSystem[Nothing]): Backend = backendType match {
+  def apply(backendType: BackendType)(implicit system: ActorSystem[Nothing]): Try[Backend] = backendType match {
     case CassandraDb(parallelism) =>
       CassandraBackend(parallelism)
     case InMemoryDb =>
-      new InMemoryBackend()
+      Try(new InMemoryBackend())
   }
 
 }
@@ -46,24 +52,21 @@ object Backend {
 class InMemoryBackend extends Backend {
 
   private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BufferedBlockInfo]()
-  private val boxesByHeight             = new ConcurrentHashMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])]()
-  private val blocksById                = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
-  private val blocksByHeight            = new ConcurrentHashMap[Int, BufferedBlockInfo]()
+
+  private val boxesByHeight =
+    new ConcurrentHashMap[Int, ArraySeq[(TxId, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]))]]()
+  private val blocksById     = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
+  private val blocksByHeight = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
   def close(): Future[Unit] = Future.successful(())
+
+  def graphTraversalSource: GraphTraversalSource = ???
 
   override def blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]
       .mapConcat {
         case BestBlockInserted(flatBlock) =>
           blocksByHeight.put(flatBlock.header.height, BufferedBlockInfo.fromBlock(flatBlock))
-          boxesByHeight.put(
-            flatBlock.header.height,
-            (
-              flatBlock.inputs.map(_.boxId),
-              flatBlock.outputs.map(o => (o.boxId, o.address, o.value))
-            )
-          )
           blocksById.put(flatBlock.header.id, BufferedBlockInfo.fromBlock(flatBlock))
           List(flatBlock)
         case ForkInserted(winningFork, _) =>
@@ -77,18 +80,25 @@ class InMemoryBackend extends Backend {
   override def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(Block, Option[MaybeNewEpoch])]
       .map {
-        case (block, Some(NewEpochCreated(epoch))) =>
-          lastBlockInfoByEpochIndex.put(
-            epoch.index,
-            blocksById.get(epoch.blockIds.last)
-          )
-          block -> Some(NewEpochCreated(epoch))
+        case (block, Some(NewEpochDetected(epoch, boxesByTxId))) =>
+          lastBlockInfoByEpochIndex.put(epoch.index, blocksById.get(epoch.blockIds.last))
+          block -> Some(NewEpochDetected(epoch, boxesByTxId))
+        case tuple =>
+          tuple
+      }
+
+  override def boxesWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
+    Flow[(Block, Option[MaybeNewEpoch])]
+      .map {
+        case (block, Some(NewEpochDetected(epoch, boxesByTxIdByHeight))) =>
+          boxesByHeight.putAll(boxesByTxIdByHeight.asJava)
+          block -> Some(NewEpochDetected(epoch, boxesByTxIdByHeight))
         case tuple =>
           tuple
       }
 
   override def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState] =
-    Future.fromTry(UtxoState.empty.mergeBoxes(TreeMap.from(boxesByHeight.asScala).valuesIterator))
+    Future.fromTry(UtxoState.empty.mergeBoxes(TreeMap.from(boxesByHeight.asScala).iterator.flatMap(_._2.iterator.map(_._2))))
 
   def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]] =
     Future.successful(TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*))

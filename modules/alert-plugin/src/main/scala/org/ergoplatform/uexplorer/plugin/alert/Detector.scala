@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.plugin.alert
 
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.{Address, BoxId}
 import org.ergoplatform.uexplorer.node.ApiTransaction
@@ -11,12 +12,14 @@ trait Detector {
   def inspectNewPoolTx(
     tx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
-    utxoStateWithPool: UtxoStateWithPool
+    utxoStateWithPool: UtxoStateWithPool,
+    graphTraversalSource: GraphTraversalSource
   ): List[AlertMessage]
 
   def inspectNewBlock(
     newBlock: Block,
-    utxoStateWoPool: UtxoStateWithoutPool
+    utxoStateWoPool: UtxoStateWithoutPool,
+    graphTraversalSource: GraphTraversalSource
   ): List[AlertMessage]
 }
 

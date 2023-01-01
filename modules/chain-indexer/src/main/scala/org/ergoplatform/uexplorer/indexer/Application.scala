@@ -52,17 +52,20 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
             ctx.spawn(new ChainStateHolder().initialBehavior, "ChainStateHolder")
           implicit val mempoolStateHolderRef: ActorRef[MempoolStateHolderRequest] =
             ctx.spawn(MempoolStateHolder.behavior(MempoolState.empty), "MempoolStateHolder")
-          (for {
-            blockHttpClient <- BlockHttpClient.withNodePoolBackend(conf)
-            pluginManager   <- PluginManager.initialize
-            backend         = Backend(conf.backendType)
-            snapshotManager = new DiskUtxoSnapshotManager()
-            chainIndexer    = new ChainIndexer(backend, blockHttpClient, snapshotManager)
-            mempoolSyncer   = new MempoolSyncer(blockHttpClient)
-            chainLoader     = new ChainLoader(backend, snapshotManager)
-            scheduler       = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, chainLoader)
-            done <- scheduler.validateAndSchedule(0.seconds, 5.seconds)
-          } yield done).andThen {
+          val initializationF =
+            for {
+              blockHttpClient <- BlockHttpClient.withNodePoolBackend(conf)
+              pluginManager   <- PluginManager.initialize
+              backend         <- Future.fromTry(Backend(conf.backendType))
+              snapshotManager = new DiskUtxoSnapshotManager()
+              chainIndexer    = new ChainIndexer(backend, blockHttpClient, snapshotManager)
+              mempoolSyncer   = new MempoolSyncer(blockHttpClient)
+              chainLoader     = new ChainLoader(backend, snapshotManager)
+              scheduler       = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, chainLoader)
+              done <- scheduler.validateAndSchedule(0.seconds, 5.seconds)
+            } yield done
+
+          initializationF.andThen {
             case Failure(ex) =>
               logger.error("Shutting down due to unexpected error", ex)
               system.terminate()

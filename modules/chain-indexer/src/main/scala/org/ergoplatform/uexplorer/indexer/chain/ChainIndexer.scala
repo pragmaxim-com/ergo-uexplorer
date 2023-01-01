@@ -1,11 +1,14 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
+import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.ActorAttributes.supervisionStrategy
+import akka.stream.{ActorAttributes, KillSwitches, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Resiliency
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend, UtxoSnapshotManager}
@@ -38,11 +41,21 @@ class ChainIndexer(
   snapshotManager: UtxoSnapshotManager
 )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest])
   extends LazyLogging {
+  private lazy val killSwitch = KillSwitches.shared("killswitch")
+
+  CoordinatedShutdown(s).addTask(
+    CoordinatedShutdown.PhaseBeforeServiceUnbind,
+    "stop-akka-stream"
+  ) { () =>
+    Future {
+      killSwitch.shutdown()
+      Done
+    }
+  }
 
   private val indexingSink: Sink[Int, Future[ChainSyncResult]] =
     Flow[Int]
       .via(blockHttpClient.blockCachingFlow)
-      .async
       .via(backend.blockWriteFlow)
       .mapAsync(1) {
         case block if Epoch.heightAtFlushPoint(block.header.height) =>
@@ -52,12 +65,15 @@ class ChainIndexer(
         case block =>
           Future.successful(block -> Option.empty)
       }
+      .buffer(Const.EpochLength, OverflowStrategy.backpressure)
+      .via(backend.boxesWriteFlow)
       .via(backend.epochsWriteFlow)
+      .via(killSwitch.flow)
       .withAttributes(supervisionStrategy(Resiliency.decider))
       .toMat(
         Sink
-          .fold((Option.empty[Block], Option.empty[NewEpochCreated])) {
-            case (_, (block, Some(e @ NewEpochCreated(_)))) =>
+          .fold((Option.empty[Block], Option.empty[NewEpochDetected])) {
+            case (_, (block, Some(e @ NewEpochDetected(_, _)))) =>
               Option(block) -> Option(e)
             case ((_, lastEpoch), (block, _)) =>
               Option(block) -> lastEpoch
@@ -68,7 +84,7 @@ class ChainIndexer(
             snapshotManager
               .makeSnapshotOnEpoch(lastEpoch.map(_.epoch), chainState.utxoState)
               .map { _ =>
-                ChainSyncResult(chainState, lastBlock)
+                ChainSyncResult(chainState, lastBlock, backend.graphTraversalSource)
               }
           }
         }
@@ -89,5 +105,5 @@ class ChainIndexer(
 }
 
 object ChainIndexer {
-  case class ChainSyncResult(chainState: ChainState, lastBlock: Option[Block])
+  case class ChainSyncResult(chainState: ChainState, lastBlock: Option[Block], graphTraversalSource: GraphTraversalSource)
 }

@@ -55,7 +55,7 @@ trait AkkaStreamSupport {
       parallelism = Math.max(maxParallelism, Runtime.getRuntime.availableProcessors()),
       Attributes.asyncBoundary
         .and(Attributes.inputBuffer(8, 32))
-        .and(ActorAttributes.dispatcher("akka.stream.processing-dispatcher"))
+        .and(ActorAttributes.IODispatcher)
     )
 
 }

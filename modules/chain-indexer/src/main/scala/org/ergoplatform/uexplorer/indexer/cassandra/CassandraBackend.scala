@@ -15,6 +15,7 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.Inserted
+import org.apache.tinkerpop.gremlin.structure.T
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.FutureConverters.*
@@ -24,11 +25,18 @@ import scala.jdk.CollectionConverters.*
 import scala.concurrent.duration.DurationInt
 import CassandraBackend.BufferSize
 import akka.actor.CoordinatedShutdown
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.ergoplatform.uexplorer.indexer.Utils
+import org.janusgraph.core.{JanusGraph, JanusGraphFactory, Multiplicity}
+import org.janusgraph.graphdb.database.StandardJanusGraph
+import org.janusgraph.graphdb.types.vertices.PropertyKeyVertex
 
 import scala.concurrent.Future
+import scala.util.Try
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
+  val janusGraph: StandardJanusGraph,
   val system: ActorSystem[Nothing]
 ) extends Backend
   with LazyLogging
@@ -44,6 +52,8 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraEpochWriter
   with CassandraEpochReader
   with CassandraUtxoReader {
+
+  def graphTraversalSource: GraphTraversalSource = janusGraph.traversal()
 
   def close(): Future[Unit] = {
     logger.info(s"Stopping Cassandra session")
@@ -71,19 +81,50 @@ object CassandraBackend extends LazyLogging {
   import scala.concurrent.Await
   val BufferSize = 16
 
-  def apply(parallelism: Int)(implicit system: ActorSystem[Nothing]): CassandraBackend = {
+  def apply(parallelism: Int)(implicit system: ActorSystem[Nothing]): Try[CassandraBackend] = Try {
+    val datastaxDriverConf = system.settings.config.getConfig("datastax-java-driver")
     implicit val cqlSession: CqlSession =
       CqlSession
         .builder()
-        .withConfigLoader(new CassandraConfigLoader(system.settings.config.getConfig("datastax-java-driver")))
+        .withConfigLoader(new CassandraConfigLoader(datastaxDriverConf))
         .build()
-    logger.info(s"Cassandra session created")
+    implicit val janusGraph = JanusGraphFactory.build
+      .set("storage.backend", "cql")
+      .set("storage.hostname", datastaxDriverConf.getStringList("basic.contact-points").get(0))
+      .set("storage.transactions", false)
+      .set("storage.batch-loading", true)
+      .set("graph.set-vertex-id", true)
+      .open()
+      .asInstanceOf[StandardJanusGraph]
+
+    val mgmt = janusGraph.openManagement()
+    if (!mgmt.containsGraphIndex("byAddress") || !mgmt.containsEdgeLabel("spentBy")) {
+      logger.info("Creating Janus index 'byAddress' and edge label 'spentBy'")
+      val address = mgmt.getOrCreatePropertyKey("address")
+      mgmt.buildIndex("byAddress", classOf[PropertyKeyVertex]).addKey(address).buildCompositeIndex()
+      mgmt.makeEdgeLabel("spentBy").multiplicity(Multiplicity.SIMPLE).make()
+      mgmt.commit()
+
+      val vertexCountBound = janusGraph.getIDManager.getVertexCountBound
+      logger.info(s"Max vertex count bound: $vertexCountBound")
+      logger.info("Creating vertices for genesis boxes")
+      val tx = janusGraph.newTransaction()
+      Const.genesisBoxes.foreach { boxId =>
+        tx.addVertex(T.id, Utils.vertexHash(boxId))
+      }
+      tx.commit()
+    }
+
+    logger.info(s"Cassandra session and Janus graph created")
     val backend = new CassandraBackend(parallelism)
     CoordinatedShutdown(system).addTask(
-      CoordinatedShutdown.PhaseBeforeServiceUnbind,
+      CoordinatedShutdown.PhaseServiceUnbind,
       "stop-cassandra-backend"
     ) { () =>
-      backend.close().map(_ => Done)
+      backend.close().map { _ =>
+        janusGraph.close()
+        Done
+      }
     }
     backend
   }

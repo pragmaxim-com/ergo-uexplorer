@@ -8,12 +8,12 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.*
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
-import org.ergoplatform.uexplorer.{Address, BoxId, Const}
+import org.ergoplatform.uexplorer.{Address, BoxId, Const, TxId}
 
 import java.io.*
 import java.nio.file.{Path, Paths}
 import scala.collection.compat.immutable.ArraySeq
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.control.NonFatal
@@ -25,10 +25,10 @@ case class UtxoState(
 ) {
 
   def mergeBoxes(
-    boxesByHeight: Iterator[(ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])]
+    boxes: Iterator[(ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])]
   ): Try[UtxoState] = {
     val (inputsBuilder, newAddressByUtxo, newUtxosByAddress) =
-      boxesByHeight
+      boxes
         .foldLeft((ArraySeq.newBuilder[BoxId], addressByUtxo, utxosByAddress)) {
           case ((inputBoxIdsAcc, addressByUtxoAcc, utxosByAddressAcc), (inputBoxIds, outputBoxIdsWithAddress)) =>
             (

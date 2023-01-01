@@ -19,7 +19,7 @@ import scala.util.{Failure, Success, Try}
 case class ChainState(
   lastBlockIdInEpoch: SortedMap[Int, BlockId],
   blockBuffer: BlockBuffer,
-  boxesByHeightBuffer: TreeMap[Int, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])],
+  boxesByHeightBuffer: TreeMap[Int, ArraySeq[(TxId, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]))]],
   utxoState: UtxoState
 ) {
   import ChainState.*
@@ -28,7 +28,7 @@ case class ChainState(
     * instead we merge only winner-fork blocks into UtxoState
     */
   def utxoStateWithCurrentEpochBoxes: Try[UtxoState] =
-    utxoState.mergeBoxes(boxesByHeightBuffer.iterator.map(_._2))
+    utxoState.mergeBoxes(boxesByHeightBuffer.iterator.flatMap(_._2.iterator.map(_._2)))
 
   def finishEpoch(currentEpochIndex: Int): Try[(MaybeNewEpoch, ChainState)] =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
@@ -41,14 +41,16 @@ case class ChainState(
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
           val newEpoch           = candidate.getEpoch
           val boxesByHeightSlice = boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
-          utxoState.mergeBoxes(boxesByHeightSlice.valuesIterator).map { newState =>
-            NewEpochCreated(newEpoch) -> ChainState(
-              lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
-              blockBuffer.flushEpoch(heightRange),
-              boxesByHeightBuffer -- boxesByHeightSlice.keysIterator,
-              newState
-            )
-          }
+          utxoState
+            .mergeBoxes(boxesByHeightSlice.iterator.flatMap(_._2.iterator.map(_._2)))
+            .map { newState =>
+              NewEpochDetected(newEpoch, boxesByHeightSlice) -> ChainState(
+                lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
+                blockBuffer.flushEpoch(heightRange),
+                boxesByHeightBuffer -- boxesByHeightSlice.keysIterator,
+                newState
+              )
+            }
         case Right(candidate) =>
           val Epoch(curIndex, _) = candidate.getEpoch
           val invalidHeights =
@@ -78,7 +80,9 @@ case class ChainState(
             blockBuffer = blockBuffer.addBlock(block),
             boxesByHeightBuffer = boxesByHeightBuffer.updated(
               block.header.height,
-              block.inputs.map(_.boxId) -> block.outputs.map(o => (o.boxId, o.address, o.value))
+              bestBlock.transactions.transactions.map { tx =>
+                tx.id -> (tx.inputs.map(_.boxId), tx.outputs.map(o => (o.boxId, o.address, o.value)))
+              }
             )
           )
         }
@@ -94,10 +98,10 @@ case class ChainState(
       )
     } else
       winningFork
-        .foldLeft(Try(ListBuffer.empty[Block] -> ListBuffer.empty[BufferedBlockInfo])) {
+        .foldLeft(Try((ListBuffer.empty[ApiFullBlock], ListBuffer.empty[Block], ListBuffer.empty[BufferedBlockInfo]))) {
           case (f @ Failure(_), _) =>
             f
-          case (Success((newBlocksAcc, toRemoveAcc)), apiBlock) =>
+          case (Success((newApiBlocksAcc, newBlocksAcc, toRemoveAcc)), apiBlock) =>
             BlockBuilder(
               apiBlock,
               Some(
@@ -106,19 +110,23 @@ case class ChainState(
                   .getOrElse(blockBuffer.byId(apiBlock.header.parentId))
               )
             ).map { newBlock =>
-              val newBlocks = newBlocksAcc :+ newBlock
+              val newApiBlocks = newApiBlocksAcc :+ apiBlock
+              val newBlocks    = newBlocksAcc :+ newBlock
               val toRemove =
                 toRemoveAcc ++ blockBuffer.byHeight
                   .get(apiBlock.header.height)
                   .filter(_.headerId != apiBlock.header.id)
-              newBlocks -> toRemove
+              (newApiBlocks, newBlocks, toRemove)
             }
         }
-        .map { case (newBlocks, supersededBlocks) =>
+        .map { case (newApiBlocks, newBlocks, supersededBlocks) =>
           val newBlockBuffer = blockBuffer.addFork(newBlocks, supersededBlocks)
           val newForkByHeight =
-            newBlocks
-              .map(b => b.header.height -> (b.inputs.map(_.boxId), b.outputs.map(o => (o.boxId, o.address, o.value))))
+            newApiBlocks
+              .map(b =>
+                b.header.height -> b.transactions.transactions
+                  .map(tx => tx.id -> (tx.inputs.map(_.boxId), tx.outputs.map(o => (o.boxId, o.address, o.value))))
+              )
               .toMap
 
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(

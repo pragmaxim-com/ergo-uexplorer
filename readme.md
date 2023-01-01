@@ -20,7 +20,7 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
       - cassandraDB = 9GB
       - chain-indexer = 4GB
   - `8GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
-      - `start-querying.sh`
+      - `start-querying.sh` (note that this script creates db indexes which are being built some time)
       - ergo-node = 1GB
       - cassandraDB = 1GB
       - stargate = 1GB

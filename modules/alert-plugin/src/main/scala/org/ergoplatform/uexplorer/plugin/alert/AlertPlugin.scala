@@ -4,6 +4,7 @@ import discord4j.common.util.Snowflake
 import discord4j.core.{DiscordClient, GatewayDiscordClient}
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.channel.MessageChannel
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import org.ergoplatform.uexplorer.node.ApiTransaction
@@ -12,6 +13,7 @@ import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWit
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.{Flux, Mono}
 import retry.Policy
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
@@ -37,24 +39,26 @@ class AlertPlugin extends Plugin {
   def processMempoolTx(
     newTx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
-    utxoStateWithPool: UtxoStateWithPool
+    utxoStateWithPool: UtxoStateWithPool,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
         detectors.flatMap { detector =>
-          detector.inspectNewPoolTx(newTx, utxoStateWoPool, utxoStateWithPool)
+          detector.inspectNewPoolTx(newTx, utxoStateWoPool, utxoStateWithPool, graphTraversalSource)
         }
       )
     }
 
   def processNewBlock(
     newBlock: Block,
-    utxoStateWoPool: UtxoStateWithoutPool
+    utxoStateWoPool: UtxoStateWithoutPool,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
         detectors.flatMap { detector =>
-          detector.inspectNewBlock(newBlock, utxoStateWoPool)
+          detector.inspectNewBlock(newBlock, utxoStateWoPool, graphTraversalSource)
         }
       )
     }

@@ -24,9 +24,9 @@ class Scheduler(
 
   def periodicSync: Future[(ChainState, MempoolStateChanges)] =
     for {
-      ChainSyncResult(chainState, lastBlock) <- chainIndexer.indexChain
-      stateChanges                           <- mempoolSyncer.syncMempool(chainState)
-      _                                      <- pluginManager.executePlugins(chainState, stateChanges, lastBlock)
+      ChainSyncResult(chainState, lastBlock, gts) <- chainIndexer.indexChain
+      stateChanges                                <- mempoolSyncer.syncMempool(chainState)
+      _                                           <- pluginManager.executePlugins(chainState, stateChanges, gts, lastBlock)
     } yield (chainState, stateChanges)
 
   def validateAndSchedule(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =

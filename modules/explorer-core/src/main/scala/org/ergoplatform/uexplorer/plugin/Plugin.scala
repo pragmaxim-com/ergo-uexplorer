@@ -4,6 +4,7 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.Future
@@ -20,12 +21,14 @@ trait Plugin {
   def processMempoolTx(
     newTx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
-    utxoStateWithPool: UtxoStateWithPool
+    utxoStateWithPool: UtxoStateWithPool,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit]
 
   def processNewBlock(
     newBlock: Block,
-    utxoStateWoPool: UtxoStateWithoutPool
+    utxoStateWoPool: UtxoStateWithoutPool,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit]
 }
 

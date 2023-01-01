@@ -5,6 +5,7 @@ import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.chain.ChainState
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolStateChanges
@@ -24,6 +25,7 @@ class PluginManager(plugins: List[Plugin]) {
   def executePlugins(
     chainState: ChainState,
     stateChanges: MempoolStateChanges,
+    graphTraversalSource: GraphTraversalSource,
     newBlockOpt: Option[Block]
   )(implicit actorSystem: ActorSystem[Nothing]): Future[Done] =
     Future.fromTry(chainState.utxoStateWithCurrentEpochBoxes).flatMap { utxoState =>
@@ -39,14 +41,15 @@ class PluginManager(plugins: List[Plugin]) {
           plugin.processMempoolTx(
             newTx,
             utxoStateWoPool,
-            UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress)
+            UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress),
+            graphTraversalSource
           )
         }
         .run()
         .flatMap { _ =>
           Source(chainExecutionPlan)
             .mapAsync(1) { case (plugin, newBlock) =>
-              plugin.processNewBlock(newBlock, utxoStateWoPool)
+              plugin.processNewBlock(newBlock, utxoStateWoPool, graphTraversalSource)
             }
             .run()
         }
@@ -65,7 +68,7 @@ object PluginManager extends LazyLogging {
         .map { _ =>
           val pluginManager = new PluginManager(plugins)
           CoordinatedShutdown(system).addTask(
-            CoordinatedShutdown.PhaseBeforeServiceUnbind,
+            CoordinatedShutdown.PhaseServiceUnbind,
             "stop-plugin-manager"
           ) { () =>
             pluginManager.close().map(_ => Done)

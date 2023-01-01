@@ -1,5 +1,7 @@
 package org.ergoplatform.uexplorer
 
+import org.apache.commons.codec.digest.MurmurHash2
+import org.janusgraph.graphdb.database.StandardJanusGraph
 import sttp.model.Uri
 import sttp.model.Uri.{EmptyPath, QuerySegment}
 
@@ -37,6 +39,9 @@ package object indexer {
   class UnexpectedStateError(msg: String, cause: Option[Throwable] = None) extends RuntimeException(msg, cause.orNull)
 
   object Utils {
+
+    def vertexHash(boxId: BoxId)(implicit g: StandardJanusGraph) =
+      g.getIDManager.toVertexId(Math.abs(MurmurHash2.hash64(boxId.unwrapped)) / 1000)
 
     def copyUri(origUri: Uri, newUri: Uri): Uri =
       newUri.copy(

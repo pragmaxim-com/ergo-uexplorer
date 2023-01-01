@@ -56,6 +56,7 @@ def chainIndexerAssemblySettings = Seq(
   assembly / assemblyMergeStrategy := {
     case "logback.xml" => MergeStrategy.first
     case other if other.contains("module-info.class") => MergeStrategy.discard
+    case other if other.contains("ExtensionModule") => MergeStrategy.first
     case other if other.contains(".proto") => MergeStrategy.first
     case other if other.contains("io.netty.versions") => MergeStrategy.first
     case other => (assembly / assemblyMergeStrategy).value(other)
@@ -67,7 +68,7 @@ def chainIndexerAssemblySettings = Seq(
     val resources = universalMappings filter {
       case (file, name) => !name.endsWith(".jar")
     }
-    val configs = (baseDirectory.value / ".." / ".." / "docker" / s"chain-indexer.conf" get).map(x => x -> s"conf/${x.getName}")
+    val configs = (baseDirectory.value / ".." / ".." / "docker" / "chain-indexer.conf" get).map(x => x -> s"conf/${x.getName}")
     resources ++ jars ++ configs
   },
   scriptClasspath := Seq((assembly / assemblyJarName).value),
@@ -86,14 +87,15 @@ lazy val root = (project in file("."))
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= circe("3"))
+    .settings(libraryDependencies ++= circe("3") ++ Seq(gremlin))
 
 lazy val `alert-plugin` =
   Utils.mkModule("alert-plugin", "alert-plugin")
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(pluginAssemblySettings("alert-plugin"))
-    .settings(libraryDependencies ++= scalatest("3") ++ Seq(retry("3"), discord4j, loggingApi, logback))
+    .settings(libraryDependencies ++= scalatest("3") ++ Seq(retry("3"), gremlin, discord4j, loggingApi, logback))
+    .settings(excludeDependencies += ExclusionRule(commonsLogging.organization, commonsLogging.name))
     .dependsOn(core)
 
 lazy val indexer =
@@ -101,6 +103,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ Seq(retry("3"), ergoWallet, loggingApi, logback, pureConfig))
-    .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)))
+    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ janusGraph ++ Seq(gremlin, retry("3"), commonsCodec, ergoWallet, loggingApi, logback, pureConfig))
+    .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
     .dependsOn(core, `alert-plugin`)

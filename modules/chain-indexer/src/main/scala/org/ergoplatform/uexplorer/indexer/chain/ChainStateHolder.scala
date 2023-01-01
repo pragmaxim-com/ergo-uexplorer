@@ -7,7 +7,7 @@ import akka.pattern.StatusReply
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, TxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
 import org.ergoplatform.uexplorer.indexer.api.Backend
@@ -16,7 +16,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
-import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
@@ -123,10 +123,13 @@ object ChainStateHolder extends LazyLogging {
 
   sealed trait MaybeNewEpoch extends ChainStateHolderResponse
 
-  case class NewEpochCreated(epoch: Epoch) extends MaybeNewEpoch {
+  case class NewEpochDetected(
+    epoch: Epoch,
+    boxesByHeight: TreeMap[Int, ArraySeq[(TxId, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]))]]
+  ) extends MaybeNewEpoch {
 
     override def toString: String =
-      s"New epoch ${epoch.index} created"
+      s"New epoch ${epoch.index} detected"
   }
 
   case class NewEpochExisted(epochIndex: Int) extends MaybeNewEpoch {
