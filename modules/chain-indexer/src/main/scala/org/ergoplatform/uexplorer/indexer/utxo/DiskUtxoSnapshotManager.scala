@@ -98,7 +98,10 @@ class DiskUtxoSnapshotManager(
               }
               .map(_.result())
               .map(utxosByAddress =>
-                Option(UtxoSnapshot.Deserialized(latestEpochIndex, UtxoState(addressByUtxo, utxosByAddress)))
+                Option(
+                  UtxoSnapshot
+                    .Deserialized(latestEpochIndex, UtxoState(addressByUtxo, utxosByAddress, Map.empty, TreeMap.empty))
+                )
               )
           }
       }

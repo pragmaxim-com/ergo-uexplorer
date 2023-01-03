@@ -28,10 +28,10 @@ class PluginManager(plugins: List[Plugin]) {
     graphTraversalSource: GraphTraversalSource,
     newBlockOpt: Option[Block]
   )(implicit actorSystem: ActorSystem[Nothing]): Future[Done] =
-    Future(chainState.utxoStateWithCurrentEpochBoxes).flatMap { utxoState =>
+    Future(chainState.utxoState.utxoStateWithCurrentEpochBoxes).flatMap { utxoState =>
       val utxoStateWoPool = UtxoStateWithoutPool(utxoState.addressByUtxo, utxoState.utxosByAddress)
       val poolExecutionPlan =
-        stateChanges.utxoStateTransitionByTx(chainState).flatMap { case (newTx, utxoStateWithPool) =>
+        stateChanges.utxoStateTransitionByTx(chainState.utxoState).flatMap { case (newTx, utxoStateWithPool) =>
           plugins.map(p => (p, newTx, utxoStateWithPool))
         }
       val chainExecutionPlan = newBlockOpt.toList.flatMap(newBlock => plugins.map(_ -> newBlock))

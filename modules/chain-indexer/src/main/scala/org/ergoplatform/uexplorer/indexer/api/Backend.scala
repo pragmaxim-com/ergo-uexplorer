@@ -4,6 +4,7 @@ import akka.NotUsed
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Flow
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, TxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
@@ -12,6 +13,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.config.{BackendType, CassandraDb, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.compat.immutable.ArraySeq
@@ -60,7 +62,7 @@ class InMemoryBackend extends Backend {
 
   def close(): Future[Unit] = Future.successful(())
 
-  def graphTraversalSource: GraphTraversalSource = ???
+  def graphTraversalSource: GraphTraversalSource = EmptyGraph.instance.traversal()
 
   override def blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]
@@ -99,7 +101,7 @@ class InMemoryBackend extends Backend {
 
   override def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState] =
     Future(
-      UtxoState.empty.mergeBoxes(TreeMap.from(boxesByHeight.asScala).iterator.flatMap(_._2.iterator.map(_._2)))
+      UtxoState.empty.mergeBufferedBoxes(Some(epochIndexes.flatMap(Epoch.heightRangeForEpochIndex).toSeq))._2
     )
 
   def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]] =

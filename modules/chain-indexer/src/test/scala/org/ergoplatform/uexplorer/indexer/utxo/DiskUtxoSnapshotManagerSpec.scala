@@ -11,6 +11,7 @@ import org.scalatest.freespec.{AnyFreeSpec, AsyncFreeSpec}
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.Paths
+import scala.collection.immutable.TreeMap
 
 class DiskUtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
 
@@ -37,7 +38,9 @@ class DiskUtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
         .toMap
     val utxoState = UtxoState(
       addressByUtxo,
-      utxosByAddress
+      utxosByAddress,
+      Map.empty,
+      TreeMap.empty
     )
     utxoSnapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(1, utxoState)).flatMap { _ =>
       utxoSnapshotManager.getLatestSnapshotByIndex.map { snapshot =>

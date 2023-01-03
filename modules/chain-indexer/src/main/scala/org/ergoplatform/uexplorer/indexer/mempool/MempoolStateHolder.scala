@@ -1,20 +1,20 @@
 package org.ergoplatform.uexplorer.indexer.mempool
 
 import akka.Done
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.chain.ChainState
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.node.ApiTransaction
+import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 
-import concurrent.duration.DurationInt
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 object MempoolStateHolder extends LazyLogging {
 
@@ -35,7 +35,7 @@ object MempoolStateHolder extends LazyLogging {
   case class MempoolStateChanges(stateTransitionByTx: List[(ApiTransaction, ListMap[TxId, ApiTransaction])])
     extends MempoolStateHolderResponse {
 
-    def utxoStateTransitionByTx(chainState: ChainState): Iterator[(ApiTransaction, UtxoState)] =
+    def utxoStateTransitionByTx(utxoState: UtxoState): Iterator[(ApiTransaction, UtxoState)] =
       stateTransitionByTx.iterator.map { case (newTx, poolTxs) =>
         val (inputs, outputs) =
           poolTxs.values.foldLeft(
@@ -43,7 +43,7 @@ object MempoolStateHolder extends LazyLogging {
           ) { case ((iAcc, oAcc), tx) =>
             val inputSet = tx.inputs.toSet.map(_.boxId)
             val inputsWithAddrValue =
-              chainState.inputsByHeightBuffer.valuesIterator.flatMap { boxes =>
+              utxoState.inputsByHeightBuffer.valuesIterator.flatMap { boxes =>
                 val shared = boxes.keySet.intersect(inputSet)
                 shared.map { boxId =>
                   val (addr, value) = boxes(boxId)
@@ -52,14 +52,14 @@ object MempoolStateHolder extends LazyLogging {
               }
             iAcc.addAll(inputsWithAddrValue) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
           }
-        newTx -> chainState.utxoState.mergeBoxes(List((inputs.result(), outputs.result())).iterator)
+        newTx -> utxoState.mergeGivenBoxes(List((inputs.result(), outputs.result())).iterator)
       }
   }
 
   case class UpdateTxs(allTxs: ListMap[TxId, ApiTransaction], replyTo: ActorRef[MempoolStateChanges])
     extends MempoolStateHolderRequest
 
-  import akka.actor.typed.scaladsl.AskPattern._
+  import akka.actor.typed.scaladsl.AskPattern.*
 
   case class MempoolState(underlyingTxs: ListMap[TxId, ApiTransaction]) {
 

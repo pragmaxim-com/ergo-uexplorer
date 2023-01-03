@@ -100,7 +100,7 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
         .runFold(UtxoState.empty) { case (s, boxesByHeight) =>
           val epochIndex = Epoch.epochIndexForHeight(boxesByHeight.head._1)
           logger.info(s"Merging boxes of epoch $epochIndex into utxo state")
-          s.mergeBoxes(boxesByHeight.iterator.map(_._2))
+          s.mergeGivenBoxes(boxesByHeight.iterator.map(_._2))
         }
     }
 }

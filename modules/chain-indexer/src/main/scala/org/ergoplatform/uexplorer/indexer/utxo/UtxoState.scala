@@ -7,58 +7,153 @@ import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.*
+import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
-import org.ergoplatform.uexplorer.{Address, BoxId, Const, TxId}
+import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, TxId}
 
 import java.io.*
 import java.nio.file.{Path, Paths}
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Success, Try}
 
 case class UtxoState(
   addressByUtxo: Map[BoxId, Address],
-  utxosByAddress: Map[Address, Map[BoxId, Long]]
+  utxosByAddress: Map[Address, Map[BoxId, Long]],
+  inputsByHeightBuffer: Map[Int, Map[BoxId, (Address, Long)]],
+  boxesByHeightBuffer: UtxoState.BoxesByHeight
 ) {
 
-  def mergeBoxes(
-    boxes: Iterator[(ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])]
-  ): UtxoState = {
+  /** on-demand computation of UtxoState up to latest blocks which are not merged right away as we do not support rollback,
+    * instead we merge only winner-fork blocks into UtxoState
+    */
+  def utxoStateWithCurrentEpochBoxes: UtxoState = mergeBufferedBoxes(Option.empty)._2
+
+  def mergeGivenBoxes(boxes: Iterator[(ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])]): UtxoState = {
     val (newAddressByUtxo, newUtxosByAddress) =
-      boxes
-        .foldLeft(addressByUtxo -> utxosByAddress) {
-          case ((addressByUtxoAcc, utxosByAddressAcc), (inputBoxIds, outputBoxIdsWithAddress)) =>
-            val newOutputBoxIdsByAddress =
-              outputBoxIdsWithAddress
-                .foldLeft(utxosByAddressAcc) { case (acc, (boxId, address, value)) =>
-                  acc.adjust(address)(_.fold(Map(boxId -> value))(_.updated(boxId, value)))
+      boxes.foldLeft(addressByUtxo -> utxosByAddress) {
+        case ((addressByUtxoAcc, utxosByAddressAcc), (inputBoxIds, outputBoxIdsWithAddress)) =>
+          val newOutputBoxIdsByAddress =
+            outputBoxIdsWithAddress
+              .foldLeft(utxosByAddressAcc) { case (acc, (boxId, address, value)) =>
+                acc.adjust(address)(_.fold(Map(boxId -> value))(_.updated(boxId, value)))
+              }
+          val newOutputBoxIdsByAddressWoInputs =
+            inputBoxIds
+              .groupBy(_._2)
+              .view
+              .mapValues(_.map(_._1))
+              .foldLeft(newOutputBoxIdsByAddress) { case (acc, (address, inputIds)) =>
+                acc.putOrRemove(address) {
+                  case None                 => None
+                  case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)
                 }
-            val newOutputBoxIdsByAddressWoInputs =
-              inputBoxIds
-                .groupBy(_._2)
-                .view
-                .mapValues(_.map(_._1))
-                .foldLeft(newOutputBoxIdsByAddress) { case (acc, (address, inputIds)) =>
-                  acc.putOrRemove(address) {
-                    case None                 => None
-                    case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)
-                  }
-                }
-            (
-              addressByUtxoAcc ++ outputBoxIdsWithAddress.iterator.map(o => o._1 -> o._2) -- inputBoxIds.iterator.map(_._1),
-              newOutputBoxIdsByAddressWoInputs
-            )
+              }
+          (
+            addressByUtxoAcc ++ outputBoxIdsWithAddress.iterator.map(o => o._1 -> o._2) -- inputBoxIds.iterator.map(_._1),
+            newOutputBoxIdsByAddressWoInputs
+          )
+      }
+    copy(
+      addressByUtxo  = newAddressByUtxo,
+      utxosByAddress = newUtxosByAddress
+    )
+
+  }
+
+  def mergeBufferedBoxes(
+    heightRangeOpt: Option[Seq[Int]]
+  ): (UtxoState.BoxesByHeight, UtxoState) = {
+    val boxesByHeightSlice = heightRangeOpt
+      .map { heightRange =>
+        boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
+      }
+      .getOrElse(boxesByHeightBuffer)
+
+    val newUtxoState = mergeGivenBoxes(boxesByHeightSlice.iterator.flatMap(_._2.iterator.map(_._2)))
+    boxesByHeightSlice -> newUtxoState.copy(
+      inputsByHeightBuffer = inputsByHeightBuffer -- boxesByHeightSlice.keysIterator,
+      boxesByHeightBuffer  = boxesByHeightBuffer -- boxesByHeightSlice.keysIterator
+    )
+  }
+
+  private def getInput(boxId: BoxId, blockId: BlockId, newInputsByHeight: Map[Int, Map[BoxId, (Address, Long)]]) =
+    addressByUtxo
+      .get(boxId)
+      .map(oAddr => (boxId, oAddr, utxosByAddress(oAddr)(boxId)))
+      .getOrElse(
+        newInputsByHeight.valuesIterator
+          .collectFirst {
+            case xs if xs.contains(boxId) =>
+              val (a, v) = xs(boxId)
+              (boxId, a, v)
+          }
+          .getOrElse(throw IllegalStateException(s"Box $boxId in block $blockId cannot be found"))
+      )
+
+  def insertBestBlock(bestBlock: ApiFullBlock): UtxoState = {
+    val newInputsByHeight = inputsByHeightBuffer.updated(
+      bestBlock.header.height,
+      bestBlock.transactions.transactions
+        .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
+        .toMap
+    )
+    val newBoxesByHeightBuffer = boxesByHeightBuffer.updated(
+      bestBlock.header.height,
+      bestBlock.transactions.transactions.map { tx =>
+        val inputs = tx.inputs.map {
+          case i if i.boxId == Const.Genesis.Emission.box =>
+            (i.boxId, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs)
+          case i if i.boxId == Const.Genesis.NoPremine.box =>
+            (i.boxId, Const.Genesis.NoPremine.address, Const.Genesis.NoPremine.initialNanoErgs)
+          case i if i.boxId == Const.Genesis.Foundation.box =>
+            (i.boxId, Const.Genesis.Foundation.address, Const.Genesis.Foundation.initialNanoErgs)
+          case i => getInput(i.boxId, bestBlock.header.id, newInputsByHeight)
         }
-    UtxoState(
-      newAddressByUtxo,
-      newUtxosByAddress
+        tx.id -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
+      }
+    )
+    copy(
+      inputsByHeightBuffer = newInputsByHeight,
+      boxesByHeightBuffer  = newBoxesByHeightBuffer
+    )
+  }
+
+  def insertFork(newApiBlocks: ListBuffer[ApiFullBlock], supersededBlocks: ListBuffer[BufferedBlockInfo]): UtxoState = {
+    val newInputsByHeight =
+      inputsByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++
+      newApiBlocks
+        .map(b =>
+          b.header.height ->
+          b.transactions.transactions
+            .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
+            .toMap
+        )
+        .toMap
+
+    val newBoxesByHeightBuffer =
+      newApiBlocks
+        .map(b =>
+          b.header.height -> b.transactions.transactions
+            .map { tx =>
+              val inputs = tx.inputs.map(i => getInput(i.boxId, b.header.id, newInputsByHeight))
+              tx.id -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
+            }
+        )
+        .toMap
+    copy(
+      inputsByHeightBuffer = newInputsByHeight,
+      boxesByHeightBuffer  = boxesByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++ newBoxesByHeightBuffer
     )
   }
 }
 
 object UtxoState extends LazyLogging {
-  def empty: UtxoState = UtxoState(Map.empty, Map.empty)
+  type BoxesByHeight = TreeMap[Int, ArraySeq[(TxId, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]
+  def empty: UtxoState = UtxoState(Map.empty, Map.empty, Map.empty, TreeMap.empty)
 }

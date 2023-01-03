@@ -10,7 +10,7 @@ import org.ergoplatform.uexplorer.indexer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.indexer.{Rest, UnexpectedStateError}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.{Address, BlockId}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -59,7 +59,9 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           val utxoState =
             UtxoState(
               utxos.map(o => o._1 -> o._2).toMap,
-              utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap
+              utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap,
+              Map.empty,
+              TreeMap.empty
             )
           val actualProgressState = ChainState.apply(
             lastBlockIdByEpochIndex,
@@ -71,7 +73,6 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
               Map(e0b2Block.header.id -> e0b2BlockInfo, e1b2Block.header.id -> e1b2BlockInfo),
               TreeMap(1024            -> e0b2BlockInfo, 2048                -> e1b2BlockInfo)
             ),
-            TreeMap.empty,
             utxoState
           )
         }
@@ -103,7 +104,9 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           val utxoState =
             UtxoState(
               utxos.map(o => o._1 -> o._2).toMap,
-              utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap
+              utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap,
+              Map.empty,
+              TreeMap.empty
             )
           val newState = ChainState.apply(lastBlockIdByEpochIndex, utxoState)
           newState shouldBe ChainState(
@@ -112,7 +115,6 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
               Map(e0b1Block.header.id -> e0b1Info),
               TreeMap(1024            -> e0b1Info)
             ),
-            TreeMap.empty,
             utxoState
           )
 
@@ -147,7 +149,9 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
         val utxoState =
           UtxoState(
             utxos.map(o => o._1 -> o._2).toMap,
-            utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap
+            utxos.groupBy(_._2).view.mapValues(x => Map(x.map(o => o._1 -> o._3): _*)).toMap,
+            Map.empty,
+            TreeMap.empty
           )
         val s               = ChainState.apply(TreeMap(0 -> commonBlockInfo), utxoState)
         val b1ApiBlock      = Rest.blocks.getByHeight(1025)
