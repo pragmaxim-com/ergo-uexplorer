@@ -35,14 +35,24 @@ object MempoolStateHolder extends LazyLogging {
   case class MempoolStateChanges(stateTransitionByTx: List[(ApiTransaction, ListMap[TxId, ApiTransaction])])
     extends MempoolStateHolderResponse {
 
-    def utxoStateTransitionByTx(utxoState: UtxoState): Iterator[(ApiTransaction, UtxoState)] =
-      stateTransitionByTx.iterator.flatMap { case (newTx, poolTxs) =>
+    def utxoStateTransitionByTx(chainState: ChainState): Iterator[(ApiTransaction, UtxoState)] =
+      stateTransitionByTx.iterator.map { case (newTx, poolTxs) =>
         val (inputs, outputs) =
-          poolTxs.values.foldLeft((ArraySeq.newBuilder[BoxId], ArraySeq.newBuilder[(BoxId, Address, Long)])) {
-            case ((iAcc, oAcc), tx) =>
-              iAcc.addAll(tx.inputs.map(_.boxId)) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
+          poolTxs.values.foldLeft(
+            (ArraySeq.newBuilder[(BoxId, Address, Long)], ArraySeq.newBuilder[(BoxId, Address, Long)])
+          ) { case ((iAcc, oAcc), tx) =>
+            val inputSet = tx.inputs.toSet.map(_.boxId)
+            val inputsWithAddrValue =
+              chainState.inputsByHeightBuffer.valuesIterator.flatMap { boxes =>
+                val shared = boxes.keySet.intersect(inputSet)
+                shared.map { boxId =>
+                  val (addr, value) = boxes(boxId)
+                  (boxId, addr, value)
+                }
+              }
+            iAcc.addAll(inputsWithAddrValue) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
           }
-        utxoState.mergeBoxes(List((inputs.result(), outputs.result())).iterator).toOption.map(newTx -> _)
+        newTx -> chainState.utxoState.mergeBoxes(List((inputs.result(), outputs.result())).iterator)
       }
   }
 

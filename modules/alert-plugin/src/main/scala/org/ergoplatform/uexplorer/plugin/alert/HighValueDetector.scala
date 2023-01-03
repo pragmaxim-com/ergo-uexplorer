@@ -20,7 +20,7 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
     graphTraversalSource: GraphTraversalSource
   ): List[AlertMessage] =
     Option(tx.outputs.iterator.map(_.value).sum)
-      .filter(_ >= txErgValueThreshold * nanoOrder)
+      .filter(_ >= txErgValueThreshold * Const.NanoOrder)
       .map { value =>
         val inputAddresses = tx.inputs.iterator.map(_.boxId).flatMap(utxoStateWithPool.addressByUtxo.get).toSet
         val inputAddressesSum =
@@ -32,9 +32,9 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
           outputAddresses.flatMap(utxoStateWithPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
             acc + valueByBox.values.sum
           }
-        val fmtValue              = valueFormat.format(value / nanoOrder)
-        val fmtInputAddressesSum  = valueFormat.format(inputAddressesSum / nanoOrder)
-        val fmtOutputAddressesSum = valueFormat.format(outputAddressesSum / nanoOrder)
+        val fmtValue              = valueFormat.format(value / Const.NanoOrder)
+        val fmtInputAddressesSum  = valueFormat.format(inputAddressesSum / Const.NanoOrder)
+        val fmtOutputAddressesSum = valueFormat.format(outputAddressesSum / Const.NanoOrder)
         s"${inputAddresses.size} addresses with total of $fmtInputAddressesSum Erg ===> $fmtValue Erg ===> ${outputAddresses.size} addresses with total of $fmtOutputAddressesSum Erg"
       }
       .map(msg => s"https://explorer.ergoplatform.com/en/transactions/${tx.id} $msg")
@@ -45,17 +45,17 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
     utxoStateWoPool: UtxoStateWithoutPool,
     graphTraversalSource: GraphTraversalSource
   ): List[AlertMessage] = {
-    val outputs = newBlock.outputs.collect { case o if o.address != Const.GenesisEmission.address => o.address -> o.value }
+    val outputs = newBlock.outputs.collect { case o if o.address != Const.Genesis.Emission.address => o.address -> o.value }
     Option(outputs.iterator.map(_._2).sum)
-      .filter(_ >= blockErgValueThreshold * nanoOrder)
+      .filter(_ >= blockErgValueThreshold * Const.NanoOrder)
       .map { value =>
         val outputAddresses = outputs.iterator.map(_._1).toSet
         val outputAddressesSum =
           outputAddresses.flatMap(utxoStateWoPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
             acc + valueByBox.values.sum
           }
-        val fmtValue              = valueFormat.format(value / nanoOrder)
-        val fmtOutputAddressesSum = valueFormat.format(outputAddressesSum / nanoOrder)
+        val fmtValue              = valueFormat.format(value / Const.NanoOrder)
+        val fmtOutputAddressesSum = valueFormat.format(outputAddressesSum / Const.NanoOrder)
         s"$fmtValue Erg ===> ${outputAddresses.size} addresses with total of $fmtOutputAddressesSum Erg"
       }
       .map(msg => s"https://explorer.ergoplatform.com/en/blocks/${newBlock.header.id} $msg")
@@ -66,5 +66,4 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
 object HighValueDetector {
 
   val valueFormat = new DecimalFormat("#,###")
-  val nanoOrder   = 1000000000d
 }

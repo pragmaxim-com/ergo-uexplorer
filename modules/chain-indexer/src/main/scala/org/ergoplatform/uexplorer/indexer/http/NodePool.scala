@@ -44,7 +44,7 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
         replyTo ! newState
         initialized(newState)
       case GracefulShutdown =>
-        logger.error(s"Stopping NodePool")
+        logger.info(s"Stopping NodePool")
         Behaviors.stopped
     }
 

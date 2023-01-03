@@ -19,7 +19,8 @@ import scala.util.{Failure, Success, Try}
 case class ChainState(
   lastBlockIdInEpoch: SortedMap[Int, BlockId],
   blockBuffer: BlockBuffer,
-  boxesByHeightBuffer: TreeMap[Int, ArraySeq[(TxId, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]))]],
+  inputsByHeightBuffer: Map[Int, Map[BoxId, (Address, Long)]],
+  boxesByHeightBuffer: TreeMap[Int, ArraySeq[(TxId, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]],
   utxoState: UtxoState
 ) {
   import ChainState.*
@@ -27,7 +28,7 @@ case class ChainState(
   /** on-demand computation of UtxoState up to latest blocks which are not merged right away as we do not support rollback,
     * instead we merge only winner-fork blocks into UtxoState
     */
-  def utxoStateWithCurrentEpochBoxes: Try[UtxoState] =
+  def utxoStateWithCurrentEpochBoxes: UtxoState =
     utxoState.mergeBoxes(boxesByHeightBuffer.iterator.flatMap(_._2.iterator.map(_._2)))
 
   def finishEpoch(currentEpochIndex: Int): Try[(MaybeNewEpoch, ChainState)] =
@@ -41,12 +42,12 @@ case class ChainState(
             if currentEpochIndex == 0 || lastBlockIdInEpoch(previousEpochIndex) == candidate.relsByHeight.head._2.parentId =>
           val newEpoch           = candidate.getEpoch
           val boxesByHeightSlice = boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
-          utxoState
-            .mergeBoxes(boxesByHeightSlice.iterator.flatMap(_._2.iterator.map(_._2)))
+          Try(utxoState.mergeBoxes(boxesByHeightSlice.iterator.flatMap(_._2.iterator.map(_._2))))
             .map { newState =>
               NewEpochDetected(newEpoch, boxesByHeightSlice) -> ChainState(
                 lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
                 blockBuffer.flushEpoch(heightRange),
+                inputsByHeightBuffer -- boxesByHeightSlice.keysIterator,
                 boxesByHeightBuffer -- boxesByHeightSlice.keysIterator,
                 newState
               )
@@ -75,13 +76,41 @@ case class ChainState(
       )
     } else
       BlockBuilder(bestBlock, blockBuffer.byId.get(bestBlock.header.parentId))
-        .map { block =>
-          BestBlockInserted(block) -> copy(
-            blockBuffer = blockBuffer.addBlock(block),
+        .map { b =>
+          val newInputsByHeight = inputsByHeightBuffer.updated(
+            b.header.height,
+            bestBlock.transactions.transactions
+              .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
+              .toMap
+          )
+          BestBlockInserted(b) -> copy(
+            blockBuffer = blockBuffer.addBlock(b),
+            newInputsByHeight,
             boxesByHeightBuffer = boxesByHeightBuffer.updated(
-              block.header.height,
+              b.header.height,
               bestBlock.transactions.transactions.map { tx =>
-                tx.id -> (tx.inputs.map(_.boxId), tx.outputs.map(o => (o.boxId, o.address, o.value)))
+                val inputs = tx.inputs.map {
+                  case i if i.boxId == Const.Genesis.Emission.box =>
+                    (i.boxId, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs)
+                  case i if i.boxId == Const.Genesis.NoPremine.box =>
+                    (i.boxId, Const.Genesis.NoPremine.address, Const.Genesis.NoPremine.initialNanoErgs)
+                  case i if i.boxId == Const.Genesis.Foundation.box =>
+                    (i.boxId, Const.Genesis.Foundation.address, Const.Genesis.Foundation.initialNanoErgs)
+                  case i =>
+                    utxoState.addressByUtxo
+                      .get(i.boxId)
+                      .map(oAddr => (i.boxId, oAddr, utxoState.utxosByAddress(oAddr)(i.boxId)))
+                      .getOrElse(
+                        newInputsByHeight.valuesIterator
+                          .collectFirst {
+                            case xs if xs.contains(i.boxId) =>
+                              val (a, v) = xs(i.boxId)
+                              (i.boxId, a, v)
+                          }
+                          .getOrElse(throw IllegalStateException(s"Box ${i.boxId} in block ${b.header.id} cannot be found"))
+                      )
+                }
+                tx.id -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
               }
             )
           )
@@ -121,17 +150,37 @@ case class ChainState(
         }
         .map { case (newApiBlocks, newBlocks, supersededBlocks) =>
           val newBlockBuffer = blockBuffer.addFork(newBlocks, supersededBlocks)
-          val newForkByHeight =
+          val newInputsByHeight =
+            inputsByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++
+            newApiBlocks
+              .map(b =>
+                b.header.height ->
+                b.transactions.transactions
+                  .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
+                  .toMap
+              )
+              .toMap
+
+          val newBoxesByHeightBuffer =
             newApiBlocks
               .map(b =>
                 b.header.height -> b.transactions.transactions
-                  .map(tx => tx.id -> (tx.inputs.map(_.boxId), tx.outputs.map(o => (o.boxId, o.address, o.value))))
+                  .map { tx =>
+                    val inputs = tx.inputs.map { i =>
+                      def oAddr         = utxoState.addressByUtxo(i.boxId)
+                      def oVal          = utxoState.utxosByAddress(oAddr)(i.boxId)
+                      val (iAddr, iVal) = newInputsByHeight(b.header.height).getOrElse(i.boxId, (oAddr, oVal))
+                      (i.boxId, iAddr, iVal)
+                    }
+                    tx.id -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
+                  }
               )
               .toMap
 
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(
-            blockBuffer         = newBlockBuffer,
-            boxesByHeightBuffer = boxesByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++ newForkByHeight
+            blockBuffer = newBlockBuffer,
+            newInputsByHeight,
+            boxesByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++ newBoxesByHeightBuffer
           )
         }
 
@@ -192,6 +241,7 @@ object ChainState {
         bufferedInfoByEpochIndex.toSeq.map(i => i._2.headerId -> i._2).toMap,
         bufferedInfoByEpochIndex.map(i => i._2.height -> i._2)
       ),
+      Map.empty,
       TreeMap.empty,
       utxoState
     )

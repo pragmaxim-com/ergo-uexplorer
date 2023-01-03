@@ -15,7 +15,7 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.Inserted
-import org.apache.tinkerpop.gremlin.structure.T
+import org.apache.tinkerpop.gremlin.structure.{Direction, T}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.FutureConverters.*
@@ -27,7 +27,7 @@ import CassandraBackend.BufferSize
 import akka.actor.CoordinatedShutdown
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.indexer.Utils
-import org.janusgraph.core.{JanusGraph, JanusGraphFactory, Multiplicity}
+import org.janusgraph.core.{Cardinality, JanusGraph, JanusGraphFactory, Multiplicity}
 import org.janusgraph.graphdb.database.StandardJanusGraph
 import org.janusgraph.graphdb.types.vertices.PropertyKeyVertex
 
@@ -98,21 +98,15 @@ object CassandraBackend extends LazyLogging {
       .asInstanceOf[StandardJanusGraph]
 
     val mgmt = janusGraph.openManagement()
-    if (!mgmt.containsGraphIndex("byAddress") || !mgmt.containsEdgeLabel("spentBy")) {
-      logger.info("Creating Janus index 'byAddress' and edge label 'spentBy'")
-      val address = mgmt.getOrCreatePropertyKey("address")
-      mgmt.buildIndex("byAddress", classOf[PropertyKeyVertex]).addKey(address).buildCompositeIndex()
-      mgmt.makeEdgeLabel("spentBy").multiplicity(Multiplicity.SIMPLE).make()
+    if (!mgmt.containsEdgeLabel("tx")) {
+      logger.info("Creating Janus properties, indexes and labels")
+      mgmt.makePropertyKey("inputs").dataType(classOf[String]).cardinality(Cardinality.LIST).make()
+      mgmt.makePropertyKey("outputs").dataType(classOf[String]).cardinality(Cardinality.LIST).make()
+      mgmt.makePropertyKey("values").dataType(classOf[java.lang.Long]).cardinality(Cardinality.LIST).make()
+      val txIdProp    = mgmt.makePropertyKey("txId").dataType(classOf[String]).make()
+      val txEdgeLabel = mgmt.makeEdgeLabel("tx").multiplicity(Multiplicity.MULTI).make()
+      mgmt.buildEdgeIndex(txEdgeLabel, "byTxId", Direction.BOTH, txIdProp)
       mgmt.commit()
-
-      val vertexCountBound = janusGraph.getIDManager.getVertexCountBound
-      logger.info(s"Max vertex count bound: $vertexCountBound")
-      logger.info("Creating vertices for genesis boxes")
-      val tx = janusGraph.newTransaction()
-      Const.genesisBoxes.foreach { boxId =>
-        tx.addVertex(T.id, Utils.vertexHash(boxId))
-      }
-      tx.commit()
     }
 
     logger.info(s"Cassandra session and Janus graph created")

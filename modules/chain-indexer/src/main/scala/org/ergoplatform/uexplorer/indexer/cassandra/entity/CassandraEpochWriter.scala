@@ -21,10 +21,12 @@ import org.apache.commons.codec.digest.MurmurHash2
 import org.ergoplatform.uexplorer.{Address, BoxId, Const, TxId}
 import org.janusgraph.core.{JanusGraphVertex, VertexLabel}
 
-import scala.collection.immutable.ArraySeq
+import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.jdk.CollectionConverters.*
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, Utils}
+
+import scala.collection.mutable
 
 trait CassandraEpochWriter extends AkkaStreamSupport with LazyLogging {
   this: CassandraBackend =>
@@ -38,29 +40,52 @@ trait CassandraEpochWriter extends AkkaStreamSupport with LazyLogging {
       epochLastHeadersInsertBinder
     )
 
-  private def addOutputVertices[G <: Graph](tx: G) =
-    Flow.fromFunction[
-      (TxId, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])),
-      (ArraySeq[BoxId], ArraySeq[Vertex])
-    ] { case (_, (inputs, outputs)) =>
-      inputs -> outputs.map { case (boxId, address, value) =>
-        val v = tx.addVertex(T.id, Utils.vertexHash(boxId))
-        v.property("address", address)
-        v.property("value", value)
-        v
-      }
-    }
-
-  private def connectSpentByEdges[G <: Graph](tx: G, epochIndex: Int) =
-    Flow.fromFunction[(ArraySeq[BoxId], ArraySeq[Vertex]), Unit] { case (inputs, outputVertexes) =>
-      inputs.foreach { inputBoxId =>
-        val vertexIt = tx.vertices(Utils.vertexHash(inputBoxId))
-        if (!vertexIt.hasNext) {
-          logger.error(s"InputBox inputBoxId $inputBoxId from epoch $epochIndex lacks corresponding vertex")
-        }
-        val inputVertex = vertexIt.next()
-        outputVertexes.foreach(ov => inputVertex.addEdge("spentBy", ov))
-      }
+  private def addOutputVertices[G <: Graph](
+    tx: G,
+    epochIndex: Int
+  ) =
+    Flow.fromFunction[(TxId, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])), Unit] {
+      case (txId, (inputs, outputs)) =>
+        val outputBoxIdsByAddressVertex =
+          outputs
+            .groupBy(_._2)
+            .view
+            .mapValues(_.map(t => t._1 -> t._3))
+            .collect {
+              case (address, valueByBox) if address != Const.FeeContract.address =>
+                val outputAddressVertexIt = tx.vertices(Utils.vertexHash(address))
+                if (outputAddressVertexIt.hasNext)
+                  outputAddressVertexIt.next() -> valueByBox
+                else
+                  tx.addVertex(T.id, Utils.vertexHash(address)) -> valueByBox
+            }
+            .toList
+        inputs
+          .filterNot(t => Const.genesisBoxes.contains(t._1))
+          .groupBy(_._2)
+          .view
+          .mapValues(_.map(t => t._1 -> t._3))
+          .collect {
+            case (address, valueByBoxId) if address != Const.FeeContract.address =>
+              val inputAddressVertexIt = tx.vertices(Utils.vertexHash(address))
+              if (!inputAddressVertexIt.hasNext) {
+                logger.error(s"inputAddress $address from epoch $epochIndex lacks corresponding vertex")
+              }
+              inputAddressVertexIt.next() -> valueByBoxId
+          }
+          .foreach { case (inputAddressV, valueByBoxId) =>
+            outputBoxIdsByAddressVertex.foreach { case (outputAddressV, outputValueByBoxId) =>
+              val txEdge = inputAddressV.addEdge("tx", outputAddressV)
+              txEdge.property("txId", txId)
+            /*
+              valueByBoxId.foreach(txEdge.property("inputs", _))
+              outputValueByBoxId.foreach { case (outputBoxId, value) =>
+                txEdge.property("outputs", outputBoxId)
+                txEdge.property("values", value)
+              }
+             */
+            }
+          }
     }
 
   def boxesWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
@@ -70,14 +95,8 @@ trait CassandraEpochWriter extends AkkaStreamSupport with LazyLogging {
           val threadedGraph = janusGraph.tx().createThreadedTx[Graph]()
           Source
             .fromIterator(() => boxesByHeight.iterator.flatMap(_._2))
-            .via(cpuHeavyBalanceFlow(addOutputVertices(threadedGraph)))
-            .runWith(Sink.seq)
-            .flatMap { xs =>
-              Source
-                .fromIterator(() => xs.iterator)
-                .via(cpuHeavyBalanceFlow(connectSpentByEdges(threadedGraph, e.index)))
-                .runWith(Sink.ignore)
-            }
+            .via(cpuHeavyBalanceFlow(addOutputVertices(threadedGraph, e.index)))
+            .run()
             .map { _ =>
               threadedGraph.tx().commit()
               logger.info(s"New epoch ${e.index} building finished")

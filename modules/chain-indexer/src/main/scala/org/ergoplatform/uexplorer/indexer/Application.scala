@@ -1,47 +1,43 @@
 package org.ergoplatform.uexplorer.indexer
 
-import akka.actor.typed.scaladsl.Behaviors
-import akka.actor.typed.{ActorSystem, Behavior}
-import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
-import akka.actor.typed.scaladsl.ActorContext
-import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.actor.CoordinatedShutdown
+import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.stream.ActorAttributes.supervisionStrategy
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
+import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
-import org.ergoplatform.uexplorer.indexer.chain.{ChainIndexer, ChainLoader, ChainState, ChainStateHolder, Epoch}
 import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
+import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.indexer.utxo.{DiskUtxoSnapshotManager, UtxoState}
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.ergoplatform.uexplorer.{Address, BoxId, Const}
+import org.slf4j.LoggerFactory
 
+import java.io.{PrintWriter, StringWriter}
 import java.util.ServiceLoader
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-object Application extends App with AkkaStreamSupport with LazyLogging {
+object Application extends App with AkkaStreamSupport {
   ChainIndexerConf.loadWithFallback match {
     case Left(failures) =>
-      failures.toList.foreach(f => logger.error(s"Config error ${f.description} at ${f.origin}"))
+      failures.toList.foreach(f => println(s"Config error ${f.description} at ${f.origin}"))
       System.exit(1)
     case Right((conf, config)) =>
       val guardian: Behavior[Nothing] =
@@ -67,11 +63,13 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
 
           initializationF.andThen {
             case Failure(ex) =>
-              logger.error("Shutting down due to unexpected error", ex)
-              system.terminate()
+              val sw = new StringWriter()
+              ex.printStackTrace(new PrintWriter(sw))
+              println(s"Shutting down due to unexpected error:\n$sw")
+              CoordinatedShutdown.get(system).run(CoordinatedShutdown.ActorSystemTerminateReason)
             case Success(_) =>
-              logger.error("Chain indexer should never stop successfully")
-              system.terminate()
+              println("Chain indexer should never stop successfully")
+              CoordinatedShutdown.get(system).run(CoordinatedShutdown.ActorSystemTerminateReason)
           }
           Behaviors.same
         }

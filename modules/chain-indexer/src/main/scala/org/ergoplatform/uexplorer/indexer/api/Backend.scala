@@ -12,7 +12,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.config.{BackendType, CassandraDb, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.TreeMap
@@ -54,7 +54,7 @@ class InMemoryBackend extends Backend {
   private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
   private val boxesByHeight =
-    new ConcurrentHashMap[Int, ArraySeq[(TxId, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]))]]()
+    new ConcurrentHashMap[Int, ArraySeq[(TxId, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]()
   private val blocksById     = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
   private val blocksByHeight = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
@@ -98,7 +98,9 @@ class InMemoryBackend extends Backend {
       }
 
   override def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState] =
-    Future.fromTry(UtxoState.empty.mergeBoxes(TreeMap.from(boxesByHeight.asScala).iterator.flatMap(_._2.iterator.map(_._2))))
+    Future(
+      UtxoState.empty.mergeBoxes(TreeMap.from(boxesByHeight.asScala).iterator.flatMap(_._2.iterator.map(_._2)))
+    )
 
   def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]] =
     Future.successful(TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*))

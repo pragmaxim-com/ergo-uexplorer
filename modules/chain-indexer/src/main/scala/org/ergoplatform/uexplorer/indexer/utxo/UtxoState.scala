@@ -25,50 +25,37 @@ case class UtxoState(
 ) {
 
   def mergeBoxes(
-    boxes: Iterator[(ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)])]
-  ): Try[UtxoState] = {
-    val (inputsBuilder, newAddressByUtxo, newUtxosByAddress) =
+    boxes: Iterator[(ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])]
+  ): UtxoState = {
+    val (newAddressByUtxo, newUtxosByAddress) =
       boxes
-        .foldLeft((ArraySeq.newBuilder[BoxId], addressByUtxo, utxosByAddress)) {
-          case ((inputBoxIdsAcc, addressByUtxoAcc, utxosByAddressAcc), (inputBoxIds, outputBoxIdsWithAddress)) =>
-            (
-              inputBoxIdsAcc.addAll(inputBoxIds),
-              addressByUtxoAcc ++ outputBoxIdsWithAddress.iterator.map(o => o._1 -> o._2),
+        .foldLeft(addressByUtxo -> utxosByAddress) {
+          case ((addressByUtxoAcc, utxosByAddressAcc), (inputBoxIds, outputBoxIdsWithAddress)) =>
+            val newOutputBoxIdsByAddress =
               outputBoxIdsWithAddress
                 .foldLeft(utxosByAddressAcc) { case (acc, (boxId, address, value)) =>
                   acc.adjust(address)(_.fold(Map(boxId -> value))(_.updated(boxId, value)))
                 }
+            val newOutputBoxIdsByAddressWoInputs =
+              inputBoxIds
+                .groupBy(_._2)
+                .view
+                .mapValues(_.map(_._1))
+                .foldLeft(newOutputBoxIdsByAddress) { case (acc, (address, inputIds)) =>
+                  acc.putOrRemove(address) {
+                    case None                 => None
+                    case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)
+                  }
+                }
+            (
+              addressByUtxoAcc ++ outputBoxIdsWithAddress.iterator.map(o => o._1 -> o._2) -- inputBoxIds.iterator.map(_._1),
+              newOutputBoxIdsByAddressWoInputs
             )
         }
-
-    val inputs = inputsBuilder.result()
-    Try {
-      inputs.foldLeft(mutable.Map.empty[Address, mutable.Set[BoxId]]) { case (inputsWithAddressAcc, boxId) =>
-        if (newAddressByUtxo.contains(boxId)) {
-          val address = newAddressByUtxo(boxId)
-          inputsWithAddressAcc.adjust(address)(
-            _.fold(mutable.Set(boxId))(_.addOne(boxId))
-          )
-        } else if (Const.genesisBoxes.contains(boxId)) {
-          inputsWithAddressAcc
-        } else {
-          throw new IllegalStateException(s"Input boxId $boxId is missing corresponding utxo in UtxoState")
-        }
-      }
-    }.map { inputsWithAddress =>
-      val utxosByAddressWoInputs =
-        inputsWithAddress
-          .foldLeft(newUtxosByAddress) { case (acc, (address, inputIds)) =>
-            acc.putOrRemove(address) {
-              case None                 => None
-              case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)
-            }
-          }
-      UtxoState(
-        newAddressByUtxo -- inputs,
-        utxosByAddressWoInputs
-      )
-    }
+    UtxoState(
+      newAddressByUtxo,
+      newUtxosByAddress
+    )
   }
 }
 

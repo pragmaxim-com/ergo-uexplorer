@@ -40,8 +40,8 @@ package object indexer {
 
   object Utils {
 
-    def vertexHash(boxId: BoxId)(implicit g: StandardJanusGraph) =
-      g.getIDManager.toVertexId(Math.abs(MurmurHash2.hash64(boxId.unwrapped)) / 1000)
+    def vertexHash(address: String)(implicit g: StandardJanusGraph): Long =
+      g.getIDManager.toVertexId(Math.abs(MurmurHash2.hash64(address)) / 1000)
 
     def copyUri(origUri: Uri, newUri: Uri): Uri =
       newUri.copy(

@@ -7,23 +7,24 @@ import akka.pattern.StatusReply
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, TxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
 import org.ergoplatform.uexplorer.indexer.api.Backend
-import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
+import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.*
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
+import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class ChainStateHolder(implicit protocol: ProtocolSettings) extends LazyLogging {
-  import ChainStateHolder._
+  import ChainStateHolder.*
 
   def initialBehavior: Behavior[ChainStateHolderRequest] =
     Behaviors.setup[ChainStateHolderRequest] { _ =>
@@ -125,7 +126,7 @@ object ChainStateHolder extends LazyLogging {
 
   case class NewEpochDetected(
     epoch: Epoch,
-    boxesByHeight: TreeMap[Int, ArraySeq[(TxId, (ArraySeq[BoxId], ArraySeq[(BoxId, Address, Long)]))]]
+    boxesByHeight: TreeMap[Int, ArraySeq[(TxId, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]
   ) extends MaybeNewEpoch {
 
     override def toString: String =
@@ -139,7 +140,7 @@ object ChainStateHolder extends LazyLogging {
   }
 
   /** API */
-  import akka.actor.typed.scaladsl.AskPattern._
+  import akka.actor.typed.scaladsl.AskPattern.*
 
   def insertWinningFork(
     winningFork: List[ApiFullBlock]

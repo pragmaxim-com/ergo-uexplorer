@@ -13,6 +13,7 @@ import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import scala.util.Failure
 
 class Scheduler(
   pluginManager: PluginManager,
@@ -30,13 +31,14 @@ class Scheduler(
     } yield (chainState, stateChanges)
 
   def validateAndSchedule(initialDelay: FiniteDuration, pollingInterval: FiniteDuration): Future[Done] =
-    chainLoader.initFromDbAndDisk.flatMap {
-      case ChainValid =>
-        schedule(initialDelay, pollingInterval)(periodicSync).run()
-      case missingEpochs: MissingEpochs =>
-        chainIndexer
-          .fixChain(missingEpochs)
-          .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval))
-    }
+    chainLoader.initFromDbAndDisk
+      .flatMap {
+        case ChainValid =>
+          schedule(initialDelay, pollingInterval)(periodicSync).run()
+        case missingEpochs: MissingEpochs =>
+          chainIndexer
+            .fixChain(missingEpochs)
+            .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval))
+      }
 
 }
