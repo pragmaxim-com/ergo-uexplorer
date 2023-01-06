@@ -15,6 +15,8 @@ services:
     ports:
       - 127.0.0.1:9044:9042
     oom_kill_disable: true
+    ulimits:
+      memlock: -1
     volumes:
       - cassandra-volume:/var/lib/cassandra
     environment:
@@ -43,7 +45,7 @@ services:
       janusgraph.storage.hostname: cassandra
       janusgraph.storage.batch-loading: true
       janusgraph.storage.transactions: false
-      janusgraph.ids.block-size: 5000000
+      janusgraph.graph.set-vertex-id: true
     healthcheck:
       test: [ "CMD", "bin/gremlin.sh", "-e", "scripts/remote-connect.groovy" ]
       interval: 10s
