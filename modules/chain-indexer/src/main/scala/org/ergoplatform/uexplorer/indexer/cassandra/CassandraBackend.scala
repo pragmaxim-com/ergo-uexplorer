@@ -27,6 +27,7 @@ import CassandraBackend.BufferSize
 import akka.actor.CoordinatedShutdown
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.indexer.Utils
+import org.ergoplatform.uexplorer.indexer.janusgraph.JanusGraphWriter
 import org.janusgraph.core.{Cardinality, JanusGraph, JanusGraphFactory, Multiplicity}
 import org.janusgraph.graphdb.database.StandardJanusGraph
 import org.janusgraph.graphdb.types.vertices.PropertyKeyVertex
@@ -50,6 +51,7 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraOutputsWriter
   with CassandraBlockUpdater
   with CassandraEpochWriter
+  with JanusGraphWriter
   with CassandraEpochReader
   with CassandraUtxoReader {
 
@@ -98,14 +100,14 @@ object CassandraBackend extends LazyLogging {
       .asInstanceOf[StandardJanusGraph]
 
     val mgmt = janusGraph.openManagement()
-    if (!mgmt.containsEdgeLabel("tx")) {
+    if (!mgmt.containsEdgeLabel("relatedTo")) {
       logger.info("Creating Janus properties, indexes and labels")
-      mgmt.makePropertyKey("inputs").dataType(classOf[String]).cardinality(Cardinality.LIST).make()
-      mgmt.makePropertyKey("outputs").dataType(classOf[String]).cardinality(Cardinality.LIST).make()
-      mgmt.makePropertyKey("values").dataType(classOf[java.lang.Long]).cardinality(Cardinality.LIST).make()
-      val txIdProp    = mgmt.makePropertyKey("txId").dataType(classOf[String]).make()
-      val txEdgeLabel = mgmt.makeEdgeLabel("tx").multiplicity(Multiplicity.MULTI).make()
-      mgmt.buildEdgeIndex(txEdgeLabel, "byTxId", Direction.BOTH, txIdProp)
+      mgmt.makeEdgeLabel("from").unidirected().multiplicity(Multiplicity.SIMPLE).make()
+      mgmt.makeEdgeLabel("to").multiplicity(Multiplicity.SIMPLE).make()
+      mgmt.makeEdgeLabel("relatedTo").multiplicity(Multiplicity.SIMPLE).make()
+      mgmt.makePropertyKey("height").dataType(classOf[Integer]).make()
+      mgmt.makePropertyKey("timestamp").dataType(classOf[java.lang.Long]).make()
+      mgmt.makePropertyKey("value").dataType(classOf[java.lang.Long]).make()
       mgmt.commit()
     }
 

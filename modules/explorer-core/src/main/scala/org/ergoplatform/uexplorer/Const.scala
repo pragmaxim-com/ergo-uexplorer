@@ -45,8 +45,7 @@ object Const {
       "5b710d70f207f03745a8bb713006f235446f0104f89e977ae066ae184c0494fa"
   }
 
-  val genesisBoxes = Set(Genesis.Emission.box, Genesis.NoPremine.box, Genesis.Foundation.box)
-  val EpochLength  = 1024
+  val EpochLength = 1024
 
   val MinerRewardDelta = 720
 

@@ -13,6 +13,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.config.{BackendType, CassandraDb, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.ConcurrentHashMap
@@ -31,7 +32,7 @@ trait Backend {
 
   def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
 
-  def boxesWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
+  def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
 
   def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState]
 
@@ -56,7 +57,7 @@ class InMemoryBackend extends Backend {
   private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
   private val boxesByHeight =
-    new ConcurrentHashMap[Int, ArraySeq[(TxId, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]()
+    new ConcurrentHashMap[Int, ArraySeq[(Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]()
   private val blocksById     = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
   private val blocksByHeight = new ConcurrentHashMap[Int, BufferedBlockInfo]()
 
@@ -89,7 +90,7 @@ class InMemoryBackend extends Backend {
           tuple
       }
 
-  override def boxesWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
+  override def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(Block, Option[MaybeNewEpoch])]
       .map {
         case (block, Some(NewEpochDetected(epoch, boxesByTxIdByHeight))) =>

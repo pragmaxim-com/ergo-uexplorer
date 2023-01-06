@@ -2,6 +2,7 @@ package org.ergoplatform.uexplorer
 
 import org.apache.commons.codec.digest.MurmurHash2
 import org.janusgraph.graphdb.database.StandardJanusGraph
+import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 import sttp.model.Uri
 import sttp.model.Uri.{EmptyPath, QuerySegment}
 
@@ -40,8 +41,8 @@ package object indexer {
 
   object Utils {
 
-    def vertexHash(address: String)(implicit g: StandardJanusGraph): Long =
-      g.getIDManager.toVertexId(Math.abs(MurmurHash2.hash64(address)) / 1000)
+    def vertexHash(address: String)(implicit tx: StandardJanusGraphTx): Long =
+      tx.getGraph.getIDManager.toVertexId(Math.abs(MurmurHash2.hash64(address)) / 1000)
 
     def copyUri(origUri: Uri, newUri: Uri): Uri =
       newUri.copy(

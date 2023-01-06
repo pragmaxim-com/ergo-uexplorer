@@ -9,6 +9,7 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, TxId}
 
@@ -115,7 +116,9 @@ case class UtxoState(
             (i.boxId, Const.Genesis.Foundation.address, Const.Genesis.Foundation.initialNanoErgs)
           case i => getInput(i.boxId, bestBlock.header.id, newInputsByHeight)
         }
-        tx.id -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
+        Tx(tx.id, bestBlock.header.height, bestBlock.header.timestamp) -> (inputs, tx.outputs.map(o =>
+          (o.boxId, o.address, o.value)
+        ))
       }
     )
     copy(
@@ -142,7 +145,7 @@ case class UtxoState(
           b.header.height -> b.transactions.transactions
             .map { tx =>
               val inputs = tx.inputs.map(i => getInput(i.boxId, b.header.id, newInputsByHeight))
-              tx.id -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
+              Tx(tx.id, b.header.height, b.header.timestamp) -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
             }
         )
         .toMap
@@ -154,6 +157,7 @@ case class UtxoState(
 }
 
 object UtxoState extends LazyLogging {
-  type BoxesByHeight = TreeMap[Int, ArraySeq[(TxId, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]
+  case class Tx(id: TxId, height: Int, timestamp: Long)
+  type BoxesByHeight = TreeMap[Int, ArraySeq[(Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]
   def empty: UtxoState = UtxoState(Map.empty, Map.empty, Map.empty, TreeMap.empty)
 }
