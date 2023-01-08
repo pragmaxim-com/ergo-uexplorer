@@ -4,28 +4,40 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
 import org.ergoplatform.uexplorer.indexer.Utils
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
-import org.ergoplatform.uexplorer.{Address, BoxId, Const, TxId}
+import org.ergoplatform.uexplorer.{Address, BoxId, Const, Height, TxId}
 import org.janusgraph.graphdb.database.StandardJanusGraph
 import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 import eu.timepit.refined.auto.autoUnwrap
 import Const.*
+import akka.NotUsed
+import akka.stream.scaladsl.Flow
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+
 import scala.jdk.CollectionConverters.*
 import scala.collection.immutable.ArraySeq
 
-object TxGraphWriter extends LazyLogging {
+class TxGraphWriter(implicit g: StandardJanusGraphTx) extends LazyLogging {
 
   private val blackListBoxes = Set(Genesis.Emission.box, Genesis.NoPremine.box, Genesis.Foundation.box)
 
   private val blackListAddresses =
     Set(FeeContract.address, Genesis.Emission.address, Genesis.NoPremine.address, Genesis.Foundation.address)
 
-  def writeGraph(
+  val graphTxWriteFlow: Flow[(Height, UtxoState.BoxesByTx), (Height, UtxoState.BoxesByTx), NotUsed] =
+    Flow.fromFunction[(Height, UtxoState.BoxesByTx), (Height, UtxoState.BoxesByTx)] { case (height, boxesByTx) =>
+      boxesByTx.foreach { case (tx, (inputs, outputs)) => writeGraph(tx, height, inputs, outputs) }
+      (height, boxesByTx)
+    }
+
+  def commit(): Unit = g.commit()
+
+  private def writeGraph(
     tx: Tx,
-    epochIndex: Int,
+    height: Int,
     inputs: ArraySeq[(BoxId, Address, Long)],
     outputs: ArraySeq[(BoxId, Address, Long)]
-  )(implicit graph: StandardJanusGraphTx): Unit = {
-    val newTxVertex = graph.addVertex(T.id, Utils.vertexHash(tx.id.unwrapped))
+  ): Unit = {
+    val newTxVertex = g.addVertex(T.id, Utils.vertexHash(tx.id.unwrapped))
     newTxVertex.property("height", tx.height)
     newTxVertex.property("timestamp", tx.timestamp)
     val inputsByAddress =
@@ -36,30 +48,16 @@ object TxGraphWriter extends LazyLogging {
         .mapValues(_.map(t => t._1 -> t._3))
         .toMap
 
-    val relatedTxVertices =
-      inputsByAddress
-        .map { case (address, valueByBoxId) =>
-          val inputAddressVertexIt = graph.vertices(Utils.vertexHash(address))
-          if (!inputAddressVertexIt.hasNext) {
-            logger.error(s"inputAddress $address from epoch $epochIndex lacks corresponding vertex")
-          }
-          (inputAddressVertexIt.next(), valueByBoxId)
+    inputsByAddress
+      .map { case (address, valueByBoxId) =>
+        val inputAddressVertexIt = g.vertices(Utils.vertexHash(address))
+        if (!inputAddressVertexIt.hasNext) {
+          logger.error(s"inputAddress $address from height $height lacks corresponding vertex")
         }
-        .flatMap { case (inputAddressVertex, valueByBoxId) =>
-          newTxVertex.addEdge("from", inputAddressVertex, "value", valueByBoxId.map(_._2).sum)
-          inputAddressVertex
-            .edges(Direction.IN, "to")
-            .asScala
-            .map(_.inVertex())
-        }
-    val relatedTxCount = relatedTxVertices.size
-    if (relatedTxCount > 1000) {
-      logger.warn(s"$relatedTxCount related transactions with addresses:${inputsByAddress.mkString("\n", "\n", "")}")
-    }
-
-    relatedTxVertices
-      .foreach { relatedTx =>
-        newTxVertex.addEdge("relatedTo", relatedTx)
+        (inputAddressVertexIt.next(), valueByBoxId)
+      }
+      .foreach { case (inputAddressVertex, valueByBoxId) =>
+        newTxVertex.addEdge("from", inputAddressVertex, "value", valueByBoxId.map(_._2).sum)
       }
 
     val inputAddresses = inputsByAddress.keySet
@@ -73,15 +71,22 @@ object TxGraphWriter extends LazyLogging {
       .view
       .mapValues(_.map(t => t._1 -> t._3))
       .map { case (address, valueByBox) =>
-        val outputAddressVertexIt = graph.vertices(Utils.vertexHash(address))
+        val outputAddressVertexIt = g.vertices(Utils.vertexHash(address))
         if (outputAddressVertexIt.hasNext) {
           outputAddressVertexIt.next() -> valueByBox
         } else {
-          graph.addVertex(T.id, Utils.vertexHash(address)) -> valueByBox
+          g.addVertex(T.id, Utils.vertexHash(address)) -> valueByBox
         }
       }
       .foreach { case (outputAddressVertex, valueByBoxId) =>
         newTxVertex.addEdge("to", outputAddressVertex, "value", valueByBoxId.map(_._2).sum)
       }
   }
+}
+
+object TxGraphWriter {
+
+  def apply(janusGraph: StandardJanusGraph): TxGraphWriter = new TxGraphWriter()(
+    janusGraph.tx().createThreadedTx[StandardJanusGraphTx]()
+  )
 }

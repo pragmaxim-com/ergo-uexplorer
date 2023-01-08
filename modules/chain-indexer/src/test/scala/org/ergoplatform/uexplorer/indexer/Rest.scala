@@ -6,7 +6,9 @@ import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.io.Source
 import io.circe.parser.*
 import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.Height
 import org.ergoplatform.uexplorer.indexer.http.Codecs
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 object Rest {
@@ -20,7 +22,7 @@ object Rest {
       )
       .getLines()
       .filterNot(_.trim.isEmpty)
-      .foldLeft(1 -> TreeMap.empty[Int, String]) { case ((height, cache), blockStr) =>
+      .foldLeft(1 -> TreeMap.empty[Height, String]) { case ((height, cache), blockStr) =>
         height + 1 -> cache.updated(height, blockStr)
       }
       ._2
@@ -34,11 +36,11 @@ object Rest {
   }
 
   object blockIds {
-    lazy val byHeight: SortedMap[Int, String] = loadCacheFromFile("blocks/block_ids.gz")
+    lazy val byHeight: SortedMap[Height, String] = loadCacheFromFile("blocks/block_ids.gz")
   }
 
   object blocks extends Codecs {
-    lazy val byHeight: SortedMap[Int, String] = loadCacheFromFile("blocks/blocks.gz")
+    lazy val byHeight: SortedMap[Height, String] = loadCacheFromFile("blocks/blocks.gz")
 
     lazy val byId: SortedMap[String, String] = byHeight.map { case (height, block) =>
       if (height == 4201)

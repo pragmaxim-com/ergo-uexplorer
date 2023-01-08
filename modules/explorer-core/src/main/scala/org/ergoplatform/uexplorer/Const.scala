@@ -7,6 +7,7 @@ object Const {
   object Genesis {
 
     object Emission {
+      val coinBaseTx            = TxId("4c6282be413c6e300a530618b37790be5f286ded758accc2aebd41554a1be308")
       val initialNanoErgs: Long = 93409132 * CoinsInOneErgo
       val box: BoxId            = BoxId("b69575e11c5c43400bfead5976ee0d6245a1168396b2e2a4f384691f275d501c")
 
@@ -16,6 +17,7 @@ object Const {
     }
 
     object Foundation {
+      val tx                    = TxId("e179f12156061c04d375f599bd8aea7ea5e704fab2d95300efb2d87460d60b83")
       val initialNanoErgs: Long = (4330791.5d * CoinsInOneErgo).toLong
       val box: BoxId            = BoxId("5527430474b673e4aafb08e0079c639de23e6a17e87edd00f78662b43c88aeda")
 

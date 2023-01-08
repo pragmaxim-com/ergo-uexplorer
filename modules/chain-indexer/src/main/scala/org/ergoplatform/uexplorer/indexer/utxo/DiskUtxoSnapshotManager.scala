@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.api.{UtxoSnapshot, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.NewEpochDetected
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
-import org.ergoplatform.uexplorer.{Address, BoxId}
+import org.ergoplatform.uexplorer.{Address, BoxId, Value}
 
 import java.io.*
 import java.nio.file.{Files, Path, Paths}
@@ -93,7 +93,7 @@ class DiskUtxoSnapshotManager(
                   .map(arr => BoxId(arr(0)) -> arr(1).toLong)
                   .toMap
               )
-              .runFold(Map.newBuilder[Address, Map[BoxId, Long]]) { case (acc, tuple) =>
+              .runFold(Map.newBuilder[Address, Map[BoxId, Value]]) { case (acc, tuple) =>
                 acc.addOne(tuple)
               }
               .map(_.result())

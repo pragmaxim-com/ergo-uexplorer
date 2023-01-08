@@ -1,7 +1,8 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, EpochIndex, Height}
 import org.ergoplatform.uexplorer.indexer.chain.Epoch.*
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.collection.mutable
@@ -14,13 +15,14 @@ trait EpochCandidate {
 
 case class BlockRel(headerId: BlockId, parentId: BlockId)
 
-case class InvalidEpochCandidate(epochIndex: Int, invalidHeightsAsc: TreeSet[Int], error: String) extends EpochCandidate {
+case class InvalidEpochCandidate(epochIndex: EpochIndex, invalidHeightsAsc: TreeSet[Height], error: String)
+  extends EpochCandidate {
   def isComplete = false
 }
 
 case class ValidEpochCandidate(
-  epochIndex: Int,
-  relsByHeight: TreeMap[Int, BlockRel]
+  epochIndex: EpochIndex,
+  relsByHeight: TreeMap[Height, BlockRel]
 ) extends EpochCandidate {
   def isComplete = true
 
@@ -30,9 +32,9 @@ case class ValidEpochCandidate(
 object EpochCandidate {
 
   def apply(
-    rels: Seq[(Int, BlockRel)]
+    rels: Seq[(Height, BlockRel)]
   ): Either[InvalidEpochCandidate, ValidEpochCandidate] = {
-    val sortedRels         = TreeMap[Int, BlockRel](rels: _*)
+    val sortedRels         = TreeMap[Height, BlockRel](rels: _*)
     val epochIndex         = sortedRels.headOption.map(tuple => epochIndexForHeight(tuple._1)).getOrElse(-1)
     val epochRange         = TreeSet(heightRangeForEpochIndex(epochIndex): _*)
     lazy val relationships = sortedRels.toSeq.sliding(2)

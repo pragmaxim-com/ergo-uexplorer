@@ -17,13 +17,13 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 case class ChainState(
-  lastBlockIdInEpoch: SortedMap[Int, BlockId],
+  lastBlockIdInEpoch: SortedMap[EpochIndex, BlockId],
   blockBuffer: BlockBuffer,
   utxoState: UtxoState
 ) {
   import ChainState.*
 
-  def finishEpoch(currentEpochIndex: Int): Try[(MaybeNewEpoch, ChainState)] =
+  def finishEpoch(currentEpochIndex: EpochIndex): Try[(MaybeNewEpoch, ChainState)] =
     if (lastBlockIdInEpoch.contains(currentEpochIndex)) {
       Success(NewEpochExisted(currentEpochIndex) -> this)
     } else {
@@ -113,7 +113,7 @@ case class ChainState(
 
   def getLastCachedBlock: Option[BufferedBlockInfo] = blockBuffer.byHeight.lastOption.map(_._2)
 
-  def persistedEpochIndexes: SortedSet[Int] = lastBlockIdInEpoch.keySet
+  def persistedEpochIndexes: SortedSet[EpochIndex] = lastBlockIdInEpoch.keySet
 
   /** Genesis block is not part of a cache as it has no parent so
     * we assert that any block either has its parent cached or its a first block
@@ -131,7 +131,7 @@ case class ChainState(
         false
     }
 
-  def findMissingEpochIndexes: TreeSet[Int] =
+  def findMissingEpochIndexes: TreeSet[EpochIndex] =
     if (lastBlockIdInEpoch.isEmpty || lastBlockIdInEpoch.size == 1)
       TreeSet.empty
     else
@@ -177,10 +177,10 @@ object ChainState {
       BufferedBlockInfo(b.header.id, b.header.parentId, b.header.timestamp, b.header.height, b.info)
   }
 
-  case class BlockBuffer(byId: Map[BlockId, BufferedBlockInfo], byHeight: SortedMap[Int, BufferedBlockInfo]) {
+  case class BlockBuffer(byId: Map[BlockId, BufferedBlockInfo], byHeight: SortedMap[Height, BufferedBlockInfo]) {
     def isEmpty: Boolean = byId.isEmpty || byHeight.isEmpty
 
-    def heights: SortedSet[Int] = byHeight.keySet
+    def heights: SortedSet[Height] = byHeight.keySet
 
     def addBlock(block: Block): BlockBuffer =
       BlockBuffer(
@@ -195,14 +195,14 @@ object ChainState {
         byHeight ++ newFork.map(b => b.header.height -> BufferedBlockInfo.fromBlock(b))
       )
 
-    def blockRelationsByHeight(heightRange: Seq[Int]): Seq[(Int, BlockRel)] =
+    def blockRelationsByHeight(heightRange: Seq[Height]): Seq[(Height, BlockRel)] =
       heightRange
         .map { height =>
           val info = byHeight(height)
           height -> BlockRel(info.headerId, info.parentId)
         }
 
-    def flushEpoch(heightRange: Seq[Int]): BlockBuffer =
+    def flushEpoch(heightRange: Seq[Height]): BlockBuffer =
       BlockBuffer(
         byId -- heightRange.flatMap(byHeight.get).map(_.headerId),
         byHeight -- heightRange

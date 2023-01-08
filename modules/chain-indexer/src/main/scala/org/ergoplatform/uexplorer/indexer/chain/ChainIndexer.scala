@@ -25,7 +25,7 @@ import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
-import org.ergoplatform.uexplorer.{Address, BoxId, Const}
+import org.ergoplatform.uexplorer.{Address, BoxId, Const, Height}
 
 import java.util.ServiceLoader
 import scala.collection.immutable.{ArraySeq, ListMap}
@@ -53,8 +53,8 @@ class ChainIndexer(
     }
   }
 
-  private val indexingSink: Sink[Int, Future[ChainSyncResult]] =
-    Flow[Int]
+  private val indexingSink: Sink[Height, Future[ChainSyncResult]] =
+    Flow[Height]
       .via(blockHttpClient.blockCachingFlow)
       .via(backend.blockWriteFlow)
       .mapAsync(1) {

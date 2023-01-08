@@ -11,7 +11,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, TxId}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, Value}
 
 import java.io.*
 import java.nio.file.{Path, Paths}
@@ -25,8 +25,8 @@ import scala.util.{Success, Try}
 
 case class UtxoState(
   addressByUtxo: Map[BoxId, Address],
-  utxosByAddress: Map[Address, Map[BoxId, Long]],
-  inputsByHeightBuffer: Map[Int, Map[BoxId, (Address, Long)]],
+  utxosByAddress: Map[Address, Map[BoxId, Value]],
+  inputsByHeightBuffer: Map[Height, Map[BoxId, (Address, Value)]],
   boxesByHeightBuffer: UtxoState.BoxesByHeight
 ) {
 
@@ -35,7 +35,9 @@ case class UtxoState(
     */
   def utxoStateWithCurrentEpochBoxes: UtxoState = mergeBufferedBoxes(Option.empty)._2
 
-  def mergeGivenBoxes(boxes: Iterator[(ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])]): UtxoState = {
+  def mergeGivenBoxes(
+    boxes: Iterator[(Iterable[(BoxId, Address, Value)], Iterable[(BoxId, Address, Value)])]
+  ): UtxoState = {
     val (newAddressByUtxo, newUtxosByAddress) =
       boxes.foldLeft(addressByUtxo -> utxosByAddress) {
         case ((addressByUtxoAcc, utxosByAddressAcc), (inputBoxIds, outputBoxIdsWithAddress)) =>
@@ -68,7 +70,7 @@ case class UtxoState(
   }
 
   def mergeBufferedBoxes(
-    heightRangeOpt: Option[Seq[Int]]
+    heightRangeOpt: Option[Seq[Height]]
   ): (UtxoState.BoxesByHeight, UtxoState) = {
     val boxesByHeightSlice = heightRangeOpt
       .map { heightRange =>
@@ -83,7 +85,11 @@ case class UtxoState(
     )
   }
 
-  private def getInput(boxId: BoxId, blockId: BlockId, newInputsByHeight: Map[Int, Map[BoxId, (Address, Long)]]) =
+  private def getInput(
+    boxId: BoxId,
+    blockId: BlockId,
+    newInputsByHeight: Map[Height, Map[BoxId, (Address, Long)]]
+  ) =
     addressByUtxo
       .get(boxId)
       .map(oAddr => (boxId, oAddr, utxosByAddress(oAddr)(boxId)))
@@ -157,7 +163,8 @@ case class UtxoState(
 }
 
 object UtxoState extends LazyLogging {
-  case class Tx(id: TxId, height: Int, timestamp: Long)
-  type BoxesByHeight = TreeMap[Int, ArraySeq[(Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]
+  case class Tx(id: TxId, height: Height, timestamp: Long)
+  type BoxesByTx     = Iterable[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
+  type BoxesByHeight = TreeMap[Height, BoxesByTx]
   def empty: UtxoState = UtxoState(Map.empty, Map.empty, Map.empty, TreeMap.empty)
 }

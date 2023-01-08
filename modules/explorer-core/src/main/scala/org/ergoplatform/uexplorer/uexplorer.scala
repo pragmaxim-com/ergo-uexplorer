@@ -10,6 +10,10 @@ import scala.util.Try
 
 package object uexplorer {
 
+  type Value = Long
+  type Height = Int
+  type EpochIndex = Int
+
   type Base58Spec = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
   type Address = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
@@ -63,7 +67,6 @@ package object uexplorer {
     extension (x: TxId)
       def unwrapped: String = x
   }
-
 
   opaque type BoxId = String
 

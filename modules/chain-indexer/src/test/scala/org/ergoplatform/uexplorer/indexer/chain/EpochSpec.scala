@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.indexer.{TestSupport, UnexpectedStateError}
 import org.ergoplatform.uexplorer.{BlockId, HexString}
 import org.scalatest.freespec.AnyFreeSpec
@@ -11,7 +12,7 @@ class EpochSpec extends AnyFreeSpec with TestSupport with Matchers {
 
   val preGenesisBlockId = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
 
-  private def epochRelationsByHeight(heightRange: Iterable[Int]) =
+  private def epochRelationsByHeight(heightRange: Iterable[Height]) =
     heightRange.foldLeft(Vector.empty[(Int, BlockRel)]) {
       case (acc, height) if acc.isEmpty =>
         acc :+ (height -> BlockRel(idGen.sample.get, preGenesisBlockId))

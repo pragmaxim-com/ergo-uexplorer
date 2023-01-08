@@ -17,6 +17,7 @@ import io.circe.*
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.indexer.parser.{ErgoTreeParser, RegistersParser}
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
@@ -39,7 +40,7 @@ trait Codecs {
       id               <- c.downField("id").as[BlockId]
       parentId         <- c.downField("parentId").as[BlockId]
       version          <- c.downField("version").as[Byte]
-      height           <- c.downField("height").as[Int]
+      height           <- c.downField("height").as[Height]
       nBits            <- c.downField("nBits").as[Long]
       difficulty       <- c.downField("difficulty").as[ApiDifficulty]
       timestamp        <- c.downField("timestamp").as[Long]
@@ -72,8 +73,8 @@ trait Codecs {
   implicit def apiOutputDecoder(implicit enc: ErgoAddressEncoder): Decoder[ApiOutput] = { (c: HCursor) =>
     for {
       boxId               <- c.downField("boxId").as[BoxId]
-      value               <- c.downField("value").as[Long]
-      creationHeight      <- c.downField("creationHeight").as[Int]
+      value               <- c.downField("value").as[Value]
+      creationHeight      <- c.downField("creationHeight").as[Height]
       ergoTree            <- c.downField("ergoTree").as[HexString]
       address             <- Right(ErgoTreeParser.ergoTreeToAddress(ergoTree))
       scriptTemplateHash  <- ErgoTreeParser.deriveErgoTreeTemplateHash(ergoTree)

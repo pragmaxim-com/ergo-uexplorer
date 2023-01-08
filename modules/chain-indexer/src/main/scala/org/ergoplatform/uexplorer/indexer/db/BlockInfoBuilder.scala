@@ -45,7 +45,7 @@ object BlockInfoBuilder {
       else if (Const.Eip27LowerPoint < reward) reward - (reward - Const.Eip27ResidualEmission)
       else reward
     val fee = apiBlock.transactions.transactions
-      .flatMap(_.outputs.toList)
+      .flatMap(_.outputs)
       .filter(_.ergoTree == indexer.Const.FeePropositionScriptHex)
       .map(_.value)
       .sum
@@ -66,7 +66,7 @@ object BlockInfoBuilder {
       val (reward, fee) = minerRewardAndFee(apiBlock)(protocolSettings)
       val coinBaseValue = reward + fee
       val blockCoins = apiBlock.transactions.transactions
-        .flatMap(_.outputs.toList)
+        .flatMap(_.outputs)
         .map(_.value)
         .sum - coinBaseValue
       val miningTime = apiBlock.header.timestamp - prevBlock

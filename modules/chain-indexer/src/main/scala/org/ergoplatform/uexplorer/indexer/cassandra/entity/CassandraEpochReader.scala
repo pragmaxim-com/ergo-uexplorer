@@ -12,7 +12,7 @@ import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, Cassandra
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
-import org.ergoplatform.uexplorer.{db, indexer, Address, BlockId, BoxId, Const}
+import org.ergoplatform.uexplorer.{db, indexer, Address, BlockId, BoxId, Const, EpochIndex}
 
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
@@ -41,7 +41,7 @@ trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
       .map(_.one())
       .map(r => epochIndex -> blockInfoRowReader(r))
 
-  def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]] =
+  def loadBlockInfoByEpochIndex: Future[TreeMap[EpochIndex, BufferedBlockInfo]] =
     Source
       .fromPublisher(
         cqlSession.executeReactive(

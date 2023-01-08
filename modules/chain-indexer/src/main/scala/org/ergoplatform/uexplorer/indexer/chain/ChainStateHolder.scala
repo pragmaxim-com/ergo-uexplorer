@@ -15,6 +15,7 @@ import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
@@ -127,7 +128,7 @@ object ChainStateHolder extends LazyLogging {
 
   case class NewEpochDetected(
     epoch: Epoch,
-    boxesByHeight: TreeMap[Int, ArraySeq[(Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]
+    txBoxesByHeight: TreeMap[Height, Iterable[(Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]
   ) extends MaybeNewEpoch {
 
     override def toString: String =

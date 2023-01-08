@@ -11,7 +11,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Const, indexer}
+import org.ergoplatform.uexplorer.{indexer, Const}
 
 import scala.collection.immutable.ArraySeq
 
@@ -95,6 +95,7 @@ trait EpochPersistenceSupport {
 
   protected[cassandra] val epoch_index    = "epoch_index"
   protected[cassandra] val last_header_id = "last_header_id"
+  protected[cassandra] val tx_id          = "tx_id"
   protected[cassandra] val box_id         = "box_id"
   protected[cassandra] val address        = "address"
   protected[cassandra] val value          = "value"

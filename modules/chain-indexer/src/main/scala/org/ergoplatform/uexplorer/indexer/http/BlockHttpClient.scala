@@ -6,7 +6,7 @@ import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
-import org.ergoplatform.uexplorer.{BlockId, Const, TxId}
+import org.ergoplatform.uexplorer.{BlockId, Const, Height, TxId}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder
@@ -18,6 +18,7 @@ import sttp.client3.*
 import sttp.client3.circe.*
 import io.circe.refined.*
 import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -36,7 +37,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   private val proxyUri                                    = uri"http://proxy"
   private val retryPolicy: Policy                         = retry.Backoff(3, 1.second)
 
-  def getBestBlockHeight: Future[Int] =
+  def getBestBlockHeight: Future[Height] =
     metadataHttpClient.getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
 
   def getUnconfirmedTxs: Future[ListMap[TxId, ApiTransaction]] =
@@ -101,8 +102,8 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
             .flatMap(b => getBestBlockOrBranch(b, block :: acc))
       }
 
-  def blockCachingFlow: Flow[Int, Inserted, NotUsed] =
-    Flow[Int]
+  def blockCachingFlow: Flow[Height, Inserted, NotUsed] =
+    Flow[Height]
       .mapAsync(1)(getBlockIdForHeight)
       .buffer(64, OverflowStrategy.backpressure)
       .mapAsync(1)(getBlockForId)

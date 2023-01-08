@@ -51,8 +51,8 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraOutputsWriter
   with CassandraBlockUpdater
   with CassandraEpochWriter
-  with JanusGraphWriter
   with CassandraEpochReader
+  with JanusGraphWriter
   with CassandraUtxoReader {
 
   def graphTraversalSource: GraphTraversalSource = janusGraph.traversal()
@@ -98,18 +98,6 @@ object CassandraBackend extends LazyLogging {
       .set("graph.set-vertex-id", true)
       .open()
       .asInstanceOf[StandardJanusGraph]
-
-    val mgmt = janusGraph.openManagement()
-    if (!mgmt.containsEdgeLabel("relatedTo")) {
-      logger.info("Creating Janus properties, indexes and labels")
-      mgmt.makeEdgeLabel("from").unidirected().multiplicity(Multiplicity.SIMPLE).make()
-      mgmt.makeEdgeLabel("to").multiplicity(Multiplicity.SIMPLE).make()
-      mgmt.makeEdgeLabel("relatedTo").multiplicity(Multiplicity.SIMPLE).make()
-      mgmt.makePropertyKey("height").dataType(classOf[Integer]).make()
-      mgmt.makePropertyKey("timestamp").dataType(classOf[java.lang.Long]).make()
-      mgmt.makePropertyKey("value").dataType(classOf[java.lang.Long]).make()
-      mgmt.commit()
-    }
 
     logger.info(s"Cassandra session and Janus graph created")
     val backend = new CassandraBackend(parallelism)

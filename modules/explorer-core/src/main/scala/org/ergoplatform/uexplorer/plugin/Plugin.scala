@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.plugin
 
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
+import org.ergoplatform.uexplorer.{Address, BoxId, TxId, Value}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -36,17 +36,17 @@ object Plugin {
 
   sealed trait UtxoStateLike {
     def addressByUtxo: Map[BoxId, Address]
-    def utxosByAddress: Map[Address, Map[BoxId, Long]]
+    def utxosByAddress: Map[Address, Map[BoxId, Value]]
   }
 
   case class UtxoStateWithoutPool(
     addressByUtxo: Map[BoxId, Address],
-    utxosByAddress: Map[Address, Map[BoxId, Long]]
+    utxosByAddress: Map[Address, Map[BoxId, Value]]
   ) extends UtxoStateLike
 
   case class UtxoStateWithPool(
     addressByUtxo: Map[BoxId, Address],
-    utxosByAddress: Map[Address, Map[BoxId, Long]]
+    utxosByAddress: Map[Address, Map[BoxId, Value]]
   ) extends UtxoStateLike
 
 }

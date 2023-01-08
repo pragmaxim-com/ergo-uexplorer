@@ -2,10 +2,10 @@ package org.ergoplatform.uexplorer.indexer.api
 
 import akka.NotUsed
 import akka.actor.typed.ActorSystem
-import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.{Flow, Source}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, TxId}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, EpochIndex, Height, TxId}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.chain.{ChainState, Epoch}
@@ -14,11 +14,13 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.config.{BackendType, CassandraDb, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
+import org.janusgraph.graphdb.database.StandardJanusGraph
+import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.compat.immutable.ArraySeq
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -26,17 +28,21 @@ import scala.util.Try
 
 trait Backend {
 
+  def janusGraph: StandardJanusGraph
+
+  def initGraph: Boolean
+
+  def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
+
+  def transactionBoxesByHeightFlow: Flow[Height, (Height, UtxoState.BoxesByTx), NotUsed]
+
   def graphTraversalSource: GraphTraversalSource
 
   def blockWriteFlow: Flow[Inserted, Block, NotUsed]
 
   def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
 
-  def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
-
-  def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState]
-
-  def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]]
+  def loadBlockInfoByEpochIndex: Future[TreeMap[EpochIndex, BufferedBlockInfo]]
 
   def close(): Future[Unit]
 }
@@ -54,12 +60,15 @@ object Backend {
 
 class InMemoryBackend extends Backend {
 
-  private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[Int, BufferedBlockInfo]()
+  private val lastBlockInfoByEpochIndex = new ConcurrentHashMap[EpochIndex, BufferedBlockInfo]()
 
-  private val boxesByHeight =
-    new ConcurrentHashMap[Int, ArraySeq[(Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]()
+  private val boxesByHeight  = new ConcurrentHashMap[Height, UtxoState.BoxesByTx]()
   private val blocksById     = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
-  private val blocksByHeight = new ConcurrentHashMap[Int, BufferedBlockInfo]()
+  private val blocksByHeight = new ConcurrentHashMap[Height, BufferedBlockInfo]()
+
+  def janusGraph: StandardJanusGraph = null
+
+  def initGraph: Boolean = false
 
   def close(): Future[Unit] = Future.successful(())
 
@@ -100,12 +109,10 @@ class InMemoryBackend extends Backend {
           tuple
       }
 
-  override def loadUtxoState(epochIndexes: Iterator[Int]): Future[UtxoState] =
-    Future(
-      UtxoState.empty.mergeBufferedBoxes(Some(epochIndexes.flatMap(Epoch.heightRangeForEpochIndex).toSeq))._2
-    )
+  def transactionBoxesByHeightFlow: Flow[Height, (Height, UtxoState.BoxesByTx), NotUsed] =
+    Flow[Height].map(height => height -> boxesByHeight.get(height))
 
-  def loadBlockInfoByEpochIndex: Future[TreeMap[Int, BufferedBlockInfo]] =
+  def loadBlockInfoByEpochIndex: Future[TreeMap[EpochIndex, BufferedBlockInfo]] =
     Future.successful(TreeMap(lastBlockInfoByEpochIndex.asScala.toSeq: _*))
 
 }

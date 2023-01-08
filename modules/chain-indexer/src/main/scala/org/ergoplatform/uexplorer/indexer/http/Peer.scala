@@ -1,7 +1,9 @@
 package org.ergoplatform.uexplorer.indexer.http
 
 import io.circe.{Decoder, HCursor}
+import org.ergoplatform.uexplorer.Height
 import org.ergoplatform.uexplorer.indexer.Utils
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import sttp.model.Uri
 
 import java.net.{URI, URL}
@@ -54,11 +56,11 @@ object Peer {
   implicit def ascWeightOrdering[P <: Peer]: Ordering[P] =
     Ordering.by[P, Int](_.weight)
 
-  def baseDecoder: Decoder[(StateType, AppVersion, Int)] = (c: HCursor) => {
+  def baseDecoder: Decoder[(StateType, AppVersion, Height)] = (c: HCursor) => {
     for {
       stateType  <- c.downField("stateType").as[StateType]
       appVersion <- c.downField("appVersion").as[AppVersion]
-      fullHeight <- c.downField("fullHeight").as[Option[Int]]
+      fullHeight <- c.downField("fullHeight").as[Option[Height]]
     } yield (appVersion, stateType, fullHeight.getOrElse(0))
   }
 

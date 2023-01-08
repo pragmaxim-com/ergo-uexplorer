@@ -1,7 +1,8 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import org.ergoplatform.uexplorer.{indexer, Address, BlockId, BoxId, Const}
+import org.ergoplatform.uexplorer.{indexer, Address, BlockId, BoxId, Const, EpochIndex, Height}
 import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
@@ -18,7 +19,7 @@ object Epoch {
     (height - 1) / Const.EpochLength
   }
 
-  def heightRangeForEpochIndex(index: Int): Seq[Int] = {
+  def heightRangeForEpochIndex(index: EpochIndex): Seq[Height] = {
     if (index < 0) throw new UnexpectedStateError("Negative epoch index is illegal")
     val epochStartHeight = index * Const.EpochLength + 1
     val epochEndHeight   = epochStartHeight + 1023
