@@ -18,18 +18,19 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool,
     graphTraversalSource: GraphTraversalSource
-  ): List[AlertMessage] =
-    Option(tx.outputs.iterator.map(_.value).sum)
+  ): List[AlertMessage] = {
+    val outputsWithoutPaybacks = tx.outputs.filterNot(o => tx.inputs.exists(_.boxId == o.boxId))
+    Option(outputsWithoutPaybacks.iterator.map(_.value).sum)
       .filter(_ >= txErgValueThreshold * Const.NanoOrder)
       .map { value =>
-        val inputAddresses = tx.inputs.iterator.map(_.boxId).flatMap(utxoStateWithPool.addressByUtxo.get).toSet
+        val inputAddresses = tx.inputs.iterator.map(_.boxId).flatMap(utxoStateWoPool.addressByUtxo.get).toSet
         val inputAddressesSum =
-          inputAddresses.flatMap(utxoStateWithPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
+          inputAddresses.flatMap(utxoStateWoPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
             acc + valueByBox.values.sum
           }
-        val outputAddresses = tx.outputs.iterator.map(_.address).toSet
+        val outputAddresses = outputsWithoutPaybacks.iterator.map(_.address).toSet
         val outputAddressesSum =
-          outputAddresses.flatMap(utxoStateWithPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
+          outputAddresses.flatMap(utxoStateWoPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
             acc + valueByBox.values.sum
           }
         val fmtValue              = valueFormat.format(value / Const.NanoOrder)
@@ -39,28 +40,14 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
       }
       .map(msg => s"https://explorer.ergoplatform.com/en/transactions/${tx.id} $msg")
       .toList
+  }
 
   def inspectNewBlock(
     newBlock: Block,
     utxoStateWoPool: UtxoStateWithoutPool,
     graphTraversalSource: GraphTraversalSource
-  ): List[AlertMessage] = {
-    val outputs = newBlock.outputs.collect { case o if o.address != Const.Genesis.Emission.address => o.address -> o.value }
-    Option(outputs.iterator.map(_._2).sum)
-      .filter(_ >= blockErgValueThreshold * Const.NanoOrder)
-      .map { value =>
-        val outputAddresses = outputs.iterator.map(_._1).toSet
-        val outputAddressesSum =
-          outputAddresses.flatMap(utxoStateWoPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
-            acc + valueByBox.values.sum
-          }
-        val fmtValue              = valueFormat.format(value / Const.NanoOrder)
-        val fmtOutputAddressesSum = valueFormat.format(outputAddressesSum / Const.NanoOrder)
-        s"$fmtValue Erg ===> ${outputAddresses.size} addresses with total of $fmtOutputAddressesSum Erg"
-      }
-      .map(msg => s"https://explorer.ergoplatform.com/en/blocks/${newBlock.header.id} $msg")
-      .toList
-  }
+  ): List[AlertMessage] = List.empty
+
 }
 
 object HighValueDetector {

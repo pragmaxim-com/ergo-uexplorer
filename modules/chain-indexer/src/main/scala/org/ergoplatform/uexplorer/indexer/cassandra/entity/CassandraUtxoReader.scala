@@ -61,7 +61,7 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
         .runFold(Map.empty[Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])]) { case (acc, r) =>
           val txId = TxId(r.getString(tx_id))
           val inputs =
-            if (txId == Const.Genesis.Emission.coinBaseTx) {
+            if (txId == Const.Genesis.Emission.tx) {
               ArraySeq((Const.Genesis.Emission.box, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs))
             } else if (txId == Const.Genesis.Foundation.tx) {
               ArraySeq(

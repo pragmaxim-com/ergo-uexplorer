@@ -27,7 +27,7 @@ class AlertPlugin extends Plugin {
   private val discord: Future[Discord] = Discord.fromEnv
 
   private lazy val detectors = List(
-    new HighValueDetector(200 * 1000, 500 * 1000)
+    new HighValueDetector(3 * 1000, 10 * 1000)
   )
 
   def name: String = "Alert Plugin"

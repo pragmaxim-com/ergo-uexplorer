@@ -113,15 +113,17 @@ case class UtxoState(
     val newBoxesByHeightBuffer = boxesByHeightBuffer.updated(
       bestBlock.header.height,
       bestBlock.transactions.transactions.map { tx =>
-        val inputs = tx.inputs.map {
-          case i if i.boxId == Const.Genesis.Emission.box =>
-            (i.boxId, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs)
-          case i if i.boxId == Const.Genesis.NoPremine.box =>
-            (i.boxId, Const.Genesis.NoPremine.address, Const.Genesis.NoPremine.initialNanoErgs)
-          case i if i.boxId == Const.Genesis.Foundation.box =>
-            (i.boxId, Const.Genesis.Foundation.address, Const.Genesis.Foundation.initialNanoErgs)
-          case i => getInput(i.boxId, bestBlock.header.id, newInputsByHeight)
-        }
+        val inputs =
+          tx match {
+            case tx if tx.id == Const.Genesis.Emission.tx =>
+              ArraySeq((Const.Genesis.Emission.box, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs))
+            case tx if tx.id == Const.Genesis.Foundation.tx =>
+              ArraySeq(
+                (Const.Genesis.Foundation.box, Const.Genesis.Foundation.address, Const.Genesis.Foundation.initialNanoErgs)
+              )
+            case tx =>
+              tx.inputs.map(i => getInput(i.boxId, bestBlock.header.id, newInputsByHeight))
+          }
         Tx(tx.id, bestBlock.header.height, bestBlock.header.timestamp) -> (inputs, tx.outputs.map(o =>
           (o.boxId, o.address, o.value)
         ))
