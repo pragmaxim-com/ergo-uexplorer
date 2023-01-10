@@ -19,8 +19,9 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
     utxoStateWithPool: UtxoStateWithPool,
     graphTraversalSource: GraphTraversalSource
   ): List[AlertMessage] = {
-    val outputsWithoutPaybacks = tx.outputs.filterNot(o => tx.inputs.exists(_.boxId == o.boxId))
-    Option(outputsWithoutPaybacks.iterator.map(_.value).sum)
+    val outputsWithoutPaybacksAndFees =
+      tx.outputs.filterNot(o => tx.inputs.exists(_.boxId == o.boxId) || o.address == Const.FeeContract.address)
+    Option(outputsWithoutPaybacksAndFees.iterator.map(_.value).sum)
       .filter(_ >= txErgValueThreshold * Const.NanoOrder)
       .map { value =>
         val inputAddresses = tx.inputs.iterator.map(_.boxId).flatMap(utxoStateWoPool.addressByUtxo.get).toSet
@@ -28,7 +29,7 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
           inputAddresses.flatMap(utxoStateWoPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
             acc + valueByBox.values.sum
           }
-        val outputAddresses = outputsWithoutPaybacks.iterator.map(_.address).toSet
+        val outputAddresses = outputsWithoutPaybacksAndFees.iterator.map(_.address).toSet
         val outputAddressesSum =
           outputAddresses.flatMap(utxoStateWoPool.utxosByAddress.get).foldLeft(0L) { case (acc, valueByBox) =>
             acc + valueByBox.values.sum
