@@ -30,11 +30,12 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
           .setString(header_id,                   output.headerId)
           .setString(box_id,                      output.boxId.unwrapped)
           .setString(tx_id,                       output.txId.unwrapped)
+          .setShort(tx_idx,                       output.txIndex)
           .setLong(value,                         output.value)
           .setString(address,                     output.address)
           .setInt(creation_height,                output.creationHeight)
           .setInt(settlement_height,              output.settlementHeight)
-          .setInt(idx,                            output.index)
+          .setShort(idx,                            output.index)
           .setLong(global_index,                  output.globalIndex)
           .setString(ergo_tree,                   output.ergoTree)
           .setString(ergo_tree_template_hash,     output.ergoTreeTemplateHash)
@@ -50,6 +51,7 @@ object Outputs {
 
   protected[cassandra] val box_id                  = "box_id"
   protected[cassandra] val tx_id                   = "tx_id"
+  protected[cassandra] val tx_idx                  = "tx_idx"
   protected[cassandra] val header_id               = "header_id"
   protected[cassandra] val value                   = "value"
   protected[cassandra] val creation_height         = "creation_height"
@@ -65,6 +67,7 @@ object Outputs {
   protected[cassandra] val columns = Seq(
     box_id,
     tx_id,
+    tx_idx,
     header_id,
     value,
     creation_height,

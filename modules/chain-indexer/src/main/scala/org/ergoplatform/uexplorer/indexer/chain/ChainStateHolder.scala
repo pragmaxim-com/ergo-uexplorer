@@ -16,7 +16,7 @@ import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.collection.mutable
@@ -56,6 +56,9 @@ class ChainStateHolder(implicit protocol: ProtocolSettings) extends LazyLogging 
       case InsertWinningFork(fork, replyTo) =>
         s.insertWinningFork(fork) match {
           case Success((winningForkInserted, newChainState)) =>
+            logger.info(
+              s"Winning fork inserted at heights ${winningForkInserted.newFork.map(_.header.height).mkString(", ")}"
+            )
             replyTo ! StatusReply.success(winningForkInserted)
             initialized(newChainState)
           case Failure(ex) =>
@@ -128,7 +131,7 @@ object ChainStateHolder extends LazyLogging {
 
   case class NewEpochDetected(
     epoch: Epoch,
-    txBoxesByHeight: TreeMap[Height, Iterable[(Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)]))]]
+    txBoxesByHeight: TreeMap[Height, BoxesByTx]
   ) extends MaybeNewEpoch {
 
     override def toString: String =

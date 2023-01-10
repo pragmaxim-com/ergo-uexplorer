@@ -33,7 +33,7 @@ trait CassandraTransactionsWriter extends LazyLogging { this: CassandraBackend =
           .setBoolean(coinbase,     tx.isCoinbase)
           .setLong(timestamp,       tx.timestamp)
           .setInt(size,             tx.size)
-          .setInt(idx,              tx.index)
+          .setShort(idx,            tx.index)
           .setLong(global_index,    tx.globalIndex)
           .setBoolean(main_chain,   tx.mainChain)
         // format: on

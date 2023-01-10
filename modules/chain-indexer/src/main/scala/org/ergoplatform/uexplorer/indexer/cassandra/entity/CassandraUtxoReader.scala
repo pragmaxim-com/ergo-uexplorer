@@ -12,7 +12,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.{MapPimp, MutableMapPimp, UnexpectedStateError}
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
-import org.ergoplatform.uexplorer.{db, indexer, Address, BlockId, BoxId, Const, Height, TxId}
+import org.ergoplatform.uexplorer.{db, indexer, Address, BlockId, BoxId, Const, Height, TxId, TxIndex}
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.jdk.FutureConverters.*
@@ -58,27 +58,38 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
       Source
         .fromPublisher(cqlSession.executeReactive(outputsSelectWhereHeader.bind(headerId)))
         .buffer(Const.EpochLength * 2, OverflowStrategy.backpressure)
-        .runFold(Map.empty[Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])]) { case (acc, r) =>
-          val txId = TxId(r.getString(tx_id))
-          val inputs =
-            if (txId == Const.Genesis.Emission.tx) {
-              ArraySeq((Const.Genesis.Emission.box, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs))
-            } else if (txId == Const.Genesis.Foundation.tx) {
-              ArraySeq(
-                (Const.Genesis.Foundation.box, Const.Genesis.Foundation.address, Const.Genesis.Foundation.initialNanoErgs)
-              )
-            } else {
-              inputsByTxId
-                .getOrElse(
-                  txId,
-                  throw new IllegalStateException(s"Tx $txId from height $height and header $headerId not found")
-                )
-            }
+        .runFold(Map.empty[(TxId, TxIndex), ArraySeq[(BoxId, Address, Long)]]) { case (acc, r) =>
           val outputs = (BoxId(r.getString(box_id)), Address.fromStringUnsafe(r.getString(address)), r.getLong(value))
-          acc.adjust(Tx(txId, height, timestamp)) {
-            case None => inputs -> ArraySeq(outputs)
-            case Some((ins, outs)) =>
-              (ins, outs :+ outputs)
+          acc.adjust(TxId(r.getString(tx_id)) -> r.getShort(tx_idx)) {
+            case None =>
+              ArraySeq(outputs)
+            case Some(outs) =>
+              outs :+ outputs
+          }
+        }
+        .map { outputsByTx =>
+          outputsByTx.toSeq.sortBy(_._1._2).map { case ((txId, txIndex), outputs) =>
+            val inputs =
+              if (txId == Const.Genesis.Emission.tx) {
+                ArraySeq(
+                  (Const.Genesis.Emission.box, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs)
+                )
+              } else if (txId == Const.Genesis.Foundation.tx) {
+                ArraySeq(
+                  (
+                    Const.Genesis.Foundation.box,
+                    Const.Genesis.Foundation.address,
+                    Const.Genesis.Foundation.initialNanoErgs
+                  )
+                )
+              } else {
+                inputsByTxId
+                  .getOrElse(
+                    txId,
+                    throw new IllegalStateException(s"Tx $txId from height $height and header $headerId not found")
+                  )
+              }
+            (Tx(txId, txIndex, height, timestamp), (inputs, outputs))
           }
         }
     }
@@ -116,10 +127,10 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
         case (height, None) =>
           Future.failed(new UnexpectedStateError(s"There is no header for height $height"))
         case (height, Some((headerId, timestamp))) =>
-          for {
-            inputs    <- getInputs(headerId)
-            boxesByTx <- getBoxesByTx(inputs, headerId, height, timestamp)
-          } yield (height, boxesByTx)
+          getInputs(headerId).map(inputs => (inputs, headerId, height, timestamp))
+      }
+      .mapAsync(8) { case (inputs, headerId, height, timestamp) =>
+        getBoxesByTx(inputs, headerId, height, timestamp).map(boxesByTx => height -> boxesByTx)
       }
       .buffer(32, OverflowStrategy.backpressure)
 
@@ -138,7 +149,7 @@ object CassandraUtxoReader extends CassandraPersistenceSupport {
   protected[cassandra] def outputsSelectStatement: SimpleStatement =
     QueryBuilder
       .selectFrom(indexer.Const.CassandraKeyspace, Outputs.node_outputs_table)
-      .columns(Outputs.tx_id, Outputs.box_id, Outputs.address, Outputs.value)
+      .columns(Outputs.tx_id, Outputs.tx_idx, Outputs.box_id, Outputs.address, Outputs.value)
       .whereColumn(Outputs.header_id)
       .isEqualTo(QueryBuilder.bindMarker(Outputs.header_id))
       .build()

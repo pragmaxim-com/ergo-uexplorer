@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_transactions
     coinbase         BOOLEAN,
     timestamp        BIGINT,
     size             INT,
-    idx              INT,
+    idx              SMALLINT,
     global_index     BIGINT,
     main_chain       BOOLEAN,
     PRIMARY KEY ((header_id), tx_id)
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_inputs
     tx_id       VARCHAR,
     proof_bytes VARCHAR,
     extension   VARCHAR,
-    idx         INT,
+    idx         SMALLINT,
     main_chain  BOOLEAN,
     PRIMARY KEY ((header_id), box_id)
 );
@@ -87,7 +87,8 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_outputs
     value                   BIGINT,
     creation_height         INT,
     settlement_height       INT,
-    idx                     INT,
+    idx                     SMALLINT,
+    tx_idx                  SMALLINT,
     global_index            BIGINT,
     ergo_tree               VARCHAR,
     ergo_tree_template_hash VARCHAR,

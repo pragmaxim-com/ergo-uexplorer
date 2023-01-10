@@ -11,7 +11,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, Value}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, TxIndex, Value}
 
 import java.io.*
 import java.nio.file.{Path, Paths}
@@ -40,14 +40,14 @@ case class UtxoState(
   ): UtxoState = {
     val (newAddressByUtxo, newUtxosByAddress) =
       boxes.foldLeft(addressByUtxo -> utxosByAddress) {
-        case ((addressByUtxoAcc, utxosByAddressAcc), (inputBoxIds, outputBoxIdsWithAddress)) =>
+        case ((addressByUtxoAcc, utxosByAddressAcc), (inputBoxes, outputBoxes)) =>
           val newOutputBoxIdsByAddress =
-            outputBoxIdsWithAddress
+            outputBoxes
               .foldLeft(utxosByAddressAcc) { case (acc, (boxId, address, value)) =>
                 acc.adjust(address)(_.fold(Map(boxId -> value))(_.updated(boxId, value)))
               }
           val newOutputBoxIdsByAddressWoInputs =
-            inputBoxIds
+            inputBoxes
               .groupBy(_._2)
               .view
               .mapValues(_.map(_._1))
@@ -58,7 +58,7 @@ case class UtxoState(
                 }
               }
           (
-            addressByUtxoAcc ++ outputBoxIdsWithAddress.iterator.map(o => o._1 -> o._2) -- inputBoxIds.iterator.map(_._1),
+            addressByUtxoAcc ++ outputBoxes.iterator.map(o => o._1 -> o._2) -- inputBoxes.iterator.map(_._1),
             newOutputBoxIdsByAddressWoInputs
           )
       }
@@ -112,7 +112,7 @@ case class UtxoState(
     )
     val newBoxesByHeightBuffer = boxesByHeightBuffer.updated(
       bestBlock.header.height,
-      bestBlock.transactions.transactions.map { tx =>
+      bestBlock.transactions.transactions.zipWithIndex.map { case (tx, txIndex) =>
         val inputs =
           tx match {
             case tx if tx.id == Const.Genesis.Emission.tx =>
@@ -124,7 +124,7 @@ case class UtxoState(
             case tx =>
               tx.inputs.map(i => getInput(i.boxId, bestBlock.header.id, newInputsByHeight))
           }
-        Tx(tx.id, bestBlock.header.height, bestBlock.header.timestamp) -> (inputs, tx.outputs.map(o =>
+        Tx(tx.id, txIndex.toShort, bestBlock.header.height, bestBlock.header.timestamp) -> (inputs, tx.outputs.map(o =>
           (o.boxId, o.address, o.value)
         ))
       }
@@ -150,10 +150,11 @@ case class UtxoState(
     val newBoxesByHeightBuffer =
       newApiBlocks
         .map(b =>
-          b.header.height -> b.transactions.transactions
-            .map { tx =>
+          b.header.height -> b.transactions.transactions.zipWithIndex
+            .map { case (tx, txIndex) =>
               val inputs = tx.inputs.map(i => getInput(i.boxId, b.header.id, newInputsByHeight))
-              Tx(tx.id, b.header.height, b.header.timestamp) -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
+              Tx(tx.id, txIndex.toShort, b.header.height, b.header.timestamp) -> (inputs, tx.outputs
+                .map(o => (o.boxId, o.address, o.value)))
             }
         )
         .toMap
@@ -165,8 +166,8 @@ case class UtxoState(
 }
 
 object UtxoState extends LazyLogging {
-  case class Tx(id: TxId, height: Height, timestamp: Long)
-  type BoxesByTx     = Iterable[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
+  case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Long)
+  type BoxesByTx     = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
   type BoxesByHeight = TreeMap[Height, BoxesByTx]
   def empty: UtxoState = UtxoState(Map.empty, Map.empty, Map.empty, TreeMap.empty)
 }

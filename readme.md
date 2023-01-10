@@ -57,9 +57,12 @@ $ cd docker
 $ start-indexing.sh
 $ docker compose logs uexplorer-chain-indexer
 11:43:19 Initiating indexing of 816 epochs ...
-11:43:21 New epoch 0 created, utxo count: 1025, non-empty-address count: 122, persisted Epochs: 1[0], Blocks cache size (heights): 33[1 - 1538]
-11:43:22 New epoch 1 created, utxo count: 2049, non-empty-address count: 134, persisted Epochs: 2[0 - 1], Blocks cache size (heights): 33[1025 - 2562]
-11:43:23 New epoch 2 created, utxo count: 3073, non-empty-address count: 235, persisted Epochs: 3[0 - 2], Blocks cache size (heights): 33[2049 - 3586]
+11:43:21 New epoch 0 detected, utxo count: 1025, non-empty-address count: 122, persisted Epochs: 1[0], blocks cache size (heights): 33[1 - 1538]
+11:43:22 New epoch 1 detected, utxo count: 2049, non-empty-address count: 134, persisted Epochs: 2[0 - 1], blocks cache size (heights): 33[1025 - 2562]
+11:43:23 New epoch 2 detected, utxo count: 3073, non-empty-address count: 235, persisted Epochs: 3[0 - 2], blocks cache size (heights): 33[2049 - 3586]
+...
+12:37:11 New epoch 815 detected, utxo count: 1878724, non-empty-address count: 158786, persisted Epochs: 816[0 - 815], blocks cache size (heights): 32[835585 - 835616]
+12:37:45 New epoch 816 detected, utxo count: 1886283, non-empty-address count: 159562, persisted Epochs: 817[0 - 816], blocks cache size (heights): 32[836609 - 836640]
 
 $ start-querying.sh
 ```

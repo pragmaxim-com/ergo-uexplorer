@@ -102,18 +102,19 @@ final case class Input(
   headerId: BlockId,
   proofBytes: Option[HexString], // serialized and hex-encoded cryptographic proof
   extension: Json, // arbitrary key-value dictionary
-  index: Int, // index  of the input in the transaction
+  index: Short, // index  of the input in the transaction
   mainChain: Boolean // chain status, `true` if this input resides in main chain.
 )
 
 final case class Output(
   boxId: BoxId,
   txId: TxId,
+  txIndex: Short, // index of the wrapping tx within a block
   headerId: BlockId,
   value: Long, // amount of nanoERG in thee corresponding box
   creationHeight: Int, // the height this output was created
   settlementHeight: Int, // the height this output got fixed in blockchain
-  index: Int, // index of the output in the transaction
+  index: Short, // index of the output in the transaction
   globalIndex: Long,
   ergoTree: HexString, // serialized and hex-encoded ErgoTree
   ergoTreeTemplateHash: ErgoTreeTemplateHash, // hash of serialized and hex-encoded ErgoTree template
@@ -139,7 +140,7 @@ final case class Transaction(
   isCoinbase: Boolean,
   timestamp: Long, // approx time output appeared in the blockchain
   size: Int, // transaction size in bytes
-  index: Int, // index of a transaction inside a block
+  index: Short, // index of a transaction inside a block
   globalIndex: Long,
   mainChain: Boolean
 ) {

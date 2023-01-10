@@ -31,7 +31,7 @@ trait CassandraInputsWriter { this: CassandraBackend =>
             .setString(box_id,        input.boxId.unwrapped)
             .setString(tx_id,         input.txId.unwrapped)
             .setString(extension,     input.extension.noSpaces)
-            .setInt(idx,              input.index)
+            .setShort(idx,            input.index)
             .setBoolean(main_chain,   input.mainChain)
             // format: on
         input.proofBytes match {

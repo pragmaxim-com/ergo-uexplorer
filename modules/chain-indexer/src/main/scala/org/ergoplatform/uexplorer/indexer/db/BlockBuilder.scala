@@ -70,7 +70,7 @@ object BlockBuilder {
         apiTransactions.transactions.zipWithIndex
           .map { case (tx, i) =>
             val globalIndex = lastTxGlobalIndex + i + 1
-            Transaction(tx.id, headerId, height, isCoinbase = false, ts, tx.size, i, globalIndex, mainChain = false)
+            Transaction(tx.id, headerId, height, isCoinbase = false, ts, tx.size, i.toShort, globalIndex, mainChain = false)
           }
       val (init, coinbase) = txs.init -> txs.lastOption
       init ++ coinbase.map(_.copy(isCoinbase = true))
@@ -84,7 +84,7 @@ object BlockBuilder {
             apiTransactions.headerId,
             i.spendingProof.proofBytes,
             i.spendingProof.extension,
-            index,
+            index.toShort,
             mainChain = false
           )
         }
@@ -110,17 +110,18 @@ object BlockBuilder {
             .map { case (o, oix) => ((o, tx.id), oix, tix) }
         }
         .sortBy { case (_, oix, tix) => (tix, oix) }
-        .map { case ((o, txId), oix, _) => (o, oix, txId) }
+        .map { case ((o, txId), oix, tix) => (o, oix, txId, tix) }
         .zipWithIndex
-        .map { case ((o, outIndex, txId), blockIndex) =>
+        .map { case ((o, outIndex, txId, tix), blockIndex) =>
           Output(
             o.boxId,
             txId,
+            tix.toShort,
             apiTransactions.headerId,
             o.value,
             o.creationHeight,
             header.height,
-            outIndex,
+            outIndex.toShort,
             lastOutputGlobalIndex + blockIndex + 1,
             o.ergoTree,
             o.scriptTemplateHash,

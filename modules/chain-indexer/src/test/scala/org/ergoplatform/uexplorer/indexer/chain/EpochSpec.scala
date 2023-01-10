@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.indexer.{TestSupport, UnexpectedStateError}
-import org.ergoplatform.uexplorer.{BlockId, HexString}
+import org.ergoplatform.uexplorer.{BlockId, Height, HexString}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 

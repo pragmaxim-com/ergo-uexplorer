@@ -96,6 +96,7 @@ trait EpochPersistenceSupport {
   protected[cassandra] val epoch_index    = "epoch_index"
   protected[cassandra] val last_header_id = "last_header_id"
   protected[cassandra] val tx_id          = "tx_id"
+  protected[cassandra] val tx_idx         = "tx_idx"
   protected[cassandra] val box_id         = "box_id"
   protected[cassandra] val address        = "address"
   protected[cassandra] val value          = "value"
