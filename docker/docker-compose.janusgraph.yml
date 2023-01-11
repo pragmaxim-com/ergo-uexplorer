@@ -1,0 +1,27 @@
+version: '3'
+
+name: uexplorer
+
+services:
+  janusgraph:
+    image: docker.io/janusgraph/janusgraph:1.0.0-rc1
+    container_name: janusgraph
+    restart: "on-failure"
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - backend
+    ports:
+      - "8182:8182"
+    environment:
+      JANUS_PROPS_TEMPLATE: cql
+      janusgraph.storage.hostname: cassandra
+      janusgraph.storage.batch-loading: true
+      janusgraph.storage.transactions: false
+      janusgraph.graph.set-vertex-id: true
+    healthcheck:
+      test: [ "CMD", "bin/gremlin.sh", "-e", "scripts/remote-connect.groovy" ]
+      interval: 10s
+      timeout: 30s
+      retries: 3

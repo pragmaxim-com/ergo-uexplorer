@@ -41,9 +41,11 @@ $ docker build . -t pragmaxim/uexplorer-chain-indexer:latest
   ├── schema-indexes.cql            # db indexes applied at start-querying.sh phase
   ├── ergo.conf                     # expects global env variable SCOREX_REST_API_KEY_HASH
   ├── chain-indexer.conf            # no need to change anything
-  ├── docker-compose.yml            # base for minimal indexing with locally running Ergo Node
+  ├── docker-compose.cassandra.yml  # base docker-compose, nothing runs without cassandra
+  ├── docker-compose.indexer.yml    # base for minimal indexing with locally running Ergo Node
   ├── docker-compose.node.yml       # apply to base for running also Ergo Node
-  ├── docker-compose.stargate.yml   # apply to base for applying indexes and graphql querying
+  ├── docker-compose.stargate.yml   # apply to base for graphql querying
+  ├── docker-compose.janusgraph.yml # apply to base for using apps like gremlin console or IDEs that interact with Janusgraph
   ├── start-indexing.sh             # starts indexing, feel free to start up services individually
   ├── start-querying.sh             # applies indexes and starts stargate for graphql querying
   ├── stop-all.sh                   # safely stops everything running

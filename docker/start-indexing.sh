@@ -39,15 +39,15 @@ while true; do
 done
 
 while true; do
-    read -p "Do you want to create Ergo Node docker container? " yn
+    read -p "Do you want to create Ergo Node and chain indexer docker containers? " yn
     case $yn in
         [Yy]* )
           echo "Starting Ergo node, cassandra, stargate and uexplorer..."
-          docker compose -f docker-compose.yml -f docker-compose.node.yml up -d --no-recreate
+          docker compose -f docker-compose.cassandra.yml -f docker-compose.node.yml -f docker-compose.indexer.yml up -d --no-recreate
           break;;
         [Nn]* )
-          echo "Starting cassandra, stargate and uexplorer..."
-          docker compose up -d --no-recreate
+          echo "Starting cassandra..."
+          docker compose -f docker-compose.cassandra.yml up -d --no-recreate
           break;;
         * ) echo "y/n ?";;
     esac

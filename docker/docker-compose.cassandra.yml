@@ -1,0 +1,47 @@
+version: '3'
+
+name: uexplorer
+
+volumes:
+  cassandra-volume:
+
+services:
+  cassandra:
+    image: cassandra:4.1
+    container_name: cassandra
+    restart: "on-failure"
+    networks:
+      - backend
+    ports:
+      - 127.0.0.1:9044:9042
+    oom_kill_disable: true
+    ulimits:
+      memlock: -1
+    volumes:
+      - cassandra-volume:/var/lib/cassandra
+    environment:
+      - HEAP_NEWSIZE=${CASSANDRA_HEAP_NEWSIZE:-1G}
+      - MAX_HEAP_SIZE=${CASSANDRA_MAX_HEAP_SIZE:-4G}
+      - CASSANDRA_CLUSTER_NAME=ergo-cluster
+    healthcheck:
+      test: cqlsh -e "describe keyspaces" || exit 1
+      interval: 5s
+      timeout: 5s
+      start_period: 90s
+      retries: 18
+  cassandra-init-tables:
+    image: cassandra:4.1
+    container_name: cassandra-init-tables
+    restart: "no"
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - backend
+    volumes:
+      - ./schema-tables.cql:/schema-tables.cql
+    environment:
+      - CQLSH_HOST=cassandra
+    command: /bin/bash -c "echo loading cassandra keyspace && cqlsh -f /schema-tables.cql"
+networks:
+  backend:
