@@ -58,8 +58,9 @@ class ChainLoader(
             ChainState.empty
           }
         case blockInfoByEpochIndex =>
+          val graphEmpty = backend.initGraph
           val txBoxesByEpochSource =
-            if (backend.initGraph) {
+            if (graphEmpty) {
               logger.info(s"Graph is empty, loading from database")
               Source
                 .fromIterator(() => blockInfoByEpochIndex.keysIterator)
@@ -86,7 +87,11 @@ class ChainLoader(
             }
           val utxoStateF =
             if (snapshotManager.latestSerializedSnapshot.exists(_.epochIndex == blockInfoByEpochIndex.lastKey)) {
-              txBoxesByEpochSource.run().flatMap { _ =>
+              if (graphEmpty) {
+                txBoxesByEpochSource.run().flatMap { _ =>
+                  snapshotManager.getLatestSnapshotByIndex.map(_.get.utxoState)
+                }
+              } else {
                 snapshotManager.getLatestSnapshotByIndex.map(_.get.utxoState)
               }
             } else {

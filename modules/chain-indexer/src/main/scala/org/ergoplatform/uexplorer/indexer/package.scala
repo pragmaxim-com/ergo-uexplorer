@@ -41,8 +41,11 @@ package object indexer {
 
   object Utils {
 
+    def vertexHash(address: String, g: StandardJanusGraph): Long =
+      g.getIDManager.toVertexId(Math.abs(MurmurHash2.hash64(address)) / 1000)
+
     def vertexHash(address: String)(implicit tx: StandardJanusGraphTx): Long =
-      tx.getGraph.getIDManager.toVertexId(Math.abs(MurmurHash2.hash64(address)) / 1000)
+      vertexHash(address, tx.getGraph)
 
     def copyUri(origUri: Uri, newUri: Uri): Uri =
       newUri.copy(
