@@ -66,6 +66,7 @@ class ChainIndexer(
           Future.successful(block -> Option.empty)
       }
       .buffer(Const.EpochLength, OverflowStrategy.backpressure)
+      .async
       .via(backend.graphWriteFlow)
       .via(backend.epochsWriteFlow)
       .via(killSwitch.flow)

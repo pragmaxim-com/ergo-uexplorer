@@ -38,7 +38,7 @@ trait CassandraInputsWriter { this: CassandraBackend =>
           case Some(proofBytes) =>
             partialStatement.setString(proof_bytes, proofBytes)
           case None =>
-            partialStatement.setToNull(proof_bytes)
+            partialStatement // .setToNull(proof_bytes)  // this would create a cassandra tombstone
         }
       }
   }

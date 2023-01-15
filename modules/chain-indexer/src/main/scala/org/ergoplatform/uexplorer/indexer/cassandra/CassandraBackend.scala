@@ -93,8 +93,6 @@ object CassandraBackend extends LazyLogging {
     implicit val janusGraph = JanusGraphFactory.build
       .set("storage.backend", "cql")
       .set("storage.hostname", datastaxDriverConf.getStringList("basic.contact-points").get(0))
-      .set("storage.transactions", false)
-      .set("storage.batch-loading", true)
       .set("graph.set-vertex-id", true)
       .open()
       .asInstanceOf[StandardJanusGraph]

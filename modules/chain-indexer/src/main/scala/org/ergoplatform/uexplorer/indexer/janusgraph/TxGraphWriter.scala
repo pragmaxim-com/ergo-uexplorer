@@ -1,43 +1,36 @@
 package org.ergoplatform.uexplorer.indexer.janusgraph
 
-import com.typesafe.scalalogging.LazyLogging
-import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
-import org.ergoplatform.uexplorer.indexer.Utils
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
-import org.ergoplatform.uexplorer.{Address, BoxId, Const, Height, TxId}
-import org.janusgraph.graphdb.database.StandardJanusGraph
-import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
-import eu.timepit.refined.auto.autoUnwrap
-import Const.*
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
+import com.typesafe.scalalogging.LazyLogging
+import eu.timepit.refined.auto.autoUnwrap
+import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
+import org.ergoplatform.uexplorer.Const.*
+import org.ergoplatform.uexplorer.indexer.Utils
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
+import org.ergoplatform.uexplorer.*
+import org.janusgraph.graphdb.database.StandardJanusGraph
+import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 
-import scala.jdk.CollectionConverters.*
 import scala.collection.immutable.ArraySeq
+import scala.jdk.CollectionConverters.*
 
-class TxGraphWriter(implicit g: StandardJanusGraphTx) extends LazyLogging {
+object TxGraphWriter extends LazyLogging {
 
   private val blackListBoxes = Set(Genesis.Emission.box, Genesis.NoPremine.box, Genesis.Foundation.box)
 
   private val blackListAddresses =
     Set(FeeContract.address, Genesis.Emission.address, Genesis.NoPremine.address, Genesis.Foundation.address)
 
-  val graphTxWriteFlow: Flow[(Height, UtxoState.BoxesByTx), (Height, UtxoState.BoxesByTx), NotUsed] =
-    Flow.fromFunction[(Height, UtxoState.BoxesByTx), (Height, UtxoState.BoxesByTx)] { case (height, boxesByTx) =>
-      boxesByTx.foreach { case (tx, (inputs, outputs)) => writeGraph(tx, height, inputs, outputs) }
-      (height, boxesByTx)
-    }
-
-  def commit(): Unit = g.commit()
-
-  private def writeGraph(
+  def writeGraph(
     tx: Tx,
     height: Int,
     inputs: ArraySeq[(BoxId, Address, Long)],
     outputs: ArraySeq[(BoxId, Address, Long)]
-  ): Unit = {
-    val newTxVertex = g.addVertex(T.id, Utils.vertexHash(tx.id.unwrapped))
+  )(g: StandardJanusGraph): Unit = {
+    val newTxVertex = g.addVertex(T.id, Utils.vertexHash(tx.id.unwrapped, g), T.label, "txId")
+    newTxVertex.property("txId", tx.id)
     newTxVertex.property("height", tx.height)
     newTxVertex.property("timestamp", tx.timestamp)
     val inputsByAddress =
@@ -50,7 +43,7 @@ class TxGraphWriter(implicit g: StandardJanusGraphTx) extends LazyLogging {
 
     inputsByAddress
       .map { case (address, valueByBoxId) =>
-        val inputAddressVertexIt = g.vertices(Utils.vertexHash(address))
+        val inputAddressVertexIt = g.vertices(Utils.vertexHash(address, g))
         if (!inputAddressVertexIt.hasNext) {
           logger.error(s"inputAddress $address from height $height lacks corresponding vertex")
         }
@@ -71,22 +64,18 @@ class TxGraphWriter(implicit g: StandardJanusGraphTx) extends LazyLogging {
       .view
       .mapValues(_.map(t => t._1 -> t._3))
       .map { case (address, valueByBox) =>
-        val outputAddressVertexIt = g.vertices(Utils.vertexHash(address))
+        val outputAddressVertexIt = g.vertices(Utils.vertexHash(address, g))
         if (outputAddressVertexIt.hasNext) {
           outputAddressVertexIt.next() -> valueByBox
         } else {
-          g.addVertex(T.id, Utils.vertexHash(address)) -> valueByBox
+          val newOutputAddressVertex = g.addVertex(T.id, Utils.vertexHash(address, g), T.label, "address")
+          newOutputAddressVertex.property("address", address)
+          newOutputAddressVertex -> valueByBox
         }
       }
       .foreach { case (outputAddressVertex, valueByBoxId) =>
         newTxVertex.addEdge("to", outputAddressVertex, "value", valueByBoxId.map(_._2).sum)
       }
   }
-}
 
-object TxGraphWriter {
-
-  def apply(janusGraph: StandardJanusGraph): TxGraphWriter = new TxGraphWriter()(
-    janusGraph.tx().createThreadedTx[StandardJanusGraphTx]()
-  )
 }

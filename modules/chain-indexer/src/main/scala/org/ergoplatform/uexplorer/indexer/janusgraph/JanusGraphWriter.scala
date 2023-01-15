@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.indexer.janusgraph
 
 import akka.NotUsed
+import akka.stream.ActorAttributes
 import akka.stream.scaladsl.{Flow, Source}
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.db.Block
@@ -25,14 +26,22 @@ trait JanusGraphWriter {
 
   def initGraph: Boolean = {
     val mgmt = janusGraph.openManagement()
-    if (!mgmt.containsEdgeLabel("relatedTo")) {
+    if (!mgmt.containsEdgeLabel("from")) {
       logger.info("Creating Janus properties, indexes and labels")
+      // tx -> address edges
       mgmt.makeEdgeLabel("from").unidirected().multiplicity(Multiplicity.SIMPLE).make()
       mgmt.makeEdgeLabel("to").multiplicity(Multiplicity.SIMPLE).make()
-      mgmt.makeEdgeLabel("relatedTo").multiplicity(Multiplicity.SIMPLE).make()
+      mgmt.makePropertyKey("value").dataType(classOf[java.lang.Long]).make()
+
+      // addresses
+      mgmt.makeVertexLabel("address").make()
+      mgmt.makePropertyKey("address").dataType(classOf[String]).make()
+
+      // transactions
+      mgmt.makeVertexLabel("txId").make()
+      mgmt.makePropertyKey("txId").dataType(classOf[String]).make()
       mgmt.makePropertyKey("height").dataType(classOf[Integer]).make()
       mgmt.makePropertyKey("timestamp").dataType(classOf[java.lang.Long]).make()
-      mgmt.makePropertyKey("value").dataType(classOf[java.lang.Long]).make()
       mgmt.commit()
       true
     } else {
@@ -43,20 +52,18 @@ trait JanusGraphWriter {
 
   def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(Block, Option[MaybeNewEpoch])]
-      .mapAsync(1) {
+      .map {
         case (b, s @ Some(NewEpochDetected(e, boxesByHeight))) =>
-          val txGraphWriter = TxGraphWriter(janusGraph)
-          Source
-            .fromIterator(() => boxesByHeight.iterator)
-            .via(
-              cpuHeavyBalanceFlow(txGraphWriter.graphTxWriteFlow, Runtime.getRuntime.availableProcessors() / 4)
-            )
-            .run()
-            .map { _ =>
-              txGraphWriter.commit()
-              logger.info(s"New epoch ${e.index} building finished")
-              b -> s
+          boxesByHeight.iterator
+            .foreach { case (height, boxesByTx) =>
+              boxesByTx.foreach { case (tx, (inputs, outputs)) =>
+                TxGraphWriter.writeGraph(tx, height, inputs, outputs)(janusGraph)
+              }
             }
-        case x => Future.successful(x)
+          janusGraph.tx().commit()
+          logger.info(s"New epoch ${e.index} building finished")
+          b -> s
+        case x => x
       }
+      .async(ActorAttributes.IODispatcher.dispatcher)
 }

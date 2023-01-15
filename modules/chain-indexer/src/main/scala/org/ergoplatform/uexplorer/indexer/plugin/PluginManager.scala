@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
 
-class PluginManager(plugins: List[Plugin]) {
+class PluginManager(plugins: List[Plugin]) extends LazyLogging {
 
   def close(): Future[Unit] = Future.sequence(plugins.map(_.close)).map(_ => ())
 
@@ -52,6 +52,10 @@ class PluginManager(plugins: List[Plugin]) {
               plugin.processNewBlock(newBlock, utxoStateWoPool, graphTraversalSource)
             }
             .run()
+        }
+        .recover { case ex: Throwable =>
+          logger.error("Plugin failure should not propagate upstream", ex)
+          Done
         }
     }
 

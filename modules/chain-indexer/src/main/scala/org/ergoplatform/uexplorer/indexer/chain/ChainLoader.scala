@@ -4,6 +4,7 @@ import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.pattern.StatusReply
+import akka.stream.ActorAttributes
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
@@ -65,18 +66,21 @@ class ChainLoader(
               Source
                 .fromIterator(() => blockInfoByEpochIndex.keysIterator)
                 .flatMapConcat { epochIndex =>
-                  val txGraphWriter = TxGraphWriter(backend.janusGraph)
                   Source(Epoch.heightRangeForEpochIndex(epochIndex))
                     .via(backend.transactionBoxesByHeightFlow)
-                    .via(
-                      cpuHeavyBalanceFlow(txGraphWriter.graphTxWriteFlow, Runtime.getRuntime.availableProcessors() / 4)
-                    )
                     .grouped(Const.EpochLength)
-                    .map { xs =>
-                      txGraphWriter.commit()
+                    .map { boxesByHeight =>
+                      boxesByHeight.iterator
+                        .foreach { case (height, boxesByTx) =>
+                          boxesByTx.foreach { case (tx, (inputs, outputs)) =>
+                            TxGraphWriter.writeGraph(tx, height, inputs, outputs)(backend.janusGraph)
+                          }
+                        }
+                      backend.janusGraph.tx().commit()
                       logger.info(s"Graph building of epoch $epochIndex finished")
-                      xs
+                      boxesByHeight
                     }
+                    .async(ActorAttributes.IODispatcher.dispatcher)
                 }
             } else {
               Source

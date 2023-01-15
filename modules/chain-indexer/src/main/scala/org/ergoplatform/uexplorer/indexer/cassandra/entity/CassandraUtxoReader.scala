@@ -53,7 +53,7 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
     headerId: String,
     height: Int,
     timestamp: Long
-  ) =
+  ): Future[UtxoState.BoxesByTx] =
     Future.fromTry(outputsSelectWhereHeaderTry).flatMap { outputsSelectWhereHeader =>
       Source
         .fromPublisher(cqlSession.executeReactive(outputsSelectWhereHeader.bind(headerId)))
@@ -129,6 +129,7 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
         case (height, Some((headerId, timestamp))) =>
           getInputs(headerId).map(inputs => (inputs, headerId, height, timestamp))
       }
+      .buffer(32, OverflowStrategy.backpressure)
       .mapAsync(8) { case (inputs, headerId, height, timestamp) =>
         getBoxesByTx(inputs, headerId, height, timestamp).map(boxesByTx => height -> boxesByTx)
       }
