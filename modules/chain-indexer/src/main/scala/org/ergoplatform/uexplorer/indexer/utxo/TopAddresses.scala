@@ -11,7 +11,7 @@ import scala.collection.immutable.ListMap
 case class TopAddresses(
   maximumSize: Int    = 100 * 1000,
   dropHeightDiff: Int = Const.EpochLength * 100,
-  dropBoxCount: Int   = 1000,
+  dropBoxCount: Int   = 2000,
   nodeMap: TopAddressMap
 ) {
 

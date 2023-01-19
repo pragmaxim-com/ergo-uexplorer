@@ -96,8 +96,8 @@ class ChainStateHolder(implicit protocol: ProtocolSettings) extends LazyLogging 
 
 object ChainStateHolder extends LazyLogging {
 
-  // this is important, if message is not returned in 10 seconds, then there is probably an inefficient operation that takes more than that
-  implicit private val timeout: Timeout = 10.seconds
+  // this is important, if message is not returned in 15 seconds, then there is probably an inefficient operation that takes more than that
+  implicit private val timeout: Timeout = 15.seconds
 
   /** REQUEST */
   sealed trait ChainStateHolderRequest
