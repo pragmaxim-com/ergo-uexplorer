@@ -1,24 +1,24 @@
 package org.ergoplatform.uexplorer.indexer.http
 
 import akka.{Done, NotUsed}
-import akka.actor.typed._
-import akka.stream.ActorAttributes
+import akka.actor.typed.*
+import akka.stream.{ActorAttributes, KillSwitches}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.{Resiliency, Utils}
-import org.ergoplatform.uexplorer.indexer.http.NodePool._
+import org.ergoplatform.uexplorer.indexer.http.NodePool.*
 import org.ergoplatform.uexplorer.indexer.http.SttpNodePoolBackend.swapUri
 import sttp.capabilities.Effect
-import sttp.client3._
+import sttp.client3.*
 import sttp.model.Uri
-import akka.actor.typed.scaladsl.AskPattern._
+import akka.actor.typed.scaladsl.AskPattern.*
 
 import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.util._
+import scala.util.*
 
 class SttpNodePoolBackend[P]()(implicit
   sys: ActorSystem[Nothing],
@@ -28,6 +28,7 @@ class SttpNodePoolBackend[P]()(implicit
   import SttpNodePoolBackend.fallbackQuery
 
   implicit private val timeout: Timeout = 5.seconds
+  private val killSwitch                = KillSwitches.shared("NodePool")
 
   override def close(): Future[Unit] = {
     nodePoolRef.tell(GracefulShutdown)
@@ -43,7 +44,7 @@ class SttpNodePoolBackend[P]()(implicit
   def keepNodePoolUpdated(metadataClient: MetadataHttpClient[_]): Future[NodePoolState] =
     updateNodePool(metadataClient)
       .andThen { case Success(_) =>
-        schedule(15.seconds, 30.seconds)(updateNodePool(metadataClient)).run()
+        schedule(15.seconds, 30.seconds, killSwitch)(updateNodePool(metadataClient)).run()
       }
 
   override def send[T, R >: P with Effect[Future]](origRequest: Request[T, R]): Future[Response[T]] = {

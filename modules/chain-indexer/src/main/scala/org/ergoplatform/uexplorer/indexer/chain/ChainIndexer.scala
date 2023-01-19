@@ -41,7 +41,7 @@ class ChainIndexer(
   snapshotManager: UtxoSnapshotManager
 )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest])
   extends LazyLogging {
-  private lazy val killSwitch = KillSwitches.shared("killswitch")
+  private lazy val killSwitch = KillSwitches.shared("indexer")
 
   CoordinatedShutdown(s).addTask(
     CoordinatedShutdown.PhaseBeforeServiceUnbind,
@@ -73,7 +73,7 @@ class ChainIndexer(
       .via(backend.graphWriteFlow)
       .via(backend.epochsWriteFlow)
       .via(killSwitch.flow)
-      .withAttributes(supervisionStrategy(Resiliency.decider(Option(killSwitch))))
+      .withAttributes(supervisionStrategy(Resiliency.decider(killSwitch)))
       .toMat(
         Sink
           .fold((Option.empty[Block], Option.empty[NewEpochDetected])) {

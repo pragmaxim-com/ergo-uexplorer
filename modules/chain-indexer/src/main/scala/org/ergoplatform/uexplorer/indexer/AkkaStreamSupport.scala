@@ -2,34 +2,31 @@ package org.ergoplatform.uexplorer.indexer
 
 import akka.NotUsed
 import akka.stream.scaladsl.{Balance, Flow, GraphDSL, Merge, RestartSource, Source}
-import akka.stream.{ActorAttributes, Attributes, FlowShape}
+import akka.stream.{ActorAttributes, Attributes, FlowShape, KillSwitch, SharedKillSwitch}
 
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 trait AkkaStreamSupport {
 
   def schedule[T](
     initialDelay: FiniteDuration,
-    interval: FiniteDuration
+    interval: FiniteDuration,
+    killSwitch: SharedKillSwitch
   )(run: => Future[T]): Source[T, NotUsed] =
-    restartSource {
-      Source
-        .tick(initialDelay, interval, ())
-        .mapAsync(1)(_ => run)
-        .withAttributes(
-          Attributes
-            .inputBuffer(0, 1)
-            .and(ActorAttributes.IODispatcher)
-        )
-    }
-
-  def restartSource[Out, Mat](source: Source[Out, Mat]): Source[Out, NotUsed] =
     RestartSource
       .withBackoff(Resiliency.restartSettings) { () =>
-        source
-          .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider()))
+        Source
+          .tick(initialDelay, interval, ())
+          .mapAsync(1)(_ => run)
+          .withAttributes(
+            Attributes
+              .inputBuffer(0, 1)
+              .and(ActorAttributes.IODispatcher)
+          )
       }
+      .via(killSwitch.flow)
+      .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider(killSwitch)))
 
   def heavyBalanceFlow[In, Out](
     worker: Flow[In, Out, Any],

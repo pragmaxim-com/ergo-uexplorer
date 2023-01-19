@@ -2,6 +2,7 @@ package org.ergoplatform.uexplorer.indexer
 
 import akka.Done
 import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.stream.KillSwitches
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
@@ -23,6 +24,8 @@ class Scheduler(
 )(implicit s: ActorSystem[Nothing], cRef: ActorRef[ChainStateHolderRequest], mRef: ActorRef[MempoolStateHolderRequest])
   extends AkkaStreamSupport {
 
+  private lazy val killSwitch = KillSwitches.shared("scheduler")
+
   def periodicSync: Future[(ChainState, MempoolStateChanges)] =
     for {
       ChainSyncResult(chainState, lastBlock, gts) <- chainIndexer.indexChain
@@ -39,7 +42,7 @@ class Scheduler(
       .initFromDbAndDisk(verify)
       .flatMap {
         case ChainValid(_) =>
-          schedule(initialDelay, pollingInterval)(periodicSync).run()
+          schedule(initialDelay, pollingInterval, killSwitch)(periodicSync).run()
         case missingEpochs: MissingEpochs =>
           chainIndexer
             .fixChain(missingEpochs)
