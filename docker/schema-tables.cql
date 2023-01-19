@@ -138,6 +138,20 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_epoch_last_headers
     PRIMARY KEY (epoch_index)
 );
 
+CREATE TABLE IF NOT EXISTS uexplorer.node_addresses
+(
+    address                 VARCHAR,
+    address_partition_idx   SMALLINT,
+    address_type            TINYINT,
+    address_description     VARCHAR,
+    timestamp               BIGINT,
+    tx_idx                  SMALLINT,
+    tx_id                   VARCHAR,
+    box_id                  VARCHAR,
+    value                   BIGINT,
+    PRIMARY KEY ((address, address_partition_idx), address_type, address_description, timestamp, tx_idx, tx_id, box_id)
+);
+
 /* height index on header table and box index on output table are needed for UtxoState construction, let's build it on the fly */
 
 CREATE INDEX IF NOT EXISTS "node_headers__height" ON uexplorer.node_headers (height);

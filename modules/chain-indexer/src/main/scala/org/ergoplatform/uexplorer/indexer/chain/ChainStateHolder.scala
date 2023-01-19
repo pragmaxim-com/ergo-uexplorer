@@ -15,10 +15,11 @@ import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.TopAddressMap
+import org.ergoplatform.uexplorer.indexer.utxo.{TopAddresses, UtxoState}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
 
-import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
+import scala.collection.immutable.{ArraySeq, ListMap, TreeMap, TreeSet}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -87,14 +88,15 @@ class ChainStateHolder(implicit protocol: ProtocolSettings) extends LazyLogging 
             replyTo ! StatusReply.error(ex)
             Behaviors.same
         }
-      case unexpected =>
-        logger.error(s"Message $unexpected unexpected")
-        Behaviors.same
+      case Initialize(newState, replyTo) =>
+        replyTo ! Done
+        initialized(newState)
     }
 }
 
 object ChainStateHolder extends LazyLogging {
 
+  // this is important, if message is not returned in 10 seconds, then there is probably an inefficient operation that takes more than that
   implicit private val timeout: Timeout = 10.seconds
 
   /** REQUEST */
@@ -131,7 +133,8 @@ object ChainStateHolder extends LazyLogging {
 
   case class NewEpochDetected(
     epoch: Epoch,
-    txBoxesByHeight: TreeMap[Height, BoxesByTx]
+    txBoxesByHeight: TreeMap[Height, BoxesByTx],
+    topAddresses: TopAddressMap
   ) extends MaybeNewEpoch {
 
     override def toString: String =

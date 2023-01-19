@@ -44,7 +44,7 @@ object CassandraEpochWriter extends EpochPersistenceSupport with LazyLogging {
 
   protected[cassandra] def epochLastHeadersInsertBinder
     : ((Block, Option[MaybeNewEpoch]), PreparedStatement) => ArraySeq[BoundStatement] = {
-    case ((_, Some(NewEpochDetected(epoch, _))), stmt) =>
+    case ((_, Some(NewEpochDetected(epoch, _, _))), stmt) =>
       ArraySeq(
         stmt
           .bind()

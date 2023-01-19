@@ -35,7 +35,7 @@ case class ChainState(
           val newEpoch = candidate.getEpoch
           Try(utxoState.mergeBufferedBoxes(Option(heightRange)))
             .map { case (boxesByHeight, newState) =>
-              NewEpochDetected(newEpoch, boxesByHeight) -> ChainState(
+              NewEpochDetected(newEpoch, boxesByHeight, newState.topAddresses.nodeMap) -> ChainState(
                 lastBlockIdInEpoch.updated(newEpoch.index, newEpoch.blockIds.last),
                 blockBuffer.flushEpoch(heightRange),
                 newState
@@ -149,6 +149,7 @@ case class ChainState(
       else xs.lastOption.filterNot(xs.headOption.contains).map(h => s" - $h]").getOrElse("]")
 
     s"utxo count: ${utxoState.addressByUtxo.size}, non-empty-address count: ${utxoState.utxosByAddress.size}, " +
+    s"active-address count: ${utxoState.topAddresses.nodeMap.size}, " +
     s"persisted Epochs: ${existingEpochs.size}${headStr(existingEpochs)}${lastStr(existingEpochs)}, " +
     s"blocks cache size (heights): ${cachedHeights.size}${headStr(cachedHeights)}${lastStr(cachedHeights)}"
   }

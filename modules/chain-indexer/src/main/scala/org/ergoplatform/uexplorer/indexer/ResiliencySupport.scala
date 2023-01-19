@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.indexer
 
-import akka.stream.{RestartSettings, Supervision}
+import akka.stream.{RestartSettings, SharedKillSwitch, Supervision}
 import com.typesafe.scalalogging.LazyLogging
 import retry.Policy
 import sttp.model.Uri
@@ -46,12 +46,14 @@ object Resiliency extends LazyLogging {
     randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
   ).withMaxRestarts(300, 60.minutes) // limits the amount of restarts to 20 within 5 minutes
 
-  val decider: Supervision.Decider = {
+  def decider(killSwitch: Option[SharedKillSwitch] = None): Supervision.Decider = {
     case ex: UnexpectedStateError =>
       logger.error("Stopping stream due to", ex)
+      killSwitch.foreach(_.shutdown())
       Supervision.stop
     case NonFatal(ex) =>
       logger.error("Stopping stream due to", ex)
+      killSwitch.foreach(_.shutdown())
       Supervision.stop
   }
 }

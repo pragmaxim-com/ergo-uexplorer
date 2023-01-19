@@ -1,7 +1,8 @@
 package org.ergoplatform.uexplorer.indexer.cassandra
 
 import akka.NotUsed
-import akka.stream.scaladsl.Flow
+import akka.actor.typed.ActorSystem
+import akka.stream.scaladsl.{Flow, Source}
 import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.cql.*
 
@@ -47,6 +48,50 @@ trait CassandraPersistenceSupport extends LazyLogging {
       )
       .mapMaterializedValue(_ => NotUsed)
 
+  protected[cassandra] def storePartitionedBatchFlow[T](
+    parallelism: Int,
+    maxBatchSize: Int,
+    batchType: BatchType = DefaultBatchType.LOGGED,
+    simpleStatement: SimpleStatement,
+    statementBinder: (T, PreparedStatement) => Source[ArraySeq[BoundStatement], NotUsed]
+  )(implicit cqlSession: CqlSession, system: ActorSystem[Nothing]): Flow[T, T, NotUsed] =
+    Flow
+      .lazyFutureFlow(() =>
+        cqlSession.prepareAsync(simpleStatement).asScala.map { preparedStatement =>
+          Flow[T]
+            .mapAsync(1) { element =>
+              statementBinder(element, preparedStatement) match {
+                case statements =>
+                  statements
+                    .mapAsyncUnordered(parallelism) {
+                      case batchStatement if batchStatement.isEmpty =>
+                        Future.successful(element)
+                      case batchStatement if batchStatement.length >= maxBatchSize =>
+                        Source
+                          .fromIterator(() => batchStatement.grouped(maxBatchSize))
+                          .mapAsync(1) { groupedStmnt =>
+                            cqlSession
+                              .executeAsync(BatchStatement.newInstance(batchType).addAll(groupedStmnt.asJava))
+                              .asScala
+                          }
+                          .run()
+                      case batchStatement if batchStatement.length == 1 =>
+                        cqlSession
+                          .executeAsync(batchStatement.head)
+                          .asScala
+                      case batchStatement =>
+                        cqlSession
+                          .executeAsync(BatchStatement.newInstance(batchType).addAll(batchStatement.asJava))
+                          .asScala
+                    }
+                    .run()
+                    .map(_ => element)
+              }
+            }
+        }
+      )
+      .mapMaterializedValue(_ => NotUsed)
+
   protected[cassandra] def storeBatchFlow[T](
     parallelism: Int,
     batchType: BatchType = DefaultBatchType.LOGGED,
@@ -61,10 +106,10 @@ trait CassandraPersistenceSupport extends LazyLogging {
               statementBinder(element, preparedStatement) match {
                 case statements if statements.isEmpty =>
                   Future.successful(element)
-                case statements if statements.length >= 10000 =>
+                case statements if statements.length >= 5000 =>
                   Future
                     .sequence(
-                      statements.grouped(10000).map { batchStatement =>
+                      statements.grouped(5000).map { batchStatement =>
                         cqlSession
                           .executeAsync(BatchStatement.newInstance(batchType).addAll(batchStatement.asJava))
                           .asScala
@@ -90,15 +135,34 @@ trait CassandraPersistenceSupport extends LazyLogging {
 
 trait EpochPersistenceSupport {
   protected[cassandra] val node_epoch_last_headers_table = "node_epoch_last_headers"
-  protected[cassandra] val node_epochs_inputs_table      = "node_epoch_inputs"
-  protected[cassandra] val node_epochs_outputs_table     = "node_epoch_outputs"
 
   protected[cassandra] val epoch_index    = "epoch_index"
   protected[cassandra] val last_header_id = "last_header_id"
-  protected[cassandra] val tx_id          = "tx_id"
-  protected[cassandra] val tx_idx         = "tx_idx"
-  protected[cassandra] val box_id         = "box_id"
-  protected[cassandra] val address        = "address"
-  protected[cassandra] val value          = "value"
+}
+
+trait AddressPersistenceSupport {
+  protected[cassandra] val node_addresses_table = "node_addresses"
+
+  protected[cassandra] val address               = "address"
+  protected[cassandra] val address_partition_idx = "address_partition_idx"
+  protected[cassandra] val address_type          = "address_type"
+  protected[cassandra] val address_description   = "address_description"
+  protected[cassandra] val timestamp             = "timestamp"
+  protected[cassandra] val tx_idx                = "tx_idx"
+  protected[cassandra] val tx_id                 = "tx_id"
+  protected[cassandra] val box_id                = "box_id"
+  protected[cassandra] val value                 = "value"
+
+  protected[cassandra] val addressColumns = Seq(
+    address,
+    address_partition_idx,
+    address_type,
+    address_description,
+    timestamp,
+    tx_idx,
+    tx_id,
+    box_id,
+    value
+  )
 
 }

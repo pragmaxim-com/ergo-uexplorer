@@ -65,16 +65,19 @@ class ChainIndexer(
         case block =>
           Future.successful(block -> Option.empty)
       }
-      .buffer(Const.EpochLength, OverflowStrategy.backpressure)
       .async
+      .buffer(2, OverflowStrategy.backpressure)
+      .via(backend.addressWriteFlow)
+      .async
+      .buffer(2, OverflowStrategy.backpressure)
       .via(backend.graphWriteFlow)
       .via(backend.epochsWriteFlow)
       .via(killSwitch.flow)
-      .withAttributes(supervisionStrategy(Resiliency.decider))
+      .withAttributes(supervisionStrategy(Resiliency.decider(Option(killSwitch))))
       .toMat(
         Sink
           .fold((Option.empty[Block], Option.empty[NewEpochDetected])) {
-            case (_, (block, Some(e @ NewEpochDetected(_, _)))) =>
+            case (_, (block, Some(e @ NewEpochDetected(_, _, _)))) =>
               Option(block) -> Option(e)
             case ((_, lastEpoch), (block, _)) =>
               Option(block) -> lastEpoch

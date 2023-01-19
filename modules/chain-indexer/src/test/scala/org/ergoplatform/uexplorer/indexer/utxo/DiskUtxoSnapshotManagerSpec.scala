@@ -40,7 +40,8 @@ class DiskUtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
       addressByUtxo,
       utxosByAddress,
       Map.empty,
-      TreeMap.empty
+      TreeMap.empty,
+      TopAddresses.empty
     )
     utxoSnapshotManager.saveSnapshot(UtxoSnapshot.Deserialized(1, utxoState)).flatMap { _ =>
       utxoSnapshotManager.getLatestSnapshotByIndex.map { snapshot =>

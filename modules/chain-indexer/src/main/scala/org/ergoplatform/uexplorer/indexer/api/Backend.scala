@@ -40,6 +40,8 @@ trait Backend {
 
   def blockWriteFlow: Flow[Inserted, Block, NotUsed]
 
+  def addressWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
+
   def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
 
   def loadBlockInfoByEpochIndex: Future[TreeMap[EpochIndex, BufferedBlockInfo]]
@@ -89,12 +91,15 @@ class InMemoryBackend extends Backend {
           winningFork
       }
 
+  def addressWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
+    Flow[(Block, Option[MaybeNewEpoch])].map(identity)
+
   override def epochsWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(Block, Option[MaybeNewEpoch])]
       .map {
-        case (block, Some(NewEpochDetected(epoch, boxesByTxId))) =>
+        case (block, Some(NewEpochDetected(epoch, boxesByTxId, topAddresses))) =>
           lastBlockInfoByEpochIndex.put(epoch.index, blocksById.get(epoch.blockIds.last))
-          block -> Some(NewEpochDetected(epoch, boxesByTxId))
+          block -> Some(NewEpochDetected(epoch, boxesByTxId, topAddresses))
         case tuple =>
           tuple
       }
@@ -102,9 +107,9 @@ class InMemoryBackend extends Backend {
   override def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(Block, Option[MaybeNewEpoch])]
       .map {
-        case (block, Some(NewEpochDetected(epoch, boxesByTxIdByHeight))) =>
+        case (block, Some(NewEpochDetected(epoch, boxesByTxIdByHeight, topAddresses))) =>
           boxesByHeight.putAll(boxesByTxIdByHeight.asJava)
-          block -> Some(NewEpochDetected(epoch, boxesByTxIdByHeight))
+          block -> Some(NewEpochDetected(epoch, boxesByTxIdByHeight, topAddresses))
         case tuple =>
           tuple
       }

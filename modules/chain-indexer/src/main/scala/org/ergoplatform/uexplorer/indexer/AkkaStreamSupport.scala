@@ -17,14 +17,18 @@ trait AkkaStreamSupport {
       Source
         .tick(initialDelay, interval, ())
         .mapAsync(1)(_ => run)
-        .withAttributes(Attributes.inputBuffer(0, 1))
+        .withAttributes(
+          Attributes
+            .inputBuffer(0, 1)
+            .and(ActorAttributes.IODispatcher)
+        )
     }
 
   def restartSource[Out, Mat](source: Source[Out, Mat]): Source[Out, NotUsed] =
     RestartSource
       .withBackoff(Resiliency.restartSettings) { () =>
         source
-          .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
+          .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider()))
       }
 
   def heavyBalanceFlow[In, Out](

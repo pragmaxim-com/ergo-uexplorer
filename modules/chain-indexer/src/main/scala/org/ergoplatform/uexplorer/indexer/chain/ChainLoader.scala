@@ -44,75 +44,81 @@ class ChainLoader(
       Future(snapshotManager.clearAllSnapshots()).map(_ => MissingEpochs(missingEpochIndexes))
     } else {
       logger.info(s"Chain state is valid")
-      Future.successful(ChainValid)
+      Future.successful(ChainValid(chainState))
     }
   }
 
-  def initFromDbAndDisk(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest]): Future[ChainIntegrity] =
+  def initFromDbAndDisk(
+    verify: Boolean = true
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest]): Future[ChainIntegrity] =
     backend.loadBlockInfoByEpochIndex
       .flatMap {
         case blockInfoByEpochIndex if blockInfoByEpochIndex.isEmpty =>
           Future {
             snapshotManager.clearAllSnapshots()
-            require(backend.initGraph, "Janus graph must be empty when main db is empty, drop janusgraph keyspace!")
+            require(
+              backend.initGraph || backend.graphTraversalSource.V().hasNext,
+              "Janus graph must be empty when main db is empty, drop janusgraph keyspace!"
+            )
             logger.info(s"Chain is empty, loading from scratch ...")
             ChainState.empty
           }
         case blockInfoByEpochIndex =>
           val graphEmpty = backend.initGraph
           val txBoxesByEpochSource =
-            if (graphEmpty) {
-              logger.info(s"Graph is empty, loading from database")
-              Source
-                .fromIterator(() => blockInfoByEpochIndex.keysIterator)
-                .flatMapConcat { epochIndex =>
-                  Source(Epoch.heightRangeForEpochIndex(epochIndex))
-                    .via(backend.transactionBoxesByHeightFlow)
-                    .grouped(Const.EpochLength)
-                    .map { boxesByHeight =>
+            Source
+              .fromIterator(() => blockInfoByEpochIndex.keysIterator)
+              .mapConcat(Epoch.heightRangeForEpochIndex)
+              .via(backend.transactionBoxesByHeightFlow)
+              .grouped(Const.EpochLength)
+
+          val utxoStateF =
+            if (
+              !graphEmpty && snapshotManager.latestSerializedSnapshot.exists(_.epochIndex == blockInfoByEpochIndex.lastKey)
+            ) {
+              logger.info("Graph is already initialized and utxo snapshot exists, let's just load it from disk")
+              txBoxesByEpochSource.run().flatMap { _ =>
+                snapshotManager.getLatestSnapshotByIndex.map(_.get.utxoState)
+              }
+            } else {
+              val subjectToLoad =
+                if (graphEmpty) {
+                  "graph and utxoState"
+                } else
+                  "utxoState"
+              logger.info(s"Loading $subjectToLoad from database ... ")
+              txBoxesByEpochSource
+                .runFoldAsync(UtxoState.empty) { case (s, boxesByHeight) =>
+                  Future {
+                    val epochIndex = Epoch.epochIndexForHeight(boxesByHeight.head._1)
+                    logger.info(s"Merging boxes of epoch $epochIndex finished")
+                    val newState = s.mergeGivenBoxes(boxesByHeight.iterator.flatMap(_._2.iterator))
+                    if (graphEmpty) {
                       boxesByHeight.iterator
                         .foreach { case (height, boxesByTx) =>
                           boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-                            TxGraphWriter.writeGraph(tx, height, inputs, outputs)(backend.janusGraph)
+                            TxGraphWriter.writeGraph(tx, height, inputs, outputs, newState.topAddresses.nodeMap)(
+                              backend.janusGraph
+                            )
                           }
                         }
                       backend.janusGraph.tx().commit()
                       logger.info(s"Graph building of epoch $epochIndex finished")
-                      boxesByHeight
                     }
-                    .async(ActorAttributes.IODispatcher.dispatcher)
-                }
-            } else {
-              Source
-                .fromIterator(() => blockInfoByEpochIndex.keysIterator)
-                .mapConcat(Epoch.heightRangeForEpochIndex)
-                .via(backend.transactionBoxesByHeightFlow)
-                .grouped(Const.EpochLength)
-            }
-          val utxoStateF =
-            if (snapshotManager.latestSerializedSnapshot.exists(_.epochIndex == blockInfoByEpochIndex.lastKey)) {
-              if (graphEmpty) {
-                txBoxesByEpochSource.run().flatMap { _ =>
-                  snapshotManager.getLatestSnapshotByIndex.map(_.get.utxoState)
-                }
-              } else {
-                snapshotManager.getLatestSnapshotByIndex.map(_.get.utxoState)
-              }
-            } else {
-              logger.info(s"Loading utxoState from database ... ")
-              txBoxesByEpochSource
-                .runFold(UtxoState.empty) { case (s, boxesByHeight) =>
-                  val epochIndex = Epoch.epochIndexForHeight(boxesByHeight.head._1)
-                  logger.info(s"Merging boxes of epoch $epochIndex finished")
-                  s.mergeGivenBoxes(boxesByHeight.iterator.flatMap(_._2.iterator.map(_._2)))
+                    newState
+                  }
                 }
             }
           utxoStateF.map(utxoState => ChainState(blockInfoByEpochIndex, utxoState))
       }
       .flatMap { chainState =>
         ChainStateHolder.initialize(chainState).flatMap { _ =>
-          verifyStateIntegrity(chainState, snapshotManager)
+          if (verify)
+            verifyStateIntegrity(chainState, snapshotManager)
+          else
+            Future.successful(ChainValid(chainState))
         }
+
       }
 
 }
@@ -120,10 +126,12 @@ class ChainLoader(
 object ChainLoader {
   trait ChainIntegrity
 
-  case object ChainValid extends ChainIntegrity
+  case class ChainValid(chainState: ChainState) extends ChainIntegrity
 
   case class MissingEpochs(missingEpochIndexes: TreeSet[EpochIndex]) extends ChainIntegrity {
-    def missingHeights: TreeSet[EpochIndex] = missingEpochIndexes.flatMap(Epoch.heightRangeForEpochIndex)
+
+    def missingHeights: TreeSet[EpochIndex] =
+      missingEpochIndexes.flatMap(idx => List(idx, idx + 1)).flatMap(Epoch.heightRangeForEpochIndex)
   }
 
 }

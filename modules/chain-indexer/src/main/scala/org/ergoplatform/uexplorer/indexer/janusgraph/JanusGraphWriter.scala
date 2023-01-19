@@ -52,18 +52,20 @@ trait JanusGraphWriter {
 
   def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(Block, Option[MaybeNewEpoch])]
-      .map {
-        case (b, s @ Some(NewEpochDetected(e, boxesByHeight))) =>
-          boxesByHeight.iterator
-            .foreach { case (height, boxesByTx) =>
-              boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-                TxGraphWriter.writeGraph(tx, height, inputs, outputs)(janusGraph)
+      .mapAsync(1) {
+        case (b, s @ Some(NewEpochDetected(e, boxesByHeight, topAddresses))) =>
+          Future {
+            boxesByHeight.iterator
+              .foreach { case (height, boxesByTx) =>
+                boxesByTx.foreach { case (tx, (inputs, outputs)) =>
+                  TxGraphWriter.writeGraph(tx, height, inputs, outputs, topAddresses)(janusGraph)
+                }
               }
-            }
-          janusGraph.tx().commit()
-          logger.info(s"New epoch ${e.index} building finished")
-          b -> s
-        case x => x
+            janusGraph.tx().commit()
+            logger.info(s"New epoch ${e.index} graph building finished")
+            b -> s
+          }
+        case x =>
+          Future.successful(x)
       }
-      .async(ActorAttributes.IODispatcher.dispatcher)
 }

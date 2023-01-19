@@ -8,12 +8,12 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.api.{UtxoSnapshot, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.NewEpochDetected
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
-import org.ergoplatform.uexplorer.{Address, BoxId, Value}
+import org.ergoplatform.uexplorer.{Address, BoxId, Height, Value}
 
 import java.io.*
 import java.nio.file.{Files, Path, Paths}
 import java.util.Comparator
-import scala.collection.immutable.TreeMap
+import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -66,6 +66,15 @@ class DiskUtxoSnapshotManager(
             .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("utxosByAddress")))
             .map(_ => ())
         }
+        .flatMap { _ =>
+          Source
+            .fromIterator(() => snapshot.utxoState.topAddresses.sortedByBoxCount.iterator)
+            .map { case (address, (height, count)) =>
+              ByteString(s"$address $height $count\n")
+            }
+            .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("topAddresses")))
+            .map(_ => ())
+        }
     }
 
   def getLatestSnapshotByIndex: Future[Option[UtxoSnapshot.Deserialized]] =
@@ -97,12 +106,26 @@ class DiskUtxoSnapshotManager(
                 acc.addOne(tuple)
               }
               .map(_.result())
-              .map(utxosByAddress =>
-                Option(
-                  UtxoSnapshot
-                    .Deserialized(latestEpochIndex, UtxoState(addressByUtxo, utxosByAddress, Map.empty, TreeMap.empty))
-                )
-              )
+              .flatMap { utxosByAddress =>
+                FileIO
+                  .fromPath(f = snapshotDir.toPath.resolve("topAddresses"))
+                  .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = Int.MaxValue))
+                  .map(line => line.utf8String.split(' '))
+                  .map(arr => (Address.fromStringUnsafe(arr(0)), (arr(1).toInt, arr(1).toInt)))
+                  .runFold(ListMap.newBuilder[Address, (Height, TopAddresses.BoxCount)]) { case (acc, tuple) =>
+                    acc.addOne(tuple)
+                  }
+                  .map(_.result())
+                  .map { topAddresses =>
+                    Option(
+                      UtxoSnapshot
+                        .Deserialized(
+                          latestEpochIndex,
+                          UtxoState(addressByUtxo, utxosByAddress, Map.empty, TreeMap.empty, TopAddresses.from(topAddresses))
+                        )
+                    )
+                  }
+              }
           }
       }
       .getOrElse(Future.successful(None))

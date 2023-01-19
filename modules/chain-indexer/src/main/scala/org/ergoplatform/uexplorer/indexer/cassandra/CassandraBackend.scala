@@ -51,6 +51,7 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraOutputsWriter
   with CassandraBlockUpdater
   with CassandraEpochWriter
+  with CassandraAddressWriter
   with CassandraEpochReader
   with JanusGraphWriter
   with CassandraUtxoReader {

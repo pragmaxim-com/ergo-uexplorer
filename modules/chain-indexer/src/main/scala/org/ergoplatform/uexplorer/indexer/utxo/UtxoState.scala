@@ -4,15 +4,16 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.pattern.StatusReply
 import akka.stream.scaladsl.Source
 import akka.{Done, NotUsed}
+import com.google.common.collect.TreeMultiset
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, TxIndex, Value}
-
+import org.ergoplatform.uexplorer.indexer.MutableMapPimp
 import java.io.*
 import java.nio.file.{Path, Paths}
 import scala.collection.compat.immutable.ArraySeq
@@ -27,7 +28,8 @@ case class UtxoState(
   addressByUtxo: Map[BoxId, Address],
   utxosByAddress: Map[Address, Map[BoxId, Value]],
   inputsByHeightBuffer: Map[Height, Map[BoxId, (Address, Value)]],
-  boxesByHeightBuffer: UtxoState.BoxesByHeight
+  boxesByHeightBuffer: UtxoState.BoxesByHeight,
+  topAddresses: TopAddresses // mutable
 ) {
 
   /** on-demand computation of UtxoState up to latest blocks which are not merged right away as we do not support rollback,
@@ -36,11 +38,11 @@ case class UtxoState(
   def utxoStateWithCurrentEpochBoxes: UtxoState = mergeBufferedBoxes(Option.empty)._2
 
   def mergeGivenBoxes(
-    boxes: Iterator[(Iterable[(BoxId, Address, Value)], Iterable[(BoxId, Address, Value)])]
+    boxes: Iterator[(Tx, (Iterable[(BoxId, Address, Value)], Iterable[(BoxId, Address, Value)]))]
   ): UtxoState = {
-    val (newAddressByUtxo, newUtxosByAddress) =
-      boxes.foldLeft(addressByUtxo -> utxosByAddress) {
-        case ((addressByUtxoAcc, utxosByAddressAcc), (inputBoxes, outputBoxes)) =>
+    val (newAddressByUtxo, newUtxosByAddress, newTopAddresses) =
+      boxes.foldLeft((addressByUtxo, utxosByAddress, topAddresses)) {
+        case ((addressByUtxoAcc, utxosByAddressAcc, topAddressesAcc), (tx, (inputBoxes, outputBoxes))) =>
           val newOutputBoxIdsByAddress =
             outputBoxes
               .foldLeft(utxosByAddressAcc) { case (acc, (boxId, address, value)) =>
@@ -57,14 +59,31 @@ case class UtxoState(
                   case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)
                 }
               }
+          val boxesToMergeToAddresses =
+            if (tx.id == Const.Genesis.Emission.tx || tx.id == Const.Genesis.Foundation.tx) {
+              outputBoxes
+            } else {
+              inputBoxes ++ outputBoxes
+            }
+
+          val actualTopAddress =
+            boxesToMergeToAddresses
+              .foldLeft(mutable.Map.empty[Address, Int]) { case (acc, (_, address, _)) =>
+                acc.adjust(address)(_.fold(1)(_ + 1))
+              }
+              .foldLeft(topAddressesAcc) { case (acc, (address, boxCount)) =>
+                acc.addOrUpdate(address, tx.height, boxCount)
+              }
           (
             addressByUtxoAcc ++ outputBoxes.iterator.map(o => o._1 -> o._2) -- inputBoxes.iterator.map(_._1),
-            newOutputBoxIdsByAddressWoInputs
+            newOutputBoxIdsByAddressWoInputs,
+            actualTopAddress
           )
       }
     copy(
       addressByUtxo  = newAddressByUtxo,
-      utxosByAddress = newUtxosByAddress
+      utxosByAddress = newUtxosByAddress,
+      topAddresses   = newTopAddresses
     )
 
   }
@@ -78,7 +97,7 @@ case class UtxoState(
       }
       .getOrElse(boxesByHeightBuffer)
 
-    val newUtxoState = mergeGivenBoxes(boxesByHeightSlice.iterator.flatMap(_._2.iterator.map(_._2)))
+    val newUtxoState = mergeGivenBoxes(boxesByHeightSlice.iterator.flatMap(_._2.iterator))
     boxesByHeightSlice -> newUtxoState.copy(
       inputsByHeightBuffer = inputsByHeightBuffer -- boxesByHeightSlice.keysIterator,
       boxesByHeightBuffer  = boxesByHeightBuffer -- boxesByHeightSlice.keysIterator
@@ -169,5 +188,5 @@ object UtxoState extends LazyLogging {
   case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Long)
   type BoxesByTx     = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
   type BoxesByHeight = TreeMap[Height, BoxesByTx]
-  def empty: UtxoState = UtxoState(Map.empty, Map.empty, Map.empty, TreeMap.empty)
+  def empty: UtxoState = UtxoState(Map.empty, Map.empty, Map.empty, TreeMap.empty, TopAddresses.empty)
 }

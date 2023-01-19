@@ -9,6 +9,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 
@@ -37,22 +38,24 @@ object MempoolStateHolder extends LazyLogging {
 
     def utxoStateTransitionByTx(utxoState: UtxoState): Iterator[(ApiTransaction, UtxoState)] =
       stateTransitionByTx.iterator.map { case (newTx, poolTxs) =>
-        val (inputs, outputs) =
+        val boxesByTxBuilder =
           poolTxs.values.foldLeft(
-            (ArraySeq.newBuilder[(BoxId, Address, Long)], ArraySeq.newBuilder[(BoxId, Address, Long)])
-          ) { case ((iAcc, oAcc), tx) =>
+            Map.newBuilder[Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])]
+          ) { case (acc, tx) =>
             val inputSet = tx.inputs.toSet.map(_.boxId)
             val inputsWithAddrValue =
-              utxoState.inputsByHeightBuffer.valuesIterator.flatMap { boxes =>
-                val shared = boxes.keySet.intersect(inputSet)
-                shared.map { boxId =>
-                  val (addr, value) = boxes(boxId)
-                  (boxId, addr, value)
+              ArraySeq.from(
+                utxoState.inputsByHeightBuffer.valuesIterator.flatMap { boxes =>
+                  val shared = boxes.keySet.intersect(inputSet)
+                  shared.map { boxId =>
+                    val (addr, value) = boxes(boxId)
+                    (boxId, addr, value)
+                  }
                 }
-              }
-            iAcc.addAll(inputsWithAddrValue) -> oAcc.addAll(tx.outputs.map(o => (o.boxId, o.address, o.value)))
+              )
+            acc.addOne(Tx(tx.id, 0, 0, 0) -> (inputsWithAddrValue, tx.outputs.map(o => (o.boxId, o.address, o.value))))
           }
-        newTx -> utxoState.mergeGivenBoxes(List((inputs.result(), outputs.result())).iterator)
+        newTx -> utxoState.mergeGivenBoxes(boxesByTxBuilder.result().iterator)
       }
   }
 

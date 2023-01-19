@@ -13,6 +13,7 @@ object Version {
 
 object Dependencies {
 
+  val scorexUtil = "org.scorexfoundation"  %% "scorex-util"     % "0.1.8" cross CrossVersion.for3Use2_13
   val ergoWallet = "org.ergoplatform"      %% "ergo-wallet"     % Version.ergo cross CrossVersion.for3Use2_13
   val pureConfig = "com.github.pureconfig" %% "pureconfig-core" % "0.17.1"
 
