@@ -53,7 +53,7 @@ trait CassandraPersistenceSupport extends LazyLogging {
     maxBatchSize: Int,
     batchType: BatchType = DefaultBatchType.LOGGED,
     simpleStatement: SimpleStatement,
-    statementBinder: (T, PreparedStatement) => Source[ArraySeq[BoundStatement], NotUsed]
+    statementBinder: (T, PreparedStatement) => Source[Seq[BoundStatement], NotUsed]
   )(implicit cqlSession: CqlSession, system: ActorSystem[Nothing]): Flow[T, T, NotUsed] =
     Flow
       .lazyFutureFlow(() =>

@@ -20,6 +20,9 @@ import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, MutableMapPimp, Ut
 import org.ergoplatform.uexplorer.{Address, BoxId, Const, TxId}
 import org.janusgraph.core.{JanusGraphVertex, VertexLabel}
 import org.ergoplatform.uexplorer.indexer.MutableMapPimp
+import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses
+import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.TopAddressMap
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.BoxesByTx
 
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.collection.mutable
@@ -44,7 +47,7 @@ trait CassandraAddressWriter extends AkkaStreamSupport with AddressPersistenceSu
 
 }
 
-object CassandraAddressWriter extends AddressPersistenceSupport with LazyLogging {
+object CassandraAddressWriter extends AddressPersistenceSupport with AkkaStreamSupport with LazyLogging {
 
   private def bindStatement(
     addr: Address,
@@ -69,36 +72,44 @@ object CassandraAddressWriter extends AddressPersistenceSupport with LazyLogging
       .setString(box_id, boxId)
       .setLong(value, v)
 
-  protected[cassandra] def addressInsertBinder
-    : ((Block, Option[MaybeNewEpoch]), PreparedStatement) => Source[ArraySeq[BoundStatement], NotUsed] = {
-    case ((_, Some(NewEpochDetected(_, txBoxesByHeight, topAddresses))), stmt) =>
-      Source
-        .fromIterator(() => txBoxesByHeight.valuesIterator)
-        .mapConcat {
-          _.map { case (tx, (inputs, outputs)) =>
-            val boxes =
-              if (tx.id == Const.Genesis.Emission.tx || tx.id == Const.Genesis.Foundation.tx)
-                inputs ++ outputs
-              else
-                outputs
-            boxes.map { case (boxId, addr, v) =>
-              val addressIndex = topAddresses.get(addr).map(n => n._2 / 10000).getOrElse(0).toShort
-              val statement =
-                bindStatement(
-                  addr,
-                  addressIndex,
-                  indexer.Const.getAddressType(addr).get,
-                  "x",
-                  tx.timestamp,
-                  tx.index,
-                  tx.id.unwrapped,
-                  boxId.unwrapped,
-                  v
-                )(stmt)
-              statement
-            }
+  private def addressPartitioningFlow(topAddresses: TopAddressMap, stmt: PreparedStatement) =
+    Flow.fromFunction[Seq[BoxesByTx], Iterable[Vector[BoundStatement]]] { boxesByTxbyHeight =>
+      val result = mutable.Map.empty[(Address, Short), Vector[BoundStatement]]
+      boxesByTxbyHeight.foreach { boxesByTx =>
+        boxesByTx.foreach { case (tx, (inputs, outputs)) =>
+          val boxes =
+            if (tx.id == Const.Genesis.Emission.tx || tx.id == Const.Genesis.Foundation.tx)
+              inputs ++ outputs
+            else
+              outputs
+          boxes.foreach { case (boxId, addr, v) =>
+            val addressIndex = topAddresses.get(addr).map(n => n._2 / 10000).getOrElse(0).toShort
+            val statement =
+              bindStatement(
+                addr,
+                addressIndex,
+                indexer.Const.getAddressType(addr).get,
+                "x",
+                tx.timestamp,
+                tx.index,
+                tx.id.unwrapped,
+                boxId.unwrapped,
+                v
+              )(stmt)
+            result.adjust(addr -> addressIndex)(_.fold(Vector(statement))(_ :+ statement))
           }
         }
+      }
+      result.values
+    }
+
+  protected[cassandra] def addressInsertBinder
+    : ((Block, Option[MaybeNewEpoch]), PreparedStatement) => Source[Seq[BoundStatement], NotUsed] = {
+    case ((_, Some(NewEpochDetected(_, txBoxesByHeight, topAddresses))), stmt) =>
+      Source
+        .fromIterator(() => txBoxesByHeight.valuesIterator.grouped(64))
+        .via(cpuHeavyBalanceFlow(addressPartitioningFlow(topAddresses, stmt)))
+        .mapConcat(identity)
     case ((_, Some(NewEpochExisted(epochIndex))), _) =>
       logger.debug(s"Skipping persistence of epoch $epochIndex as it already existed")
       Source.empty

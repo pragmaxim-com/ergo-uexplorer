@@ -65,21 +65,12 @@ class ChainLoader(
           }
         case blockInfoByEpochIndex =>
           val graphEmpty = backend.initGraph
-          val txBoxesByEpochSource =
-            Source
-              .fromIterator(() => blockInfoByEpochIndex.keysIterator)
-              .mapConcat(Epoch.heightRangeForEpochIndex)
-              .via(backend.transactionBoxesByHeightFlow)
-              .grouped(Const.EpochLength)
-
+          lazy val snapshotExists =
+            snapshotManager.latestSerializedSnapshot.exists(_.epochIndex == blockInfoByEpochIndex.lastKey)
           val utxoStateF =
-            if (
-              !graphEmpty && snapshotManager.latestSerializedSnapshot.exists(_.epochIndex == blockInfoByEpochIndex.lastKey)
-            ) {
+            if (!graphEmpty && snapshotExists) {
               logger.info("Graph is already initialized and utxo snapshot exists, let's just load it from disk")
-              txBoxesByEpochSource.run().flatMap { _ =>
-                snapshotManager.getLatestSnapshotByIndex.map(_.get.utxoState)
-              }
+              snapshotManager.getLatestSnapshotByIndex.map(_.get.utxoState)
             } else {
               val subjectToLoad =
                 if (graphEmpty) {
@@ -87,7 +78,11 @@ class ChainLoader(
                 } else
                   "utxoState"
               logger.info(s"Loading $subjectToLoad from database ... ")
-              txBoxesByEpochSource
+              Source
+                .fromIterator(() => blockInfoByEpochIndex.keysIterator)
+                .mapConcat(Epoch.heightRangeForEpochIndex)
+                .via(backend.transactionBoxesByHeightFlow)
+                .grouped(Const.EpochLength)
                 .runFoldAsync(UtxoState.empty) { case (s, boxesByHeight) =>
                   Future {
                     val epochIndex = Epoch.epochIndexForHeight(boxesByHeight.head._1)
