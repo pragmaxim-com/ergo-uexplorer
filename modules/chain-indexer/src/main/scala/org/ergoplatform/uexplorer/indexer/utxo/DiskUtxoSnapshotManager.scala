@@ -112,7 +112,7 @@ class DiskUtxoSnapshotManager(
                   .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = Int.MaxValue))
                   .map(line => line.utf8String.split(' '))
                   .map(arr => (Address.fromStringUnsafe(arr(0)), (arr(1).toInt, arr(2).toInt)))
-                  .runFold(ListMap.newBuilder[Address, (Height, TopAddresses.BoxCount)]) { case (acc, tuple) =>
+                  .runFold(Map.newBuilder[Address, (Height, TopAddresses.BoxCount)]) { case (acc, tuple) =>
                     acc.addOne(tuple)
                   }
                   .map(_.result())
