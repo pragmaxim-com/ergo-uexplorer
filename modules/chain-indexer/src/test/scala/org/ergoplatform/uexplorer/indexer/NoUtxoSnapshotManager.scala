@@ -13,7 +13,7 @@ class NoUtxoSnapshotManager extends UtxoSnapshotManager {
 
   override def makeSnapshotOnEpoch(newEpochOpt: Option[Epoch], utxoState: UtxoState): Future[Unit] = Future.successful(())
 
-  override def saveSnapshot(snapshot: UtxoSnapshot.Deserialized): Future[Unit] = Future.successful(())
+  override def saveSnapshot(snapshot: UtxoSnapshot.Deserialized, force: Boolean): Future[Unit] = Future.successful(())
 
   override def getLatestSnapshotByIndex: Future[Option[UtxoSnapshot.Deserialized]] = Future.successful(Option.empty)
 }

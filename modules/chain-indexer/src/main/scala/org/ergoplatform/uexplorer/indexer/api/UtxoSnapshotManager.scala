@@ -10,7 +10,7 @@ trait UtxoSnapshotManager {
   def clearAllSnapshots(): Unit
   def latestSerializedSnapshot: Option[UtxoSnapshot.Serialized]
   def makeSnapshotOnEpoch(newEpochOpt: Option[Epoch], utxoState: UtxoState): Future[Unit]
-  def saveSnapshot(snapshot: UtxoSnapshot.Deserialized): Future[Unit]
+  def saveSnapshot(snapshot: UtxoSnapshot.Deserialized, force: Boolean): Future[Unit]
   def getLatestSnapshotByIndex: Future[Option[UtxoSnapshot.Deserialized]]
 }
 

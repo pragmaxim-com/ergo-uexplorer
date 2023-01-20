@@ -46,36 +46,39 @@ class DiskUtxoSnapshotManager(
       saveSnapshot(UtxoSnapshot.Deserialized(newEpoch.index, utxoState))
     }
 
-  def saveSnapshot(snapshot: UtxoSnapshot.Deserialized): Future[Unit] =
+  def saveSnapshot(snapshot: UtxoSnapshot.Deserialized, force: Boolean = true): Future[Unit] =
     Future(rootSnapshotDir.mkdirs()).flatMap { _ =>
       val snapshotDir = rootSnapshotDir.toPath.resolve(snapshot.epochIndex.toString).toFile
-      logger.info(s"Saving snapshot at epoch ${snapshot.epochIndex} to ${snapshotDir.getPath}")
-      if (snapshotDir.exists()) {
+      if (snapshotDir.exists() && force) {
+        logger.info(s"Saving snapshot at epoch ${snapshot.epochIndex} to ${snapshotDir.getPath}")
         Option(snapshotDir.listFiles()).foreach(_.foreach(_.delete()))
+        snapshotDir.mkdirs()
+        Source
+          .fromIterator(() => snapshot.utxoState.addressByUtxo.iterator)
+          .map { case (boxId, address) => ByteString(s"$boxId $address\n") }
+          .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("addressByUtxo")))
+          .flatMap { _ =>
+            Source
+              .fromIterator(() => snapshot.utxoState.utxosByAddress.iterator)
+              .map { case (address, utxos) =>
+                ByteString(s"$address ${utxos.map { case (b, v) => s"$b:$v" }.mkString(",")}\n")
+              }
+              .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("utxosByAddress")))
+              .map(_ => ())
+          }
+          .flatMap { _ =>
+            Source
+              .fromIterator(() => snapshot.utxoState.topAddresses.sortedByBoxCount.iterator)
+              .map { case (address, Address.Stats(lastTxHeight, txCount, boxCount)) =>
+                ByteString(s"$address $lastTxHeight $txCount $boxCount\n")
+              }
+              .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("topAddresses")))
+              .map(_ => ())
+          }
+      } else {
+        logger.info(s"Snapshot at epoch ${snapshot.epochIndex} already exists at ${snapshotDir.getPath}")
+        Future.successful(())
       }
-      snapshotDir.mkdirs()
-      Source
-        .fromIterator(() => snapshot.utxoState.addressByUtxo.iterator)
-        .map { case (boxId, address) => ByteString(s"$boxId $address\n") }
-        .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("addressByUtxo")))
-        .flatMap { _ =>
-          Source
-            .fromIterator(() => snapshot.utxoState.utxosByAddress.iterator)
-            .map { case (address, utxos) =>
-              ByteString(s"$address ${utxos.map { case (b, v) => s"$b:$v" }.mkString(",")}\n")
-            }
-            .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("utxosByAddress")))
-            .map(_ => ())
-        }
-        .flatMap { _ =>
-          Source
-            .fromIterator(() => snapshot.utxoState.topAddresses.sortedByBoxCount.iterator)
-            .map { case (address, (lastHeight, txCount, boxCount)) =>
-              ByteString(s"$address $lastHeight $txCount $boxCount\n")
-            }
-            .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("topAddresses")))
-            .map(_ => ())
-        }
     }
 
   def getLatestSnapshotByIndex: Future[Option[UtxoSnapshot.Deserialized]] =
@@ -112,8 +115,8 @@ class DiskUtxoSnapshotManager(
                   .fromPath(f = snapshotDir.toPath.resolve("topAddresses"))
                   .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = Int.MaxValue))
                   .map(line => line.utf8String.split(' '))
-                  .map(arr => (Address.fromStringUnsafe(arr(0)), (arr(1).toInt, arr(2).toInt, arr(3).toInt)))
-                  .runFold(Map.newBuilder[Address, (LastHeight, TxCount, BoxCount)]) { case (acc, tuple) =>
+                  .map(arr => (Address.fromStringUnsafe(arr(0)), Address.Stats(arr(1).toInt, arr(2).toInt, arr(3).toInt)))
+                  .runFold(Map.newBuilder[Address, Address.Stats]) { case (acc, tuple) =>
                     acc.addOne(tuple)
                   }
                   .map(_.result())

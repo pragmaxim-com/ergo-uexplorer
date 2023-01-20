@@ -77,9 +77,9 @@ case class UtxoState(
               .foldLeft(topAddressesAcc) { case (acc, (address, boxCount)) =>
                 acc.adjust(address) {
                   case None =>
-                    (height, 1, boxCount)
-                  case Some((_, oldTxCount, oldBoxCount)) =>
-                    (height, oldTxCount + 1, oldBoxCount + boxCount)
+                    Address.Stats(height, 1, boxCount)
+                  case Some(Address.Stats(_, oldTxCount, oldBoxCount)) =>
+                    Address.Stats(height, oldTxCount + 1, oldBoxCount + boxCount)
                 }
               }
           (

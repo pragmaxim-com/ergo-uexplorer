@@ -10,7 +10,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, UnexpectedStateError}
-import org.ergoplatform.uexplorer.indexer.api.{Backend, UtxoSnapshotManager}
+import org.ergoplatform.uexplorer.indexer.api.{Backend, UtxoSnapshot, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
@@ -43,8 +43,10 @@ class ChainLoader(
       logger.error(s"Going to index missing blocks for epochs : ${missingEpochIndexes.mkString(", ")}")
       Future(snapshotManager.clearAllSnapshots()).map(_ => MissingEpochs(missingEpochIndexes))
     } else {
-      logger.info(s"Chain state is valid")
-      Future.successful(ChainValid(chainState))
+      logger.info(s"Chain state is valid, making utxo state snapshot if it does not exists")
+      snapshotManager
+        .saveSnapshot(UtxoSnapshot.Deserialized(chainState.persistedEpochIndexes.last, chainState.utxoState), force = false)
+        .map(_ => ChainValid(chainState))
     }
   }
 

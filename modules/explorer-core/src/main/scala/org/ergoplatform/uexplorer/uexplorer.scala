@@ -5,7 +5,9 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.{HexStringSpec, MatchesRegex, ValidByte}
 import eu.timepit.refined.refineV
 import io.circe.*
+import org.ergoplatform.uexplorer.{BoxCount, LastHeight, TxCount}
 
+import scala.collection.immutable.ListMap
 import scala.util.Try
 
 package object uexplorer {
@@ -18,13 +20,15 @@ package object uexplorer {
   type BoxCount = Int
   type TxCount = Int
   type LastHeight = Int
-  type TopAddressMap = Map[Address, (LastHeight, TxCount, BoxCount)]
+  type TopAddressMap = Map[Address, Address.Stats]
+  type SortedTopAddressMap = ListMap[Address, Address.Stats]
 
   type Base58Spec = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
   type Address = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
 
   object Address {
+    case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount)
     def fromStringUnsafe(s: String): Address = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
   }
 

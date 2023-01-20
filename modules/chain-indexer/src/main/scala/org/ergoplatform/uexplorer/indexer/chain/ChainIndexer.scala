@@ -25,7 +25,7 @@ import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
-import org.ergoplatform.uexplorer.{Address, BoxId, Const, Height}
+import org.ergoplatform.uexplorer.{Address, BoxId, Const, Height, SortedTopAddressMap}
 
 import java.util.ServiceLoader
 import scala.collection.immutable.{ArraySeq, ListMap}
@@ -88,7 +88,12 @@ class ChainIndexer(
             snapshotManager
               .makeSnapshotOnEpoch(lastEpoch.map(_.epoch), chainState.utxoState)
               .map { _ =>
-                ChainSyncResult(chainState, lastBlock, backend.graphTraversalSource)
+                ChainSyncResult(
+                  chainState,
+                  lastBlock,
+                  backend.graphTraversalSource,
+                  chainState.utxoState.topAddresses.sortedByBoxCount
+                )
               }
           }
         }
@@ -109,5 +114,11 @@ class ChainIndexer(
 }
 
 object ChainIndexer {
-  case class ChainSyncResult(chainState: ChainState, lastBlock: Option[Block], graphTraversalSource: GraphTraversalSource)
+
+  case class ChainSyncResult(
+    chainState: ChainState,
+    lastBlock: Option[Block],
+    graphTraversalSource: GraphTraversalSource,
+    topAddressMap: SortedTopAddressMap
+  )
 }

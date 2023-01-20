@@ -55,9 +55,12 @@ class MetadataHttpClient[P](minNodeHeight: Int = indexer.Const.MinNodeHeight)(im
         case masterNodes =>
           masterNodes
       }
-      .flatMap(masterNodes =>
-        getAllValidConnectedPeers(masterNodes, masterNodes.maxBy(_.fullHeight).fullHeight).map(_ ++ masterNodes)
-      )
+      .flatMap {
+        case masterNodes if masterNodes.nonEmpty =>
+          getAllValidConnectedPeers(masterNodes, masterNodes.maxBy(_.fullHeight).fullHeight).map(_ ++ masterNodes)
+        case _ =>
+          Future.successful(TreeSet.empty[Peer])
+      }
 
   def getMasterNodes: Future[SortedSet[Peer]] =
     retryPolicy
