@@ -104,13 +104,17 @@ object HighValueDetector {
       def stringify(tuple: (Address, Address.State)) = tuple match {
         case (address, Address.State(value, Some(Address.Stats(lastTxHeight, txCount, boxCount)))) =>
           val fmtVal = valueFormat.format(value / Const.NanoOrder)
-          s"${address.asInstanceOf[String].take(5)} [totalValue/lastTxHeight/txCount/boxCount : $fmtVal/$lastTxHeight/$txCount/$boxCount]"
+          s"${address.asInstanceOf[String].take(5)} $fmtVal @ [$lastTxHeight/$txCount/$boxCount]"
         case (address, Address.State(value, None)) =>
           val fmtVal = valueFormat.format(value / Const.NanoOrder)
-          s"${address.asInstanceOf[String].take(5)} [totalValue : $fmtVal]"
+          s"${address.asInstanceOf[String].take(5)} $fmtVal"
       }
 
-      val addressDetails = inputs.map(stringify).mkString("\n") + "\n===>\n" + outputs.map(stringify).mkString("\n")
+      val addressDetails =
+        inputs.map(stringify).mkString("      totalValue @ [lastTxHeight/txCount/boxCount]", "\n", "\n===>\n") +
+        outputs
+          .map(stringify)
+          .mkString("\n")
       val msg =
         s"${inputs.size} addresses with total of $fmtInputAddrSum Erg ===> $fmtValue Erg ===> ${outputs.size} addresses with total of $fmtOutputAddrSum Erg"
       s"https://explorer.ergoplatform.com/en/transactions/${tx.id}\n$msg\n$addressDetails"
