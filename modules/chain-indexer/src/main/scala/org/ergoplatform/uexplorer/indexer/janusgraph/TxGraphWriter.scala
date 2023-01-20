@@ -10,7 +10,6 @@ import org.ergoplatform.uexplorer.indexer.Utils
 import org.ergoplatform.uexplorer.indexer.utxo.{TopAddresses, UtxoState}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.TopAddressMap
 import org.janusgraph.graphdb.database.StandardJanusGraph
 import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 

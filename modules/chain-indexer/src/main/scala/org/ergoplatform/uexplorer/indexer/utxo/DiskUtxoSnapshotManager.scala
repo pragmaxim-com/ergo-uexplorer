@@ -8,7 +8,8 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.indexer.api.{UtxoSnapshot, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.NewEpochDetected
 import org.ergoplatform.uexplorer.indexer.chain.Epoch
-import org.ergoplatform.uexplorer.{Address, BoxId, Height, Value}
+import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.*
+import org.ergoplatform.uexplorer.*
 
 import java.io.*
 import java.nio.file.{Files, Path, Paths}
@@ -69,8 +70,8 @@ class DiskUtxoSnapshotManager(
         .flatMap { _ =>
           Source
             .fromIterator(() => snapshot.utxoState.topAddresses.sortedByBoxCount.iterator)
-            .map { case (address, (height, count)) =>
-              ByteString(s"$address $height $count\n")
+            .map { case (address, (lastHeight, txCount, boxCount)) =>
+              ByteString(s"$address $lastHeight $txCount $boxCount\n")
             }
             .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("topAddresses")))
             .map(_ => ())
@@ -111,8 +112,8 @@ class DiskUtxoSnapshotManager(
                   .fromPath(f = snapshotDir.toPath.resolve("topAddresses"))
                   .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = Int.MaxValue))
                   .map(line => line.utf8String.split(' '))
-                  .map(arr => (Address.fromStringUnsafe(arr(0)), (arr(1).toInt, arr(2).toInt)))
-                  .runFold(Map.newBuilder[Address, (Height, TopAddresses.BoxCount)]) { case (acc, tuple) =>
+                  .map(arr => (Address.fromStringUnsafe(arr(0)), (arr(1).toInt, arr(2).toInt, arr(3).toInt)))
+                  .runFold(Map.newBuilder[Address, (LastHeight, TxCount, BoxCount)]) { case (acc, tuple) =>
                     acc.addOne(tuple)
                   }
                   .map(_.result())

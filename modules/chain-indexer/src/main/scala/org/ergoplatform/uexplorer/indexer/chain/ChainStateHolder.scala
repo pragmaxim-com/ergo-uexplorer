@@ -15,7 +15,6 @@ import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.TopAddressMap
 import org.ergoplatform.uexplorer.indexer.utxo.{TopAddresses, UtxoState}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
 

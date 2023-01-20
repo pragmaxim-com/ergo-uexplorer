@@ -1,23 +1,29 @@
 package org.ergoplatform.uexplorer.indexer.utxo
 
 import com.datastax.oss.driver.shaded.guava.common.collect.MinMaxPriorityQueue
-import org.ergoplatform.uexplorer.{Address, Const, Height}
-import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.{BoxCount, TopAddressMap}
+import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.*
 
 import scala.jdk.CollectionConverters.*
 import java.util.Comparator
 import scala.collection.mutable
-import org.ergoplatform.uexplorer.indexer.MapPimp
 
 case class TopAddresses(
   nodeMap: TopAddressMap,
   maximumSize: Int    = 50 * 1000,
   dropHeightDiff: Int = Const.EpochLength * 50,
-  dropBoxCount: Int   = 5000
+  dropBoxCount: Int   = 5000,
+  dropTxCount: Int    = 100
 ) {
 
-  def sortedByBoxCount: Seq[(Address, (Height, BoxCount))] =
+  def sortedByBoxCount: Seq[(Address, (LastHeight, TxCount, BoxCount))] =
+    nodeMap.toSeq.sortBy(_._2._3)
+
+  def sortedByTxCount: Seq[(Address, (LastHeight, TxCount, BoxCount))] =
     nodeMap.toSeq.sortBy(_._2._2)
+
+  def sortedByLastHeight: Seq[(Address, (LastHeight, TxCount, BoxCount))] =
+    nodeMap.toSeq.sortBy(_._2._1)
 
   def addOrUpdate(height: Int, newNodeMap: TopAddressMap): TopAddresses = {
     val totalSize = nodeMap.size
@@ -25,7 +31,8 @@ case class TopAddresses(
       val toRemove =
         nodeMap.iterator
           .collect {
-            case (address, (h, c)) if c < dropBoxCount && height - h > dropHeightDiff =>
+            case (address, (lastHeight, txCount, boxCount))
+                if (boxCount < dropBoxCount || txCount < dropTxCount) && height - lastHeight > dropHeightDiff =>
               address
           }
           .take(totalSize - maximumSize)
@@ -37,9 +44,6 @@ case class TopAddresses(
 }
 
 object TopAddresses {
-
-  type BoxCount      = Int
-  type TopAddressMap = Map[Address, (Height, BoxCount)]
 
   def empty: TopAddresses = TopAddresses(nodeMap = Map.empty)
 

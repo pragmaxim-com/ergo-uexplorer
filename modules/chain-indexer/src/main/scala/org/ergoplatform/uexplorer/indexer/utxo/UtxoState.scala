@@ -14,7 +14,7 @@ import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, TxIndex, Value}
 import org.ergoplatform.uexplorer.indexer.MutableMapPimp
-import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.BoxCount
+import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.*
 
 import java.io.*
 import java.nio.file.{Path, Paths}
@@ -31,7 +31,7 @@ case class UtxoState(
   utxosByAddress: Map[Address, Map[BoxId, Value]],
   inputsByHeightBuffer: Map[Height, Map[BoxId, (Address, Value)]],
   boxesByHeightBuffer: UtxoState.BoxesByHeight,
-  topAddresses: TopAddresses // mutable
+  topAddresses: TopAddresses
 ) {
 
   /** on-demand computation of UtxoState up to latest blocks which are not merged right away as we do not support rollback,
@@ -71,8 +71,16 @@ case class UtxoState(
 
           val newTopAddressesAcc =
             boxesToMergeToAddresses
-              .foldLeft(topAddressesAcc) { case (acc, (_, address, _)) =>
-                acc.adjust(address)(_.fold(height -> 1) { case (_, oldCount) => (height, oldCount + 1) })
+              .foldLeft(mutable.Map.empty[Address, Int]) { case (acc, (_, address, _)) =>
+                acc.adjust(address)(_.fold(1)(_ + 1))
+              }
+              .foldLeft(topAddressesAcc) { case (acc, (address, boxCount)) =>
+                acc.adjust(address) {
+                  case None =>
+                    (height, 1, boxCount)
+                  case Some((_, oldTxCount, oldBoxCount)) =>
+                    (height, oldTxCount + 1, oldBoxCount + boxCount)
+                }
               }
           (
             addressByUtxoAcc ++ outputBoxes.iterator.map(o => o._1 -> o._2) -- inputBoxes.iterator.map(_._1),

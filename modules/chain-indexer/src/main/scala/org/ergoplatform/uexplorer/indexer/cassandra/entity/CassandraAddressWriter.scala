@@ -15,13 +15,11 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.{AddressPersistenceSupport, CassandraBackend}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.chain.{Epoch, InvalidEpochCandidate}
-import org.ergoplatform.uexplorer.indexer
+import org.ergoplatform.uexplorer.{indexer, Address, BoxId, Const, TopAddressMap, TxId}
 import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, MutableMapPimp, Utils}
-import org.ergoplatform.uexplorer.{Address, BoxId, Const, TxId}
 import org.janusgraph.core.{JanusGraphVertex, VertexLabel}
 import org.ergoplatform.uexplorer.indexer.MutableMapPimp
 import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses
-import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.TopAddressMap
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.BoxesByTx
 
 import scala.collection.immutable.{ArraySeq, TreeMap}

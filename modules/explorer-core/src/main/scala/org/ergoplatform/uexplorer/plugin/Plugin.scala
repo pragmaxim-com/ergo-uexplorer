@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.plugin
 
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.{Address, BoxId, TxId, Value}
+import org.ergoplatform.uexplorer.{Address, BoxId, TopAddressMap, TxId, Value}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
@@ -22,13 +22,15 @@ trait Plugin {
     newTx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: GraphTraversalSource,
+    topAddresses: TopAddressMap
   ): Future[Unit]
 
   def processNewBlock(
     newBlock: Block,
     utxoStateWoPool: UtxoStateWithoutPool,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: GraphTraversalSource,
+    topAddresses: TopAddressMap
   ): Future[Unit]
 }
 
