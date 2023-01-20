@@ -14,6 +14,8 @@ import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, TxIndex, Value}
 import org.ergoplatform.uexplorer.indexer.MutableMapPimp
+import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.BoxCount
+
 import java.io.*
 import java.nio.file.{Path, Paths}
 import scala.collection.compat.immutable.ArraySeq
@@ -38,10 +40,11 @@ case class UtxoState(
   def utxoStateWithCurrentEpochBoxes: UtxoState = mergeBufferedBoxes(Option.empty)._2
 
   def mergeGivenBoxes(
+    height: Height,
     boxes: Iterator[(Tx, (Iterable[(BoxId, Address, Value)], Iterable[(BoxId, Address, Value)]))]
   ): UtxoState = {
     val (newAddressByUtxo, newUtxosByAddress, newTopAddresses) =
-      boxes.foldLeft((addressByUtxo, utxosByAddress, topAddresses)) {
+      boxes.foldLeft((addressByUtxo, utxosByAddress, topAddresses.nodeMap)) {
         case ((addressByUtxoAcc, utxosByAddressAcc, topAddressesAcc), (tx, (inputBoxes, outputBoxes))) =>
           val newOutputBoxIdsByAddress =
             outputBoxes
@@ -66,24 +69,22 @@ case class UtxoState(
               inputBoxes ++ outputBoxes
             }
 
-          val actualTopAddress =
+          val newTopAddressesAcc =
             boxesToMergeToAddresses
-              .foldLeft(mutable.Map.empty[Address, Int]) { case (acc, (_, address, _)) =>
-                acc.adjust(address)(_.fold(1)(_ + 1))
-              }
-              .foldLeft(topAddressesAcc) { case (acc, (address, boxCount)) =>
-                acc.addOrUpdate(address, tx.height, boxCount)
+              .foldLeft(topAddressesAcc) { case (acc, (_, address, _)) =>
+                acc.adjust(address)(_.fold(height -> 1) { case (_, oldCount) => (height, oldCount + 1) })
               }
           (
             addressByUtxoAcc ++ outputBoxes.iterator.map(o => o._1 -> o._2) -- inputBoxes.iterator.map(_._1),
             newOutputBoxIdsByAddressWoInputs,
-            actualTopAddress
+            newTopAddressesAcc
           )
       }
+
     copy(
       addressByUtxo  = newAddressByUtxo,
       utxosByAddress = newUtxosByAddress,
-      topAddresses   = newTopAddresses
+      topAddresses   = topAddresses.addOrUpdate(height, newTopAddresses)
     )
 
   }
@@ -97,7 +98,7 @@ case class UtxoState(
       }
       .getOrElse(boxesByHeightBuffer)
 
-    val newUtxoState = mergeGivenBoxes(boxesByHeightSlice.iterator.flatMap(_._2.iterator))
+    val newUtxoState = mergeGivenBoxes(boxesByHeightSlice.lastKey, boxesByHeightSlice.iterator.flatMap(_._2.iterator))
     boxesByHeightSlice -> newUtxoState.copy(
       inputsByHeightBuffer = inputsByHeightBuffer -- boxesByHeightSlice.keysIterator,
       boxesByHeightBuffer  = boxesByHeightBuffer -- boxesByHeightSlice.keysIterator

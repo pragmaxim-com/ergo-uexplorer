@@ -87,7 +87,7 @@ class ChainLoader(
                   Future {
                     val epochIndex = Epoch.epochIndexForHeight(boxesByHeight.head._1)
                     logger.info(s"Merging boxes of epoch $epochIndex finished")
-                    val newState = s.mergeGivenBoxes(boxesByHeight.iterator.flatMap(_._2.iterator))
+                    val newState = s.mergeGivenBoxes(boxesByHeight.last._1, boxesByHeight.iterator.flatMap(_._2.iterator))
                     if (graphEmpty) {
                       boxesByHeight.iterator
                         .foreach { case (height, boxesByTx) =>

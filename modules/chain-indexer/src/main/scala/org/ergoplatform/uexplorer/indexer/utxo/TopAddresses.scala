@@ -6,30 +6,22 @@ import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.{BoxCount, TopAddres
 
 import scala.jdk.CollectionConverters.*
 import java.util.Comparator
-import scala.collection.immutable.ListMap
+import scala.collection.mutable
+import org.ergoplatform.uexplorer.indexer.MapPimp
 
 case class TopAddresses(
-  maximumSize: Int    = 100 * 1000,
-  dropHeightDiff: Int = Const.EpochLength * 100,
-  dropBoxCount: Int   = 2000,
-  nodeMap: TopAddressMap
+  nodeMap: TopAddressMap,
+  maximumSize: Int    = 50 * 1000,
+  dropHeightDiff: Int = Const.EpochLength * 50,
+  dropBoxCount: Int   = 5000
 ) {
 
   def sortedByBoxCount: Seq[(Address, (Height, BoxCount))] =
     nodeMap.toSeq.sortBy(_._2._2)
 
-  def addOrUpdate(address: Address, height: Height, count: BoxCount): TopAddresses = {
-    assert(count > 0, "Do not update counter with 0")
-    val newTopAddresses =
-      nodeMap.get(address) match {
-        case None =>
-          nodeMap.updated(address, height -> count)
-        case Some((_, oldCount)) =>
-          val newCount = oldCount + count
-          nodeMap.updated(address, height -> newCount)
-      }
-    lazy val totalSize = nodeMap.size
-    if (height % Const.EpochLength == 0 && totalSize > maximumSize) {
+  def addOrUpdate(height: Int, newNodeMap: TopAddressMap): TopAddresses = {
+    val totalSize = nodeMap.size
+    if (totalSize > maximumSize) {
       val toRemove =
         nodeMap.iterator
           .collect {
@@ -37,9 +29,9 @@ case class TopAddresses(
               address
           }
           .take(totalSize - maximumSize)
-      TopAddresses(nodeMap = newTopAddresses.removedAll(toRemove))
+      TopAddresses(nodeMap = newNodeMap.removedAll(toRemove))
     } else {
-      TopAddresses(nodeMap = newTopAddresses)
+      TopAddresses(nodeMap = newNodeMap)
     }
   }
 }
