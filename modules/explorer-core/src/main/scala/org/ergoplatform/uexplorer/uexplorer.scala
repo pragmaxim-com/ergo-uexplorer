@@ -29,6 +29,7 @@ package object uexplorer {
 
   object Address {
     case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount)
+    case class State(value: Value, stats: Option[Address.Stats])
     def fromStringUnsafe(s: String): Address = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
   }
 

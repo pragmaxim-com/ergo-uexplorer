@@ -2,10 +2,12 @@ package org.ergoplatform.uexplorer.plugin.alert
 
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.{Address, BoxId}
+import org.ergoplatform.uexplorer.{Address, BoxId, SortedTopAddressMap, TopAddressMap}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.ergoplatform.uexplorer.plugin.alert.Detector.AlertMessage
+import org.ergoplatform.uexplorer.plugin.alert.HighValueDetector.TxMatch
+import org.ergoplatform.uexplorer.plugin.alert.HighValueDetector.BlockMatch
 
 trait Detector {
 
@@ -13,14 +15,16 @@ trait Detector {
     tx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool,
-    graphTraversalSource: GraphTraversalSource
-  ): List[AlertMessage]
+    graphTraversalSource: GraphTraversalSource,
+    topAddresses: SortedTopAddressMap
+  ): List[TxMatch]
 
   def inspectNewBlock(
     newBlock: Block,
     utxoStateWoPool: UtxoStateWithoutPool,
-    graphTraversalSource: GraphTraversalSource
-  ): List[AlertMessage]
+    graphTraversalSource: GraphTraversalSource,
+    topAddresses: SortedTopAddressMap
+  ): List[BlockMatch]
 }
 
 object Detector {
