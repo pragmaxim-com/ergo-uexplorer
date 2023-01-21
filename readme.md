@@ -114,12 +114,7 @@ query {
 }
 ```
 
-## TODO
-
-  - Rest API that would provider access to all the interesting data
-  - UI that would render all the interesting data
-
-### Build
+## Build
 
 Not necessary as all docker images from docker-compose are publicly available :
 ```
@@ -143,7 +138,7 @@ $ docker build . -t pragmaxim/uexplorer-chain-indexer:latest
   └── drain-cassandra.sh            # cassandra must be stopped gracefully
 ```
 
-### Run
+## Run
 
 ```
 $ cd docker
@@ -186,3 +181,8 @@ $ start-querying.sh
 $ ./stop-all.sh
 $ docker volume ls # cassandra and ergo volumes contain a lot of data
 ```
+
+## TODO
+
+  - Rest API that would provider access to all the interesting data
+  - UI that would render all the interesting data
