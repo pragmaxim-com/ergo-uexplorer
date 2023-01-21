@@ -1,6 +1,6 @@
-# uExplorer
+# μExplorer
 
-Supplementary, lightweight Ergo explorer/analyzer with CassandraDB backend :
+Supplementary, lightweight (μ = micro) Ergo explorer/analyzer with CassandraDB backend :
   - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`16GB RAM`
   - datastructures accessible in real-time
     - whole utxo state
