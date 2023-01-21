@@ -11,7 +11,7 @@ import scala.collection.mutable
 
 case class TopAddresses(
   nodeMap: TopAddressMap,
-  maximumSize: Int    = 50 * 1000,
+  maximumSize: Int    = 100 * 1000,
   dropHeightDiff: Int = Const.EpochLength * 50,
   dropBoxCount: Int   = 5000,
   dropTxCount: Int    = 100

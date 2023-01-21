@@ -76,7 +76,6 @@ class DiskUtxoSnapshotManager(
               .map(_ => ())
           }
       } else {
-        logger.info(s"Snapshot at epoch ${snapshot.epochIndex} already exists at ${snapshotDir.getPath}")
         Future.successful(())
       }
     }
