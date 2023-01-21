@@ -66,6 +66,59 @@ See example `modules/alert-plugin` implementation which submits high-volume Txs 
 It was able to render entire graph of related transactions/addresses via passing Graphml to [Retina](https://gitlab.com/ouestware/retina),
 and providing hyper-link to Retina's UI interface but that was not resilient due to unpredictable graph size (seeking for alternative).
 
+## Graphql API
+
+When `./start-all.sh` script finishes, go to http://localhost:8085/playground and
+copy/paste the auth token from following snippet to `HTTP HEADERS` at bottom-left of the playground
+and follow [documentation](https://stargate.io/docs/latest/develop/graphql.html).
+```
+curl -L -X POST 'http://localhost:8081/v1/auth' \
+  -H 'Content-Type: application/json' \
+  --data-raw '{
+    "username": "cassandra",
+    "password": "cassandra"
+}'
+```
+and copy `{"authToken": "secret"}` paste `{"x-cassandra-token": "secret"}`
+
+### Examples
+
+There is an address bar in the playground UI where you select either `DDL (/graphql-schema)` or `DML (/graphql/<keyspace>)` :
+
+**DDL (/graphql-schema)**
+```
+query {
+  keyspace(name: "uexplorer") {
+    node_outputs: table(name: "node_outputs") { columns { name } }
+  }
+}
+```
+
+**DML (/graphql/uexplorer)**
+```
+query {
+  node_outputs(filter: {header_id: {eq: "b0244dfc267baca974a4caee06120321562784303a8a688976ae56170e4d175b"}}){
+    values {
+      address
+    }
+  }
+}
+```
+```
+query {
+  node_outputs(filter: {address: {eq: "88dhgzEuTXaVTz3coGyrAbJ7DNqH37vUMzpSe2vZaCEeBzA6K2nKTZ2JQJhEFgoWmrCQEQLyZNDYMby5"}}){
+    values {
+      box_id
+    }
+  }
+}
+```
+
+## TODO
+
+  - Rest API that would provider access to all the interesting data
+  - UI that would render all the interesting data
+
 ### Build
 
 Not necessary as all docker images from docker-compose are publicly available :
@@ -133,56 +186,3 @@ $ start-querying.sh
 $ ./stop-all.sh
 $ docker volume ls # cassandra and ergo volumes contain a lot of data
 ```
-
-## Graphql API
-
-When `./start-all.sh` script finishes, go to http://localhost:8085/playground and
-copy/paste the auth token from following snippet to `HTTP HEADERS` at bottom-left of the playground
-and follow [documentation](https://stargate.io/docs/latest/develop/graphql.html).
-```
-curl -L -X POST 'http://localhost:8081/v1/auth' \
-  -H 'Content-Type: application/json' \
-  --data-raw '{
-    "username": "cassandra",
-    "password": "cassandra"
-}'
-```
-and copy `{"authToken": "secret"}` paste `{"x-cassandra-token": "secret"}`
-
-### Examples
-
-There is an address bar in the playground UI where you select either `DDL (/graphql-schema)` or `DML (/graphql/<keyspace>)` :
-
-**DDL (/graphql-schema)**
-```
-query {
-  keyspace(name: "uexplorer") {
-    node_outputs: table(name: "node_outputs") { columns { name } }
-  }
-}
-```
-
-**DML (/graphql/uexplorer)**
-```
-query {
-  node_outputs(filter: {header_id: {eq: "b0244dfc267baca974a4caee06120321562784303a8a688976ae56170e4d175b"}}){
-    values {
-      address
-    }
-  }
-}
-```
-```
-query {
-  node_outputs(filter: {address: {eq: "88dhgzEuTXaVTz3coGyrAbJ7DNqH37vUMzpSe2vZaCEeBzA6K2nKTZ2JQJhEFgoWmrCQEQLyZNDYMby5"}}){
-    values {
-      box_id
-    }
-  }
-}
-```
-
-## TODO
-
-  - Rest API that would provider access to all the interesting data
-  - UI that would render all the interesting data
