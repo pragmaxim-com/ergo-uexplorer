@@ -1,16 +1,29 @@
 # uExplorer
 
-Supplementary, lightweight Ergo explorer with CassandraDB backend :
+Supplementary, lightweight Ergo explorer/analyzer with CassandraDB backend :
   - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`16GB RAM`
-  - whole utxo state accessible in real-time (4GB of RAM)
+  - datastructures accessible in real-time
+    - whole utxo state
+    - hot address statistics (box and tx counts, last tx height, etc.)
+  - janus graph of the whole chain (good to use in combination with hot address statistics to avoid infinite traversals)
+  - plugin framework, add a plugin that is supplied with
+    - all new mempool transactions and blocks
+    - all handy datastructures and janus graph needed for analyzing such transaction/block
   - [stargate](https://stargate.io/) graphql server over cassandra schema
-  - shares the same model and schema as [Ergo explorer](https://github.com/ergoplatform/explorer-backend)
+    - allows for arbitrary analyzes and queries on top of all available data
   - resilient
     - it primarily uses local node (good for initial sync) with a fallback to peer network
 
 ## Chain Indexer
 
 Chain indexer syncs with Node and keeps polling blocks while discarding superseded forks.
+Valid "Source of Truth" transaction data downloaded from Nodes is persisted into cassandra within an hour.
+Secondary Data Views that are derived from Source of Truth can be easily reindexed very fast which
+allows for flexible development. Major Data Views derived from Source of Truth :
+  - janus graph of transfers withing address network
+  - utxo state
+  - cassandra view of all transactions and their boxes grouped by address, including address type and optional description
+  - size limited MinMax Queue of hot addresses and their statistics which helps solve the SuperNode problem
 
 **Requirements:**
   - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
@@ -27,6 +40,31 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
       - chain-indexer = 4GB
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks automatically falls back to peer-network if local node is not available
+
+## Plugin framework
+
+A Jar with `Plugin` implementation can be put on classpath and it will be passed each new Tx from mempool or each new Block
+together with all instances necessary for analysis:
+```
+  def processMempoolTx(
+    newTx: Transaction,                    // new Tx is passed to all plugins whenever it appears in mempool of connected Nodes
+    utxoStateWoPool: UtxoStateWithoutPool, // Utxo State without mempool merged into it
+    utxoStateWithPool: UtxoStateWithPool,  // Utxo State with mempool merged into it (needed for chained transactions)
+    topAddresses: SortedTopAddressMap,     // hot addresses are needed for dealing with SuperNode problem during graph traversal
+    graph: GraphTraversalSource            // Janus Graph for executing arbitrary gremlin traversal queries
+  ): Future[Unit]
+
+  def processNewBlock(
+    newBlock: Block,                       // new Block is passed to all plugins whenever it is applied to chain of connected Nodes
+    utxoStateWoPool: UtxoStateWithoutPool, // Utxo State without mempool merged into it
+    topAddresses: SortedTopAddressMap,     // hot addresses are needed for dealing with SuperNode problem during graph traversal
+    graph: GraphTraversalSource            // Janus Graph for executing arbitrary gremlin traversal queries
+  ): Future[Unit]
+```
+
+See example `modules/alert-plugin` implementation which submits high-volume Txs and Blocks to Discord channel with detailed information.
+It was able to render entire graph of related transactions/addresses via passing Graphml to [Retina](https://gitlab.com/ouestware/retina),
+and providing hyper-link to Retina's UI interface but that was not resilient due to unpredictable graph size (seeking for alternative).
 
 ### Build
 

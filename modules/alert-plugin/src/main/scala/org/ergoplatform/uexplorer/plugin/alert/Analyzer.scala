@@ -11,15 +11,15 @@ trait Analyzer {
     txMatch: TxMatch,
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): Option[TxMatch]
 
   def trackBlock(
     blockMatch: BlockMatch,
     utxoStateWoPool: UtxoStateWithoutPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): Option[BlockMatch]
 
 }

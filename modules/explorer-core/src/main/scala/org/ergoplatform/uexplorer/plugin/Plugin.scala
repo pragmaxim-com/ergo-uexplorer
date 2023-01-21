@@ -22,15 +22,15 @@ trait Plugin {
     newTx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit]
 
   def processNewBlock(
     newBlock: Block,
     utxoStateWoPool: UtxoStateWithoutPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit]
 }
 

@@ -14,28 +14,17 @@ class SourceAnalyzer extends Analyzer {
     txMatch: TxMatch,
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): Option[TxMatch] =
-    /*
-    val subGraph =
-      graphTraversalSource
-        .V(txMatch.inputs.keys)
-        .out("knows")
-        .out("created")
-        .values("property")
-        .next()
-
-    val stream = new FileOutputStream("data/jupiter.xml")
-    GraphMLWriter.build().vertexLabelKey("labels").create().writeGraph(stream, subGraph)
-     */
+    // TODO currently lack of options for visualizing graphson/graphml besides https://gitlab.com/ouestware/retina
     Option(txMatch)
 
   def trackBlock(
     blockMatch: BlockMatch,
     utxoStateWoPool: UtxoStateWithoutPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): Option[BlockMatch] = Option.empty
 
 }

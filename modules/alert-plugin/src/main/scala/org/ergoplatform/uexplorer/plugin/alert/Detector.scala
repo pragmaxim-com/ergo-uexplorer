@@ -15,15 +15,15 @@ trait Detector {
     tx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): List[TxMatch]
 
   def inspectNewBlock(
     newBlock: Block,
     utxoStateWoPool: UtxoStateWithoutPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): List[BlockMatch]
 }
 

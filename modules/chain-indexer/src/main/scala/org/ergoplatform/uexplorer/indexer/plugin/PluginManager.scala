@@ -44,15 +44,15 @@ class PluginManager(plugins: List[Plugin]) extends LazyLogging {
             newTx,
             utxoStateWoPool,
             UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress),
-            graphTraversalSource,
-            topAddresses
+            topAddresses,
+            graphTraversalSource
           )
         }
         .run()
         .flatMap { _ =>
           Source(chainExecutionPlan)
             .mapAsync(1) { case (plugin, newBlock) =>
-              plugin.processNewBlock(newBlock, utxoStateWoPool, graphTraversalSource, topAddresses)
+              plugin.processNewBlock(newBlock, utxoStateWoPool, topAddresses, graphTraversalSource)
             }
             .run()
         }

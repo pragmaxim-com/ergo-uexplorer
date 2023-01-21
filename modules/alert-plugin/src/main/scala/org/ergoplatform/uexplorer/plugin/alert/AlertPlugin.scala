@@ -44,17 +44,17 @@ class AlertPlugin extends Plugin {
     newTx: ApiTransaction,
     utxoStateWoPool: UtxoStateWithoutPool,
     utxoStateWithPool: UtxoStateWithPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
         detectors.flatMap { detector =>
           detector
-            .inspectNewPoolTx(newTx, utxoStateWoPool, utxoStateWithPool, graphTraversalSource, topAddresses)
+            .inspectNewPoolTx(newTx, utxoStateWoPool, utxoStateWithPool, topAddresses, graphTraversalSource)
             .flatMap { txMatch =>
               trackers.flatMap(
-                _.trackTx(txMatch, utxoStateWoPool, utxoStateWithPool, graphTraversalSource, topAddresses).toList
+                _.trackTx(txMatch, utxoStateWoPool, utxoStateWithPool, topAddresses, graphTraversalSource).toList
                   .map(_.toString)
               )
             }
@@ -65,17 +65,17 @@ class AlertPlugin extends Plugin {
   def processNewBlock(
     newBlock: Block,
     utxoStateWoPool: UtxoStateWithoutPool,
-    graphTraversalSource: GraphTraversalSource,
-    topAddresses: SortedTopAddressMap
+    topAddresses: SortedTopAddressMap,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
         detectors.flatMap { detector =>
           detector
-            .inspectNewBlock(newBlock, utxoStateWoPool, graphTraversalSource, topAddresses)
+            .inspectNewBlock(newBlock, utxoStateWoPool, topAddresses, graphTraversalSource)
             .flatMap { blockMatch =>
               trackers.flatMap(
-                _.trackBlock(blockMatch, utxoStateWoPool, graphTraversalSource, topAddresses).toList.map(_.toString)
+                _.trackBlock(blockMatch, utxoStateWoPool, topAddresses, graphTraversalSource).toList.map(_.toString)
               )
             }
 
