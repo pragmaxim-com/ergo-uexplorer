@@ -181,3 +181,8 @@ query {
   }
 }
 ```
+
+## TODO
+
+  - Rest API that would provider access to all the interesting data
+  - UI that would render all the interesting data
