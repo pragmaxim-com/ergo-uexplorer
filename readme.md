@@ -20,7 +20,7 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
 Valid "Source of Truth" transaction data downloaded from Nodes is persisted into cassandra within an hour.
 Secondary Data Views that are derived from Source of Truth can be easily reindexed very fast which
 allows for flexible development. Major Data Views derived from Source of Truth :
-  - janus graph of transfers withing address network
+  - janus graph of transfers within address network
   - utxo state
   - cassandra view of all transactions and their boxes grouped by address, including address type and optional description
   - size limited MinMax Queue of hot addresses and their statistics which helps solve the SuperNode problem
@@ -186,3 +186,4 @@ $ docker volume ls # cassandra and ergo volumes contain a lot of data
 
   - Rest API that would provider access to all the interesting data
   - UI that would render all the interesting data
+  - using approximate datastructures like [datasketches](https://datasketches.apache.org/) or [algebird](https://twitter.github.io/algebird/)
