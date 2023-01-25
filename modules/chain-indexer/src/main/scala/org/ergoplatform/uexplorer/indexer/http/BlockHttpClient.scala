@@ -4,7 +4,7 @@ import akka.{Done, NotUsed}
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.stream.OverflowStrategy
+import akka.stream.{OverflowStrategy, SharedKillSwitch}
 import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.{BlockId, Const, Height, TxId}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
@@ -132,16 +132,17 @@ object BlockHttpClient {
   )(implicit
     protocol: ProtocolSettings,
     ctx: ActorContext[_],
-    chainSyncer: ActorRef[ChainStateHolderRequest]
+    chainSyncer: ActorRef[ChainStateHolderRequest],
+    killSwitch: SharedKillSwitch
   ): Future[BlockHttpClient] = {
     val futureSttpBackend = HttpClientFutureBackend()
     val metadataClient    = MetadataHttpClient(conf)(futureSttpBackend, ctx.system)
     val nodePoolRef       = ctx.spawn(NodePool.behavior, "NodePool")
-    val backend           = SttpNodePoolBackend[WebSockets](nodePoolRef)(ctx.system, futureSttpBackend)
+    val backend           = SttpNodePoolBackend[WebSockets](nodePoolRef)(ctx.system, futureSttpBackend, killSwitch)
     backend.keepNodePoolUpdated(metadataClient).map { _ =>
       val blockClient = new BlockHttpClient(metadataClient)(protocol, ctx.system, chainSyncer, backend)
       CoordinatedShutdown(ctx.system).addTask(
-        CoordinatedShutdown.PhaseServiceUnbind,
+        CoordinatedShutdown.PhaseServiceStop,
         "stop-block-http-client"
       ) { () =>
         blockClient.close().map(_ => Done)

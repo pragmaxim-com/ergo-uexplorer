@@ -3,7 +3,9 @@ package org.ergoplatform.uexplorer.indexer
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.http.scaladsl.Http
 import akka.stream.ActorAttributes.supervisionStrategy
+import akka.stream.{KillSwitches, SharedKillSwitch}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
@@ -15,7 +17,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
+import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, Routes}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
@@ -48,6 +50,21 @@ object Application extends App with AkkaStreamSupport {
             ctx.spawn(new ChainStateHolder().initialBehavior, "ChainStateHolder")
           implicit val mempoolStateHolderRef: ActorRef[MempoolStateHolderRequest] =
             ctx.spawn(MempoolStateHolder.behavior(MempoolState.empty), "MempoolStateHolder")
+
+          implicit val killSwitch: SharedKillSwitch = KillSwitches.shared("uexplorer-kill-switch")
+
+          val bindingFuture = Http().newServerAt("localhost", 8089).bind(new Routes().shutdown)
+          CoordinatedShutdown(system).addTask(
+            CoordinatedShutdown.PhaseBeforeServiceUnbind,
+            "stop-akka-streams"
+          ) { () =>
+            for {
+              _       <- Future(killSwitch.shutdown())
+              binding <- bindingFuture
+              done    <- binding.unbind()
+            } yield done
+          }
+
           val initializationF =
             for {
               blockHttpClient <- BlockHttpClient.withNodePoolBackend(conf)

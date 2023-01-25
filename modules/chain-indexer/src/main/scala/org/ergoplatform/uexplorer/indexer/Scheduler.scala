@@ -1,8 +1,9 @@
 package org.ergoplatform.uexplorer.indexer
 
 import akka.Done
+import akka.actor.CoordinatedShutdown
 import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.stream.KillSwitches
+import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
@@ -21,10 +22,12 @@ class Scheduler(
   chainIndexer: ChainIndexer,
   mempoolSyncer: MempoolSyncer,
   chainLoader: ChainLoader
-)(implicit s: ActorSystem[Nothing], cRef: ActorRef[ChainStateHolderRequest], mRef: ActorRef[MempoolStateHolderRequest])
-  extends AkkaStreamSupport {
-
-  private lazy val killSwitch = KillSwitches.shared("scheduler")
+)(implicit
+  s: ActorSystem[Nothing],
+  cRef: ActorRef[ChainStateHolderRequest],
+  mRef: ActorRef[MempoolStateHolderRequest],
+  killSwitch: SharedKillSwitch
+) extends AkkaStreamSupport {
 
   def periodicSync: Future[(ChainState, MempoolStateChanges)] =
     for {
@@ -38,15 +41,24 @@ class Scheduler(
     pollingInterval: FiniteDuration,
     verify: Boolean = true
   ): Future[Done] =
-    chainLoader
-      .initFromDbAndDisk(verify)
-      .flatMap {
-        case ChainValid(_) =>
-          schedule(initialDelay, pollingInterval, killSwitch)(periodicSync).run()
-        case missingEpochs: MissingEpochs =>
-          chainIndexer
-            .fixChain(missingEpochs)
-            .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
+    chainLoader.initChainStateFromDbAndDisk
+      .flatMap { chainState =>
+        ChainStateHolder
+          .initialize(chainState)
+          .flatMap { _ =>
+            if (verify)
+              chainLoader.verifyStateIntegrity(chainState)
+            else
+              Future.successful(ChainValid(chainState))
+          }
+          .flatMap {
+            case ChainValid(_) =>
+              schedule(initialDelay, pollingInterval)(periodicSync).via(killSwitch.flow).run()
+            case missingEpochs: MissingEpochs =>
+              chainIndexer
+                .fixChain(missingEpochs)
+                .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
+          }
       }
 
 }

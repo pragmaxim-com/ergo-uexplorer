@@ -46,14 +46,12 @@ object Resiliency extends LazyLogging {
     randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
   ).withMaxRestarts(300, 60.minutes) // limits the amount of restarts to 20 within 5 minutes
 
-  def decider(killSwitch: SharedKillSwitch): Supervision.Decider = {
+  def decider: Supervision.Decider = {
     case ex: UnexpectedStateError =>
       logger.error("Stopping stream due to", ex)
-      killSwitch.shutdown()
       Supervision.stop
     case NonFatal(ex) =>
       logger.error("Stopping stream due to", ex)
-      killSwitch.shutdown()
       Supervision.stop
   }
 }

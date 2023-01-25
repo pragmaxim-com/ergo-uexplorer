@@ -11,6 +11,8 @@ services:
         condition: service_healthy
       cassandra-init-tables:
         condition: service_completed_successfully
+    ports:
+      - 127.0.0.1:8089:8089
     networks:
       - backend
     volumes:

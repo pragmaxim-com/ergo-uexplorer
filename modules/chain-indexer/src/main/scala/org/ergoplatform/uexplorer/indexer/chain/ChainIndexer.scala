@@ -4,7 +4,7 @@ import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.ActorAttributes.supervisionStrategy
-import akka.stream.{ActorAttributes, KillSwitches, OverflowStrategy}
+import akka.stream.{ActorAttributes, KillSwitches, OverflowStrategy, SharedKillSwitch}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
@@ -39,19 +39,8 @@ class ChainIndexer(
   backend: Backend,
   blockHttpClient: BlockHttpClient,
   snapshotManager: UtxoSnapshotManager
-)(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest])
+)(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest], killSwitch: SharedKillSwitch)
   extends LazyLogging {
-  private lazy val killSwitch = KillSwitches.shared("indexer")
-
-  CoordinatedShutdown(s).addTask(
-    CoordinatedShutdown.PhaseBeforeServiceUnbind,
-    "stop-akka-stream"
-  ) { () =>
-    Future {
-      killSwitch.shutdown()
-      Done
-    }
-  }
 
   private val indexingSink: Sink[Height, Future[ChainSyncResult]] =
     Flow[Height]
@@ -73,7 +62,7 @@ class ChainIndexer(
       .via(backend.graphWriteFlow)
       .via(backend.epochsWriteFlow)
       .via(killSwitch.flow)
-      .withAttributes(supervisionStrategy(Resiliency.decider(killSwitch)))
+      .withAttributes(supervisionStrategy(Resiliency.decider))
       .toMat(
         Sink
           .fold((Option.empty[Block], Option.empty[NewEpochDetected])) {

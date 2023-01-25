@@ -75,7 +75,7 @@ object PluginManager extends LazyLogging {
         .map { _ =>
           val pluginManager = new PluginManager(plugins)
           CoordinatedShutdown(system).addTask(
-            CoordinatedShutdown.PhaseServiceUnbind,
+            CoordinatedShutdown.PhaseServiceStop,
             "stop-plugin-manager"
           ) { () =>
             pluginManager.close().map(_ => Done)

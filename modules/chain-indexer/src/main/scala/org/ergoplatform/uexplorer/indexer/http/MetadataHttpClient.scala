@@ -110,7 +110,7 @@ object MetadataHttpClient {
     implicit val remoteNodeUriMagnet: RemoteNodeUriMagnet = conf.remoteUriMagnet
     val metadataClient                                    = new MetadataHttpClient[P]()
     CoordinatedShutdown(system).addTask(
-      CoordinatedShutdown.PhaseServiceUnbind,
+      CoordinatedShutdown.PhaseServiceStop,
       "stop-metadata-http-client"
     ) { () =>
       metadataClient.close().map(_ => Done)

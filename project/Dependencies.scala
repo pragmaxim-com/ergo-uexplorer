@@ -1,7 +1,7 @@
 import sbt._
 
 object Version {
-  lazy val akka            = "2.6.20"
+  lazy val akka            = "2.7.0"
   lazy val sttp            = "3.8.2"
   lazy val circe           = "0.14.3"
   lazy val enumeratum      = "1.7.0"
@@ -17,10 +17,10 @@ object Dependencies {
   val ergoWallet = "org.ergoplatform"      %% "ergo-wallet"     % Version.ergo cross CrossVersion.for3Use2_13
   val pureConfig = "com.github.pureconfig" %% "pureconfig-core" % "0.17.1"
 
-  lazy val commonsCodec   = "commons-codec"   % "commons-codec"   % "1.15"
-  lazy val commonsLogging = "commons-logging" % "commons-logging" % "1.2"
-
-  lazy val gremlin = "org.apache.tinkerpop" % "gremlin-driver" % "3.6.1"
+  lazy val commonsCodec   = "commons-codec"           % "commons-codec"     % "1.15"
+  lazy val commonsLogging = "commons-logging"         % "commons-logging"   % "1.2"
+  lazy val gremlin        = "org.apache.tinkerpop"    % "gremlin-driver"    % "3.6.1"
+  lazy val sketches       = "org.apache.datasketches" % "datasketches-java" % "3.1.0"
 
   lazy val janusGraph = List(
     "org.janusgraph" % "janusgraph-driver" % "1.0.0-rc1",
@@ -40,6 +40,7 @@ object Dependencies {
 
   def lightBend(v: String) = Seq(
     "com.typesafe.akka"          % s"akka-actor_$v"               % Version.akka,
+    "com.typesafe.akka"          % s"akka-http_$v"                % "10.5.0-M1",
     "com.typesafe.akka"          % s"akka-actor-typed_$v"         % Version.akka,
     "com.typesafe.akka"          % s"akka-stream-typed_$v"        % Version.akka,
     "com.typesafe.akka"          % s"akka-actor-testkit-typed_$v" % Version.akka % Test,

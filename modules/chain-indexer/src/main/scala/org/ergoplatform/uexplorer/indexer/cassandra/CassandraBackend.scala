@@ -101,7 +101,7 @@ object CassandraBackend extends LazyLogging {
     logger.info(s"Cassandra session and Janus graph created")
     val backend = new CassandraBackend(parallelism)
     CoordinatedShutdown(system).addTask(
-      CoordinatedShutdown.PhaseServiceUnbind,
+      CoordinatedShutdown.PhaseServiceStop,
       "stop-cassandra-backend"
     ) { () =>
       backend.close().map { _ =>

@@ -49,7 +49,9 @@ class DiskUtxoSnapshotManager(
   def saveSnapshot(snapshot: UtxoSnapshot.Deserialized, force: Boolean = true): Future[Unit] =
     Future(rootSnapshotDir.mkdirs()).flatMap { _ =>
       val snapshotDir = rootSnapshotDir.toPath.resolve(snapshot.epochIndex.toString).toFile
-      if (snapshotDir.exists() && force) {
+      if (snapshotDir.exists() && !force) {
+        Future.successful(())
+      } else {
         logger.info(s"Saving snapshot at epoch ${snapshot.epochIndex} to ${snapshotDir.getPath}")
         Option(snapshotDir.listFiles()).foreach(_.foreach(_.delete()))
         snapshotDir.mkdirs()
@@ -75,8 +77,6 @@ class DiskUtxoSnapshotManager(
               .runWith(FileIO.toPath(f = snapshotDir.toPath.resolve("topAddresses")))
               .map(_ => ())
           }
-      } else {
-        Future.successful(())
       }
     }
 

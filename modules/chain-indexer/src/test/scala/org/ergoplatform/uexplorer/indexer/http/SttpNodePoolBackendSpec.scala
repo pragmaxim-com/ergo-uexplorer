@@ -2,12 +2,13 @@ package org.ergoplatform.uexplorer.indexer.http
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 import sttp.capabilities
-import sttp.client3._
+import sttp.client3.*
 import sttp.client3.testing.SttpBackendStub
 import sttp.model.StatusCode
 
@@ -26,8 +27,9 @@ class SttpNodePoolBackendSpec extends AsyncFreeSpec with Matchers with BeforeAnd
 
   private val proxyUri = uri"http://proxy"
 
-  private val testKit                      = ActorTestKit()
-  implicit private val sys: ActorSystem[_] = testKit.internalSystem
+  private val testKit                       = ActorTestKit()
+  implicit private val sys: ActorSystem[_]  = testKit.internalSystem
+  implicit val killSwitch: SharedKillSwitch = KillSwitches.shared("nodepool")
 
   override def afterAll(): Unit = {
     super.afterAll()

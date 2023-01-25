@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer.http
 
 import akka.{Done, NotUsed}
 import akka.actor.typed.*
-import akka.stream.{ActorAttributes, KillSwitches}
+import akka.stream.{ActorAttributes, KillSwitches, SharedKillSwitch}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
@@ -23,12 +23,12 @@ import scala.util.*
 class SttpNodePoolBackend[P]()(implicit
   sys: ActorSystem[Nothing],
   nodePoolRef: ActorRef[NodePoolRequest],
-  underlying: SttpBackend[Future, P]
+  underlying: SttpBackend[Future, P],
+  killSwitch: SharedKillSwitch
 ) extends DelegateSttpBackend[Future, P](underlying) {
   import SttpNodePoolBackend.fallbackQuery
 
   implicit private val timeout: Timeout = 5.seconds
-  private val killSwitch                = KillSwitches.shared("NodePool")
 
   override def close(): Future[Unit] = {
     nodePoolRef.tell(GracefulShutdown)
@@ -44,7 +44,7 @@ class SttpNodePoolBackend[P]()(implicit
   def keepNodePoolUpdated(metadataClient: MetadataHttpClient[_]): Future[NodePoolState] =
     updateNodePool(metadataClient)
       .andThen { case Success(_) =>
-        schedule(15.seconds, 30.seconds, killSwitch)(updateNodePool(metadataClient)).run()
+        schedule(15.seconds, 30.seconds)(updateNodePool(metadataClient)).via(killSwitch.flow).run()
       }
 
   override def send[T, R >: P with Effect[Future]](origRequest: Request[T, R]): Future[Response[T]] = {
@@ -73,9 +73,10 @@ object SttpNodePoolBackend extends LazyLogging {
 
   def apply[P](nodePoolRef: ActorRef[NodePoolRequest])(implicit
     s: ActorSystem[Nothing],
-    underlyingBackend: SttpBackend[Future, P]
+    underlyingBackend: SttpBackend[Future, P],
+    killSwitch: SharedKillSwitch
   ): SttpNodePoolBackend[P] =
-    new SttpNodePoolBackend()(s, nodePoolRef, underlyingBackend)
+    new SttpNodePoolBackend()(s, nodePoolRef, underlyingBackend, killSwitch)
 
   def swapUri[T, R](reqWithDummyUri: Request[T, R], peerUri: Uri): Request[T, R] =
     reqWithDummyUri.get(Utils.copyUri(reqWithDummyUri.uri, peerUri))

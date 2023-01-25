@@ -2,6 +2,7 @@ package org.ergoplatform.uexplorer.indexer
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
@@ -28,6 +29,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   implicit val protocol: ProtocolSettings                       = ChainIndexerConf.loadDefaultOrThrow.protocol
   implicit private val localNodeUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(uri"http://local")
   implicit private val remoteNodeUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(uri"http://remote")
+  implicit val killSwitch: SharedKillSwitch = KillSwitches.shared("scheduler-kill-switch")
 
   override def afterAll(): Unit = {
     super.afterAll()
