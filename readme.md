@@ -187,3 +187,7 @@ $ docker volume ls # cassandra and ergo volumes contain a lot of data
   - Rest API that would provider access to all the interesting data
   - UI that would render all the interesting data
   - using approximate datastructures like [datasketches](https://datasketches.apache.org/) or [algebird](https://twitter.github.io/algebird/)
+  - using persistent-offheap datastructures
+     - [SwayDB](https://swaydb.io)
+     - [fast-serialization](https://github.com/RuedigerMoeller/fast-serialization)
+     - or RocksDB
