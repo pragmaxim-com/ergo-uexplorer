@@ -189,5 +189,5 @@ $ docker volume ls # cassandra and ergo volumes contain a lot of data
   - using approximate datastructures like [datasketches](https://datasketches.apache.org/) or [algebird](https://twitter.github.io/algebird/)
   - using persistent-offheap datastructures
      - [SwayDB](https://swaydb.io)
-     - [fast-serialization](https://github.com/RuedigerMoeller/fast-serialization)
+     - [MVStore](https://www.h2database.com/html/mvstore.html)
      - or RocksDB
