@@ -103,6 +103,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ janusGraph ++ Seq(sketches, gremlin, retry("3"), commonsCodec, ergoWallet, loggingApi, logback, pureConfig))
+    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ janusGraph ++ Seq(gremlin, retry("3"), commonsCodec, ergoWallet, loggingApi, logback, pureConfig))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
     .dependsOn(core, `alert-plugin`)

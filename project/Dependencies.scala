@@ -8,19 +8,18 @@ object Version {
   lazy val cassandraDriver = "4.15.0"
   lazy val caliban         = "2.0.1"
   lazy val cql4s           = "0.0.1"
-  lazy val ergo            = "4.0.42-153-3b68716c-20221008-0749-SNAPSHOT"
+  lazy val ergo            = "5.0.7"
 }
 
 object Dependencies {
 
-  val scorexUtil = "org.scorexfoundation"  %% "scorex-util"     % "0.1.8" cross CrossVersion.for3Use2_13
-  val ergoWallet = "org.ergoplatform"      %% "ergo-wallet"     % Version.ergo cross CrossVersion.for3Use2_13
-  val pureConfig = "com.github.pureconfig" %% "pureconfig-core" % "0.17.1"
+  lazy val scorexUtil = "org.scorexfoundation"  %% "scorex-util"     % "0.1.8" cross CrossVersion.for3Use2_13
+  lazy val ergoWallet = "org.ergoplatform"      %% "ergo-wallet"     % Version.ergo cross CrossVersion.for3Use2_13
+  lazy val pureConfig = "com.github.pureconfig" %% "pureconfig-core" % "0.17.1"
 
-  lazy val commonsCodec   = "commons-codec"           % "commons-codec"     % "1.15"
-  lazy val commonsLogging = "commons-logging"         % "commons-logging"   % "1.2"
-  lazy val gremlin        = "org.apache.tinkerpop"    % "gremlin-driver"    % "3.6.1"
-  lazy val sketches       = "org.apache.datasketches" % "datasketches-java" % "3.1.0"
+  lazy val commonsCodec   = "commons-codec"        % "commons-codec"   % "1.15"
+  lazy val commonsLogging = "commons-logging"      % "commons-logging" % "1.2"
+  lazy val gremlin        = "org.apache.tinkerpop" % "gremlin-driver"  % "3.6.1"
 
   lazy val janusGraph = List(
     "org.janusgraph" % "janusgraph-driver" % "1.0.0-rc1",
