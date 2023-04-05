@@ -1,5 +1,15 @@
 # μExplorer
 
+## Rationale
+
+Blockchain weak spot? **Efficient block persistence**
+  - Reason? **Peer-to-peer architecture**
+     => key-value store without analytical possibilities => requires Explorer that indexes data into queryable representation
+
+Explorer weak spot? **Data distribution**
+  - Reason? [Supernode problem](https://www.datastax.com/blog/solution-supernode-problem)
+     => queries for hot addresses overload DBs => requires Explorer that indexes data in supernode-resistant manner
+
 Supplementary, lightweight (μ = micro) Ergo explorer/analyzer with CassandraDB backend :
   - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`16GB RAM`
   - datastructures accessible in real-time
