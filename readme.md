@@ -10,6 +10,9 @@ Explorer weak spot? **Data distribution**
   - Reason? [Supernode problem](https://www.datastax.com/blog/solution-supernode-problem)
      => queries for hot addresses overload DBs => requires Explorer that indexes data in supernode-resistant manner
 
+[Watch](https://youtu.be/5W2KIcw9Pp0)
+
+[![IMAGE ALT TEXT](https://img.youtube.com/vi/5W2KIcw9Pp0/0.jpg)](https://youtu.be/5W2KIcw9Pp0)
 
 ## Solution
 
