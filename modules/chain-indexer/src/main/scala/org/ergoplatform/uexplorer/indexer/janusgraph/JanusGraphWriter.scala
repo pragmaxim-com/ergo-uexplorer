@@ -3,26 +3,30 @@ package org.ergoplatform.uexplorer.indexer.janusgraph
 import akka.NotUsed
 import akka.stream.ActorAttributes
 import akka.stream.scaladsl.{Flow, Source}
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Utils
-import org.ergoplatform.uexplorer.{Address, BoxId, Const, TxId}
+import org.ergoplatform.uexplorer.{Address, BoxId, Const, TopAddressMap, TxId}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.{MaybeNewEpoch, NewEpochDetected}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.collection.immutable.ArraySeq
+import scala.collection.immutable.{ArraySeq, TreeMap}
 import eu.timepit.refined.auto.autoUnwrap
+import org.ergoplatform.uexplorer.indexer.api.GraphBackend
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.janusgraph.core.Multiplicity
 import org.janusgraph.graphdb.database.StandardJanusGraph
 import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 
 import scala.concurrent.Future
+import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
 
-trait JanusGraphWriter {
-  this: CassandraBackend =>
+trait JanusGraphWriter extends LazyLogging {
+  this: JanusGraphBackend =>
 
   def initGraph: Boolean = {
     val mgmt = janusGraph.openManagement()
@@ -50,18 +54,22 @@ trait JanusGraphWriter {
     }
   }
 
+  def writeTxsAndCommit(txBoxesByHeight: IterableOnce[(Height, BoxesByTx)], topAddresses: TopAddressMap): Unit = {
+    txBoxesByHeight.iterator
+      .foreach { case (height, boxesByTx) =>
+        boxesByTx.foreach { case (tx, (inputs, outputs)) =>
+          TxGraphWriter.writeGraph(tx, height, inputs, outputs, topAddresses)(janusGraph)
+        }
+      }
+    janusGraph.tx().commit()
+  }
+
   def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
     Flow[(Block, Option[MaybeNewEpoch])]
       .mapAsync(1) {
         case (b, s @ Some(NewEpochDetected(e, boxesByHeight, topAddresses))) =>
           Future {
-            boxesByHeight.iterator
-              .foreach { case (height, boxesByTx) =>
-                boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-                  TxGraphWriter.writeGraph(tx, height, inputs, outputs, topAddresses)(janusGraph)
-                }
-              }
-            janusGraph.tx().commit()
+            writeTxsAndCommit(boxesByHeight, topAddresses)
             logger.info(s"New epoch ${e.index} graph building finished")
             b -> s
           }

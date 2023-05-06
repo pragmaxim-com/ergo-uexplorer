@@ -1,43 +1,37 @@
 package org.ergoplatform.uexplorer.indexer.cassandra
 
-import akka.{Done, NotUsed}
+import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Flow
+import akka.{Done, NotUsed}
 import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.config.{DriverConfig, DriverConfigLoader}
 import com.datastax.oss.driver.api.core.context.DriverContext
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.apache.tinkerpop.gremlin.structure.{Direction, T}
 import org.ergoplatform.uexplorer.Const
 import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.indexer.Utils
 import org.ergoplatform.uexplorer.indexer.api.Backend
+import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend.BufferSize
 import org.ergoplatform.uexplorer.indexer.cassandra.entity.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.Inserted
-import org.apache.tinkerpop.gremlin.structure.{Direction, T}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.jdk.FutureConverters.*
 import java.net.InetSocketAddress
 import java.util.concurrent.{CompletableFuture, CompletionStage}
-import scala.jdk.CollectionConverters.*
-import scala.concurrent.duration.DurationInt
-import CassandraBackend.BufferSize
-import akka.actor.CoordinatedShutdown
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.indexer.Utils
-import org.ergoplatform.uexplorer.indexer.janusgraph.JanusGraphWriter
-import org.janusgraph.core.{Cardinality, JanusGraph, JanusGraphFactory, Multiplicity}
-import org.janusgraph.graphdb.database.StandardJanusGraph
-import org.janusgraph.graphdb.types.vertices.PropertyKeyVertex
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 import scala.util.Try
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
-  val janusGraph: StandardJanusGraph,
   val system: ActorSystem[Nothing]
 ) extends Backend
   with LazyLogging
@@ -53,10 +47,7 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraEpochWriter
   with CassandraAddressWriter
   with CassandraEpochReader
-  with JanusGraphWriter
   with CassandraUtxoReader {
-
-  def graphTraversalSource: GraphTraversalSource = janusGraph.traversal()
 
   def close(): Future[Unit] = {
     logger.info(s"Stopping Cassandra session")
@@ -91,21 +82,13 @@ object CassandraBackend extends LazyLogging {
         .builder()
         .withConfigLoader(new CassandraConfigLoader(datastaxDriverConf))
         .build()
-    implicit val janusGraph = JanusGraphFactory.build
-      .set("storage.backend", "cql")
-      .set("storage.hostname", datastaxDriverConf.getStringList("basic.contact-points").get(0))
-      .set("graph.set-vertex-id", true)
-      .open()
-      .asInstanceOf[StandardJanusGraph]
-
-    logger.info(s"Cassandra session and Janus graph created")
+    logger.info(s"Cassandra session created")
     val backend = new CassandraBackend(parallelism)
     CoordinatedShutdown(system).addTask(
       CoordinatedShutdown.PhaseServiceStop,
       "stop-cassandra-backend"
     ) { () =>
       backend.close().map { _ =>
-        janusGraph.close()
         Done
       }
     }

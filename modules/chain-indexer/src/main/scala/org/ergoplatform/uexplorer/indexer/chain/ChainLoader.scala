@@ -10,7 +10,7 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, UnexpectedStateError}
-import org.ergoplatform.uexplorer.indexer.api.{Backend, UtxoSnapshot, UtxoSnapshotManager}
+import org.ergoplatform.uexplorer.indexer.api.{Backend, GraphBackend, UtxoSnapshot, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
 import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
@@ -28,6 +28,7 @@ import scala.util.{Failure, Success}
 
 class ChainLoader(
   backend: Backend,
+  graphBackend: GraphBackend,
   snapshotManager: UtxoSnapshotManager
 )(implicit s: ActorSystem[Nothing])
   extends AkkaStreamSupport
@@ -49,15 +50,7 @@ class ChainLoader(
           logger.info(s"Merging boxes of epoch $epochIndex finished")
           val newState = s.mergeGivenBoxes(boxesByHeight.last._1, boxesByHeight.iterator.flatMap(_._2.iterator))
           if (includingGraph) {
-            boxesByHeight.iterator
-              .foreach { case (height, boxesByTx) =>
-                boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-                  TxGraphWriter.writeGraph(tx, height, inputs, outputs, newState.topAddresses.nodeMap)(
-                    backend.janusGraph
-                  )
-                }
-              }
-            backend.janusGraph.tx().commit()
+            graphBackend.writeTxsAndCommit(boxesByHeight, newState.topAddresses.nodeMap)
             logger.info(s"Graph building of epoch $epochIndex finished")
           }
           newState
@@ -70,14 +63,14 @@ class ChainLoader(
       Future {
         snapshotManager.clearAllSnapshots()
         require(
-          backend.initGraph || backend.graphTraversalSource.V().hasNext,
+          graphBackend.initGraph || graphBackend.isEmpty,
           "Janus graph must be empty when main db is empty, drop janusgraph keyspace!"
         )
         logger.info(s"Chain is empty, loading from scratch ...")
         UtxoState.empty
       }
     else {
-      val graphEmpty = backend.initGraph
+      val graphEmpty = graphBackend.initGraph
       lazy val snapshotExists =
         snapshotManager.latestSerializedSnapshot.exists(_.epochIndex == blockInfoByEpochIndex.lastKey)
       if (!graphEmpty && snapshotExists) {

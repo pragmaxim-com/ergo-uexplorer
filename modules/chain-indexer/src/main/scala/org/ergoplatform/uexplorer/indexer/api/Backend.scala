@@ -14,8 +14,6 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.config.{BackendType, CassandraDb, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
-import org.janusgraph.graphdb.database.StandardJanusGraph
-import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.ConcurrentHashMap
@@ -28,15 +26,7 @@ import scala.util.Try
 
 trait Backend {
 
-  def janusGraph: StandardJanusGraph
-
-  def initGraph: Boolean
-
-  def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed]
-
   def transactionBoxesByHeightFlow: Flow[Height, (Height, UtxoState.BoxesByTx), NotUsed]
-
-  def graphTraversalSource: GraphTraversalSource
 
   def blockWriteFlow: Flow[Inserted, Block, NotUsed]
 
@@ -68,13 +58,7 @@ class InMemoryBackend extends Backend {
   private val blocksById     = new ConcurrentHashMap[BlockId, BufferedBlockInfo]()
   private val blocksByHeight = new ConcurrentHashMap[Height, BufferedBlockInfo]()
 
-  def janusGraph: StandardJanusGraph = null
-
-  def initGraph: Boolean = false
-
   def close(): Future[Unit] = Future.successful(())
-
-  def graphTraversalSource: GraphTraversalSource = EmptyGraph.instance.traversal()
 
   override def blockWriteFlow: Flow[Inserted, Block, NotUsed] =
     Flow[Inserted]
@@ -99,17 +83,8 @@ class InMemoryBackend extends Backend {
       .map {
         case (block, Some(NewEpochDetected(epoch, boxesByTxId, topAddresses))) =>
           lastBlockInfoByEpochIndex.put(epoch.index, blocksById.get(epoch.blockIds.last))
+          boxesByHeight.putAll(boxesByTxId.asJava)
           block -> Some(NewEpochDetected(epoch, boxesByTxId, topAddresses))
-        case tuple =>
-          tuple
-      }
-
-  override def graphWriteFlow: Flow[(Block, Option[MaybeNewEpoch]), (Block, Option[MaybeNewEpoch]), NotUsed] =
-    Flow[(Block, Option[MaybeNewEpoch])]
-      .map {
-        case (block, Some(NewEpochDetected(epoch, boxesByTxIdByHeight, topAddresses))) =>
-          boxesByHeight.putAll(boxesByTxIdByHeight.asJava)
-          block -> Some(NewEpochDetected(epoch, boxesByTxIdByHeight, topAddresses))
         case tuple =>
           tuple
       }

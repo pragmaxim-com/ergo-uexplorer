@@ -1,13 +1,13 @@
-import Dependencies._
+import Dependencies.*
 import java.nio.file.Files
 import java.util.stream.Collectors
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 Global / cancelable := true // Allow cancellation of forked task without killing SBT
 
 lazy val commonSettings = Seq(
   organization := "org.ergoplatform",
-  scalaVersion := "3.2.0",
+  scalaVersion := "3.2.2",
   version := "0.0.1",
   resolvers ++= Resolver.sonatypeOssRepos("public") ++ Resolver.sonatypeOssRepos("snapshots"),
   ThisBuild / evictionErrorLevel := Level.Info,

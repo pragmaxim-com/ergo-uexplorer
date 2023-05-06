@@ -45,10 +45,16 @@ sealed trait BackendType derives ConfigReader
 case class CassandraDb(parallelism: Int) extends BackendType
 case object InMemoryDb extends BackendType
 
+sealed trait GraphBackendType derives ConfigReader
+
+case object JanusGraph extends GraphBackendType
+case object InMemoryGraph extends GraphBackendType
+
 case class ChainIndexerConf(
   nodeAddressToInitFrom: Uri,
   peerAddressToPollFrom: Uri,
   backendType: BackendType,
+  graphBackendType: GraphBackendType,
   protocol: ProtocolSettings
 ) derives ConfigReader {
   def remoteUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(peerAddressToPollFrom)

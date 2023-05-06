@@ -11,7 +11,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.Resiliency
-import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend, UtxoSnapshotManager}
+import org.ergoplatform.uexplorer.indexer.api.{Backend, GraphBackend, InMemoryBackend, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
@@ -37,6 +37,7 @@ import scala.util.{Failure, Try}
 
 class ChainIndexer(
   backend: Backend,
+  graphBackend: GraphBackend,
   blockHttpClient: BlockHttpClient,
   snapshotManager: UtxoSnapshotManager
 )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest], killSwitch: SharedKillSwitch)
@@ -59,7 +60,7 @@ class ChainIndexer(
       .via(backend.addressWriteFlow)
       .async
       .buffer(2, OverflowStrategy.backpressure)
-      .via(backend.graphWriteFlow)
+      .via(graphBackend.graphWriteFlow)
       .via(backend.epochsWriteFlow)
       .via(killSwitch.flow)
       .withAttributes(supervisionStrategy(Resiliency.decider))
@@ -80,7 +81,7 @@ class ChainIndexer(
                 ChainSyncResult(
                   chainState,
                   lastBlock,
-                  backend.graphTraversalSource,
+                  graphBackend.graphTraversalSource,
                   chainState.utxoState.topAddresses.sortedByBoxCount
                 )
               }

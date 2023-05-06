@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.indexer
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
-import org.ergoplatform.uexplorer.indexer.api.InMemoryBackend
+import org.ergoplatform.uexplorer.indexer.api.{InMemoryBackend, InMemoryGraphBackend}
 import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
 import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
 import org.ergoplatform.uexplorer.indexer.chain.{ChainIndexer, ChainLoader, ChainState, ChainStateHolder}
@@ -29,7 +29,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   implicit val protocol: ProtocolSettings                       = ChainIndexerConf.loadDefaultOrThrow.protocol
   implicit private val localNodeUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(uri"http://local")
   implicit private val remoteNodeUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(uri"http://remote")
-  implicit val killSwitch: SharedKillSwitch = KillSwitches.shared("scheduler-kill-switch")
+  implicit val killSwitch: SharedKillSwitch                     = KillSwitches.shared("scheduler-kill-switch")
 
   override def afterAll(): Unit = {
     super.afterAll()
@@ -65,11 +65,12 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
 
   val blockClient     = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val backend         = new InMemoryBackend
+  val graphBackend    = new InMemoryGraphBackend
   val snapshotManager = new NoUtxoSnapshotManager()
   val pluginManager   = new PluginManager(List.empty)
-  val chainIndexer    = new ChainIndexer(backend, blockClient, snapshotManager)
+  val chainIndexer    = new ChainIndexer(backend, graphBackend, blockClient, snapshotManager)
   val mempoolSyncer   = new MempoolSyncer(blockClient)
-  val chainLoader     = new ChainLoader(backend, snapshotManager)
+  val chainLoader     = new ChainLoader(backend, graphBackend, snapshotManager)
 
   val scheduler = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, chainLoader)
 

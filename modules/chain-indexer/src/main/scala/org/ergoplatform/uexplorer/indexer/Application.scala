@@ -10,7 +10,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.api.{Backend, InMemoryBackend}
+import org.ergoplatform.uexplorer.indexer.api.{Backend, GraphBackend, InMemoryBackend}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
@@ -67,15 +67,16 @@ object Application extends App with AkkaStreamSupport {
 
           val initializationF =
             for {
-              blockHttpClient <- BlockHttpClient.withNodePoolBackend(conf)
-              pluginManager   <- PluginManager.initialize
-              backend         <- Future.fromTry(Backend(conf.backendType))
-              snapshotManager = new DiskUtxoSnapshotManager()
-              chainIndexer    = new ChainIndexer(backend, blockHttpClient, snapshotManager)
-              mempoolSyncer   = new MempoolSyncer(blockHttpClient)
-              chainLoader     = new ChainLoader(backend, snapshotManager)
-              scheduler       = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, chainLoader)
-              done <- scheduler.validateAndSchedule(0.seconds, 5.seconds)
+              blockHttpClient   <- BlockHttpClient.withNodePoolBackend(conf)
+              pluginManager     <- PluginManager.initialize
+              backend           <- Future.fromTry(Backend(conf.backendType))
+              graphBackend      <- Future.fromTry(GraphBackend(conf.graphBackendType))
+              snapshotManager   = new DiskUtxoSnapshotManager()
+              chainIndexer      = new ChainIndexer(backend, graphBackend, blockHttpClient, snapshotManager)
+              mempoolSyncer     = new MempoolSyncer(blockHttpClient)
+              chainLoader       = new ChainLoader(backend, graphBackend, snapshotManager)
+              scheduler         = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, chainLoader)
+              done              <- scheduler.validateAndSchedule(0.seconds, 5.seconds)
             } yield done
 
           initializationF.andThen {
