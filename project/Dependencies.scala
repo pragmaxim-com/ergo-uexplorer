@@ -27,6 +27,8 @@ object Dependencies {
     "org.janusgraph" % "janusgraph-cql"    % "1.0.0-rc1"
   )
 
+  lazy val mvStore = "com.h2database" % "h2-mvstore" % "2.1.214"
+
   lazy val cassandraDb = List(
     "com.datastax.oss" % "java-driver-core"             % Version.cassandraDriver,
     "com.datastax.oss" % "java-driver-query-builder"    % Version.cassandraDriver,
