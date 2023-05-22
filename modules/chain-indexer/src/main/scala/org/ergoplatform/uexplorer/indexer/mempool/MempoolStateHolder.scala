@@ -9,13 +9,13 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainState
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.Tx
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import org.ergoplatform.uexplorer.Tx
 
 object MempoolStateHolder extends LazyLogging {
 

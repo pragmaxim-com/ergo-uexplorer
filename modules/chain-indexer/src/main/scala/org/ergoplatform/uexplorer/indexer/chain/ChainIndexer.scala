@@ -10,13 +10,11 @@ import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.api.{Backend, GraphBackend, InMemoryBackend, UtxoSnapshotManager}
-import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
-import org.ergoplatform.uexplorer.indexer.chain.{ChainLoader, ChainState, ChainStateHolder, Epoch}
-import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb}
+import org.ergoplatform.uexplorer.indexer.chain.{ChainLoader, ChainState, ChainStateHolder}
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
@@ -34,6 +32,12 @@ import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Try}
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.Resiliency
+import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
+import org.ergoplatform.uexplorer.indexer.utxo.UtxoSnapshotManager
+import org.ergoplatform.uexplorer.Epoch
+import org.ergoplatform.uexplorer.Epoch.EpochCommand
+import org.ergoplatform.uexplorer.Epoch.WriteNewEpoch
 
 class ChainIndexer(
   backend: Backend,
@@ -43,11 +47,24 @@ class ChainIndexer(
 )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest], killSwitch: SharedKillSwitch)
   extends LazyLogging {
 
+  private def forkDeleteFlow(parallelism: Int): Flow[Inserted, Block, NotUsed] =
+    Flow[Inserted]
+      .mapAsync(parallelism) {
+        case BestBlockInserted(flatBlock) =>
+          Future.successful(List(flatBlock))
+        case ForkInserted(newFlatBlocks, supersededFork) =>
+          backend
+            .removeBlocksFromMainChain(supersededFork.map(_.headerId))
+            .map(_ => newFlatBlocks)
+      }
+      .mapConcat(identity)
+
   private val indexingSink: Sink[Height, Future[ChainSyncResult]] =
     Flow[Height]
       .via(blockHttpClient.blockFlow)
       .mapAsync(1) { block =>
-        blockHttpClient.getBestBlockOrBranch(block, ChainStateHolder.containsBlock, List.empty)
+        blockHttpClient
+          .getBestBlockOrBranch(block, ChainStateHolder.containsBlock, List.empty)
           .flatMap {
             case bestBlock :: Nil =>
               ChainStateHolder.insertBestBlock(bestBlock)
@@ -55,14 +72,15 @@ class ChainIndexer(
               ChainStateHolder.insertWinningFork(winningFork)
           }
       }
+      .via(forkDeleteFlow(1))
       .via(backend.blockWriteFlow)
       .mapAsync(1) {
         case block if Epoch.heightAtFlushPoint(block.header.height) =>
           ChainStateHolder
             .finishEpoch(Epoch.epochIndexForHeight(block.header.height) - 1)
-            .map(e => block -> Option(e))
+            .map(e => block -> Option(e.toEpochCommand))
         case block =>
-          Future.successful(block -> Option.empty)
+          Future.successful(block -> Option.empty[EpochCommand])
       }
       .async
       .buffer(2, OverflowStrategy.backpressure)
@@ -75,8 +93,8 @@ class ChainIndexer(
       .withAttributes(supervisionStrategy(Resiliency.decider))
       .toMat(
         Sink
-          .fold((Option.empty[Block], Option.empty[NewEpochDetected])) {
-            case (_, (block, Some(e @ NewEpochDetected(_, _, _)))) =>
+          .fold((Option.empty[Block], Option.empty[WriteNewEpoch])) {
+            case (_, (block, Some(e @ WriteNewEpoch(_, _, _)))) =>
               Option(block) -> Option(e)
             case ((_, lastEpoch), (block, _)) =>
               Option(block) -> lastEpoch

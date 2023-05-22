@@ -5,7 +5,7 @@ import org.ergoplatform.uexplorer.indexer.TestSupport
 import org.ergoplatform.uexplorer.{BlockId, Height, HexString}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-
+import org.ergoplatform.uexplorer.Epoch
 import scala.collection.immutable.ArraySeq
 import org.ergoplatform.uexplorer.UnexpectedStateError
 

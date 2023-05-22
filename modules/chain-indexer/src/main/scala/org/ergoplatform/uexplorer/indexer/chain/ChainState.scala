@@ -2,12 +2,11 @@ package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.db.{Block, BlockInfo}
-import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BlockBuffer
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
-import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
+import org.ergoplatform.uexplorer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
-import org.ergoplatform.uexplorer.indexer.MapPimp
+import org.ergoplatform.uexplorer.MapPimp
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import scala.collection.immutable.{ArraySeq, List, SortedMap, SortedSet, TreeMap, TreeSet}
@@ -46,7 +45,7 @@ case class ChainState(
             TreeSet(Epoch.heightRangeForEpochIndex(previousEpochIndex).last, candidate.relsByHeight.head._1)
           val error =
             s"Prev epoch $previousEpochIndex header ${lastBlockIdInEpoch.get(previousEpochIndex)} " +
-            s"does not match current epoch $curIndex header, invalid heights: ${invalidHeights.mkString(",")}"
+              s"does not match current epoch $curIndex header, invalid heights: ${invalidHeights.mkString(",")}"
           Failure(new IllegalStateException(error))
         case Left(candidate) =>
           Failure(new IllegalStateException(candidate.error))
@@ -82,7 +81,7 @@ case class ChainState(
       )
     } else
       winningFork
-        .foldLeft(Try((ListBuffer.empty[ApiFullBlock], ListBuffer.empty[Block], ListBuffer.empty[BufferedBlockInfo]))) {
+        .foldLeft(Try((ListBuffer.empty[ApiFullBlock], ListBuffer.empty[Block], ListBuffer.empty[BlockMetadata]))) {
           case (f @ Failure(_), _) =>
             f
           case (Success((newApiBlocksAcc, newBlocksAcc, toRemoveAcc)), apiBlock) =>
@@ -90,7 +89,7 @@ case class ChainState(
               apiBlock,
               Some(
                 newBlocksAcc.lastOption
-                  .collect { case b if b.header.id == apiBlock.header.parentId => BufferedBlockInfo.fromBlock(b) }
+                  .collect { case b if b.header.id == apiBlock.header.parentId => BlockMetadata.fromBlock(b) }
                   .getOrElse(blockBuffer.byId(apiBlock.header.parentId))
               )
             ).map { newBlock =>
@@ -110,25 +109,25 @@ case class ChainState(
           )
         }
 
-  def getLastCachedBlock: Option[BufferedBlockInfo] = blockBuffer.byHeight.lastOption.map(_._2)
+  def getLastCachedBlock: Option[BlockMetadata] = blockBuffer.byHeight.lastOption.map(_._2)
 
   def persistedEpochIndexes: SortedSet[EpochIndex] = lastBlockIdInEpoch.keySet
 
-  /** Genesis block is not part of a cache as it has no parent so
-    * we assert that any block either has its parent cached or its a first block
+  /** Genesis block is not part of a cache as it has no parent so we assert that any block either has its parent cached or
+    * its a first block
     */
   def hasParent(block: ApiFullBlock): Boolean =
     blockBuffer.byId.contains(block.header.parentId) || block.header.height == 1
 
   def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
     fork.size > 1 &&
-    blockBuffer.byId.contains(fork.head.header.parentId) &&
-    fork.sliding(2).forall {
-      case first :: second :: Nil =>
-        first.header.id == second.header.parentId
-      case _ =>
-        false
-    }
+      blockBuffer.byId.contains(fork.head.header.parentId) &&
+      fork.sliding(2).forall {
+        case first :: second :: Nil =>
+          first.header.id == second.header.parentId
+        case _ =>
+          false
+      }
 
   def findMissingEpochIndexes: TreeSet[EpochIndex] =
     if (lastBlockIdInEpoch.isEmpty || lastBlockIdInEpoch.size == 1)
@@ -157,11 +156,9 @@ case class ChainState(
 
 object ChainState {
 
-  case class BufferedBlockInfo(headerId: BlockId, parentId: BlockId, timestamp: Long, height: Int, info: BlockInfo)
-
   def empty: ChainState = apply(TreeMap.empty, UtxoState.empty)
 
-  def apply(bufferedInfoByEpochIndex: TreeMap[Int, BufferedBlockInfo], utxoState: UtxoState): ChainState =
+  def apply(bufferedInfoByEpochIndex: TreeMap[Int, BlockMetadata], utxoState: UtxoState): ChainState =
     ChainState(
       bufferedInfoByEpochIndex.map { case (epochIndex, blockInfo) => epochIndex -> blockInfo.headerId },
       BlockBuffer(
@@ -171,28 +168,22 @@ object ChainState {
       utxoState
     )
 
-  object BufferedBlockInfo {
-
-    def fromBlock(b: Block): BufferedBlockInfo =
-      BufferedBlockInfo(b.header.id, b.header.parentId, b.header.timestamp, b.header.height, b.info)
-  }
-
-  case class BlockBuffer(byId: Map[BlockId, BufferedBlockInfo], byHeight: SortedMap[Height, BufferedBlockInfo]) {
+  case class BlockBuffer(byId: Map[BlockId, BlockMetadata], byHeight: SortedMap[Height, BlockMetadata]) {
     def isEmpty: Boolean = byId.isEmpty || byHeight.isEmpty
 
     def heights: SortedSet[Height] = byHeight.keySet
 
     def addBlock(block: Block): BlockBuffer =
       BlockBuffer(
-        byId.updated(block.header.id, BufferedBlockInfo.fromBlock(block)),
-        byHeight.updated(block.header.height, BufferedBlockInfo.fromBlock(block))
+        byId.updated(block.header.id, BlockMetadata.fromBlock(block)),
+        byHeight.updated(block.header.height, BlockMetadata.fromBlock(block))
       )
 
-    def addFork(newFork: ListBuffer[Block], supersededFork: ListBuffer[BufferedBlockInfo]): BlockBuffer =
+    def addFork(newFork: ListBuffer[Block], supersededFork: ListBuffer[BlockMetadata]): BlockBuffer =
       BlockBuffer(
         (byId -- supersededFork.map(_.headerId)) ++ newFork
-          .map(b => b.header.id -> BufferedBlockInfo.fromBlock(b)),
-        byHeight ++ newFork.map(b => b.header.height -> BufferedBlockInfo.fromBlock(b))
+          .map(b => b.header.id -> BlockMetadata.fromBlock(b)),
+        byHeight ++ newFork.map(b => b.header.height -> BlockMetadata.fromBlock(b))
       )
 
     def blockRelationsByHeight(heightRange: Seq[Height]): Seq[(Height, BlockRel)] =

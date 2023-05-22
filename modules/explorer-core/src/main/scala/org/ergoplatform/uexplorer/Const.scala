@@ -1,6 +1,9 @@
 package org.ergoplatform.uexplorer
 
 import org.ergoplatform.uexplorer.{BoxId, HexString}
+import org.ergoplatform.ErgoScriptPredef
+import scorex.util.encode.{Base16, Base58}
+import scala.util.Try
 
 object Const {
 
@@ -33,7 +36,9 @@ object Const {
     }
   }
 
-  /** These form very big partitions in secondary indexes of node_outputs table which leads to garbage collecting related crashes during indexing */
+  /** These form very big partitions in secondary indexes of node_outputs table which leads to garbage collecting related
+    * crashes during indexing
+    */
   object FeeContract {
 
     val address = Address.fromStringUnsafe(
@@ -63,5 +68,29 @@ object Const {
 
   val MainnetEip27ActivationHeight = 777217
   val TestnetEip27ActivationHeight = 188001
+
+  val FeePropositionScriptHex: HexString = {
+    val script = ErgoScriptPredef.feeProposition(MinerRewardDelta)
+    HexString.fromStringUnsafe(Base16.encode(script.bytes))
+  }
+
+  type NetworkPrefix = Byte
+  type AddressPrefix = Byte
+
+  val MainnetNetworkPrefix          = 0: NetworkPrefix
+  val P2PKAddressTypePrefix: Byte   = 1: AddressPrefix
+  val Pay2SHAddressTypePrefix: Byte = 2: AddressPrefix
+  val Pay2SAddressTypePrefix: Byte  = 3: AddressPrefix
+
+  def getAddressType(address: String): Try[AddressPrefix] =
+    Base58.decode(address).map { bytes =>
+      val headByte = bytes.head
+      val t        = (headByte - MainnetNetworkPrefix).toByte
+      require(
+        t == P2PKAddressTypePrefix || t == Pay2SHAddressTypePrefix || t == Pay2SAddressTypePrefix,
+        s"Unsupported address $address with type $t"
+      )
+      t
+    }
 
 }

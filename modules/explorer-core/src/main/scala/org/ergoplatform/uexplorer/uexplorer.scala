@@ -6,6 +6,9 @@ import eu.timepit.refined.string.{HexStringSpec, MatchesRegex, ValidByte}
 import eu.timepit.refined.refineV
 import io.circe.*
 import org.ergoplatform.uexplorer.{BoxCount, LastHeight, TxCount}
+import scala.collection.mutable
+import scala.collection.compat.immutable.ArraySeq
+import scala.collection.immutable.{ArraySeq, TreeMap}
 
 import scala.collection.immutable.ListMap
 import scala.util.Try
@@ -26,6 +29,9 @@ package object uexplorer {
   type Base58Spec    = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
   type Address       = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
+
+  type BoxesByTx     = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
+  type BoxesByHeight = TreeMap[Height, BoxesByTx]
 
   object Address {
     case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount)
@@ -66,6 +72,8 @@ package object uexplorer {
   object ErgoTree {
     def fromStringUnsafe(s: String): ErgoTree = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
+
+  case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Long)
 
   opaque type TxId = String
 
@@ -144,6 +152,33 @@ package object uexplorer {
   object RegisterId {
     given keyEncoder: KeyEncoder[RegisterId] = (a: RegisterId) => a.toString
     given keyDecoder: KeyDecoder[RegisterId] = KeyDecoder.decodeKeyString.map(RegisterId.valueOf)
+  }
+
+  implicit class MapPimp[K, V](underlying: Map[K, V]) {
+
+    def putOrRemove(k: K)(f: Option[V] => Option[V]): Map[K, V] =
+      f(underlying.get(k)) match {
+        case None    => underlying removed k
+        case Some(v) => underlying updated (k, v)
+      }
+
+    def adjust(k: K)(f: Option[V] => V): Map[K, V] = underlying.updated(k, f(underlying.get(k)))
+  }
+
+  implicit class MutableMapPimp[K, V](underlying: mutable.Map[K, V]) {
+
+    def putOrRemove(k: K)(f: Option[V] => Option[V]): mutable.Map[K, V] =
+      f(underlying.get(k)) match {
+        case None => underlying -= k
+        case Some(v) =>
+          underlying.put(k, v)
+          underlying
+      }
+
+    def adjust(k: K)(f: Option[V] => V): mutable.Map[K, V] = {
+      underlying.put(k, f(underlying.get(k)))
+      underlying
+    }
   }
 
 }

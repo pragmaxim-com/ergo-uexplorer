@@ -5,9 +5,7 @@ import akka.stream.IOResult
 import akka.stream.scaladsl.{FileIO, Framing, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.api.{UtxoSnapshot, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.NewEpochDetected
-import org.ergoplatform.uexplorer.indexer.chain.Epoch
 import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.*
 import org.ergoplatform.uexplorer.*
 

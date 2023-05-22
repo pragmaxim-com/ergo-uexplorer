@@ -8,12 +8,11 @@ import com.google.common.collect.TreeMultiset
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.*
-import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
-import org.ergoplatform.uexplorer.indexer.chain.Epoch
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
+import org.ergoplatform.uexplorer.BlockMetadata
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, TxIndex, Value}
-import org.ergoplatform.uexplorer.indexer.MutableMapPimp
+import org.ergoplatform.uexplorer.MutableMapPimp
+import org.ergoplatform.uexplorer.MapPimp
 import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.*
 
 import java.io.*
@@ -25,12 +24,14 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Success, Try}
+import org.ergoplatform.uexplorer.BoxesByHeight
+import org.ergoplatform.uexplorer.Tx
 
 case class UtxoState(
   addressByUtxo: Map[BoxId, Address],
   utxosByAddress: Map[Address, Map[BoxId, Value]],
   inputsByHeightBuffer: Map[Height, Map[BoxId, (Address, Value)]],
-  boxesByHeightBuffer: UtxoState.BoxesByHeight,
+  boxesByHeightBuffer: BoxesByHeight,
   topAddresses: TopAddresses
 ) {
 
@@ -99,7 +100,7 @@ case class UtxoState(
 
   def mergeBufferedBoxes(
     heightRangeOpt: Option[Seq[Height]]
-  ): (UtxoState.BoxesByHeight, UtxoState) = {
+  ): (BoxesByHeight, UtxoState) = {
     val boxesByHeightSlice = heightRangeOpt
       .map { heightRange =>
         boxesByHeightBuffer.range(heightRange.head, heightRange.last + 1)
@@ -163,17 +164,17 @@ case class UtxoState(
     )
   }
 
-  def insertFork(newApiBlocks: ListBuffer[ApiFullBlock], supersededBlocks: ListBuffer[BufferedBlockInfo]): UtxoState = {
+  def insertFork(newApiBlocks: ListBuffer[ApiFullBlock], supersededBlocks: ListBuffer[BlockMetadata]): UtxoState = {
     val newInputsByHeight =
       inputsByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++
-      newApiBlocks
-        .map(b =>
-          b.header.height ->
-          b.transactions.transactions
-            .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
-            .toMap
-        )
-        .toMap
+        newApiBlocks
+          .map(b =>
+            b.header.height ->
+              b.transactions.transactions
+                .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
+                .toMap
+          )
+          .toMap
 
     val newBoxesByHeightBuffer =
       newApiBlocks
@@ -194,8 +195,5 @@ case class UtxoState(
 }
 
 object UtxoState extends LazyLogging {
-  case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Long)
-  type BoxesByTx     = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
-  type BoxesByHeight = TreeMap[Height, BoxesByTx]
   def empty: UtxoState = UtxoState(Map.empty, Map.empty, Map.empty, TreeMap.empty, TopAddresses.empty)
 }

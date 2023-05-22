@@ -3,7 +3,6 @@ package org.ergoplatform.uexplorer.indexer
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
-import org.ergoplatform.uexplorer.indexer.api.{InMemoryBackend, InMemoryGraphBackend}
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.chain.{ChainIndexer, ChainLoader, ChainState, ChainStateHolder}
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
@@ -17,10 +16,11 @@ import org.scalatest.matchers.should.Matchers
 import sttp.capabilities.WebSockets
 import sttp.client3.*
 import sttp.client3.testing.SttpBackendStub
-
+import org.ergoplatform.uexplorer.janusgraph.api.InMemoryGraphBackend
 import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.Future
 import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.cassandra.api.InMemoryBackend
 import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.http.BlockHttpClient
@@ -52,9 +52,9 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
     }
     .thenRespondCyclicResponses(
       (1 to 3).map(_ => Response.ok(getPeerInfo(Rest.info.sync))) ++
-      (1 to 100).map(_ => Response.ok(getPeerInfo(Rest.info.poll))): _*
+        (1 to 100).map(_ => Response.ok(getPeerInfo(Rest.info.poll))): _*
     )
-    .whenRequestMatchesPartial({
+    .whenRequestMatchesPartial {
       case r if r.uri.path.endsWith(List("transactions", "unconfirmed")) =>
         Response.ok(getUnconfirmedTxs)
       case r if r.uri.path.endsWith(List("peers", "connected")) =>
@@ -65,7 +65,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
       case r if r.uri.path.startsWith(List("blocks")) =>
         val blockId = r.uri.path.last
         Response.ok(Rest.blocks.byId(blockId))
-    })
+    }
 
   val blockClient     = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val backend         = new InMemoryBackend

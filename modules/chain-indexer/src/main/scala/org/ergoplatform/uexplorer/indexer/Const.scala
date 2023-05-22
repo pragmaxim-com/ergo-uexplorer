@@ -8,8 +8,6 @@ import scorex.util.encode.{Base16, Base58}
 import scala.util.Try
 
 object Const {
-  val CassandraKeyspace = "uexplorer"
-  val FlushHeight       = 32
 
   val FeePropositionScriptHex: HexString = {
     val script = ErgoScriptPredef.feeProposition(MinerRewardDelta)

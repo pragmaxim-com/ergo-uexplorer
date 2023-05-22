@@ -1,11 +1,11 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, EpochIndex, Height}
-import org.ergoplatform.uexplorer.indexer.chain.Epoch.*
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.collection.mutable
+import org.ergoplatform.uexplorer.Epoch
+import org.ergoplatform.uexplorer.Epoch.*
 
 trait EpochCandidate {
   def epochIndex: Int

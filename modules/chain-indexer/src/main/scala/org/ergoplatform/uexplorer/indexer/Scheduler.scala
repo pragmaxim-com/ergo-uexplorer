@@ -17,6 +17,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Failure
 import org.ergoplatform.uexplorer.AkkaStreamSupport
+import org.ergoplatform.uexplorer.Resiliency
 
 class Scheduler(
   pluginManager: PluginManager,
@@ -28,13 +29,14 @@ class Scheduler(
   cRef: ActorRef[ChainStateHolderRequest],
   mRef: ActorRef[MempoolStateHolderRequest],
   killSwitch: SharedKillSwitch
-) extends AkkaStreamSupport {
+) extends AkkaStreamSupport
+  with Resiliency {
 
   def periodicSync: Future[(ChainState, MempoolStateChanges)] =
     for {
       ChainSyncResult(chainState, lastBlock, gts, topAddressMap) <- chainIndexer.indexChain
       stateChanges                                               <- mempoolSyncer.syncMempool(chainState)
-      _                                                          <- pluginManager.executePlugins(chainState, stateChanges, gts, lastBlock, topAddressMap)
+      _ <- pluginManager.executePlugins(chainState, stateChanges, gts, lastBlock, topAddressMap)
     } yield (chainState, stateChanges)
 
   def validateAndSchedule(

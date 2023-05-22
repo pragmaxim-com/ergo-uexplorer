@@ -19,14 +19,15 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.*
 import org.ergoplatform.uexplorer.Utils
-import org.ergoplatform.uexplorer.AkkaStreamSupport
+import org.ergoplatform.uexplorer.Resiliency
 
 class SttpNodePoolBackend[P]()(implicit
   sys: ActorSystem[Nothing],
   nodePoolRef: ActorRef[NodePoolRequest],
   underlying: SttpBackend[Future, P],
   killSwitch: SharedKillSwitch
-) extends DelegateSttpBackend[Future, P](underlying) with AkkaStreamSupport {
+) extends DelegateSttpBackend[Future, P](underlying)
+  with Resiliency {
   import SttpNodePoolBackend.fallbackQuery
 
   implicit private val timeout: Timeout = 5.seconds

@@ -11,6 +11,34 @@ import scala.concurrent.duration.DurationInt
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
+import akka.NotUsed
+import akka.stream.scaladsl.{Balance, Flow, GraphDSL, Merge, RestartSource, Source}
+import akka.stream.*
+
+import scala.concurrent.Future
+import scala.concurrent.duration.*
+
+trait Resiliency {
+
+  def schedule[T](
+    initialDelay: FiniteDuration,
+    interval: FiniteDuration
+  )(run: => Future[T]): Source[T, NotUsed] =
+    RestartSource
+      .withBackoff(Resiliency.restartSettings) { () =>
+        Source
+          .tick(initialDelay, interval, ())
+          .mapAsync(1)(_ => run)
+          .withAttributes(
+            Attributes
+              .inputBuffer(0, 1)
+              .and(ActorAttributes.IODispatcher)
+              .and(ActorAttributes.supervisionStrategy(Resiliency.decider))
+          )
+      }
+
+}
+
 object Resiliency extends LazyLogging {
 
   val restartSettings: RestartSettings = RestartSettings(

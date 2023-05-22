@@ -9,10 +9,8 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.api.{Backend, GraphBackend, UtxoSnapshot, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
-import org.ergoplatform.uexplorer.indexer.janusgraph.TxGraphWriter
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, EpochIndex}
@@ -23,6 +21,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 import org.ergoplatform.uexplorer.AkkaStreamSupport
+import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
+import org.ergoplatform.uexplorer.Epoch
+import org.ergoplatform.uexplorer.BlockMetadata
+import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoSnapshotManager}
 
 class ChainLoader(
   backend: Backend,
@@ -34,7 +37,7 @@ class ChainLoader(
 
   import ChainLoader.*
 
-  private def loadUtxoStateFromDb(blockInfoByEpochIndex: TreeMap[Int, BufferedBlockInfo], includingGraph: Boolean) = {
+  private def loadUtxoStateFromDb(blockInfoByEpochIndex: TreeMap[Int, BlockMetadata], includingGraph: Boolean) = {
     val subjectToLoad = if (includingGraph) "graph and utxoState" else "utxoState"
     logger.info(s"Loading $subjectToLoad from database ... ")
     Source
@@ -56,7 +59,7 @@ class ChainLoader(
       }
   }
 
-  private def initUtxoState(blockInfoByEpochIndex: TreeMap[EpochIndex, BufferedBlockInfo]) =
+  private def initUtxoState(blockInfoByEpochIndex: TreeMap[EpochIndex, BlockMetadata]) =
     if (blockInfoByEpochIndex.isEmpty)
       Future {
         snapshotManager.clearAllSnapshots()

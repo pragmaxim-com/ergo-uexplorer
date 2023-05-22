@@ -8,12 +8,9 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.indexer.utxo.{TopAddresses, UtxoState}
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState.{BoxesByTx, Tx}
 
 import scala.collection.immutable.{ArraySeq, ListMap, TreeMap, TreeSet}
 import scala.collection.mutable
@@ -21,6 +18,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
+import org.ergoplatform.uexplorer.Epoch.EpochCommand
+import org.ergoplatform.uexplorer.Epoch.WriteNewEpoch
+import org.ergoplatform.uexplorer.Epoch.IgnoreEpoch
 
 class ChainStateHolder(implicit protocol: ProtocolSettings) extends LazyLogging {
   import ChainStateHolder.*
@@ -123,9 +123,16 @@ object ChainStateHolder extends LazyLogging {
 
   case class BestBlockInserted(flatBlock: Block) extends Inserted
 
-  case class ForkInserted(newFork: List[Block], supersededFork: List[BufferedBlockInfo]) extends Inserted
+  case class ForkInserted(newFork: List[Block], supersededFork: List[BlockMetadata]) extends Inserted
 
-  sealed trait MaybeNewEpoch extends ChainStateHolderResponse
+  sealed trait MaybeNewEpoch extends ChainStateHolderResponse {
+    def toEpochCommand: EpochCommand = this match {
+      case NewEpochDetected(e, txBoxesByHeight, topAddresses) =>
+        WriteNewEpoch(e, txBoxesByHeight, topAddresses)
+      case NewEpochExisted(epochIndex) =>
+        IgnoreEpoch(epochIndex)
+    }
+  }
 
   case class NewEpochDetected(
     epoch: Epoch,

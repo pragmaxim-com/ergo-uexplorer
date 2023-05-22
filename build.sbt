@@ -87,12 +87,24 @@ lazy val root = (project in file("."))
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= circe("3") ++ Seq(retry("3"), pureConfig, ergoWallet, gremlin, loggingApi, scalaLogging("3")))
+    .settings(libraryDependencies ++= circe("3") ++ monocle("3") ++ refined("3") ++ Seq(retry("3"), pureConfig, ergoWallet, gremlin, loggingApi, scalaLogging("3")))
 
 lazy val `node-pool` =
   Utils.mkModule("node-pool", "node-pool")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ circe("3") ++ sttp("3") ++ Seq(retry("3"), loggingApi))
+    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3"))
+    .dependsOn(core)
+
+lazy val cassandra =
+  Utils.mkModule("cassandra", "cassandra")
+    .settings(commonSettings)
+    .settings(libraryDependencies ++= lightBend("3") ++ cassandraDb ++ Seq(commonsCodec))
+    .dependsOn(core)
+
+lazy val janusgraph =
+  Utils.mkModule("janusgraph", "janusgraph")
+    .settings(commonSettings)
+    .settings(libraryDependencies ++= lightBend("3") ++ janusGraph ++ cassandraDb ++ scalatest("3"))
     .dependsOn(core)
 
 lazy val `alert-plugin` =
@@ -100,7 +112,7 @@ lazy val `alert-plugin` =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(pluginAssemblySettings("alert-plugin"))
-    .settings(libraryDependencies ++= scalatest("3") ++ Seq(retry("3"), gremlin, discord4j, loggingApi, logback))
+    .settings(libraryDependencies ++= scalatest("3") ++ Seq(discord4j, logback))
     .settings(excludeDependencies += ExclusionRule(commonsLogging.organization, commonsLogging.name))
     .dependsOn(core)
 
@@ -109,6 +121,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ janusGraph ++ Seq(gremlin, retry("3"), mvStore, commonsCodec, ergoWallet, loggingApi, logback, pureConfig))
+    .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3") ++ Seq(mvStore))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `node-pool`, `alert-plugin`)
+    .dependsOn(core, `node-pool`, cassandra, janusgraph, `alert-plugin`)

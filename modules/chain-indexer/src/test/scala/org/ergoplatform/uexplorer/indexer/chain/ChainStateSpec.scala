@@ -4,7 +4,7 @@ import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
+import org.ergoplatform.uexplorer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.utxo.{TopAddresses, UtxoState}
 import org.ergoplatform.uexplorer.indexer.Rest
@@ -12,7 +12,7 @@ import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
-
+import org.ergoplatform.uexplorer.BlockMetadata
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 import org.ergoplatform.uexplorer.ProtocolSettings
@@ -41,12 +41,12 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
       "allow for updating epoch indexes" - {
         "when has epochs" in {
           val e0b1Block     = BlockBuilder(Rest.blocks.getByHeight(1023), None).get
-          val e0b2Block     = BlockBuilder(Rest.blocks.getByHeight(1024), Option(BufferedBlockInfo.fromBlock(e0b1Block))).get
-          val e0b2BlockInfo = BufferedBlockInfo.fromBlock(e0b2Block)
+          val e0b2Block     = BlockBuilder(Rest.blocks.getByHeight(1024), Option(BlockMetadata.fromBlock(e0b1Block))).get
+          val e0b2BlockInfo = BlockMetadata.fromBlock(e0b2Block)
 
           val e1b1Block     = BlockBuilder(Rest.blocks.getByHeight(2047), None).get
-          val e1b2Block     = BlockBuilder(Rest.blocks.getByHeight(2048), Option(BufferedBlockInfo.fromBlock(e1b1Block))).get
-          val e1b2BlockInfo = BufferedBlockInfo.fromBlock(e1b2Block)
+          val e1b2Block     = BlockBuilder(Rest.blocks.getByHeight(2048), Option(BlockMetadata.fromBlock(e1b1Block))).get
+          val e1b2BlockInfo = BlockMetadata.fromBlock(e1b2Block)
 
           val e0In = List(e0b1Block, e0b2Block).flatMap(_.inputs.map(_.boxId))
           val e1In = List(e1b1Block, e1b2Block).flatMap(_.inputs.map(_.boxId))
@@ -90,13 +90,13 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
           val (blockInserted, newState) = ChainState.empty.insertBestBlock(firstApiBlock).get
           blockInserted.flatBlock shouldBe firstFlatBlock
           newState.blockBuffer shouldBe BlockBuffer(
-            Map(firstApiBlock.header.id -> BufferedBlockInfo.fromBlock(firstFlatBlock)),
-            TreeMap(1                   -> BufferedBlockInfo.fromBlock(firstFlatBlock))
+            Map(firstApiBlock.header.id -> BlockMetadata.fromBlock(firstFlatBlock)),
+            TreeMap(1                   -> BlockMetadata.fromBlock(firstFlatBlock))
           )
         }
         "after an existing block" in {
           val e0b1Block               = BlockBuilder(Rest.blocks.getByHeight(1024), None).get
-          val e0b1Info                = BufferedBlockInfo.fromBlock(e0b1Block)
+          val e0b1Info                = BlockMetadata.fromBlock(e0b1Block)
           val lastBlockIdByEpochIndex = TreeMap(0 -> e0b1Info)
 
           val utxos =
@@ -123,7 +123,7 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
 
           val e1b1                       = Rest.blocks.getByHeight(1025)
           val e1b1Block                  = BlockBuilder(e1b1, Some(e0b1Info)).get
-          val e1b1Info                   = BufferedBlockInfo.fromBlock(e1b1Block)
+          val e1b1Info                   = BlockMetadata.fromBlock(e1b1Block)
           val (blockInserted, newState2) = newState.insertBestBlock(e1b1).get
           blockInserted.flatBlock shouldBe e1b1Block
           newState2.blockBuffer shouldBe BlockBuffer(
@@ -144,7 +144,7 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
 
       "allow for inserting new fork" in {
         val commonBlock     = BlockBuilder(Rest.blocks.getByHeight(1024), None).get
-        val commonBlockInfo = BufferedBlockInfo.fromBlock(commonBlock)
+        val commonBlockInfo = BlockMetadata.fromBlock(commonBlock)
         val utxos = commonBlock.outputs
           .map(b => (b.boxId, b.address, b.value))
           .filterNot(b => commonBlock.inputs.map(_.boxId).contains(b._1))
@@ -160,18 +160,18 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
         val s               = ChainState.apply(TreeMap(0 -> commonBlockInfo), utxoState)
         val b1ApiBlock      = Rest.blocks.getByHeight(1025)
         val b1FlatBlock     = BlockBuilder(b1ApiBlock, Option(commonBlockInfo)).get
-        val b1FlatBlockInfo = BufferedBlockInfo.fromBlock(b1FlatBlock)
+        val b1FlatBlockInfo = BlockMetadata.fromBlock(b1FlatBlock)
         val b2ApiBlock      = Rest.blocks.getByHeight(1026)
         val b2FlatBlock     = BlockBuilder(b2ApiBlock, Option(b1FlatBlockInfo)).get
-        val b2FlatBlockInfo = BufferedBlockInfo.fromBlock(b2FlatBlock)
+        val b2FlatBlockInfo = BlockMetadata.fromBlock(b2FlatBlock)
         val b3              = Rest.blocks.getByHeight(1027)
         val b3FlatBlock     = BlockBuilder(b3, Option(b2FlatBlockInfo)).get
-        val b3FlatBlockInfo = BufferedBlockInfo.fromBlock(b3FlatBlock)
+        val b3FlatBlockInfo = BlockMetadata.fromBlock(b3FlatBlock)
         val b1Fork          = forkBlock(b1ApiBlock, "7975b60515b881504ec471affb84234123ac5491d0452da0eaf5fb96948f18e7")
         val b1ForkFlatBlock = BlockBuilder(b1Fork, Option(commonBlockInfo)).get
         val b2Fork =
           forkBlock(b2ApiBlock, "4077fcf3359c15c3ad3797a78fff342166f09a7f1b22891a18030dcd8604b087", Option(b1Fork.header.id))
-        val b2ForkFlatBlock           = BlockBuilder(b2Fork, Option(BufferedBlockInfo.fromBlock(b1ForkFlatBlock))).get
+        val b2ForkFlatBlock           = BlockBuilder(b2Fork, Option(BlockMetadata.fromBlock(b1ForkFlatBlock))).get
         val (_, s2)                   = s.insertBestBlock(b1Fork).get
         val (_, s3)                   = s2.insertBestBlock(b2Fork).get
         val (forkInserted, newState4) = s3.insertWinningFork(List(b1ApiBlock, b2ApiBlock, b3)).get
@@ -179,8 +179,8 @@ class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
         forkInserted.supersededFork.size shouldBe 2
         forkInserted.newFork shouldBe List(b1FlatBlock, b2FlatBlock, b3FlatBlock)
         forkInserted.supersededFork shouldBe List(
-          BufferedBlockInfo.fromBlock(b1ForkFlatBlock),
-          BufferedBlockInfo.fromBlock(b2ForkFlatBlock)
+          BlockMetadata.fromBlock(b1ForkFlatBlock),
+          BlockMetadata.fromBlock(b2ForkFlatBlock)
         )
         newState4.blockBuffer shouldBe BlockBuffer(
           Map(
