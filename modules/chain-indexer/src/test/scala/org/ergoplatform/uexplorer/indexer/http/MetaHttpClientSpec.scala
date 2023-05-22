@@ -12,6 +12,14 @@ import sttp.client3._
 import sttp.model.StatusCode
 
 import scala.concurrent.Future
+import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
+import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
+import org.ergoplatform.uexplorer.http.MetadataHttpClient
+import org.ergoplatform.uexplorer.http.RemoteNode
+import org.ergoplatform.uexplorer.http.RemotePeer
+import org.ergoplatform.uexplorer.http.LocalNode
+import org.ergoplatform.uexplorer.http.RemotePeerUriMagnet
+import org.ergoplatform.uexplorer.http.ConnectedPeer
 
 class MetaHttpClientSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
 

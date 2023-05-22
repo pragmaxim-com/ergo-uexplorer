@@ -11,7 +11,7 @@ import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
 
 import scala.util.Try
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
+import org.ergoplatform.uexplorer.ProtocolSettings
 
 object BlockInfoBuilder {
 

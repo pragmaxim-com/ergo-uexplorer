@@ -8,11 +8,8 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
-import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.indexer.utxo.{TopAddresses, UtxoState}
@@ -161,8 +158,8 @@ object ChainStateHolder extends LazyLogging {
 
   def containsBlock(
     blockId: BlockId
-  )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest]): Future[IsBlockCached] =
-    ref.ask(ref => GetBlock(blockId, ref))
+  )(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest]): Future[Boolean] =
+    ref.ask[IsBlockCached](ref => GetBlock(blockId, ref)).map(_.present)
 
   def initialize(
     chainState: ChainState

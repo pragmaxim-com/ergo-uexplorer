@@ -1,6 +1,6 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
-import org.ergoplatform.uexplorer.indexer.http.NodePool._
+import org.ergoplatform.uexplorer.http.NodePool._
 
 import scala.collection.immutable.SortedSet
 

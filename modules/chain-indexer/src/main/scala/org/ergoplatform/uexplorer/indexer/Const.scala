@@ -9,8 +9,6 @@ import scala.util.Try
 
 object Const {
   val CassandraKeyspace = "uexplorer"
-  val AllowedHeightDiff = 10
-  val MinNodeHeight     = EpochLength * 800
   val FlushHeight       = 32
 
   val FeePropositionScriptHex: HexString = {

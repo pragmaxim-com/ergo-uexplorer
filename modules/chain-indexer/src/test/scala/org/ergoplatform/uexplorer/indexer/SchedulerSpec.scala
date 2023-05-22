@@ -4,8 +4,7 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.ergoplatform.uexplorer.indexer.api.{InMemoryBackend, InMemoryGraphBackend}
-import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
-import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, LocalNodeUriMagnet, MetadataHttpClient, RemoteNodeUriMagnet}
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.chain.{ChainIndexer, ChainLoader, ChainState, ChainStateHolder}
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolState
@@ -21,12 +20,17 @@ import sttp.client3.testing.SttpBackendStub
 
 import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.Future
+import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
+import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
+import org.ergoplatform.uexplorer.http.BlockHttpClient
+import org.ergoplatform.uexplorer.http.MetadataHttpClient
 
 class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
 
   private val testKit                                           = ActorTestKit()
   implicit private val sys: ActorSystem[_]                      = testKit.internalSystem
-  implicit val protocol: ProtocolSettings                       = ChainIndexerConf.loadDefaultOrThrow.protocol
+  implicit private val protocol: ProtocolSettings               = ChainIndexerConf.loadDefaultOrThrow.protocol
   implicit private val localNodeUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(uri"http://local")
   implicit private val remoteNodeUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(uri"http://remote")
   implicit val killSwitch: SharedKillSwitch                     = KillSwitches.shared("scheduler-kill-switch")

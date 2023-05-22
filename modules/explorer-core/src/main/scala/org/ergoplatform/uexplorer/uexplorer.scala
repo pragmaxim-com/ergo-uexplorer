@@ -12,19 +12,19 @@ import scala.util.Try
 
 package object uexplorer {
 
-  type Value = Long
-  type Height = Int
+  type Value      = Long
+  type Height     = Int
   type EpochIndex = Int
-  type TxIndex = Short
+  type TxIndex    = Short
 
-  type BoxCount = Int
-  type TxCount = Int
-  type LastHeight = Int
-  type TopAddressMap = Map[Address, Address.Stats]
+  type BoxCount            = Int
+  type TxCount             = Int
+  type LastHeight          = Int
+  type TopAddressMap       = Map[Address, Address.Stats]
   type SortedTopAddressMap = ListMap[Address, Address.Stats]
 
-  type Base58Spec = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
-  type Address = String Refined Base58Spec
+  type Base58Spec    = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
+  type Address       = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
 
   object Address {
@@ -74,9 +74,8 @@ package object uexplorer {
 
     given Encoder[TxId] = Encoder.encodeString
 
-    given Decoder[TxId] = Decoder.decodeString
-    extension (x: TxId)
-      def unwrapped: String = x
+    given Decoder[TxId]                       = Decoder.decodeString
+    extension (x: TxId) def unwrapped: String = x
   }
 
   opaque type BoxId = String
@@ -86,9 +85,8 @@ package object uexplorer {
 
     given Encoder[BoxId] = Encoder.encodeString
 
-    given Decoder[BoxId] = Decoder.decodeString
-    extension (x: BoxId)
-      def unwrapped: String = x
+    given Decoder[BoxId]                       = Decoder.decodeString
+    extension (x: BoxId) def unwrapped: String = x
   }
 
   opaque type TokenName = String
@@ -100,8 +98,7 @@ package object uexplorer {
 
     given Decoder[TokenName] = Decoder.decodeString
 
-    extension (x: TokenName)
-      def unwrapped: String = x
+    extension (x: TokenName) def unwrapped: String = x
   }
 
   opaque type TokenSymbol = String
@@ -113,8 +110,7 @@ package object uexplorer {
 
     given Decoder[TokenSymbol] = Decoder.decodeString
 
-    extension (x: TokenSymbol)
-      def unwrapped: String = x
+    extension (x: TokenSymbol) def unwrapped: String = x
   }
 
   opaque type TokenType = String
@@ -128,8 +124,7 @@ package object uexplorer {
 
     given Decoder[TokenType] = Decoder.decodeString
 
-    extension (x: TokenType)
-      def unwrapped: String = x
+    extension (x: TokenType) def unwrapped: String = x
 
   }
 
@@ -147,7 +142,7 @@ package object uexplorer {
   }
 
   object RegisterId {
-    given keyEncoder: KeyEncoder[RegisterId] =  (a: RegisterId) => a.toString
+    given keyEncoder: KeyEncoder[RegisterId] = (a: RegisterId) => a.toString
     given keyDecoder: KeyDecoder[RegisterId] = KeyDecoder.decodeKeyString.map(RegisterId.valueOf)
   }
 

@@ -1,11 +1,11 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.uexplorer.{indexer, Address, BlockId, BoxId, Const, EpochIndex, Height}
-import org.ergoplatform.uexplorer.indexer.UnexpectedStateError
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
+import org.ergoplatform.uexplorer.UnexpectedStateError
 
 case class Epoch(
   index: Int,

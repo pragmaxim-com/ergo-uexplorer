@@ -9,12 +9,9 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, UnexpectedStateError}
 import org.ergoplatform.uexplorer.indexer.api.{Backend, GraphBackend, UtxoSnapshot, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
-import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.janusgraph.TxGraphWriter
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 import org.ergoplatform.uexplorer.node.ApiFullBlock
@@ -25,6 +22,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
+import org.ergoplatform.uexplorer.AkkaStreamSupport
 
 class ChainLoader(
   backend: Backend,

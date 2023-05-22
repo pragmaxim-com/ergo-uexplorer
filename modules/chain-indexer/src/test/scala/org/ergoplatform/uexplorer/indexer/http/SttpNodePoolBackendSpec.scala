@@ -15,6 +15,13 @@ import sttp.model.StatusCode
 import scala.collection.immutable.TreeSet
 import scala.concurrent.Future
 import scala.util.Success
+import org.ergoplatform.uexplorer.http.LocalNode
+import org.ergoplatform.uexplorer.http.RemoteNode
+import org.ergoplatform.uexplorer.http.RemotePeer
+import org.ergoplatform.uexplorer.http.Peer
+import org.ergoplatform.uexplorer.http.SttpNodePoolBackend
+import org.ergoplatform.uexplorer.http.NodePool
+import org.ergoplatform.uexplorer.http.NodePoolState
 
 class SttpNodePoolBackendSpec extends AsyncFreeSpec with Matchers with BeforeAndAfterAll with ScalaFutures {
 

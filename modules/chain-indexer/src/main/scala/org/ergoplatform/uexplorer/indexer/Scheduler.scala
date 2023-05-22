@@ -16,6 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Failure
+import org.ergoplatform.uexplorer.AkkaStreamSupport
 
 class Scheduler(
   pluginManager: PluginManager,

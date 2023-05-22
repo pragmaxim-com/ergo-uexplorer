@@ -16,8 +16,7 @@ import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
-import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
-import org.ergoplatform.uexplorer.indexer.http.{BlockHttpClient, Routes}
+import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
@@ -35,6 +34,12 @@ import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
+import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.AkkaStreamSupport
+import org.ergoplatform.uexplorer.http.BlockHttpClient
+import org.ergoplatform.uexplorer.indexer.http.Routes
+import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
+import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 
 object Application extends App with AkkaStreamSupport {
   ChainIndexerConf.loadWithFallback match {
@@ -52,7 +57,9 @@ object Application extends App with AkkaStreamSupport {
             ctx.spawn(MempoolStateHolder.behavior(MempoolState.empty), "MempoolStateHolder")
 
           implicit val killSwitch: SharedKillSwitch = KillSwitches.shared("uexplorer-kill-switch")
-
+          implicit val localNodeUriMagnet: LocalNodeUriMagnet = conf.localUriMagnet
+          implicit val remoteNodeUriMagnet: RemoteNodeUriMagnet = conf.remoteUriMagnet
+          
           val bindingFuture = Http().newServerAt("localhost", 8089).bind(new Routes().shutdown)
           CoordinatedShutdown(system).addTask(
             CoordinatedShutdown.PhaseBeforeServiceUnbind,
@@ -67,7 +74,7 @@ object Application extends App with AkkaStreamSupport {
 
           val initializationF =
             for {
-              blockHttpClient   <- BlockHttpClient.withNodePoolBackend(conf)
+              blockHttpClient   <- BlockHttpClient.withNodePoolBackend
               pluginManager     <- PluginManager.initialize
               backend           <- Future.fromTry(Backend(conf.backendType))
               graphBackend      <- Future.fromTry(GraphBackend(conf.graphBackendType))

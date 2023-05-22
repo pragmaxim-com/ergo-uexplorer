@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer
+package org.ergoplatform.uexplorer
 
 import akka.NotUsed
 import akka.stream.scaladsl.{Balance, Flow, GraphDSL, Merge, RestartSource, Source}

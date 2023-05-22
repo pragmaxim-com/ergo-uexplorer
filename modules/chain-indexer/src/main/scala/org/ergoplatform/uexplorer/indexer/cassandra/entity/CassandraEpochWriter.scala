@@ -15,7 +15,7 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.chain.{Epoch, InvalidEpochCandidate}
-import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, Utils}
+import org.ergoplatform.uexplorer.indexer.{Utils}
 import org.ergoplatform.uexplorer.{Address, BoxId, Const, TxId}
 import org.janusgraph.core.{JanusGraphVertex, VertexLabel}
 
@@ -25,6 +25,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
+import org.ergoplatform.uexplorer.AkkaStreamSupport
 
 trait CassandraEpochWriter extends AkkaStreamSupport with LazyLogging {
   this: CassandraBackend =>

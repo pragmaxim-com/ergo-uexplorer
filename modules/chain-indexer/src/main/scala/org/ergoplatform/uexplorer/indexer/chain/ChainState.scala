@@ -5,10 +5,9 @@ import org.ergoplatform.uexplorer.db.{Block, BlockInfo}
 import org.ergoplatform.uexplorer.indexer.api.Backend
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BlockBuffer
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
-import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
-import org.ergoplatform.uexplorer.indexer.{MapPimp, UnexpectedStateError}
+import org.ergoplatform.uexplorer.indexer.MapPimp
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import scala.collection.immutable.{ArraySeq, List, SortedMap, SortedSet, TreeMap, TreeSet}

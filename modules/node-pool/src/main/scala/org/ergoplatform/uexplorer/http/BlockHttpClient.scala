@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
 import akka.{Done, NotUsed}
 import akka.actor.CoordinatedShutdown
@@ -8,27 +8,22 @@ import akka.stream.{OverflowStrategy, SharedKillSwitch}
 import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.{BlockId, Const, Height, TxId}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
-import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder
-import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
-import org.ergoplatform.uexplorer.indexer.ResiliencySupport
 import retry.Policy
 import sttp.capabilities.WebSockets
 import sttp.client3.*
 import sttp.client3.circe.*
 import io.circe.refined.*
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.ResiliencySupport
 
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   protocol: ProtocolSettings,
-  s: ActorSystem[Nothing],
-  chainSyncer: ActorRef[ChainStateHolderRequest],
   sttpB: SttpBackend[Future, _]
 ) extends ResiliencySupport
   with Codecs {
@@ -87,36 +82,27 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
 
   def getBestBlockOrBranch(
     block: ApiFullBlock,
+    isBlockCached: BlockId => Future[Boolean],
     acc: List[ApiFullBlock]
   ): Future[List[ApiFullBlock]] =
-    ChainStateHolder
-      .containsBlock(block.header.parentId)
+    isBlockCached(block.header.parentId)
       .flatMap {
-        case IsBlockCached(true) =>
+        case blockCached if blockCached =>
           Future.successful(block :: acc)
-        case IsBlockCached(false) if block.header.height == 1 =>
+        case _ if block.header.height == 1 =>
           Future.successful(block :: acc)
-        case IsBlockCached(false) =>
+        case _ =>
           logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
           getBlockForId(block.header.parentId)
-            .flatMap(b => getBestBlockOrBranch(b, block :: acc))
+            .flatMap(b => getBestBlockOrBranch(b, isBlockCached, block :: acc))
       }
 
-  def blockCachingFlow: Flow[Height, Inserted, NotUsed] =
+  def blockFlow: Flow[Height, ApiFullBlock, NotUsed] =
     Flow[Height]
       .mapAsync(1)(getBlockIdForHeight)
       .buffer(64, OverflowStrategy.backpressure)
       .mapAsync(1)(getBlockForId)
       .buffer(32, OverflowStrategy.backpressure)
-      .mapAsync(1) { block =>
-        getBestBlockOrBranch(block, List.empty)
-          .flatMap {
-            case bestBlock :: Nil =>
-              ChainStateHolder.insertBestBlock(bestBlock)
-            case winningFork =>
-              ChainStateHolder.insertWinningFork(winningFork)
-          }
-      }
 
   def close(): Future[Unit] = {
     logger.info(s"Stopping Block http client")
@@ -127,20 +113,19 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
 
 object BlockHttpClient {
 
-  def withNodePoolBackend(
-    conf: ChainIndexerConf
-  )(implicit
+  def withNodePoolBackend(implicit
+    localNodeUriMagnet: LocalNodeUriMagnet,
+    remoteNodeUriMagnet: RemoteNodeUriMagnet,
     protocol: ProtocolSettings,
     ctx: ActorContext[_],
-    chainSyncer: ActorRef[ChainStateHolderRequest],
     killSwitch: SharedKillSwitch
   ): Future[BlockHttpClient] = {
     val futureSttpBackend = HttpClientFutureBackend()
-    val metadataClient    = MetadataHttpClient(conf)(futureSttpBackend, ctx.system)
+    val metadataClient    = MetadataHttpClient(localNodeUriMagnet, remoteNodeUriMagnet, futureSttpBackend, ctx.system)
     val nodePoolRef       = ctx.spawn(NodePool.behavior, "NodePool")
     val backend           = SttpNodePoolBackend[WebSockets](nodePoolRef)(ctx.system, futureSttpBackend, killSwitch)
     backend.keepNodePoolUpdated(metadataClient).map { _ =>
-      val blockClient = new BlockHttpClient(metadataClient)(protocol, ctx.system, chainSyncer, backend)
+      val blockClient = new BlockHttpClient(metadataClient)(protocol, backend)
       CoordinatedShutdown(ctx.system).addTask(
         CoordinatedShutdown.PhaseServiceStop,
         "stop-block-http-client"

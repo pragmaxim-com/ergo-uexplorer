@@ -10,15 +10,13 @@ import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.Resiliency
 import org.ergoplatform.uexplorer.indexer.api.{Backend, GraphBackend, InMemoryBackend, UtxoSnapshotManager}
 import org.ergoplatform.uexplorer.indexer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.chain.{ChainLoader, ChainState, ChainStateHolder, Epoch}
-import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb, ProtocolSettings}
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
+import org.ergoplatform.uexplorer.indexer.config.{CassandraDb, ChainIndexerConf, InMemoryDb}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
@@ -34,6 +32,8 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Try}
+import org.ergoplatform.uexplorer.http.BlockHttpClient
+import org.ergoplatform.uexplorer.Resiliency
 
 class ChainIndexer(
   backend: Backend,
@@ -45,7 +45,16 @@ class ChainIndexer(
 
   private val indexingSink: Sink[Height, Future[ChainSyncResult]] =
     Flow[Height]
-      .via(blockHttpClient.blockCachingFlow)
+      .via(blockHttpClient.blockFlow)
+      .mapAsync(1) { block =>
+        blockHttpClient.getBestBlockOrBranch(block, ChainStateHolder.containsBlock, List.empty)
+          .flatMap {
+            case bestBlock :: Nil =>
+              ChainStateHolder.insertBestBlock(bestBlock)
+            case winningFork =>
+              ChainStateHolder.insertWinningFork(winningFork)
+          }
+      }
       .via(backend.blockWriteFlow)
       .mapAsync(1) {
         case block if Epoch.heightAtFlushPoint(block.header.height) =>

@@ -37,8 +37,6 @@ package object indexer {
     }
   }
 
-  class UnexpectedStateError(msg: String, cause: Option[Throwable] = None) extends RuntimeException(msg, cause.orNull)
-
   object Utils {
 
     def vertexHash(address: String, g: StandardJanusGraph): Long =
@@ -46,19 +44,5 @@ package object indexer {
 
     def vertexHash(address: String)(implicit tx: StandardJanusGraphTx): Long =
       vertexHash(address, tx.getGraph)
-
-    def copyUri(origUri: Uri, newUri: Uri): Uri =
-      newUri.copy(
-        pathSegments    = origUri.pathSegments,
-        querySegments   = origUri.querySegments,
-        fragmentSegment = origUri.fragmentSegment
-      )
-
-    def stripUri(uri: Uri): Uri =
-      uri.copy(
-        pathSegments    = EmptyPath,
-        querySegments   = List.empty[QuerySegment],
-        fragmentSegment = Option.empty
-      )
   }
 }

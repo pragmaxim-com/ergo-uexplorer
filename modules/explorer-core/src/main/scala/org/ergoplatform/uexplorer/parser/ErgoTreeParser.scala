@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.parser
+package org.ergoplatform.uexplorer.parser
 
 import org.ergoplatform.uexplorer.{Address, ErgoTreeTemplateHash, HexString}
 import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, Pay2SAddress}

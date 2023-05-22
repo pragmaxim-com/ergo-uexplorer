@@ -3,12 +3,11 @@ package org.ergoplatform.uexplorer.indexer.chain
 import com.softwaremill.diffx.scalatest.DiffShouldMatcher
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, ProtocolSettings}
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
-import org.ergoplatform.uexplorer.indexer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.indexer.utxo.{TopAddresses, UtxoState}
-import org.ergoplatform.uexplorer.indexer.{Rest, UnexpectedStateError}
+import org.ergoplatform.uexplorer.indexer.Rest
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const}
 import org.scalatest.freespec.AnyFreeSpec
@@ -16,6 +15,8 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable
+import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.UnexpectedStateError
 
 class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
 

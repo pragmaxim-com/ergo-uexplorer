@@ -16,7 +16,7 @@ import org.ergoplatform.uexplorer.indexer.cassandra.{AddressPersistenceSupport, 
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.indexer.chain.{Epoch, InvalidEpochCandidate}
 import org.ergoplatform.uexplorer.{indexer, Address, BoxId, Const, TopAddressMap, TxId}
-import org.ergoplatform.uexplorer.indexer.{AkkaStreamSupport, MutableMapPimp, Utils}
+import org.ergoplatform.uexplorer.indexer.{MutableMapPimp, Utils}
 import org.janusgraph.core.{JanusGraphVertex, VertexLabel}
 import org.ergoplatform.uexplorer.indexer.MutableMapPimp
 import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses
@@ -29,6 +29,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Random
+import org.ergoplatform.uexplorer.AkkaStreamSupport
 
 trait CassandraAddressWriter extends AkkaStreamSupport with AddressPersistenceSupport with LazyLogging {
   this: CassandraBackend =>

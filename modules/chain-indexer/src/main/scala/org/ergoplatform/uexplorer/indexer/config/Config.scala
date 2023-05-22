@@ -10,7 +10,6 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.mining.emission.EmissionRules
 import org.ergoplatform.settings.MonetarySettings
 import org.ergoplatform.uexplorer.{Address, NetworkPrefix}
-import org.ergoplatform.uexplorer.indexer.http.{LocalNodeUriMagnet, RemoteNodeUriMagnet}
 import pureconfig.ConfigReader.Result
 import pureconfig.error.CannotConvert
 import pureconfig.{ConfigReader, ConfigSource}
@@ -18,27 +17,9 @@ import sttp.model.Uri
 import pureconfig.generic.derivation.default.*
 
 import java.io.File
-
-final case class ProtocolSettings(
-                                   networkPrefix: NetworkPrefix,
-                                   genesisAddress: Address,
-                                 )  derives ConfigReader {
-
-  val monetary = MonetarySettings()
-  val emission = new EmissionRules(monetary)
-
-  val addressEncoder: ErgoAddressEncoder =
-    ErgoAddressEncoder(networkPrefix.value.toByte)
-}
-object ProtocolSettings {
-
-  implicit def addrConfigReader: ConfigReader[Address] =
-    implicitly[ConfigReader[String]].map(Address.fromStringUnsafe)
-
-  implicit def netConfigReader: ConfigReader[NetworkPrefix] =
-    implicitly[ConfigReader[String]].map(NetworkPrefix.fromStringUnsafe)
-
-}
+import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
+import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
 
 sealed trait BackendType derives ConfigReader
 

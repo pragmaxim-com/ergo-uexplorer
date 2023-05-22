@@ -1,18 +1,16 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.AkkaStreamSupport
-import org.ergoplatform.uexplorer.indexer.http.SttpNodePoolBackend.InvalidPeers
 
 import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-object NodePool extends AkkaStreamSupport with LazyLogging {
+object NodePool extends LazyLogging {
 
   implicit private val timeout: Timeout = 3.seconds
 
@@ -61,6 +59,8 @@ object NodePool extends AkkaStreamSupport with LazyLogging {
   sealed trait NodePoolResponse
 
   case class AvailablePeers(peerAddresses: List[Peer]) extends NodePoolResponse
+
+  type InvalidPeers = SortedSet[Peer]
 
   def getAvailablePeers(implicit s: ActorSystem[Nothing], actorRef: ActorRef[NodePoolRequest]): Future[AvailablePeers] =
     actorRef.ask[AvailablePeers](ref => GetAvailablePeers(ref))

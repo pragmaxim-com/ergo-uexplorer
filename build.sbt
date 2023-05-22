@@ -87,7 +87,13 @@ lazy val root = (project in file("."))
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= circe("3") ++ Seq(gremlin))
+    .settings(libraryDependencies ++= circe("3") ++ Seq(retry("3"), pureConfig, ergoWallet, gremlin, loggingApi, scalaLogging("3")))
+
+lazy val `node-pool` =
+  Utils.mkModule("node-pool", "node-pool")
+    .settings(commonSettings)
+    .settings(libraryDependencies ++= lightBend("3") ++ circe("3") ++ sttp("3") ++ Seq(retry("3"), loggingApi))
+    .dependsOn(core)
 
 lazy val `alert-plugin` =
   Utils.mkModule("alert-plugin", "alert-plugin")
@@ -103,6 +109,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ janusGraph ++ Seq(gremlin, retry("3"), commonsCodec, ergoWallet, loggingApi, logback, pureConfig))
+    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ cassandraDb ++ monocle("3") ++ refined("3") ++ scalatest("3") ++ janusGraph ++ Seq(gremlin, retry("3"), mvStore, commonsCodec, ergoWallet, loggingApi, logback, pureConfig))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `alert-plugin`)
+    .dependsOn(core, `node-pool`, `alert-plugin`)

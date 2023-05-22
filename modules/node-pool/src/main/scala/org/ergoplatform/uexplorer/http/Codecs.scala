@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
 import io.circe.{Decoder, HCursor}
 import org.ergoplatform.uexplorer.BoxId
@@ -16,11 +16,11 @@ import io.circe.syntax.*
 import io.circe.*
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.indexer.parser.{ErgoTreeParser, RegistersParser}
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
 
 import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
+import org.ergoplatform.uexplorer.parser.ErgoTreeParser
+import org.ergoplatform.uexplorer.parser.RegistersParser
 
 trait Codecs {
 

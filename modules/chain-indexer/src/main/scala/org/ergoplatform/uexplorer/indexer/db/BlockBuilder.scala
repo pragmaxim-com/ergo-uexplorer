@@ -7,13 +7,12 @@ import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, Register
 import org.ergoplatform.uexplorer.{Address, HexString, SigmaType, TokenId, TokenType}
 import io.circe.refined.*
 import io.circe.syntax.*
-import org.ergoplatform.uexplorer.indexer.config.ProtocolSettings
 import eu.timepit.refined.auto.*
 import io.circe.Encoder
-import org.ergoplatform.uexplorer.indexer.parser.{RegistersParser, TokenPropsParser}
-
+import org.ergoplatform.uexplorer.parser.TokenPropsParser
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
+import org.ergoplatform.uexplorer.ProtocolSettings
 
 object BlockBuilder {
 

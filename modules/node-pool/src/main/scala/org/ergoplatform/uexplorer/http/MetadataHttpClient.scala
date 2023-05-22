@@ -1,13 +1,11 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
 import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import io.circe.Decoder
-import org.ergoplatform.uexplorer.{indexer, Const}
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.ResiliencySupport
+import org.ergoplatform.uexplorer.Const
 import retry.Policy
 import sttp.client3.*
 import sttp.client3.circe.asJson
@@ -17,13 +15,17 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
+import org.ergoplatform.uexplorer.ResiliencySupport
+import org.ergoplatform.uexplorer.Const.EpochLength
 
-class MetadataHttpClient[P](minNodeHeight: Int = indexer.Const.MinNodeHeight)(implicit
+class MetadataHttpClient[P](minNodeHeight: Int = EpochLength * 800)(implicit
   remoteUri: RemoteNodeUriMagnet,
   localUri: LocalNodeUriMagnet,
   system: ActorSystem[Nothing],
   underlyingB: SttpBackend[Future, P]
 ) extends ResiliencySupport {
+
+  private val allowedHeightDiff = 10
 
   private val retryPolicy: Policy = retry.Backoff(3, 1.second)
 
@@ -36,7 +38,7 @@ class MetadataHttpClient[P](minNodeHeight: Int = indexer.Const.MinNodeHeight)(im
       .send(underlyingB)
       .map(_.body)
       .transform {
-        case Success(peer) if peer.fullHeight < minHeight - indexer.Const.AllowedHeightDiff || peer.stateType != "utxo" =>
+        case Success(peer) if peer.fullHeight < minHeight - allowedHeightDiff || peer.stateType != "utxo" =>
           logger.debug(s"Peer has empty fullHeight or it has not utxo state : $peer")
           Success(None)
         case Success(peer) =>
@@ -51,7 +53,7 @@ class MetadataHttpClient[P](minNodeHeight: Int = indexer.Const.MinNodeHeight)(im
       .map {
         case masterNodes if masterNodes.size > 1 =>
           val bestFullHeight = masterNodes.maxBy(_.fullHeight).fullHeight
-          masterNodes.filter(_.fullHeight >= bestFullHeight - indexer.Const.AllowedHeightDiff)
+          masterNodes.filter(_.fullHeight >= bestFullHeight - allowedHeightDiff)
         case masterNodes =>
           masterNodes
       }
@@ -104,11 +106,9 @@ class MetadataHttpClient[P](minNodeHeight: Int = indexer.Const.MinNodeHeight)(im
 object MetadataHttpClient {
 
   def apply[P](
-    conf: ChainIndexerConf
-  )(implicit underlyingB: SttpBackend[Future, P], system: ActorSystem[Nothing]): MetadataHttpClient[P] = {
-    implicit val localNodeUriMagnet: LocalNodeUriMagnet   = conf.localUriMagnet
-    implicit val remoteNodeUriMagnet: RemoteNodeUriMagnet = conf.remoteUriMagnet
-    val metadataClient                                    = new MetadataHttpClient[P]()
+    implicit localNodeUriMagnet: LocalNodeUriMagnet, remoteNodeUriMagnet: RemoteNodeUriMagnet, underlyingB: SttpBackend[Future, P], system: ActorSystem[Nothing]
+  ): MetadataHttpClient[P] = {
+    val metadataClient = new MetadataHttpClient[P]()
     CoordinatedShutdown(system).addTask(
       CoordinatedShutdown.PhaseServiceStop,
       "stop-metadata-http-client"

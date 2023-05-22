@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
 import akka.{Done, NotUsed}
 import akka.actor.typed.*
@@ -6,9 +6,8 @@ import akka.stream.{ActorAttributes, KillSwitches, SharedKillSwitch}
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.{Resiliency, Utils}
-import org.ergoplatform.uexplorer.indexer.http.NodePool.*
-import org.ergoplatform.uexplorer.indexer.http.SttpNodePoolBackend.swapUri
+import org.ergoplatform.uexplorer.http.NodePool.*
+import org.ergoplatform.uexplorer.http.SttpNodePoolBackend.swapUri
 import sttp.capabilities.Effect
 import sttp.client3.*
 import sttp.model.Uri
@@ -19,13 +18,15 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.*
+import org.ergoplatform.uexplorer.Utils
+import org.ergoplatform.uexplorer.AkkaStreamSupport
 
 class SttpNodePoolBackend[P]()(implicit
   sys: ActorSystem[Nothing],
   nodePoolRef: ActorRef[NodePoolRequest],
   underlying: SttpBackend[Future, P],
   killSwitch: SharedKillSwitch
-) extends DelegateSttpBackend[Future, P](underlying) {
+) extends DelegateSttpBackend[Future, P](underlying) with AkkaStreamSupport {
   import SttpNodePoolBackend.fallbackQuery
 
   implicit private val timeout: Timeout = 5.seconds
@@ -69,7 +70,6 @@ class SttpNodePoolBackend[P]()(implicit
 }
 
 object SttpNodePoolBackend extends LazyLogging {
-  type InvalidPeers = SortedSet[Peer]
 
   def apply[P](nodePoolRef: ActorRef[NodePoolRequest])(implicit
     s: ActorSystem[Nothing],

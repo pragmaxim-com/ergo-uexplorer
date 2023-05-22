@@ -5,6 +5,10 @@ import org.scalatest.matchers.should.Matchers
 import sttp.client3._
 
 import scala.collection.immutable.TreeSet
+import org.ergoplatform.uexplorer.http.NodePoolState
+import org.ergoplatform.uexplorer.http.RemotePeer
+import org.ergoplatform.uexplorer.http.LocalNode
+import org.ergoplatform.uexplorer.http.RemoteNode
 
 class NodePoolSpec extends AnyFreeSpec with Matchers {
 

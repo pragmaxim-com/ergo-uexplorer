@@ -2,9 +2,8 @@ package org.ergoplatform.uexplorer.indexer.mempool
 
 import akka.actor.typed.{ActorRef, ActorSystem}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState
-import org.ergoplatform.uexplorer.indexer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.{updateTransactions, MempoolStateChanges, UpdateTxs}
-
+import org.ergoplatform.uexplorer.http.BlockHttpClient
 import scala.concurrent.Future
 
 class MempoolSyncer(blockHttpClient: BlockHttpClient) {

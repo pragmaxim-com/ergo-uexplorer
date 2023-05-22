@@ -9,7 +9,7 @@ import com.datastax.oss.driver.api.core.cql.{AsyncResultSet, BoundStatement, Pre
 import com.datastax.oss.driver.api.core.data.TupleValue
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.{MapPimp, MutableMapPimp, UnexpectedStateError}
+import org.ergoplatform.uexplorer.indexer.{MapPimp, MutableMapPimp}
 import org.ergoplatform.uexplorer.indexer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BufferedBlockInfo
 import org.ergoplatform.uexplorer.{db, indexer, Address, BlockId, BoxId, Const, Height, TxId, TxIndex}
@@ -28,6 +28,7 @@ import scala.collection.compat.immutable.ArraySeq
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
+import org.ergoplatform.uexplorer.UnexpectedStateError
 
 trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
   this: CassandraBackend =>
