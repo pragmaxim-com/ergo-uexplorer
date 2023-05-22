@@ -203,6 +203,7 @@ $ docker volume ls # cassandra and ergo volumes contain a lot of data
   - Rest API that would provider access to all the interesting data
   - UI that would render all the interesting data
   - using approximate datastructures like [datasketches](https://datasketches.apache.org/) or [algebird](https://twitter.github.io/algebird/)
+  - using [overflowdb](https://github.com/ShiftLeftSecurity/overflowdb) instead of JanusGraph for performance reasons
   - using persistent-offheap datastructures
      - [SwayDB](https://swaydb.io)
      - [MVStore](https://www.h2database.com/html/mvstore.html)
