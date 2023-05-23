@@ -32,6 +32,7 @@ package object uexplorer {
 
   type BoxesByTx     = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
   type BoxesByHeight = TreeMap[Height, BoxesByTx]
+  type InputsByHeight = Map[Height, Map[BoxId, (Address, Value)]]
 
   object Address {
     case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount)

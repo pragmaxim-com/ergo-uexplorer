@@ -24,13 +24,14 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Success, Try}
+import org.ergoplatform.uexplorer.InputsByHeight
 import org.ergoplatform.uexplorer.BoxesByHeight
 import org.ergoplatform.uexplorer.Tx
 
 case class UtxoState(
   addressByUtxo: Map[BoxId, Address],
   utxosByAddress: Map[Address, Map[BoxId, Value]],
-  inputsByHeightBuffer: Map[Height, Map[BoxId, (Address, Value)]],
+  inputsByHeightBuffer: InputsByHeight,
   boxesByHeightBuffer: BoxesByHeight,
   topAddresses: TopAddresses
 ) {
