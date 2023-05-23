@@ -44,7 +44,7 @@ trait CassandraUtxoReader extends EpochPersistenceSupport with LazyLogging {
   private def getHeaderByHeight(height: Int): Future[(Int, Option[(String, Long)])] =
     Future.fromTry(headerSelectWhereHeightTry).flatMap { headerSelectWhereHeight =>
       cqlSession
-        .executeAsync(headerSelectWhereHeight.bind(height))
+        .executeAsync(headerSelectWhereHeight.bind(height, true))
         .asScala
         .map(rs => height -> Option(rs.one()).map(r => r.getString(Headers.header_id) -> r.getLong(Headers.timestamp)))
     }
@@ -146,6 +146,9 @@ object CassandraUtxoReader extends CassandraPersistenceSupport {
       .columns(Headers.header_id, Headers.timestamp)
       .whereColumn(Headers.height)
       .isEqualTo(QueryBuilder.bindMarker(Headers.height))
+      .whereColumn(Headers.main_chain)
+      .isEqualTo(QueryBuilder.bindMarker(Headers.main_chain))
+      .allowFiltering()
       .build()
 
   protected[cassandra] def outputsSelectStatement: SimpleStatement =
