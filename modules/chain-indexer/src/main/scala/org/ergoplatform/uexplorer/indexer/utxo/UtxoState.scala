@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.*
 import org.ergoplatform.uexplorer.BlockMetadata
-import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, TxIndex, Value}
 import org.ergoplatform.uexplorer.MutableMapPimp
 import org.ergoplatform.uexplorer.MapPimp
@@ -133,16 +133,16 @@ case class UtxoState(
           .getOrElse(throw IllegalStateException(s"Box $boxId in block $blockId cannot be found"))
       )
 
-  def insertBestBlock(bestBlock: ApiFullBlock): UtxoState = {
+  def insertBestBlock(headerId: BlockId, height: Height, timestamp: Long, txs: ArraySeq[ApiTransaction]): UtxoState = {
     val newInputsByHeight = inputsByHeightBuffer.updated(
-      bestBlock.header.height,
-      bestBlock.transactions.transactions
+      height,
+      txs
         .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
         .toMap
     )
     val newBoxesByHeightBuffer = boxesByHeightBuffer.updated(
-      bestBlock.header.height,
-      bestBlock.transactions.transactions.zipWithIndex.map { case (tx, txIndex) =>
+      height,
+      txs.zipWithIndex.map { case (tx, txIndex) =>
         val inputs =
           tx match {
             case tx if tx.id == Const.Genesis.Emission.tx =>
@@ -152,11 +152,9 @@ case class UtxoState(
                 (Const.Genesis.Foundation.box, Const.Genesis.Foundation.address, Const.Genesis.Foundation.initialNanoErgs)
               )
             case tx =>
-              tx.inputs.map(i => getInput(i.boxId, bestBlock.header.id, newInputsByHeight))
+              tx.inputs.map(i => getInput(i.boxId, headerId, newInputsByHeight))
           }
-        Tx(tx.id, txIndex.toShort, bestBlock.header.height, bestBlock.header.timestamp) -> (inputs, tx.outputs.map(o =>
-          (o.boxId, o.address, o.value)
-        ))
+        Tx(tx.id, txIndex.toShort, height, timestamp) -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
       }
     )
     copy(

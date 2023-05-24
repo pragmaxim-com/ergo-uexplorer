@@ -53,20 +53,21 @@ case class ChainState(
     }
 
   def insertBestBlock(
-    bestBlock: ApiFullBlock
+    b: ApiFullBlock
   )(implicit protocol: ProtocolSettings): Try[(BestBlockInserted, ChainState)] =
-    if (!hasParent(bestBlock)) {
+    if (!hasParent(b)) {
       Failure(
         new UnexpectedStateError(
-          s"Inserting block ${bestBlock.header.id} at ${bestBlock.header.height} without parent being applied is not possible"
+          s"Inserting block ${b.header.id} at ${b.header.height} without parent being applied is not possible"
         )
       )
     } else
-      BlockBuilder(bestBlock, blockBuffer.byId.get(bestBlock.header.parentId))
-        .map { b =>
-          BestBlockInserted(b) -> copy(
-            blockBuffer = blockBuffer.addBlock(b),
-            utxoState   = utxoState.insertBestBlock(bestBlock)
+      BlockBuilder(b, blockBuffer.byId.get(b.header.parentId))
+        .map { block =>
+          BestBlockInserted(block) -> copy(
+            blockBuffer = blockBuffer.addBlock(block),
+            utxoState =
+              utxoState.insertBestBlock(b.header.id, b.header.height, b.header.timestamp, b.transactions.transactions)
           )
         }
 
