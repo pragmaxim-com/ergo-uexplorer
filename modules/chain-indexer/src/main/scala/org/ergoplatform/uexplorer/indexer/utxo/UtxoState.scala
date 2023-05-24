@@ -133,7 +133,7 @@ case class UtxoState(
           .getOrElse(throw IllegalStateException(s"Box $boxId in block $blockId cannot be found"))
       )
 
-  def insertBestBlock(headerId: BlockId, height: Height, timestamp: Long, txs: ArraySeq[ApiTransaction]): UtxoState = {
+  def bufferBestBlock(headerId: BlockId, height: Height, timestamp: Long, txs: ArraySeq[ApiTransaction]): UtxoState = {
     val newInputsByHeight = inputsByHeightBuffer.updated(
       height,
       txs
@@ -163,7 +163,7 @@ case class UtxoState(
     )
   }
 
-  def insertFork(newApiBlocks: ListBuffer[ApiFullBlock], supersededBlocks: ListBuffer[BlockMetadata]): UtxoState = {
+  def bufferFork(newApiBlocks: ListBuffer[ApiFullBlock], supersededBlocks: ListBuffer[BlockMetadata]): UtxoState = {
     val newInputsByHeight =
       inputsByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++
         newApiBlocks

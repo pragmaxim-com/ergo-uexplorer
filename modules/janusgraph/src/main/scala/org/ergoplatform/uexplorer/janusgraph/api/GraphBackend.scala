@@ -4,6 +4,7 @@ import akka.NotUsed
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Flow, Source}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.BlockMetadata
@@ -11,6 +12,7 @@ import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Epoch.EpochCommand
 import pureconfig.ConfigReader
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
+
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap}
@@ -26,9 +28,13 @@ trait GraphBackend {
 
   def graphWriteFlow: Flow[(Block, Option[EpochCommand]), (Block, Option[EpochCommand]), NotUsed]
 
+  def writeTx(height: Height, boxesByTx: BoxesByTx, topAddresses: TopAddressMap, g: Graph): Unit
+
   def writeTxsAndCommit(txBoxesByHeight: IterableOnce[(Height, BoxesByTx)], topAddresses: TopAddressMap): Unit
 
   def graphTraversalSource: GraphTraversalSource
+
+  def tx: Transaction
 
   def isEmpty: Boolean
 
@@ -54,6 +60,10 @@ object GraphBackend {
 class InMemoryGraphBackend extends GraphBackend {
 
   def initGraph: Boolean = false
+
+  def tx: Transaction = ???
+
+  def writeTx(height: Height, boxesByTx: BoxesByTx, topAddresses: TopAddressMap, g: Graph): Unit = ()
 
   def isEmpty: Boolean = true
 

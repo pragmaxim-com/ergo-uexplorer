@@ -67,7 +67,7 @@ case class ChainState(
           BestBlockInserted(block) -> copy(
             blockBuffer = blockBuffer.addBlock(block),
             utxoState =
-              utxoState.insertBestBlock(b.header.id, b.header.height, b.header.timestamp, b.transactions.transactions)
+              utxoState.bufferBestBlock(b.header.id, b.header.height, b.header.timestamp, b.transactions.transactions)
           )
         }
 
@@ -106,7 +106,7 @@ case class ChainState(
         .map { case (newApiBlocks, newBlocks, supersededBlocks) =>
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(
             blockBuffer = blockBuffer.addFork(newBlocks, supersededBlocks),
-            utxoState   = utxoState.insertFork(newApiBlocks, supersededBlocks)
+            utxoState   = utxoState.bufferFork(newApiBlocks, supersededBlocks)
           )
         }
 

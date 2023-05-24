@@ -6,6 +6,8 @@ import akka.stream.scaladsl.Flow
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.apache.tinkerpop.gremlin.structure.Transaction
+import org.ergoplatform.uexplorer.{BoxesByTx, Height, TopAddressMap}
 import org.ergoplatform.uexplorer.db.Block
 import org.janusgraph.core.JanusGraphFactory
 import org.janusgraph.graphdb.database.StandardJanusGraph
@@ -18,6 +20,8 @@ import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 class JanusGraphBackend(val janusGraph: StandardJanusGraph) extends GraphBackend with JanusGraphWriter {
 
   def graphTraversalSource: GraphTraversalSource = janusGraph.traversal()
+
+  def tx: Transaction = janusGraph.tx()
 
   def isEmpty: Boolean = janusGraph.traversal().V().hasNext
 

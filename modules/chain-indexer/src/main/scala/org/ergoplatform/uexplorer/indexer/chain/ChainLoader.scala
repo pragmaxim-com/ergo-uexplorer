@@ -4,10 +4,11 @@ import akka.Done
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.pattern.StatusReply
-import akka.stream.ActorAttributes
+import akka.stream.{ActorAttributes, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.tinkerpop.gremlin.structure.Graph
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
@@ -37,7 +38,8 @@ class ChainLoader(
 
   import ChainLoader.*
 
-  private def loadUtxoStateFromDb(blockInfoByEpochIndex: TreeMap[Int, BlockMetadata], includingGraph: Boolean) = {
+  /*
+  private def loadUtxoStateFromDb2(blockInfoByEpochIndex: TreeMap[Int, BlockMetadata], includingGraph: Boolean) = {
     val subjectToLoad = if (includingGraph) "graph and utxoState" else "utxoState"
     logger.info(s"Loading $subjectToLoad from database ... ")
     Source
@@ -57,6 +59,36 @@ class ChainLoader(
           newState
         }
       }
+  }
+   */
+
+  private def loadUtxoStateFromDb(blockInfoByEpochIndex: TreeMap[Int, BlockMetadata], includingGraph: Boolean) = {
+    val subjectToLoad = if (includingGraph) "graph and utxoState" else "utxoState"
+    logger.info(s"Loading $subjectToLoad from database ... ")
+    Source
+      .fromIterator(() => blockInfoByEpochIndex.keysIterator)
+      .mapConcat(Epoch.heightRangeForEpochIndex)
+      .via(backend.transactionBoxesByHeightFlow)
+      .buffer(Const.EpochLength, OverflowStrategy.backpressure)
+      .runFold((UtxoState.empty, graphBackend.tx.createThreadedTx[Graph]())) {
+        case ((s, threadedGraph), (height, boxesByTx)) =>
+          if (height % Const.EpochLength == 0) {
+            logger.info(s"Merging boxes of epoch ${Epoch.epochIndexForHeight(height)} finished")
+          }
+          val newState = s.mergeGivenBoxes(height, boxesByTx.iterator)
+          val newG =
+            if (includingGraph) {
+              graphBackend.writeTx(height, boxesByTx, newState.topAddresses.nodeMap, threadedGraph)
+              if (height % Const.EpochLength == 0) {
+                threadedGraph.tx.commit()
+                logger.info(s"Graph building of epoch ${Epoch.epochIndexForHeight(height)} finished")
+                graphBackend.tx.createThreadedTx[Graph]()
+              } else threadedGraph
+            } else threadedGraph
+
+          newState -> newG
+      }
+      .map(_._1)
   }
 
   private def initUtxoState(blockInfoByEpochIndex: TreeMap[EpochIndex, BlockMetadata]) =

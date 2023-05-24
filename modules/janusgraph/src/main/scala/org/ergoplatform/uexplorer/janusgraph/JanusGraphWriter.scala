@@ -9,8 +9,6 @@ import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.*
 import org.janusgraph.core.Multiplicity
-import org.janusgraph.graphdb.database.StandardJanusGraph
-import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 import org.ergoplatform.uexplorer.Epoch.{EpochCommand, IgnoreEpoch, WriteNewEpoch}
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -45,12 +43,15 @@ trait JanusGraphWriter extends LazyLogging {
     }
   }
 
+  def writeTx(height: Height, boxesByTx: BoxesByTx, topAddresses: TopAddressMap, g: Graph): Unit =
+    boxesByTx.foreach { case (tx, (inputs, outputs)) =>
+      TxGraphWriter.writeGraph(tx, height, inputs, outputs, topAddresses)(g)
+    }
+
   def writeTxsAndCommit(txBoxesByHeight: IterableOnce[(Height, BoxesByTx)], topAddresses: TopAddressMap): Unit = {
     txBoxesByHeight.iterator
       .foreach { case (height, boxesByTx) =>
-        boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-          TxGraphWriter.writeGraph(tx, height, inputs, outputs, topAddresses)(janusGraph)
-        }
+        writeTx(height, boxesByTx, topAddresses, janusGraph)
       }
     janusGraph.tx().commit()
   }

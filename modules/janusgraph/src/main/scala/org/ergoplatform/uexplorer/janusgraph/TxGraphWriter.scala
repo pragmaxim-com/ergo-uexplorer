@@ -7,8 +7,6 @@ import eu.timepit.refined.auto.autoUnwrap
 import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.*
-import org.janusgraph.graphdb.database.StandardJanusGraph
-import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.collection.mutable
@@ -27,7 +25,7 @@ object TxGraphWriter extends LazyLogging {
     inputs: ArraySeq[(BoxId, Address, Long)],
     outputs: ArraySeq[(BoxId, Address, Long)],
     topAddresses: TopAddressMap
-  )(g: StandardJanusGraph): Unit = {
+  )(g: Graph): Unit = {
     val newTxVertex = g.addVertex(T.id, Utils.vertexHash(tx.id.unwrapped, g), T.label, "txId")
     newTxVertex.property("txId", tx.id)
     newTxVertex.property("height", tx.height)
