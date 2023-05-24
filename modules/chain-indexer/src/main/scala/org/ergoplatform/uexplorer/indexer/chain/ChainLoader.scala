@@ -75,7 +75,7 @@ class ChainLoader(
           if (height % Const.EpochLength == 0) {
             logger.info(s"Merging boxes of epoch ${Epoch.epochIndexForHeight(height)} finished")
           }
-          val newState = s.mergeGivenBoxes(height, boxesByTx.iterator)
+          val newState = s.mergeBlockBoxes(height, boxesByTx.iterator)
           val newG =
             if (includingGraph) {
               graphBackend.writeTx(height, boxesByTx, newState.topAddresses.nodeMap, threadedGraph)

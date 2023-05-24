@@ -41,7 +41,7 @@ case class UtxoState(
     */
   def utxoStateWithCurrentEpochBoxes: UtxoState = mergeBufferedBoxes(Option.empty)._2
 
-  def mergeGivenBoxes(
+  def mergeBlockBoxes(
     height: Height,
     boxes: Iterator[(Tx, (Iterable[(BoxId, Address, Value)], Iterable[(BoxId, Address, Value)]))]
   ): UtxoState = {
@@ -108,7 +108,7 @@ case class UtxoState(
       }
       .getOrElse(boxesByHeightBuffer)
 
-    val newUtxoState = mergeGivenBoxes(boxesByHeightSlice.lastKey, boxesByHeightSlice.iterator.flatMap(_._2.iterator))
+    val newUtxoState = mergeBlockBoxes(boxesByHeightSlice.lastKey, boxesByHeightSlice.iterator.flatMap(_._2.iterator))
     boxesByHeightSlice -> newUtxoState.copy(
       inputsByHeightBuffer = inputsByHeightBuffer -- boxesByHeightSlice.keysIterator,
       boxesByHeightBuffer  = boxesByHeightBuffer -- boxesByHeightSlice.keysIterator

@@ -55,7 +55,7 @@ object MempoolStateHolder extends LazyLogging {
               )
             acc.addOne(Tx(tx.id, 0, 0, 0) -> (inputsWithAddrValue, tx.outputs.map(o => (o.boxId, o.address, o.value))))
           }
-        newTx -> utxoState.mergeGivenBoxes(0, boxesByTxBuilder.result().iterator)
+        newTx -> utxoState.mergeBlockBoxes(0, boxesByTxBuilder.result().iterator)
       }
   }
 
