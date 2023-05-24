@@ -1,8 +1,8 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.ActorSystem
-import org.ergoplatform.uexplorer.indexer.{Rest, TestSupport}
+import org.ergoplatform.uexplorer.http.{Rest, TestSupport}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec

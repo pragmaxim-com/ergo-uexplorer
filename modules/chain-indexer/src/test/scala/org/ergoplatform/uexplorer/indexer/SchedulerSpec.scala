@@ -17,11 +17,12 @@ import sttp.capabilities.WebSockets
 import sttp.client3.*
 import sttp.client3.testing.SttpBackendStub
 import org.ergoplatform.uexplorer.janusgraph.api.InMemoryGraphBackend
+
 import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.Future
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.cassandra.api.InMemoryBackend
-import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
+import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, Rest, TestSupport}
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.http.MetadataHttpClient

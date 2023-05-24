@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}

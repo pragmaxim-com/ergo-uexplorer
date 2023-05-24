@@ -1,15 +1,14 @@
-package org.ergoplatform.uexplorer.indexer
+package org.ergoplatform.uexplorer.http
+
+import io.circe.parser.*
+import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.Height
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import java.io.BufferedInputStream
 import java.util.zip.GZIPInputStream
 import scala.collection.immutable.{SortedMap, TreeMap}
 import scala.io.Source
-import io.circe.parser.*
-import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.Height
-import org.ergoplatform.uexplorer.utxo.UtxoState
-import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.http.Codecs
 
 object Rest {
 

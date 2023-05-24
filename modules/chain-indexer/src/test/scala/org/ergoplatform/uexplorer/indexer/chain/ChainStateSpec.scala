@@ -7,7 +7,6 @@ import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.utxo.{TopAddresses, UtxoState}
-import org.ergoplatform.uexplorer.indexer.Rest
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const}
 import org.scalatest.freespec.AnyFreeSpec
@@ -17,6 +16,7 @@ import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.UnexpectedStateError
+import org.ergoplatform.uexplorer.http.Rest
 
 class ChainStateSpec extends AnyFreeSpec with Matchers with DiffShouldMatcher {
 

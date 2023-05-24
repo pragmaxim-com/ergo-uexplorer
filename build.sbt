@@ -82,7 +82,7 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `alert-plugin`, indexer)
+  ).aggregate(core, `node-pool`, `utxo-state`, cassandra, janusgraph, `alert-plugin`, indexer)
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
@@ -92,14 +92,14 @@ lazy val core =
 lazy val `node-pool` =
   Utils.mkModule("node-pool", "node-pool")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3"))
+    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ scalatest("3"))
     .dependsOn(core)
 
 lazy val `utxo-state` =
   Utils.mkModule("utxo-state", "utxo-state")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3") ++ Seq(mvStore))
-    .dependsOn(core)
+    .settings(libraryDependencies ++= lightBend("3") ++ Seq(mvStore) ++ scalatest("3"))
+    .dependsOn(`node-pool` % "compile->compile;test->test") //TODO only snapshots depend on node-pool
 
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
@@ -129,4 +129,4 @@ lazy val indexer =
     .settings(chainIndexerAssemblySettings)
     .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3"))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `node-pool`, `utxo-state`, cassandra, janusgraph, `alert-plugin`)
+    .dependsOn(core, `node-pool` % "compile->compile;test->test", `utxo-state`, cassandra, janusgraph, `alert-plugin`)

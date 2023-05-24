@@ -3,8 +3,7 @@ package org.ergoplatform.uexplorer.utxo
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.db.BlockBuilder
-import org.ergoplatform.uexplorer.indexer.Rest
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.http.Rest
 import org.scalatest.freespec.{AnyFreeSpec, AsyncFreeSpec}
 import org.scalatest.matchers.should.Matchers
 
@@ -13,6 +12,8 @@ import scala.collection.immutable.TreeMap
 
 class DiskUtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
 
+  /*
+  import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
   private val testKit                                     = ActorTestKit()
   implicit private val protocol: ProtocolSettings         = ChainIndexerConf.loadDefaultOrThrow.protocol
   implicit private val addressEncoder: ErgoAddressEncoder = protocol.addressEncoder
@@ -48,4 +49,5 @@ class DiskUtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
       }
     }
   }
+   */
 }

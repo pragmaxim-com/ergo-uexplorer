@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer.http
+package org.ergoplatform.uexplorer.http
 
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

@@ -1,6 +1,6 @@
-package org.ergoplatform.uexplorer.indexer
+package org.ergoplatform.uexplorer.http
 
-import eu.timepit.refined._
+import eu.timepit.refined.*
 import eu.timepit.refined.string.HexStringSpec
 import org.ergoplatform.uexplorer.{BlockId, HexString}
 import org.scalacheck.Gen
