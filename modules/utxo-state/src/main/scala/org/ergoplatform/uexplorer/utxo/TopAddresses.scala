@@ -1,13 +1,12 @@
-package org.ergoplatform.uexplorer.indexer.utxo
+package org.ergoplatform.uexplorer.utxo
 
-import com.datastax.oss.driver.shaded.guava.common.collect.MinMaxPriorityQueue
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.*
+import org.ergoplatform.uexplorer.utxo.TopAddresses.*
 
-import scala.jdk.CollectionConverters.*
 import java.util.Comparator
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
 
 case class TopAddresses(
   nodeMap: TopAddressMap,

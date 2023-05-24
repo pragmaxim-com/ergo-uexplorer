@@ -1,20 +1,11 @@
-package org.ergoplatform.uexplorer.indexer.utxo
+package org.ergoplatform.uexplorer.utxo
 
-import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.pattern.StatusReply
-import akka.stream.scaladsl.Source
-import akka.{Done, NotUsed}
 import com.google.common.collect.TreeMultiset
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.*
-import org.ergoplatform.uexplorer.BlockMetadata
+import org.ergoplatform.uexplorer.utxo.TopAddresses.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, Height, TxId, TxIndex, Value}
-import org.ergoplatform.uexplorer.MutableMapPimp
-import org.ergoplatform.uexplorer.MapPimp
-import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.*
-
+import org.ergoplatform.uexplorer.*
 import java.io.*
 import java.nio.file.{Path, Paths}
 import scala.collection.compat.immutable.ArraySeq
@@ -24,9 +15,6 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Success, Try}
-import org.ergoplatform.uexplorer.InputsByHeight
-import org.ergoplatform.uexplorer.BoxesByHeight
-import org.ergoplatform.uexplorer.Tx
 
 case class UtxoState(
   addressByUtxo: Map[BoxId, Address],

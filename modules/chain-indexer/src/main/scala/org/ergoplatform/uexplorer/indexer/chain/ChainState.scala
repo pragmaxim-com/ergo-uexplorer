@@ -5,7 +5,7 @@ import org.ergoplatform.uexplorer.db.{Block, BlockInfo}
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.BlockBuffer
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
 import org.ergoplatform.uexplorer.db.BlockBuilder
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.utxo.UtxoState
 import org.ergoplatform.uexplorer.MapPimp
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 

@@ -1,10 +1,10 @@
-package org.ergoplatform.uexplorer.indexer.utxo
+package org.ergoplatform.uexplorer.utxo
 
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.Epoch
+import org.ergoplatform.uexplorer.utxo.UtxoState
 
 import java.io.File
 import scala.concurrent.Future
-import org.ergoplatform.uexplorer.Epoch
 
 trait UtxoSnapshotManager {
   def clearAllSnapshots(): Unit

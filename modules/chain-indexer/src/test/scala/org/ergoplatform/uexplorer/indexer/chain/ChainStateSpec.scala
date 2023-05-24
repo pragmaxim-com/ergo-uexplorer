@@ -6,7 +6,7 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
-import org.ergoplatform.uexplorer.indexer.utxo.{TopAddresses, UtxoState}
+import org.ergoplatform.uexplorer.utxo.{TopAddresses, UtxoState}
 import org.ergoplatform.uexplorer.indexer.Rest
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const}

@@ -95,6 +95,12 @@ lazy val `node-pool` =
     .settings(libraryDependencies ++= lightBend("3") ++ sttp("3"))
     .dependsOn(core)
 
+lazy val `utxo-state` =
+  Utils.mkModule("utxo-state", "utxo-state")
+    .settings(commonSettings)
+    .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3") ++ Seq(mvStore))
+    .dependsOn(core)
+
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
     .settings(commonSettings)
@@ -121,6 +127,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3") ++ Seq(mvStore))
+    .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3"))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `node-pool`, cassandra, janusgraph, `alert-plugin`)
+    .dependsOn(core, `node-pool`, `utxo-state`, cassandra, janusgraph, `alert-plugin`)

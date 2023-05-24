@@ -12,7 +12,7 @@ import org.apache.tinkerpop.gremlin.structure.Graph
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.indexer.chain.ChainState.*
 import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.utxo.UtxoState
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Const, EpochIndex}
 
@@ -26,7 +26,7 @@ import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.Epoch
 import org.ergoplatform.uexplorer.BlockMetadata
-import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoSnapshotManager}
+import org.ergoplatform.uexplorer.utxo.{UtxoSnapshot, UtxoSnapshotManager}
 
 class ChainLoader(
   backend: Backend,

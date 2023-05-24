@@ -1,17 +1,15 @@
-package org.ergoplatform.uexplorer.indexer.utxo
+package org.ergoplatform.uexplorer.utxo
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.ActorSystem
 import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.db.BlockBuilder
 import org.ergoplatform.uexplorer.indexer.Rest
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.db.BlockBuilder
 import org.scalatest.freespec.{AnyFreeSpec, AsyncFreeSpec}
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.file.Paths
 import scala.collection.immutable.TreeMap
-import org.ergoplatform.uexplorer.ProtocolSettings
 
 class DiskUtxoSnapshotManagerSpec extends AsyncFreeSpec with Matchers {
 

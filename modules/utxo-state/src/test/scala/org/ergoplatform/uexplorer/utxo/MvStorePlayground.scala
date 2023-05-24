@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.indexer
+package org.ergoplatform.uexplorer.utxo
 
 import org.ergoplatform.uexplorer.{Address, BoxId, Height, Value}
 import org.h2.mvstore.MVStore

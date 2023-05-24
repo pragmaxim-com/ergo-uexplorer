@@ -1,13 +1,11 @@
-package org.ergoplatform.uexplorer.indexer.utxo
+package org.ergoplatform.uexplorer.utxo
 
 import akka.actor.typed.ActorSystem
-import akka.stream.IOResult
 import akka.stream.scaladsl.{FileIO, Framing, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.NewEpochDetected
-import org.ergoplatform.uexplorer.indexer.utxo.TopAddresses.*
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.utxo.TopAddresses.*
 
 import java.io.*
 import java.nio.file.{Files, Path, Paths}

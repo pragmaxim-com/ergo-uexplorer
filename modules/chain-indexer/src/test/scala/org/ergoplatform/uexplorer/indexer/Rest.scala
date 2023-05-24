@@ -7,7 +7,7 @@ import scala.io.Source
 import io.circe.parser.*
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.Height
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.utxo.UtxoState
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.http.Codecs
 

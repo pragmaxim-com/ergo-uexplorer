@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.indexer
 
-import org.ergoplatform.uexplorer.indexer.utxo.{UtxoSnapshot, UtxoSnapshotManager, UtxoState}
+import org.ergoplatform.uexplorer.utxo.{UtxoSnapshot, UtxoSnapshotManager, UtxoState}
 import org.ergoplatform.uexplorer.Epoch
 
 import scala.concurrent.Future

@@ -18,7 +18,7 @@ import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoState
+import org.ergoplatform.uexplorer.utxo.UtxoState
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.ergoplatform.uexplorer.{Address, BoxId, Const, Height, SortedTopAddressMap}
@@ -34,7 +34,7 @@ import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.Resiliency
 import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
-import org.ergoplatform.uexplorer.indexer.utxo.UtxoSnapshotManager
+import org.ergoplatform.uexplorer.utxo.UtxoSnapshotManager
 import org.ergoplatform.uexplorer.Epoch
 import org.ergoplatform.uexplorer.Epoch.EpochCommand
 import org.ergoplatform.uexplorer.Epoch.WriteNewEpoch
