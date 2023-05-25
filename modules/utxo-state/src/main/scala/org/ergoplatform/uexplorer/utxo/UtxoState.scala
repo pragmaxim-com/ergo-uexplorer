@@ -6,6 +6,8 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.utxo.TopAddresses.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.utxo.UtxoState.BestBlock
+
 import java.io.*
 import java.nio.file.{Path, Paths}
 import scala.collection.compat.immutable.ArraySeq
@@ -22,7 +24,7 @@ case class UtxoState(
   inputsByHeightBuffer: InputsByHeight,
   boxesByHeightBuffer: BoxesByHeight,
   topAddresses: TopAddresses
-) {
+) extends UtxoStateLike[UtxoState] {
 
   /** on-demand computation of UtxoState up to latest blocks which are not merged right away as we do not support rollback,
     * instead we merge only winner-fork blocks into UtxoState
@@ -121,16 +123,16 @@ case class UtxoState(
           .getOrElse(throw IllegalStateException(s"Box $boxId in block $blockId cannot be found"))
       )
 
-  def bufferBestBlock(headerId: BlockId, height: Height, timestamp: Long, txs: ArraySeq[ApiTransaction]): UtxoState = {
+  override def addBestBlock(bestBlock: BestBlock): UtxoState = {
     val newInputsByHeight = inputsByHeightBuffer.updated(
-      height,
-      txs
+      bestBlock.height,
+      bestBlock.txs
         .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
         .toMap
     )
     val newBoxesByHeightBuffer = boxesByHeightBuffer.updated(
-      height,
-      txs.zipWithIndex.map { case (tx, txIndex) =>
+      bestBlock.height,
+      bestBlock.txs.zipWithIndex.map { case (tx, txIndex) =>
         val inputs =
           tx match {
             case tx if tx.id == Const.Genesis.Emission.tx =>
@@ -140,9 +142,11 @@ case class UtxoState(
                 (Const.Genesis.Foundation.box, Const.Genesis.Foundation.address, Const.Genesis.Foundation.initialNanoErgs)
               )
             case tx =>
-              tx.inputs.map(i => getInput(i.boxId, headerId, newInputsByHeight))
+              tx.inputs.map(i => getInput(i.boxId, bestBlock.headerId, newInputsByHeight))
           }
-        Tx(tx.id, txIndex.toShort, height, timestamp) -> (inputs, tx.outputs.map(o => (o.boxId, o.address, o.value)))
+        Tx(tx.id, txIndex.toShort, bestBlock.height, bestBlock.timestamp) -> (inputs, tx.outputs.map(o =>
+          (o.boxId, o.address, o.value)
+        ))
       }
     )
     copy(
@@ -151,36 +155,37 @@ case class UtxoState(
     )
   }
 
-  def bufferFork(newApiBlocks: ListBuffer[ApiFullBlock], supersededBlocks: ListBuffer[BlockMetadata]): UtxoState = {
+  override def addFork(
+    newApiBlocks: ListBuffer[BestBlock],
+    supersededBlocks: ListBuffer[BlockMetadata]
+  ): UtxoState = {
     val newInputsByHeight =
       inputsByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++
-        newApiBlocks
-          .map(b =>
-            b.header.height ->
-              b.transactions.transactions
-                .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
-                .toMap
-          )
-          .toMap
+        newApiBlocks.map { case BestBlock(_, height, _, txs) =>
+          height -> txs.flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap).toMap
+        }.toMap
 
     val newBoxesByHeightBuffer =
-      newApiBlocks
-        .map(b =>
-          b.header.height -> b.transactions.transactions.zipWithIndex
-            .map { case (tx, txIndex) =>
-              val inputs = tx.inputs.map(i => getInput(i.boxId, b.header.id, newInputsByHeight))
-              Tx(tx.id, txIndex.toShort, b.header.height, b.header.timestamp) -> (inputs, tx.outputs
-                .map(o => (o.boxId, o.address, o.value)))
-            }
-        )
-        .toMap
+      newApiBlocks.map { case BestBlock(headerId, height, timestamp, txs) =>
+        height -> txs.zipWithIndex
+          .map { case (tx, txIndex) =>
+            val inputs = tx.inputs.map(i => getInput(i.boxId, headerId, newInputsByHeight))
+            Tx(tx.id, txIndex.toShort, height, timestamp) -> (inputs, tx.outputs
+              .map(o => (o.boxId, o.address, o.value)))
+          }
+      }.toMap
     copy(
       inputsByHeightBuffer = newInputsByHeight,
       boxesByHeightBuffer  = boxesByHeightBuffer.removedAll(supersededBlocks.map(_.height)) ++ newBoxesByHeightBuffer
     )
   }
+
+  override def getAddressByUtxo(boxId: BoxId): Option[Address] = addressByUtxo.get(boxId)
+
+  override def getUtxosByAddress(address: Address): Option[Map[BoxId, Value]] = utxosByAddress.get(address)
 }
 
 object UtxoState extends LazyLogging {
+  case class BestBlock(headerId: BlockId, height: Height, timestamp: Long, txs: ArraySeq[ApiTransaction])
   def empty: UtxoState = UtxoState(Map.empty, Map.empty, Map.empty, TreeMap.empty, TopAddresses.empty)
 }

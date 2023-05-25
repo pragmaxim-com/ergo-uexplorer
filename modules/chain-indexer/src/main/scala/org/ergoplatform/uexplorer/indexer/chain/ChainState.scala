@@ -8,6 +8,7 @@ import org.ergoplatform.uexplorer.db.BlockBuilder
 import org.ergoplatform.uexplorer.utxo.UtxoState
 import org.ergoplatform.uexplorer.MapPimp
 import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.utxo.UtxoState.BestBlock
 
 import scala.collection.immutable.{ArraySeq, List, SortedMap, SortedSet, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
@@ -64,10 +65,10 @@ case class ChainState(
     } else
       BlockBuilder(b, blockBuffer.byId.get(b.header.parentId))
         .map { block =>
+          val bestBlock = BestBlock(b.header.id, b.header.height, b.header.timestamp, b.transactions.transactions)
           BestBlockInserted(block) -> copy(
             blockBuffer = blockBuffer.addBlock(block),
-            utxoState =
-              utxoState.bufferBestBlock(b.header.id, b.header.height, b.header.timestamp, b.transactions.transactions)
+            utxoState   = utxoState.addBestBlock(bestBlock)
           )
         }
 
@@ -82,10 +83,10 @@ case class ChainState(
       )
     } else
       winningFork
-        .foldLeft(Try((ListBuffer.empty[ApiFullBlock], ListBuffer.empty[Block], ListBuffer.empty[BlockMetadata]))) {
+        .foldLeft(Try((ListBuffer.empty[BestBlock], ListBuffer.empty[Block], ListBuffer.empty[BlockMetadata]))) {
           case (f @ Failure(_), _) =>
             f
-          case (Success((newApiBlocksAcc, newBlocksAcc, toRemoveAcc)), apiBlock) =>
+          case (Success((newBestBlocksAcc, newBlocksAcc, toRemoveAcc)), apiBlock) =>
             BlockBuilder(
               apiBlock,
               Some(
@@ -94,8 +95,13 @@ case class ChainState(
                   .getOrElse(blockBuffer.byId(apiBlock.header.parentId))
               )
             ).map { newBlock =>
-              val newApiBlocks = newApiBlocksAcc :+ apiBlock
-              val newBlocks    = newBlocksAcc :+ newBlock
+              val newApiBlocks = newBestBlocksAcc :+ BestBlock(
+                apiBlock.header.id,
+                apiBlock.header.height,
+                apiBlock.header.timestamp,
+                apiBlock.transactions.transactions
+              )
+              val newBlocks = newBlocksAcc :+ newBlock
               val toRemove =
                 toRemoveAcc ++ blockBuffer.byHeight
                   .get(apiBlock.header.height)
@@ -106,7 +112,7 @@ case class ChainState(
         .map { case (newApiBlocks, newBlocks, supersededBlocks) =>
           ForkInserted(newBlocks.toList, supersededBlocks.toList) -> copy(
             blockBuffer = blockBuffer.addFork(newBlocks, supersededBlocks),
-            utxoState   = utxoState.bufferFork(newApiBlocks, supersededBlocks)
+            utxoState   = utxoState.addFork(newApiBlocks, supersededBlocks)
           )
         }
 
