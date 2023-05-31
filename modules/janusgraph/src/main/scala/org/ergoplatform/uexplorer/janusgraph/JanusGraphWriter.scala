@@ -13,6 +13,7 @@ import org.ergoplatform.uexplorer.Epoch.{EpochCommand, IgnoreEpoch, WriteNewEpoc
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait JanusGraphWriter extends LazyLogging {
   this: JanusGraphBackend =>
@@ -43,29 +44,27 @@ trait JanusGraphWriter extends LazyLogging {
     }
   }
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, topAddresses: TopAddressMap, g: Graph): Unit =
+  def writeTx(height: Height, boxesByTx: BoxesByTx, addressStats: Address => Option[Address.Stats], g: Graph): Unit =
     boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-      TxGraphWriter.writeGraph(tx, height, inputs, outputs, topAddresses)(g)
+      TxGraphWriter.writeGraph(tx, height, inputs, outputs, addressStats)(g)
     }
 
-  def writeTxsAndCommit(txBoxesByHeight: IterableOnce[(Height, BoxesByTx)], topAddresses: TopAddressMap): Unit = {
+  def writeTxsAndCommit(
+    txBoxesByHeight: IterableOnce[BestBlockInserted],
+    addressStats: Address => Option[Address.Stats]
+  ): Unit = {
     txBoxesByHeight.iterator
-      .foreach { case (height, boxesByTx) =>
-        writeTx(height, boxesByTx, topAddresses, janusGraph)
+      .foreach { case BestBlockInserted(b, boxesByTx) =>
+        writeTx(b.header.height, boxesByTx, addressStats, janusGraph)
       }
     janusGraph.tx().commit()
   }
 
-  def graphWriteFlow: Flow[(Block, Option[EpochCommand]), (Block, Option[EpochCommand]), NotUsed] =
-    Flow[(Block, Option[EpochCommand])]
-      .mapAsync(1) {
-        case (b, s @ Some(WriteNewEpoch(e, boxesByHeight, topAddresses))) =>
-          Future {
-            writeTxsAndCommit(boxesByHeight, topAddresses)
-            logger.info(s"New epoch ${e.index} graph building finished")
-            b -> s
-          }
-        case x =>
-          Future.successful(x)
+  def graphWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+    Flow[BestBlockInserted]
+      .grouped(64)
+      .mapConcat { blocks =>
+        writeTxsAndCommit(blocks, addressStats)
+        blocks
       }
 }

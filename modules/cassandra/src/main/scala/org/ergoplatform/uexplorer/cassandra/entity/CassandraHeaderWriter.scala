@@ -11,27 +11,29 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.cassandra
+import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
   import Headers._
 
-  def headerWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
+  def headerWriteFlow(parallelism: Int): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     storeFlow(
       parallelism,
       buildInsertStatement(columns, node_headers_table),
       headerInsertBinder
     )
 
-  protected[cassandra] def headerInsertBinder: (Block, PreparedStatement) => BoundStatement = { case (block, statement) =>
-    val validVersion =
-      if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
-        logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")
-        0: Byte
-      } else {
-        block.header.version
-      }
+  protected[cassandra] def headerInsertBinder: (BestBlockInserted, PreparedStatement) => BoundStatement = {
+    case (BestBlockInserted(block, _), statement) =>
+      val validVersion =
+        if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
+          logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")
+          0: Byte
+        } else {
+          block.header.version
+        }
 
-    val partialStatement =
+      val partialStatement =
       // format: off
         statement
           .bind()
@@ -57,11 +59,11 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
           .setUdtValue(BlockInfo.udtName,   BlockInfo.buildUdtValue(block))
         // format: on
 
-    block.adProofOpt.fold(partialStatement) { adProof =>
-      partialStatement
-        .setString(ad_proofs_bytes, adProof.proofBytes)
-        .setString(ad_proofs_digest, adProof.digest)
-    }
+      block.adProofOpt.fold(partialStatement) { adProof =>
+        partialStatement
+          .setString(ad_proofs_bytes, adProof.proofBytes)
+          .setString(ad_proofs_digest, adProof.digest)
+      }
   }
 
 }

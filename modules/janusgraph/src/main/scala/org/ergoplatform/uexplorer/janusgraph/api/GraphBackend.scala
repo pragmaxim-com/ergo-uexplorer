@@ -21,16 +21,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait GraphBackend {
 
   def initGraph: Boolean
 
-  def graphWriteFlow: Flow[(Block, Option[EpochCommand]), (Block, Option[EpochCommand]), NotUsed]
+  def graphWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, topAddresses: TopAddressMap, g: Graph): Unit
+  def writeTx(height: Height, boxesByTx: BoxesByTx, addressStats: Address => Option[Address.Stats], g: Graph): Unit
 
-  def writeTxsAndCommit(txBoxesByHeight: IterableOnce[(Height, BoxesByTx)], topAddresses: TopAddressMap): Unit
+  def writeTxsAndCommit(
+    txBoxesByHeight: IterableOnce[BestBlockInserted],
+    addressStats: Address => Option[Address.Stats]
+  ): Unit
 
   def graphTraversalSource: GraphTraversalSource
 
@@ -63,16 +67,18 @@ class InMemoryGraphBackend extends GraphBackend {
 
   def tx: Transaction = ???
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, topAddresses: TopAddressMap, g: Graph): Unit = ()
+  def writeTx(height: Height, boxesByTx: BoxesByTx, addressStats: Address => Option[Address.Stats], g: Graph): Unit = {}
 
+  def writeTxsAndCommit(
+    txBoxesByHeight: IterableOnce[BestBlockInserted],
+    addressStats: Address => Option[Address.Stats]
+  ): Unit = {}
   def isEmpty: Boolean = true
 
   def graphTraversalSource: GraphTraversalSource = EmptyGraph.instance.traversal()
 
-  def graphWriteFlow: Flow[(Block, Option[EpochCommand]), (Block, Option[EpochCommand]), NotUsed] =
-    Flow[(Block, Option[EpochCommand])].map(identity)
-
-  def writeTxsAndCommit(txBoxesByHeight: IterableOnce[(Height, BoxesByTx)], topAddresses: TopAddressMap): Unit = ()
+  def graphWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+    Flow[BestBlockInserted].map(identity)
 
   def close(): Future[Unit] = Future.successful(())
 }

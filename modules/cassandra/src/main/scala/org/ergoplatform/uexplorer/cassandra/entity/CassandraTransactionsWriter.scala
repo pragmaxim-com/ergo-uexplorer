@@ -9,11 +9,12 @@ import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
 
 import scala.collection.immutable.ArraySeq
+import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait CassandraTransactionsWriter extends LazyLogging { this: CassandraBackend =>
   import Transactions._
 
-  def transactionsWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
+  def transactionsWriteFlow(parallelism: Int): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
@@ -21,8 +22,8 @@ trait CassandraTransactionsWriter extends LazyLogging { this: CassandraBackend =
       transactionsInsertBinder
     )
 
-  protected[cassandra] def transactionsInsertBinder: (Block, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (block, statement) =>
+  protected[cassandra] def transactionsInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
+    case (BestBlockInserted(block, _), statement) =>
       block.txs.map { tx =>
         // format: off
         statement

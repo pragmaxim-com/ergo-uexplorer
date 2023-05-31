@@ -11,36 +11,36 @@ import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
 import org.apache.commons.codec.digest.MurmurHash2
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
-import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.cassandra.{AddressPersistenceSupport, CassandraBackend}
-import org.ergoplatform.uexplorer.Epoch
-import org.ergoplatform.uexplorer.{Address, BoxId, Const, TopAddressMap, TxId}
-import org.ergoplatform.uexplorer.MutableMapPimp
+import org.ergoplatform.uexplorer.Epoch.{EpochCommand, IgnoreEpoch, WriteNewEpoch}
+import org.ergoplatform.uexplorer.cassandra.{AddressPersistenceSupport, AkkaStreamSupport, CassandraBackend}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.{Address, BoxId, BoxesByTx, Const, Epoch, MutableMapPimp, TopAddressMap, TxId}
 
 import scala.collection.immutable.{ArraySeq, TreeMap}
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Random
-import org.ergoplatform.uexplorer.BoxesByTx
-import org.ergoplatform.uexplorer.AkkaStreamSupport
-import org.ergoplatform.uexplorer.Epoch.{EpochCommand, IgnoreEpoch, WriteNewEpoch}
 
 trait CassandraAddressWriter extends AddressPersistenceSupport with LazyLogging {
   this: CassandraBackend =>
   import CassandraAddressWriter.*
 
-  def addressWriteFlow: Flow[(Block, Option[EpochCommand]), (Block, Option[EpochCommand]), NotUsed] =
-    storePartitionedBatchFlow(
-      parallelism  = 4,
-      maxBatchSize = 20,
-      batchType    = DefaultBatchType.LOGGED,
-      buildInsertStatement(addressColumns, node_addresses_table),
-      addressInsertBinder
-    )
-
+  def addressWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+    Flow[BestBlockInserted]
+      .grouped(64)
+      .via(
+        storePartitionedBatchFlow(
+          parallelism  = 4,
+          maxBatchSize = 100,
+          batchType    = DefaultBatchType.LOGGED,
+          buildInsertStatement(addressColumns, node_addresses_table),
+          addressInsertBinder(addressStats)
+        )
+      )
+      .mapConcat(identity)
 }
 
 object CassandraAddressWriter extends AkkaStreamSupport with AddressPersistenceSupport with LazyLogging {
@@ -68,10 +68,10 @@ object CassandraAddressWriter extends AkkaStreamSupport with AddressPersistenceS
       .setString(box_id, boxId)
       .setLong(value, v)
 
-  private def addressPartitioningFlow(topAddresses: TopAddressMap, stmt: PreparedStatement) =
-    Flow.fromFunction[Seq[BoxesByTx], Iterable[Vector[BoundStatement]]] { boxesByTxbyHeight =>
+  private def addressPartitioningFlow(addressStats: Address => Option[Address.Stats], stmt: PreparedStatement) =
+    Flow.fromFunction[immutable.Seq[BestBlockInserted], Iterable[Vector[BoundStatement]]] { boxesByTxGroup =>
       val result = mutable.Map.empty[(Address, Short), Vector[BoundStatement]]
-      boxesByTxbyHeight.foreach { boxesByTx =>
+      boxesByTxGroup.foreach { case BestBlockInserted(_, boxesByTx) =>
         boxesByTx.foreach { case (tx, (inputs, outputs)) =>
           val boxes =
             if (tx.id == Const.Genesis.Emission.tx || tx.id == Const.Genesis.Foundation.tx)
@@ -79,7 +79,7 @@ object CassandraAddressWriter extends AkkaStreamSupport with AddressPersistenceS
             else
               outputs
           boxes.foreach { case (boxId, addr, v) =>
-            val addressIndex = topAddresses.get(addr).map(n => n._2 / 10000).getOrElse(0).toShort
+            val addressIndex = addressStats(addr).map(n => n.boxCount / 10000).getOrElse(0).toShort
             val statement =
               bindStatement(
                 addr,
@@ -99,18 +99,14 @@ object CassandraAddressWriter extends AkkaStreamSupport with AddressPersistenceS
       result.values
     }
 
-  protected[cassandra] def addressInsertBinder
-    : ((Block, Option[EpochCommand]), PreparedStatement) => Source[Seq[BoundStatement], NotUsed] = {
-    case ((_, Some(WriteNewEpoch(_, txBoxesByHeight, topAddresses))), stmt) =>
+  protected[cassandra] def addressInsertBinder(
+    addressStats: Address => Option[Address.Stats]
+  ): (immutable.Seq[BestBlockInserted], PreparedStatement) => Source[Seq[BoundStatement], NotUsed] = {
+    case (txBoxesGroup, stmt) =>
       Source
-        .fromIterator(() => txBoxesByHeight.valuesIterator.grouped(64))
-        .via(cpuHeavyBalanceFlow(addressPartitioningFlow(topAddresses, stmt)))
+        .single(txBoxesGroup)
+        .via(cpuHeavyBalanceFlow(addressPartitioningFlow(addressStats, stmt)))
         .mapConcat(identity)
-    case ((_, Some(IgnoreEpoch(epochIndex))), _) =>
-      logger.debug(s"Skipping persistence of epoch $epochIndex as it already existed")
-      Source.empty
-    case _ =>
-      Source.empty
   }
 
 }

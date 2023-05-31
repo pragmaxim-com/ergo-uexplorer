@@ -17,6 +17,7 @@ package object uexplorer {
 
   type Value      = Long
   type Height     = Int
+  type Timestamp  = Long
   type EpochIndex = Int
   type TxIndex    = Short
 
@@ -30,8 +31,8 @@ package object uexplorer {
   type Address       = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
 
-  type BoxesByTx     = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
-  type BoxesByHeight = TreeMap[Height, BoxesByTx]
+  type BoxesByTx      = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
+  type BoxesByHeight  = TreeMap[Height, BoxesByTx]
   type InputsByHeight = Map[Height, Map[BoxId, (Address, Value)]]
 
   object Address {
@@ -74,7 +75,7 @@ package object uexplorer {
     def fromStringUnsafe(s: String): ErgoTree = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
-  case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Long)
+  case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Timestamp)
 
   opaque type TxId = String
 

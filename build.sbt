@@ -120,7 +120,7 @@ lazy val `alert-plugin` =
     .settings(pluginAssemblySettings("alert-plugin"))
     .settings(libraryDependencies ++= scalatest("3") ++ Seq(discord4j, logback))
     .settings(excludeDependencies += ExclusionRule(commonsLogging.organization, commonsLogging.name))
-    .dependsOn(core)
+    .dependsOn(core, `utxo-state`)
 
 lazy val indexer =
   Utils.mkModule("chain-indexer", "chain-indexer")

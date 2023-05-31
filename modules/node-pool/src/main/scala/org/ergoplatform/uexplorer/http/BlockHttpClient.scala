@@ -82,20 +82,19 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
 
   def getBestBlockOrBranch(
     block: ApiFullBlock,
-    isBlockCached: BlockId => Future[Boolean],
+    isBlockCached: (BlockId, Height) => Boolean,
     acc: List[ApiFullBlock]
   ): Future[List[ApiFullBlock]] =
-    isBlockCached(block.header.parentId)
-      .flatMap {
-        case blockCached if blockCached =>
-          Future.successful(block :: acc)
-        case _ if block.header.height == 1 =>
-          Future.successful(block :: acc)
-        case _ =>
-          logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
-          getBlockForId(block.header.parentId)
-            .flatMap(b => getBestBlockOrBranch(b, isBlockCached, block :: acc))
-      }
+    isBlockCached(block.header.parentId, block.header.height - 1) match {
+      case blockCached if blockCached =>
+        Future.successful(block :: acc)
+      case _ if block.header.height == 1 =>
+        Future.successful(block :: acc)
+      case _ =>
+        logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
+        getBlockForId(block.header.parentId)
+          .flatMap(b => getBestBlockOrBranch(b, isBlockCached, block :: acc))
+    }
 
   def blockFlow: Flow[Height, ApiFullBlock, NotUsed] =
     Flow[Height]

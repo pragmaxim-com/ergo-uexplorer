@@ -131,13 +131,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_tokens
     PRIMARY KEY ((header_id), token_id, box_id)
 );
 
-CREATE TABLE IF NOT EXISTS uexplorer.node_epoch_last_headers
-(
-    epoch_index    INT,
-    last_header_id VARCHAR,
-    PRIMARY KEY (epoch_index)
-);
-
 CREATE TABLE IF NOT EXISTS uexplorer.node_addresses
 (
     address                 VARCHAR,

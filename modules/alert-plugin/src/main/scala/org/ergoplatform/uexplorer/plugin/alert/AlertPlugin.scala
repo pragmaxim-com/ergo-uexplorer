@@ -5,11 +5,11 @@ import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.channel.MessageChannel
 import discord4j.core.{DiscordClient, GatewayDiscordClient}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.utxo.{MvUtxoState, UtxoState}
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.{Flux, Mono}
 import retry.Policy
@@ -42,19 +42,17 @@ class AlertPlugin extends Plugin {
 
   def processMempoolTx(
     newTx: ApiTransaction,
-    utxoStateWoPool: UtxoStateWithoutPool,
-    utxoStateWithPool: UtxoStateWithPool,
-    topAddresses: SortedTopAddressMap,
+    utxoState: UtxoState,
     graphTraversalSource: GraphTraversalSource
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
         detectors.flatMap { detector =>
           detector
-            .inspectNewPoolTx(newTx, utxoStateWoPool, utxoStateWithPool, topAddresses, graphTraversalSource)
+            .inspectNewPoolTx(newTx, utxoState, graphTraversalSource)
             .flatMap { txMatch =>
               trackers.flatMap(
-                _.trackTx(txMatch, utxoStateWoPool, utxoStateWithPool, topAddresses, graphTraversalSource).toList
+                _.trackTx(txMatch, utxoState, graphTraversalSource).toList
                   .map(_.toString)
               )
             }
@@ -63,19 +61,18 @@ class AlertPlugin extends Plugin {
     }
 
   def processNewBlock(
-    newBlock: Block,
-    utxoStateWoPool: UtxoStateWithoutPool,
-    topAddresses: SortedTopAddressMap,
+    newBlock: BestBlockInserted,
+    utxoState: UtxoState,
     graphTraversalSource: GraphTraversalSource
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
         detectors.flatMap { detector =>
           detector
-            .inspectNewBlock(newBlock, utxoStateWoPool, topAddresses, graphTraversalSource)
+            .inspectNewBlock(newBlock, utxoState, graphTraversalSource)
             .flatMap { blockMatch =>
               trackers.flatMap(
-                _.trackBlock(blockMatch, utxoStateWoPool, topAddresses, graphTraversalSource).toList.map(_.toString)
+                _.trackBlock(blockMatch, utxoState, graphTraversalSource).toList.map(_.toString)
               )
             }
 

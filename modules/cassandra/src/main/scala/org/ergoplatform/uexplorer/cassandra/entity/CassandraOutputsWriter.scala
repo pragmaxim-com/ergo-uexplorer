@@ -9,11 +9,12 @@ import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.Const
 
 import scala.collection.immutable.ArraySeq
+import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait CassandraOutputsWriter { this: CassandraBackend =>
   import Outputs._
 
-  def outputsWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
+  def outputsWriteFlow(parallelism: Int): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
@@ -21,8 +22,8 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
       outputInsertBinder
     )
 
-  protected[cassandra] def outputInsertBinder: (Block, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (block, statement) =>
+  protected[cassandra] def outputInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
+    case (BestBlockInserted(block, _), statement) =>
       block.outputs.map { output =>
         statement
           .bind()

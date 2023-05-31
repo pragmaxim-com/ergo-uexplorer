@@ -1,10 +1,10 @@
 package org.ergoplatform.uexplorer.plugin
 
-import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.{Address, BoxId, SortedTopAddressMap, TopAddressMap, TxId, Value}
-import org.ergoplatform.uexplorer.node.ApiTransaction
-import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.node.ApiTransaction
+import org.ergoplatform.uexplorer.utxo.UtxoState
+import org.ergoplatform.uexplorer.{Address, BoxId, SortedTopAddressMap, TopAddressMap, TxId, Value}
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.Future
@@ -20,35 +20,13 @@ trait Plugin {
 
   def processMempoolTx(
     newTx: ApiTransaction,
-    utxoStateWoPool: UtxoStateWithoutPool,
-    utxoStateWithPool: UtxoStateWithPool,
-    topAddresses: SortedTopAddressMap,
+    utxoState: UtxoState,
     graphTraversalSource: GraphTraversalSource
   ): Future[Unit]
 
   def processNewBlock(
-    newBlock: Block,
-    utxoStateWoPool: UtxoStateWithoutPool,
-    topAddresses: SortedTopAddressMap,
+    newBlock: BestBlockInserted,
+    utxoState: UtxoState,
     graphTraversalSource: GraphTraversalSource
   ): Future[Unit]
-}
-
-object Plugin {
-
-  sealed trait UtxoStateLike {
-    def addressByUtxo: Map[BoxId, Address]
-    def utxosByAddress: Map[Address, Map[BoxId, Value]]
-  }
-
-  case class UtxoStateWithoutPool(
-    addressByUtxo: Map[BoxId, Address],
-    utxosByAddress: Map[Address, Map[BoxId, Value]]
-  ) extends UtxoStateLike
-
-  case class UtxoStateWithPool(
-    addressByUtxo: Map[BoxId, Address],
-    utxosByAddress: Map[Address, Map[BoxId, Value]]
-  ) extends UtxoStateLike
-
 }

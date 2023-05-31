@@ -12,6 +12,7 @@ import org.ergoplatform.uexplorer.{Address, BlockMetadata, HexString, ProtocolSe
 
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
+import org.ergoplatform.uexplorer.BoxesByTx
 
 object BlockBuilder {
 
@@ -218,3 +219,9 @@ object BlockBuilder {
     }
   }
 }
+
+sealed trait Inserted
+
+case class BestBlockInserted(block: Block, boxesByTx: BoxesByTx) extends Inserted
+
+case class ForkInserted(newFork: List[BestBlockInserted], supersededFork: List[BlockMetadata]) extends Inserted

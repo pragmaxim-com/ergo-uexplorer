@@ -27,6 +27,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Try
 import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
@@ -42,9 +43,8 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraInputsWriter
   with CassandraOutputsWriter
   with CassandraBlockUpdater
-  with CassandraEpochWriter
   with CassandraAddressWriter
-  with CassandraEpochReader
+  with CassandraHeadersReader
   with CassandraUtxoReader {
 
   def close(): Future[Unit] = {
@@ -52,8 +52,8 @@ class CassandraBackend(parallelism: Int)(implicit
     cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
   }
 
-  val blockWriteFlow: Flow[Block, Block, NotUsed] =
-    Flow[Block]
+  val blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+    Flow[BestBlockInserted]
       // format: off
       .via(headerWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
       .via(transactionsWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)

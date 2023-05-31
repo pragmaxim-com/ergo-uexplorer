@@ -10,17 +10,11 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.cassandra.CassandraBackend
-import org.ergoplatform.uexplorer.indexer.chain.*
-import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
-import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
-import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
+import org.ergoplatform.uexplorer.cassandra.{AkkaStreamSupport, CassandraBackend}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
-import org.ergoplatform.uexplorer.utxo.{DiskUtxoSnapshotManager, UtxoState}
 import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.ergoplatform.uexplorer.{Address, BoxId, Const}
 import org.slf4j.LoggerFactory
 
@@ -33,14 +27,15 @@ import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 import org.ergoplatform.uexplorer.ProtocolSettings
-import org.ergoplatform.uexplorer.AkkaStreamSupport
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.http.Routes
 import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, Initializer}
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.utxo.MvUtxoState
 
 object Application extends App with AkkaStreamSupport {
   ChainIndexerConf.loadWithFallback match {
@@ -52,8 +47,6 @@ object Application extends App with AkkaStreamSupport {
         Behaviors.setup[Nothing] { implicit ctx =>
           implicit val system: ActorSystem[Nothing] = ctx.system
           implicit val protocol: ProtocolSettings   = conf.protocol
-          implicit val chainStateHolderRef: ActorRef[ChainStateHolderRequest] =
-            ctx.spawn(new ChainStateHolder().initialBehavior, "ChainStateHolder")
           implicit val mempoolStateHolderRef: ActorRef[MempoolStateHolderRequest] =
             ctx.spawn(MempoolStateHolder.behavior(MempoolState.empty), "MempoolStateHolder")
 
@@ -79,11 +72,11 @@ object Application extends App with AkkaStreamSupport {
               pluginManager   <- PluginManager.initialize
               backend         <- Future.fromTry(Backend(conf.backendType))
               graphBackend    <- Future.fromTry(GraphBackend(conf.graphBackendType))
-              snapshotManager = new DiskUtxoSnapshotManager()
-              chainIndexer    = new ChainIndexer(backend, graphBackend, blockHttpClient, snapshotManager)
-              mempoolSyncer   = new MempoolSyncer(blockHttpClient)
-              chainLoader     = new ChainLoader(backend, graphBackend, snapshotManager)
-              scheduler       = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, chainLoader)
+              utxoState     = MvUtxoState()
+              blockIndexer  = new BlockIndexer(backend, graphBackend, blockHttpClient, utxoState)
+              mempoolSyncer = new MempoolSyncer(blockHttpClient)
+              initializer   = new Initializer(utxoState, backend, graphBackend)
+              scheduler     = new Scheduler(pluginManager, blockIndexer, mempoolSyncer, initializer)
               done <- scheduler.validateAndSchedule(0.seconds, 5.seconds)
             } yield done
 

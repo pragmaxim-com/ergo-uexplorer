@@ -8,10 +8,10 @@ import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.{MapPimp, MutableMapPimp}
-import org.ergoplatform.uexplorer.cassandra.{CassandraBackend, CassandraPersistenceSupport, EpochPersistenceSupport}
+import org.ergoplatform.uexplorer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
 import org.ergoplatform.uexplorer.Epoch
 import org.ergoplatform.uexplorer.db
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, EpochIndex}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.cassandra
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
@@ -24,42 +24,38 @@ import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
 import org.ergoplatform.uexplorer.BlockMetadata
 
-trait CassandraEpochReader extends EpochPersistenceSupport with LazyLogging {
+trait CassandraHeadersReader extends LazyLogging {
   this: CassandraBackend =>
 
-  import CassandraEpochReader.*
+  import CassandraHeadersReader.*
 
   private lazy val blockInfoSelectWhereHeader = cqlSession.prepare(blockInfoSelectStatement)
+  private lazy val headerSelectWhereHeader    = cqlSession.prepare(headerIdSelectStatement)
 
-  private def blockInfoByEpochIndex(
-    epochIndex: Int,
-    headerId: String
-  ): Future[(Int, BlockMetadata)] =
+  def isEmpty: Boolean =
     cqlSession
-      .executeAsync(blockInfoSelectWhereHeader.bind(headerId))
-      .asScala
-      .map(_.one())
-      .map(r => epochIndex -> blockInfoRowReader(r))
+      .execute(headerSelectWhereHeader.bind())
+      .iterator()
+      .hasNext
 
-  def loadBlockInfoByEpochIndex: Future[TreeMap[EpochIndex, BlockMetadata]] =
-    Source
-      .fromPublisher(
-        cqlSession.executeReactive(
-          s"SELECT $epoch_index, $last_header_id FROM ${cassandra.Const.CassandraKeyspace}.$node_epoch_last_headers_table;"
-        )
-      )
-      .mapAsync(1)(row => blockInfoByEpochIndex(row.getInt(epoch_index), row.getString(last_header_id)))
-      .runWith(Sink.seq[(Int, BlockMetadata)])
-      .map(TreeMap(_: _*))
-      .andThen { case Success(infoByIndex) =>
-        if (infoByIndex.isEmpty)
-          logger.info(s"Starting with empty chain ...")
-        else
-          logger.info(s"${infoByIndex.size} epoch indexes loaded from ${infoByIndex.firstKey} to ${infoByIndex.lastKey}")
-      }
+  def getBlockInfo(
+    blockId: BlockId
+  ): Future[Option[BlockMetadata]] =
+    cqlSession
+      .executeAsync(blockInfoSelectWhereHeader.bind(blockId))
+      .asScala
+      .map(r => Option(r.one()).map(blockInfoRowReader))
+
 }
 
-object CassandraEpochReader extends CassandraPersistenceSupport {
+object CassandraHeadersReader extends CassandraPersistenceSupport {
+
+  protected[cassandra] val headerIdSelectStatement: SimpleStatement =
+    QueryBuilder
+      .selectFrom(cassandra.Const.CassandraKeyspace, Headers.node_headers_table)
+      .columns(Headers.header_id)
+      .limit(1)
+      .build()
 
   protected[cassandra] val blockInfoSelectStatement: SimpleStatement =
     QueryBuilder
