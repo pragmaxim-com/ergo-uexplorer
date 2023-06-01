@@ -32,11 +32,7 @@ trait CassandraHeadersReader extends LazyLogging {
   private lazy val blockInfoSelectWhereHeader = cqlSession.prepare(blockInfoSelectStatement)
   private lazy val headerSelectWhereHeader    = cqlSession.prepare(headerIdSelectStatement)
 
-  def isEmpty: Boolean =
-    cqlSession
-      .execute(headerSelectWhereHeader.bind())
-      .iterator()
-      .hasNext
+  def isEmpty: Boolean = !cqlSession.execute(headerSelectWhereHeader.bind()).iterator().hasNext
 
   def getBlockInfo(
     blockId: BlockId

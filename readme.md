@@ -19,7 +19,7 @@ Explorer weak spot? **Data distribution**
 Supplementary, lightweight (μ = micro) Ergo explorer/analyzer with CassandraDB backend :
   - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`16GB RAM`
   - datastructures accessible in real-time
-    - whole utxo state
+    - whole utxo state persisted in [MvStore](https://www.h2database.com/html/mvstore.html)
     - hot address statistics (box and tx counts, last tx height, etc.)
   - janus graph of the whole chain (good to use in combination with hot address statistics to avoid infinite traversals)
   - plugin framework, add a plugin that is supplied with
@@ -37,7 +37,7 @@ Valid "Source of Truth" transaction data downloaded from Nodes is persisted into
 Secondary Data Views that are derived from Source of Truth can be easily reindexed very fast which
 allows for flexible development. Major Data Views derived from Source of Truth :
   - janus graph of transfers within address network
-  - utxo state
+  - utxo state persisted in [MvStore](https://www.h2database.com/html/mvstore.html)
   - cassandra view of all transactions and their boxes grouped by address, including address type and optional description
   - size limited MinMax Queue of hot addresses and their statistics which helps solve the SuperNode problem
 
@@ -64,16 +64,13 @@ together with all instances necessary for analysis:
 ```
   def processMempoolTx(
     newTx: Transaction,                    // new Tx is passed to all plugins whenever it appears in mempool of connected Nodes
-    utxoStateWoPool: UtxoStateWithoutPool, // Utxo State without mempool merged into it
-    utxoStateWithPool: UtxoStateWithPool,  // Utxo State with mempool merged into it (needed for chained transactions)
-    topAddresses: SortedTopAddressMap,     // hot addresses are needed for dealing with SuperNode problem during graph traversal
+    utxoState: UtxoState,                  // Utxo State
     graph: GraphTraversalSource            // Janus Graph for executing arbitrary gremlin traversal queries
   ): Future[Unit]
 
   def processNewBlock(
     newBlock: Block,                       // new Block is passed to all plugins whenever it is applied to chain of connected Nodes
-    utxoStateWoPool: UtxoStateWithoutPool, // Utxo State without mempool merged into it
-    topAddresses: SortedTopAddressMap,     // hot addresses are needed for dealing with SuperNode problem during graph traversal
+    utxoState: UtxoState,                  // Utxo State
     graph: GraphTraversalSource            // Janus Graph for executing arbitrary gremlin traversal queries
   ): Future[Unit]
 ```

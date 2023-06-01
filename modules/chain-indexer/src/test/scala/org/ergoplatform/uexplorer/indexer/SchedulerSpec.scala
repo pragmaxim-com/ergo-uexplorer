@@ -67,7 +67,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
         Response.ok(Rest.blocks.byId(blockId))
     }
 
-  val utxoState     = MvUtxoState.inMemoryUtxoState
+  val utxoState     = MvUtxoState().get
   val blockClient   = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val backend       = new InMemoryBackend
   val graphBackend  = new InMemoryGraphBackend
@@ -83,7 +83,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
         utxoState.getLastBlock.map(_._1).get shouldBe 4150
         utxoState.findMissingHeights shouldBe empty
         mempoolState.stateTransitionByTx.size shouldBe 9
-        scheduler.periodicSync.map { case newMempoolState =>
+        scheduler.periodicSync.map { newMempoolState =>
           utxoState.getLastBlock.map(_._1).get shouldBe 4200
           utxoState.findMissingHeights shouldBe empty
           newMempoolState.stateTransitionByTx.size shouldBe 0

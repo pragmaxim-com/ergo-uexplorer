@@ -1,36 +1,25 @@
 package org.ergoplatform.uexplorer.utxo
 
-import org.ergoplatform.uexplorer.node.ApiTransaction
+import akka.{Done, NotUsed}
+import akka.actor.typed.ActorSystem
+import akka.stream.scaladsl.Source
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, BlockBuilder, ForkInserted}
+import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.utxo.MvUtxoState.*
-import org.ergoplatform.uexplorer.{Address, BlockId, BlockMetadata, BoxId, Height, Timestamp, Value}
-import org.h2.mvstore.MVStore
+import org.ergoplatform.uexplorer.*
+import org.h2.mvstore.{MVMap, MVStore}
 
-import scala.collection.mutable
 import java.io.File
 import java.nio.file.Paths
-import scala.collection.compat.immutable.ArraySeq
-import scala.collection.mutable.ListBuffer
-import scala.util.{Failure, Random, Success, Try}
-import org.ergoplatform.uexplorer.Tx
-import org.ergoplatform.uexplorer.Const
-import org.ergoplatform.uexplorer.*
-import org.h2.mvstore.MVMap
-
-import scala.jdk.CollectionConverters.*
 import java.util.concurrent.ConcurrentSkipListMap
+import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{TreeMap, TreeSet}
-import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.db.BlockBuilder
-
-import scala.concurrent.Future
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
-import org.ergoplatform.uexplorer.db.Block
-import akka.NotUsed
-import akka.stream.scaladsl.Source
-import akka.Done
-import akka.actor.typed.ActorSystem
-import org.ergoplatform.uexplorer.db.BestBlockInserted
-import org.ergoplatform.uexplorer.db.ForkInserted
+import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
+import scala.util.{Failure, Random, Success, Try}
 
 class MvUtxoState(
   store: MVStore,
@@ -41,30 +30,14 @@ class MvUtxoState(
   blockCacheByHeight: ConcurrentSkipListMap[Height, Map[BlockId, BlockMetadata]]
 ) extends UtxoState {
 
-  // TODO persistent ?
-  val versionByHeight = new ConcurrentSkipListMap[Height, MvUtxoState.Version]()
-  // TODO periodically drop versions and top addresses
+  private[this] def cacheBlock(
+    lastHeight: Height,
+    lastBlockId: BlockId,
+    blockMetadata: BlockMetadata
+  ): Map[BlockId, BlockMetadata] =
+    blockCacheByHeight.put(lastHeight, Map(lastBlockId -> blockMetadata))
 
-  def load(blockHeightSource: Source[(Height, BlockId), NotUsed])(implicit s: ActorSystem[Nothing]): Future[Done] =
-    blockHeightSource.runForeach { case (height, blockId) =>
-      blockIdByHeight.put(height, blockId)
-    }
-
-  def init(getLastBlock: BlockId => Future[Option[BlockMetadata]]): Future[Unit] = {
-    val lastHeight = blockIdByHeight.lastKey
-    Future
-      .sequence(
-        Option(blockIdByHeight.get(lastHeight))
-          .map(getLastBlock(_))
-          .toList
-      )
-      .map(_.flatten)
-      .map { blockMetadata =>
-        blockCacheByHeight.put(lastHeight, blockMetadata.map(bm => bm.headerId -> bm).toMap)
-      }
-  }
-
-  def isEmpty: Boolean = utxosByAddress.isEmpty || addressByUtxo.isEmpty
+  def isEmpty: Boolean = utxosByAddress.isEmpty && addressByUtxo.isEmpty && topAddresses.isEmpty && blockIdByHeight.isEmpty
 
   def getLastBlock: Option[(Height, BlockId)] = Option(blockIdByHeight.lastKey()).map { lastKey =>
     lastKey -> blockIdByHeight.get(lastKey)
@@ -107,7 +80,7 @@ class MvUtxoState(
         .diff(blockIdByHeight.keySet().asScala)
   }
 
-  def flushCache: Unit =
+  def flushCache(): Unit =
     blockCacheByHeight
       .keySet()
       .asScala
@@ -150,10 +123,10 @@ class MvUtxoState(
       }
     }
     blockIdByHeight.put(height, blockId)
-    versionByHeight.put(height, store.commit())
+    require(store.commit() == height, s"Height $height")
   }
 
-  def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[BlockMetadata]] =
+  private def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[BlockMetadata]] =
     /** Genesis block has no parent so we assert that any block either has its parent cached or its a first block */
     if (apiBlock.header.height == 1)
       Try(Option.empty)
@@ -240,7 +213,7 @@ class MvUtxoState(
           }
       }
 
-  def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
+  private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
     fork.size > 1 &&
       blockCacheByHeight.get(fork.head.header.height - 1).contains(fork.head.header.parentId) &&
       fork.sliding(2).forall {
@@ -258,7 +231,7 @@ class MvUtxoState(
         )
       )
     } else {
-      Try(store.rollbackTo(versionByHeight.get(winningFork.head.header.height - 1)))
+      Try(store.rollbackTo(winningFork.head.header.height - 1))
         .flatMap { _ =>
           winningFork
             .foldLeft(Try((ListBuffer.empty[BestBlockInserted], ListBuffer.empty[BlockMetadata]))) {
@@ -283,16 +256,12 @@ class MvUtxoState(
 }
 
 object MvUtxoState {
-  type Version = Long
   val VersionsToKeep = 10
   val MaxCacheSize   = 10
 
-  def inMemoryUtxoState: MvUtxoState =
-    MvUtxoState(Paths.get(System.getProperty("java.io.tmpdir"), Random.nextString(10)).toFile)
-
   def apply(
-    rootDir: File = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "utxo").toFile
-  ): MvUtxoState = {
+    rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), Random.nextString(10)).toFile
+  ): Try[MvUtxoState] = Try {
     rootDir.mkdirs()
     val store =
       new MVStore.Builder()
@@ -301,7 +270,7 @@ object MvUtxoState {
         .open()
 
     store.setVersionsToKeep(VersionsToKeep)
-    store.setRetentionTime(3600 * 1000)
+    store.setRetentionTime(3600 * 1000 * 24 * 7)
     new MvUtxoState(
       store,
       store.openMap[Address, Map[BoxId, Value]]("utxosByAddress"),
@@ -311,6 +280,28 @@ object MvUtxoState {
       new ConcurrentSkipListMap[Height, Map[BlockId, BlockMetadata]]()
     )
   }
+
+  def withCache(
+    getLastBlockMetadata: BlockId => Future[Option[BlockMetadata]],
+    rootDir: File = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "utxo").toFile
+  ): Future[MvUtxoState] =
+    MvUtxoState(rootDir) match {
+      case Success(utxoState) if !utxoState.isEmpty =>
+        val (lastHeight, lastBlockId) = utxoState.getLastBlock.get
+
+        getLastBlockMetadata(lastBlockId).map { metadataOpt =>
+          val blockMetadata = metadataOpt.getOrElse(
+            throw new IllegalStateException(s"last block $lastBlockId at $lastHeight does not have metadata in backend!")
+          )
+          utxoState.cacheBlock(lastHeight, lastBlockId, blockMetadata)
+          utxoState
+        }
+      case Success(utxoState) =>
+        Future.successful(utxoState)
+      case Failure(ex) =>
+        Future.failed(ex)
+    }
+
   implicit class MVMapPimp[K, V](underlying: MVMap[K, V]) {
 
     def putOrRemove(k: K)(f: Option[V] => Option[V]): MVMap[K, V] =

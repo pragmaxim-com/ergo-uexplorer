@@ -66,8 +66,8 @@ class BlockIndexer(
       .via(forkDeleteFlow(1))
       .via(backend.blockWriteFlow)
       .wireTap { bb =>
-        if (bb.block.header.height % MvUtxoState.VersionsToKeep == 0) {
-          utxoState.flushCache
+        if (bb.block.header.height % MvUtxoState.MaxCacheSize * 2 == 0) {
+          utxoState.flushCache()
         }
       }
       .async
