@@ -39,7 +39,7 @@ class Initializer(
             .via(backend.transactionBoxesByHeightFlow)
             .buffer(Const.EpochLength, OverflowStrategy.backpressure)
             .runFold[(ChainIntegrity, Graph)](ChainValid(0) -> graphBackend.tx.createThreadedTx[Graph]()) {
-              case ((MissingBlocks(latestHeight, missingHeights), threadedGraph), ((height, blockId), boxesByTx)) =>
+              case ((MissingBlocks(latestHeight, missingHeights), threadedGraph), ((height, blockId), _)) =>
                 if (height != latestHeight + 1) {
                   logger.error(s"Chain integrity is broken at height $height for blockId $blockId")
                   MissingBlocks(height, missingHeights ++ ((latestHeight + 1) until height)) -> threadedGraph
@@ -51,6 +51,9 @@ class Initializer(
                   logger.error(s"Chain integrity is broken at height $height for blockId $blockId")
                   MissingBlocks(height, TreeSet((latestHeight + 1 until height): _*)) -> threadedGraph
                 } else {
+                  if (height % 1000 == 0) {
+                    logger.info(s"Inserting block $blockId at height $height")
+                  }
                   utxoState.mergeBlockBoxesUnsafe(height, blockId, boxesByTx.iterator.map(_._2))
                   val newG =
                     if (includingGraph) {

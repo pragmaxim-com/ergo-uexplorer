@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.utxo
 
+import akka.actor.CoordinatedShutdown
 import akka.{Done, NotUsed}
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Source
@@ -83,6 +84,7 @@ class MvUtxoState(
   def flushCache(): Unit =
     blockCacheByHeight
       .keySet()
+      .iterator()
       .asScala
       .take(Math.max(0, blockCacheByHeight.size() - MaxCacheSize))
       .foreach(blockCacheByHeight.remove)
@@ -261,7 +263,7 @@ object MvUtxoState {
 
   def apply(
     rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), Random.nextString(10)).toFile
-  ): Try[MvUtxoState] = Try {
+  )(implicit s: ActorSystem[Nothing]): Try[MvUtxoState] = Try {
     rootDir.mkdirs()
     val store =
       new MVStore.Builder()
@@ -271,20 +273,28 @@ object MvUtxoState {
 
     store.setVersionsToKeep(VersionsToKeep)
     store.setRetentionTime(3600 * 1000 * 24 * 7)
-    new MvUtxoState(
-      store,
-      store.openMap[Address, Map[BoxId, Value]]("utxosByAddress"),
-      store.openMap[BoxId, Address]("addressByUtxo"),
-      store.openMap[Address, Address.Stats]("topAddresses"),
-      store.openMap[Height, BlockId]("blockIdByHeight"),
-      new ConcurrentSkipListMap[Height, Map[BlockId, BlockMetadata]]()
-    )
+    val utxoState =
+      new MvUtxoState(
+        store,
+        store.openMap[Address, Map[BoxId, Value]]("utxosByAddress"),
+        store.openMap[BoxId, Address]("addressByUtxo"),
+        store.openMap[Address, Address.Stats]("topAddresses"),
+        store.openMap[Height, BlockId]("blockIdByHeight"),
+        new ConcurrentSkipListMap[Height, Map[BlockId, BlockMetadata]]()
+      )
+    CoordinatedShutdown(s).addTask(
+      CoordinatedShutdown.PhaseServiceStop,
+      "close-mv-store"
+    ) { () =>
+      Future(store.close()).map(_ => Done)
+    }
+    utxoState
   }
 
   def withCache(
     getLastBlockMetadata: BlockId => Future[Option[BlockMetadata]],
     rootDir: File = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "utxo").toFile
-  ): Future[MvUtxoState] =
+  )(implicit s: ActorSystem[Nothing]): Future[MvUtxoState] =
     MvUtxoState(rootDir) match {
       case Success(utxoState) if !utxoState.isEmpty =>
         val (lastHeight, lastBlockId) = utxoState.getLastBlock.get
