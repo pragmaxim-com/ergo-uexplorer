@@ -31,7 +31,7 @@ class Initializer(
           acc.addOne(el)
         }
         .flatMap { blockIdByHeightBuilder =>
-          val blockIdByHeight = blockIdByHeightBuilder.result()
+          val blockIdByHeight = blockIdByHeightBuilder.result().dropRight(MvUtxoState.VersionsToKeep)
           logger.info(s"Loading ${blockIdByHeight.size} from backand into UtxoState")
           val includingGraph = graphBackend.initGraph
           Source
@@ -51,14 +51,21 @@ class Initializer(
                   logger.error(s"Chain integrity is broken at height $height for blockId $blockId")
                   MissingBlocks(height, TreeSet((latestHeight + 1 until height): _*)) -> threadedGraph
                 } else {
-                  if (height % 1000 == 0) {
-                    logger.info(s"Inserting block $blockId at height $height")
-                  }
                   utxoState.mergeBlockBoxesUnsafe(height, blockId, boxesByTx.iterator.map(_._2))
+                  if (height % 1000 == 0) {
+                    logger.info(
+                      s"Height $height, utxo count: ${utxoState.utxoBoxCount}, non-empty-address count: ${utxoState.nonEmptyAddressCount}"
+                    )
+                  }
+                  if (height % 100000 == 0) {
+                    logger.info("Compacting mvstore")
+                    utxoState.compactFile(60000)
+                  }
+
                   val newG =
                     if (includingGraph) {
                       graphBackend.writeTx(height, boxesByTx, utxoState.getAddressStats, threadedGraph)
-                      if (height % Const.EpochLength == 0) {
+                      if (height % 50 == 0) {
                         threadedGraph.tx.commit()
                         logger.info(s"Graph building of epoch ${Epoch.epochIndexForHeight(height)} finished")
                         graphBackend.tx.createThreadedTx[Graph]()

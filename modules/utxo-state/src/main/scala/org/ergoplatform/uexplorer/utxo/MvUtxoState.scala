@@ -4,6 +4,11 @@ import akka.actor.CoordinatedShutdown
 import akka.{Done, NotUsed}
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Source
+import com.esotericsoftware.kryo.Kryo
+import com.esotericsoftware.kryo.io.{ByteBufferInput, ByteBufferOutput, Input, Output}
+import com.esotericsoftware.kryo.serializers.MapSerializer
+import com.esotericsoftware.kryo.util.Pool
+import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, BlockBuilder, ForkInserted}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.utxo.MvUtxoState.*
@@ -11,7 +16,9 @@ import org.ergoplatform.uexplorer.*
 import org.h2.mvstore.{MVMap, MVStore}
 
 import java.io.File
+import java.nio.ByteBuffer
 import java.nio.file.Paths
+import java.util
 import java.util.concurrent.ConcurrentSkipListMap
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{TreeMap, TreeSet}
@@ -24,12 +31,59 @@ import scala.util.{Failure, Random, Success, Try}
 
 class MvUtxoState(
   store: MVStore,
-  utxosByAddress: MVMap[Address, Map[BoxId, Value]],
+  utxosByAddress: MVMap[Address, Array[Byte]],
   addressByUtxo: MVMap[BoxId, Address],
   topAddresses: MVMap[Address, Address.Stats],
   blockIdByHeight: MVMap[Height, BlockId],
   blockCacheByHeight: ConcurrentSkipListMap[Height, Map[BlockId, BlockMetadata]]
 ) extends UtxoState {
+
+  private val kryoPool = new Pool[Kryo](true, false, 8) {
+    protected def create: Kryo = {
+      val kryo       = new Kryo()
+      val serializer = new MapSerializer()
+      kryo.register(classOf[util.HashMap[_, _]], serializer)
+      serializer.setKeyClass(classOf[String], kryo.getSerializer(classOf[String]))
+      serializer.setKeysCanBeNull(false)
+      serializer.setValueClass(classOf[java.lang.Long], kryo.getSerializer(classOf[java.lang.Long]))
+      serializer.setValuesCanBeNull(false)
+      kryo
+    }
+  }
+
+  private def serValueByBoxId(valueByBoxId: java.util.Map[String, Long]): Array[Byte] = {
+    val buffer = ByteBuffer.allocate(valueByBoxId.size() * 256)
+    val output = new ByteBufferOutput(buffer)
+    val kryo   = kryoPool.obtain()
+    try kryo.writeObject(output, valueByBoxId)
+    finally {
+      kryoPool.free(kryo)
+      output.close()
+    }
+    buffer.array()
+  }
+
+  private def serEmpty(boxId: BoxId, value: Value): Array[Byte] = {
+    val map = new util.HashMap[String, Long]()
+    map.put(boxId.unwrapped, value)
+    serValueByBoxId(map)
+  }
+
+  private def deserValueByBoxId(bytes: Array[Byte]): java.util.Map[String, Long] = {
+    val input = new Input(bytes)
+    val kryo  = kryoPool.obtain()
+    try kryo.readObject(input, classOf[util.HashMap[String, Long]])
+    finally {
+      kryoPool.free(kryo)
+      input.close()
+    }
+  }
+
+  private def addValue(bytes: Array[Byte], boxId: BoxId, value: Value): Array[Byte] = {
+    val map = deserValueByBoxId(bytes)
+    map.put(boxId.unwrapped, value)
+    serValueByBoxId(map)
+  }
 
   private[this] def cacheBlock(
     lastHeight: Height,
@@ -48,13 +102,19 @@ class MvUtxoState(
     firstKey -> blockIdByHeight.get(firstKey)
   }
 
+  def utxoBoxCount: Int = addressByUtxo.size()
+
+  def nonEmptyAddressCount: Int = utxosByAddress.size()
+
   def getAddressStats(address: Address): Option[Address.Stats] = Option(topAddresses.get(address))
 
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean = blockIdByHeight.get(atHeight) == blockId
 
   def getAddressByUtxo(boxId: BoxId): Option[Address] = Option(addressByUtxo.get(boxId))
 
-  def getUtxosByAddress(address: Address): Option[Map[BoxId, Value]] = Option(utxosByAddress.get(address))
+  def getUtxosByAddress(address: Address): Option[Map[BoxId, Value]] = Option(
+    deserValueByBoxId(utxosByAddress.get(address)).asScala.toMap.asInstanceOf[Map[BoxId, Value]]
+  )
 
   def getTopAddresses: Iterator[(Address, Address.Stats)] = new Iterator[(Address, Address.Stats)]() {
     private val cursor = topAddresses.cursor(null.asInstanceOf[Address])
@@ -81,6 +141,10 @@ class MvUtxoState(
         .diff(blockIdByHeight.keySet().asScala)
   }
 
+  def compactFile(maxCompactTimeMillis: Int): Try[Unit] = Try(store.compactFile(maxCompactTimeMillis))
+
+  def commit(): Long = store.commit()
+
   def flushCache(): Unit =
     blockCacheByHeight
       .keySet()
@@ -98,7 +162,9 @@ class MvUtxoState(
       outputBoxes
         .foldLeft(mutable.Map.empty[Address, Int]) { case (acc, (boxId, address, value)) =>
           addressByUtxo.put(boxId, address)
-          utxosByAddress.adjust(address)(_.fold(Map(boxId -> value))(_.updated(boxId, value)))
+          utxosByAddress.adjust(address)(
+            _.fold(serEmpty(boxId, value))(arr => addValue(arr, boxId, value))
+          )
           acc.adjust(address)(_.fold(1)(_ + 1))
         }
         .foreach { case (address, boxCount) =>
@@ -115,8 +181,11 @@ class MvUtxoState(
         .mapValues(_.map(_._1))
         .foreach { case (address, inputIds) =>
           utxosByAddress.putOrRemove(address) {
-            case None                 => None
-            case Some(existingBoxIds) => Option(existingBoxIds.removedAll(inputIds)).filter(_.nonEmpty)
+            case None => None
+            case Some(existingBoxIds) =>
+              val map = deserValueByBoxId(existingBoxIds)
+              inputIds.foreach(map.remove)
+              Option(map).collect { case m if !m.isEmpty => serValueByBoxId(m) }
           }
         }
 
@@ -185,14 +254,13 @@ class MvUtxoState(
                             )
                         val inputValue =
                           Option(utxosByAddress.get(inputAddress))
-                            .map(
-                              _.getOrElse(
-                                i.boxId,
+                            .map { arr =>
+                              Option(deserValueByBoxId(arr).get(i.boxId)).getOrElse(
                                 throw new IllegalStateException(
                                   s"BoxId ${i.boxId} of block ${b.header.id} at height ${b.header.height} not found in utxo state"
                                 )
                               )
-                            )
+                            }
                             .orElse(outputLookup.get(i.boxId).map(_._2))
                             .getOrElse(
                               throw new IllegalStateException(
@@ -276,7 +344,7 @@ object MvUtxoState {
     val utxoState =
       new MvUtxoState(
         store,
-        store.openMap[Address, Map[BoxId, Value]]("utxosByAddress"),
+        store.openMap[Address, Array[Byte]]("utxosByAddress"),
         store.openMap[BoxId, Address]("addressByUtxo"),
         store.openMap[Address, Address.Stats]("topAddresses"),
         store.openMap[Height, BlockId]("blockIdByHeight"),

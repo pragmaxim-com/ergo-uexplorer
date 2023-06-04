@@ -67,7 +67,9 @@ class BlockIndexer(
       .via(backend.blockWriteFlow)
       .wireTap { bb =>
         if (bb.block.header.height % (MvUtxoState.MaxCacheSize * 10) == 0) {
-          logger.info(s"Block ${bb.block.header.id} at ${bb.block.header.height} indexed")
+          logger.info(
+            s"Height ${bb.block.header.height}, utxo count: ${utxoState.utxoBoxCount}, non-empty-address count: ${utxoState.nonEmptyAddressCount}"
+          )
           utxoState.flushCache()
         }
       }

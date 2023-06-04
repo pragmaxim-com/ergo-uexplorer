@@ -98,7 +98,7 @@ lazy val `node-pool` =
 lazy val `utxo-state` =
   Utils.mkModule("utxo-state", "utxo-state")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ Seq(mvStore) ++ scalatest("3"))
+    .settings(libraryDependencies ++= lightBend("3") ++ Seq(mvStore, kryo) ++ scalatest("3"))
     .dependsOn(`node-pool` % "compile->compile;test->test") //TODO only snapshots depend on node-pool
 
 lazy val cassandra =

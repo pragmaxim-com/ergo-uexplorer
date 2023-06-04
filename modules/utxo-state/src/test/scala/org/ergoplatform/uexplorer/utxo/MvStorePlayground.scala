@@ -11,36 +11,25 @@ class MvStorePlayground extends AsyncFreeSpec with Matchers {
 
   "blabla" in {
 
-    val store = MVStore.open(null);
+    val store = MVStore.open();
     val map   = store.openMap[Int, Map[Height, Map[BoxId, (Address, Value)]]]("data")
 
-    // add some data
-    map.put(1, Map(1 -> Map(Emission.box -> (Emission.address, 1))))
-    map.put(2, Map(2 -> Map(Emission.box -> (Emission.address, 1))))
-
+    map.put(1, Map())
     // get the current version, for later use
-    val oldVersion = store.getCurrentVersion
+    val oldVersion1 = store.commit
 
-    // from now on, the old version is read-only
-    store.commit
+    println(s"1 $oldVersion1")
 
-    // more changes, in the new version
-    // changes can be rolled back if required
-    // changes always go into "head" (the newest version)
-    map.put(1, Map(11 -> Map(Emission.box -> (Emission.address, 11))))
-    map.remove(2)
+    map.put(1, Map())
+    // get the current version, for later use
+    val oldVersion2 = store.commit
 
-    // access the old data (before the commit)
-    val oldMap = map.openVersion(oldVersion)
+    println(s"2 $oldVersion2")
 
-    // print the old version (can be done
-    // concurrently with further modifications)
-    // this will print "Hello" and "World":
-    System.out.println(oldMap.get(1).head)
-    System.out.println(oldMap.get(2).head)
+    store.setStoreVersion(1)
+    println(s"4 ${store.getCurrentVersion}")
 
-    // print the newest version ("Hi")
-    System.out.println(map.get(1).head)
+    store.close()
     0 shouldBe 0
   }
 }

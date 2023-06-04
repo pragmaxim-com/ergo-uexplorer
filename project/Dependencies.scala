@@ -29,24 +29,26 @@ object Dependencies {
 
   lazy val mvStore = "com.h2database" % "h2-mvstore" % "2.1.214"
 
+  lazy val kryo = "com.esotericsoftware" % "kryo" % "5.5.0"
+
   lazy val cassandraDb = List(
     "com.datastax.oss" % "java-driver-core"             % Version.cassandraDriver,
     "com.datastax.oss" % "java-driver-query-builder"    % Version.cassandraDriver,
     "io.netty"         % "netty-transport-native-epoll" % "4.1.79.Final" classifier "linux-x86_64"
   )
 
-  val discord4j  = "com.discord4j"  % "discord4j-core"  % "3.2.3"
-  val loggingApi = "org.slf4j"      % "slf4j-api"       % "2.0.3"
-  val logback    = "ch.qos.logback" % "logback-classic" % "1.4.3"
-  def scalaLogging(v: String) = "com.typesafe.scala-logging" % s"scala-logging_$v"            % "3.9.5"
+  val discord4j               = "com.discord4j"              % "discord4j-core"    % "3.2.3"
+  val loggingApi              = "org.slf4j"                  % "slf4j-api"         % "2.0.3"
+  val logback                 = "ch.qos.logback"             % "logback-classic"   % "1.4.3"
+  def scalaLogging(v: String) = "com.typesafe.scala-logging" % s"scala-logging_$v" % "3.9.5"
 
   def lightBend(v: String) = Seq(
-    "com.typesafe.akka"          % s"akka-actor_$v"               % Version.akka,
-    "com.typesafe.akka"          % s"akka-http_$v"                % "10.5.0-M1",
-    "com.typesafe.akka"          % s"akka-actor-typed_$v"         % Version.akka,
-    "com.typesafe.akka"          % s"akka-stream-typed_$v"        % Version.akka,
-    "com.typesafe.akka"          % s"akka-actor-testkit-typed_$v" % Version.akka % Test,
-    "com.typesafe.akka"          % s"akka-slf4j_$v"               % Version.akka,
+    "com.typesafe.akka" % s"akka-actor_$v"               % Version.akka,
+    "com.typesafe.akka" % s"akka-http_$v"                % "10.5.0-M1",
+    "com.typesafe.akka" % s"akka-actor-typed_$v"         % Version.akka,
+    "com.typesafe.akka" % s"akka-stream-typed_$v"        % Version.akka,
+    "com.typesafe.akka" % s"akka-actor-testkit-typed_$v" % Version.akka % Test,
+    "com.typesafe.akka" % s"akka-slf4j_$v"               % Version.akka,
     scalaLogging(v)
   )
 
