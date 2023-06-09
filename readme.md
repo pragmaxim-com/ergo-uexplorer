@@ -206,5 +206,5 @@ $ docker volume ls # cassandra and ergo volumes contain a lot of data
   - using [overflowdb](https://github.com/ShiftLeftSecurity/overflowdb) instead of JanusGraph for performance reasons
   - using persistent-offheap datastructures
      - [SwayDB](https://swaydb.io)
-     - [MVStore](https://www.h2database.com/html/mvstore.html)
+     - [MVStore](https://www.h2database.com/html/mvstore.html) partially [done](https://github.com/pragmaxim/ergo-uexplorer/pull/2) but performs very slowly
      - or RocksDB
