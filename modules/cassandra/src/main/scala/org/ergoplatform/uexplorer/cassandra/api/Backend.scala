@@ -72,9 +72,9 @@ class InMemoryBackend extends Backend {
   override def removeBlocksFromMainChain(blockIds: List[BlockId]): Future[Done] = ???
 
   override def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
-    Flow[BestBlockInserted].map { case blockInserted =>
-      blocksByHeight.put(blockInserted.block.header.height, BlockMetadata.fromBlock(blockInserted.block))
-      blocksById.put(blockInserted.block.header.id, BlockMetadata.fromBlock(blockInserted.block))
+    Flow[BestBlockInserted].map { blockInserted =>
+      blocksByHeight.put(blockInserted.block.header.height, BlockMetadata.fromBlock(blockInserted.block, 0))
+      blocksById.put(blockInserted.block.header.id, BlockMetadata.fromBlock(blockInserted.block, 0))
       blockInserted
     }
 

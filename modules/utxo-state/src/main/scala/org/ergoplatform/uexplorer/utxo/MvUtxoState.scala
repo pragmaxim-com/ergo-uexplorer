@@ -108,7 +108,8 @@ case class MvUtxoState(
     block: Block,
     boxes: Iterator[(Iterable[(BoxId, Address, Value)], Iterable[(BoxId, Address, Value)])]
   ): Try[Unit] = Try {
-    val blockMetadata = BlockMetadata.fromBlock(block)
+    val currentVersion = store.getCurrentVersion
+    val blockMetadata  = BlockMetadata.fromBlock(block, currentVersion)
     boxes.foreach { case (inputBoxes, outputBoxes) =>
       outputBoxes
         .foldLeft(mutable.Map.empty[Address, Int]) { case (acc, (boxId, address, value)) =>
@@ -148,7 +149,6 @@ case class MvUtxoState(
     blockMetadata
   }.flatMap { blockMetadata =>
     putBlockByHeight(blockMetadata.height, blockMetadata).map { _ =>
-      require(store.commit() == blockMetadata.height, s"Height ${blockMetadata.height}")
       if (blockMetadata.height % (MvUtxoState.MaxCacheSize * 1000) == 0) {
         compactFile(60000 * 10) // 10 minutes
         logger.info(
@@ -254,7 +254,7 @@ case class MvUtxoState(
     } else {
       val supersededBlocks =
         winningFork.map(_.header.height).map(h => getBlockByHeight(h).get) // todo check there is no None
-      Try(store.rollbackTo(winningFork.head.header.height - 1))
+      Try(store.rollbackTo(getBlockByHeight(winningFork.head.header.height).map(_.parentVersion).get))
         .flatMap { _ =>
           winningFork
             .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
