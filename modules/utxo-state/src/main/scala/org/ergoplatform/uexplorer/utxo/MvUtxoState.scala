@@ -243,9 +243,11 @@ class MvUtxoState(
                       )
                     case tx =>
                       tx.inputs.map { i =>
+                        val valueByBoxId = outputLookup.get(i.boxId)
                         val inputAddress =
-                          Option(addressByUtxo.get(i.boxId))
-                            .orElse(outputLookup.get(i.boxId).map(_._1))
+                          valueByBoxId
+                            .map(_._1)
+                            .orElse(Option(addressByUtxo.get(i.boxId)))
                             .getOrElse(
                               throw new IllegalStateException(
                                 s"BoxId ${i.boxId} of block ${b.header.id} at height ${b.header.height} not found in utxo state" + outputs
@@ -253,18 +255,13 @@ class MvUtxoState(
                               )
                             )
                         val inputValue =
-                          Option(utxosByAddress.get(inputAddress))
-                            .map { arr =>
-                              Option(deserValueByBoxId(arr).get(i.boxId)).getOrElse(
-                                throw new IllegalStateException(
-                                  s"BoxId ${i.boxId} of block ${b.header.id} at height ${b.header.height} not found in utxo state"
-                                )
-                              )
-                            }
-                            .orElse(outputLookup.get(i.boxId).map(_._2))
+                          valueByBoxId
+                            .map(_._2)
+                            .orElse(Option(deserValueByBoxId(utxosByAddress.get(inputAddress)).get(i.boxId)))
                             .getOrElse(
                               throw new IllegalStateException(
-                                s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+                                s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state" + outputs
+                                  .mkString("\n", "\n", "\n")
                               )
                             )
                         (i.boxId, inputAddress, inputValue)
