@@ -149,6 +149,12 @@ case class MvUtxoState(
   }.flatMap { blockMetadata =>
     putBlockByHeight(blockMetadata.height, blockMetadata).map { _ =>
       require(store.commit() == blockMetadata.height, s"Height ${blockMetadata.height}")
+      if (blockMetadata.height % (MvUtxoState.MaxCacheSize * 1000) == 0) {
+        compactFile(60000 * 10) // 10 minutes
+        logger.info(
+          s"Compacting at height ${blockMetadata.height}, utxo count: $utxoBoxCount, non-empty-address count: $nonEmptyAddressCount"
+        )
+      }
     }
   }
 

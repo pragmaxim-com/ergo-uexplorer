@@ -71,12 +71,6 @@ class BlockIndexer(
         if (bb.block.header.height % (MvUtxoState.MaxCacheSize * 10) == 0) {
           logger.info(s"Height ${bb.block.header.height}")
         }
-        if (bb.block.header.height % (MvUtxoState.MaxCacheSize * 1000) == 0) {
-          utxoState.compactFile(60000 * 10) // 10 minutes
-          logger.info(
-            s"Compacting at height ${bb.block.header.height}, utxo count: ${utxoState.utxoBoxCount}, non-empty-address count: ${utxoState.nonEmptyAddressCount}"
-          )
-        }
       }
       .async
       .buffer(100, OverflowStrategy.backpressure)
