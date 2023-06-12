@@ -25,7 +25,8 @@ class JanusGraphBackend(val janusGraph: StandardJanusGraph) extends GraphBackend
 
   def isEmpty: Boolean = janusGraph.traversal().V().hasNext
 
-  def close(): Future[Unit] = Future(janusGraph.close())
+  def close(): Future[Unit] =
+    Future.fromTry(Try(janusGraph.close()))
 
 }
 
