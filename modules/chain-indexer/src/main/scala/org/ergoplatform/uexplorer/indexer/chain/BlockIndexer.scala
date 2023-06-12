@@ -28,6 +28,7 @@ import org.ergoplatform.uexplorer.db.BestBlockInserted
 import akka.stream.scaladsl.Source
 
 import scala.collection.immutable.TreeSet
+import org.ergoplatform.uexplorer.ExeContext.Implicits
 
 class BlockIndexer(
   backend: Backend,
@@ -57,20 +58,23 @@ class BlockIndexer(
           .getBestBlockOrBranch(block, utxoState.containsBlock, List.empty)
           .map {
             case bestBlock :: Nil =>
-              utxoState.addBestBlock(bestBlock)
+              utxoState.addBestBlock(bestBlock).get
             case winningFork =>
-              utxoState.addWinningFork(winningFork)
-          }
-          .flatMap(Future.fromTry)
+              utxoState.addWinningFork(winningFork).get
+          }(Implicits.trampoline)
       }
       .via(forkDeleteFlow(1))
       .via(backend.blockWriteFlow)
       .wireTap { bb =>
         if (bb.block.header.height % (MvUtxoState.MaxCacheSize * 10) == 0) {
-          logger.info(
-            s"Height ${bb.block.header.height}, utxo count: ${utxoState.utxoBoxCount}, non-empty-address count: ${utxoState.nonEmptyAddressCount}"
-          )
+          logger.info(s"Height ${bb.block.header.height}")
           utxoState.flushCache()
+        }
+        if (bb.block.header.height % (MvUtxoState.MaxCacheSize * 10000) == 0) {
+          utxoState.compactFile(60000 * 10) // 10 minutes
+          logger.info(
+            s"Compacting at height ${bb.block.header.height}, utxo count: ${utxoState.utxoBoxCount}, non-empty-address count: ${utxoState.nonEmptyAddressCount}"
+          )
         }
       }
       .async

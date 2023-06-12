@@ -21,6 +21,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.ResiliencySupport
+import org.ergoplatform.uexplorer.ExeContext.Implicits
 
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   protocol: ProtocolSettings,
@@ -93,7 +94,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
       case _ =>
         logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
         getBlockForId(block.header.parentId)
-          .flatMap(b => getBestBlockOrBranch(b, isBlockCached, block :: acc))
+          .flatMap(b => getBestBlockOrBranch(b, isBlockCached, block :: acc))(Implicits.trampoline)
     }
 
   def blockFlow: Flow[Height, ApiFullBlock, NotUsed] =
