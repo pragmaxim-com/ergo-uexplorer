@@ -64,6 +64,8 @@ class BlockIndexer(
           }(Implicits.trampoline)
       }
       .via(forkDeleteFlow(1))
+      .async
+      .buffer(100, OverflowStrategy.backpressure)
       .via(backend.blockWriteFlow)
       .wireTap { bb =>
         if (bb.block.header.height % (MvUtxoState.MaxCacheSize * 10) == 0) {

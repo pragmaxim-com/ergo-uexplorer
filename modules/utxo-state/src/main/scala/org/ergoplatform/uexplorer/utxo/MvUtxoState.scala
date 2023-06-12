@@ -8,6 +8,7 @@ import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ByteBufferInput, ByteBufferOutput, Input, Output}
 import com.esotericsoftware.kryo.serializers.MapSerializer
 import com.esotericsoftware.kryo.util.Pool
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, BlockBuilder, ForkInserted}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
@@ -36,7 +37,8 @@ class MvUtxoState(
   topAddresses: MVMap[Address, Address.Stats],
   blockIdByHeight: MVMap[Height, BlockId],
   blockCacheByHeight: ConcurrentSkipListMap[Height, Map[BlockId, BlockMetadata]]
-) extends UtxoState {
+) extends UtxoState
+  with LazyLogging {
 
   private val kryoPool = new Pool[Kryo](true, false, 8) {
     protected def create: Kryo = {
@@ -144,6 +146,17 @@ class MvUtxoState(
   def compactFile(maxCompactTimeMillis: Int): Try[Unit] = Try(store.compactFile(maxCompactTimeMillis))
 
   def commit(): Long = store.commit()
+
+  def rolbackToLatest(): Option[(Height, BlockId)] =
+    Option(blockIdByHeight.lastKey())
+      .map(_ - 1)
+      .filter(_ > 0)
+      .map { previousHeight =>
+        val previousBlockId = blockIdByHeight.get(previousHeight)
+        logger.info(s"Rolling back to version/height $previousHeight with block $previousBlockId")
+        store.rollbackTo(previousHeight)
+        previousHeight -> previousBlockId
+      }
 
   def flushCache(): Unit =
     blockCacheByHeight
@@ -322,7 +335,7 @@ class MvUtxoState(
 
 }
 
-object MvUtxoState {
+object MvUtxoState extends LazyLogging {
   val VersionsToKeep = 10
   val MaxCacheSize   = 10
 
@@ -355,6 +368,26 @@ object MvUtxoState {
     }
     utxoState
   }
+  def getLastMetadataRecursively(
+    lastHeight: Height,
+    lastBlockId: BlockId,
+    utxoState: MvUtxoState,
+    getLastBlockMetadata: BlockId => Future[Option[BlockMetadata]]
+  ): Future[Option[BlockMetadata]] = {
+    logger.info(s"Getting last block metadata for height/version $lastHeight with block $lastBlockId")
+    getLastBlockMetadata(lastBlockId).flatMap {
+      case Some(blockMetadata) =>
+        utxoState.cacheBlock(lastHeight, lastBlockId, blockMetadata)
+        Future.successful(Some(blockMetadata))
+      case None =>
+        utxoState.rolbackToLatest() match {
+          case Some(prevHeight, prevBlockId) =>
+            getLastMetadataRecursively(prevHeight, prevBlockId, utxoState, getLastBlockMetadata)
+          case None =>
+            Future.successful(None)
+        }
+    }
+  }
 
   def withCache(
     getLastBlockMetadata: BlockId => Future[Option[BlockMetadata]],
@@ -363,13 +396,14 @@ object MvUtxoState {
     MvUtxoState(rootDir) match {
       case Success(utxoState) if !utxoState.isEmpty =>
         val (lastHeight, lastBlockId) = utxoState.getLastBlock.get
-
-        getLastBlockMetadata(lastBlockId).map { metadataOpt =>
-          val blockMetadata = metadataOpt.getOrElse(
-            throw new IllegalStateException(s"last block $lastBlockId at $lastHeight does not have metadata in backend!")
-          )
-          utxoState.cacheBlock(lastHeight, lastBlockId, blockMetadata)
-          utxoState
+        getLastMetadataRecursively(lastHeight, lastBlockId, utxoState, getLastBlockMetadata).flatMap {
+          case Some(_) =>
+            logger.info(s"Found metadata for height/version $lastHeight with block $lastBlockId")
+            Future.successful(utxoState)
+          case None =>
+            Future.failed(
+              new IllegalStateException(s"last block $lastBlockId at $lastHeight does not have metadata in backend!")
+            )
         }
       case Success(utxoState) =>
         Future.successful(utxoState)
