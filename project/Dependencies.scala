@@ -8,7 +8,7 @@ object Version {
   lazy val cassandraDriver = "4.15.0"
   lazy val caliban         = "2.0.1"
   lazy val cql4s           = "0.0.1"
-  lazy val ergo            = "5.0.7"
+  lazy val ergo            = "5.0.8"
 }
 
 object Dependencies {
