@@ -72,7 +72,7 @@ object Application extends App with AkkaStreamSupport {
               pluginManager   <- PluginManager.initialize
               backend         <- Future.fromTry(Backend(conf.backendType))
               graphBackend    <- Future.fromTry(GraphBackend(conf.graphBackendType))
-              utxoState       <- MvUtxoState.withCache(backend.getBlockInfo)
+              utxoState       <- Future.fromTry(MvUtxoState.withDefaultDir())
               blockIndexer  = new BlockIndexer(backend, graphBackend, blockHttpClient, utxoState)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
               initializer   = new Initializer(utxoState, backend, graphBackend)

@@ -11,7 +11,7 @@ class MvStorePlayground extends AsyncFreeSpec with Matchers {
 
   "blabla" in {
 
-    val store = MVStore.open();
+    val store = MVStore.open(null);
     val map   = store.openMap[Int, Map[Height, Map[BoxId, (Address, Value)]]]("data")
 
     map.put(1, Map())

@@ -37,8 +37,6 @@ trait Backend {
 
   def addressWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
-  def getBlockInfo(blockId: BlockId): Future[Option[BlockMetadata]]
-
   def close(): Future[Unit]
 }
 
@@ -66,8 +64,6 @@ class InMemoryBackend extends Backend {
   private val blocksById        = new ConcurrentHashMap[BlockId, BlockMetadata]()
   private val blocksByHeight    = new ConcurrentHashMap[Height, BlockMetadata]()
   override def isEmpty: Boolean = true
-
-  override def getBlockInfo(blockId: BlockId): Future[Option[BlockMetadata]] = ???
 
   override def getAllBlockIdsAndHeight: Source[(Height, BlockId), NotUsed] = ???
 

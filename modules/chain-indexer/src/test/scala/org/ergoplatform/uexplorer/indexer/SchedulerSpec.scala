@@ -26,6 +26,7 @@ import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, Rest, TestSupport}
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.http.MetadataHttpClient
+import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
 
 import java.nio.file.Paths
 
@@ -78,16 +79,15 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
 
   "Scheduler should sync from 1 to 4150 and then from 4150 to 4200" in {
-    initializer.init(sys).flatMap { _ =>
-      scheduler.periodicSync.flatMap { mempoolState =>
-        utxoState.getLastBlock.map(_._1).get shouldBe 4150
+    initializer.init shouldBe ChainEmpty
+    scheduler.periodicSync.flatMap { mempoolState =>
+      utxoState.getLastBlock.map(_._1).get shouldBe 4150
+      utxoState.findMissingHeights shouldBe empty
+      mempoolState.stateTransitionByTx.size shouldBe 9
+      scheduler.periodicSync.map { newMempoolState =>
+        utxoState.getLastBlock.map(_._1).get shouldBe 4200
         utxoState.findMissingHeights shouldBe empty
-        mempoolState.stateTransitionByTx.size shouldBe 9
-        scheduler.periodicSync.map { newMempoolState =>
-          utxoState.getLastBlock.map(_._1).get shouldBe 4200
-          utxoState.findMissingHeights shouldBe empty
-          newMempoolState.stateTransitionByTx.size shouldBe 0
-        }
+        newMempoolState.stateTransitionByTx.size shouldBe 0
       }
     }
   }

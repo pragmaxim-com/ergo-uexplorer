@@ -1,27 +1,5 @@
 CREATE KEYSPACE IF NOT EXISTS uexplorer WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};
 
-CREATE TYPE IF NOT EXISTS uexplorer.block_info
-(
-    block_size             INT,
-    block_coins            BIGINT,
-    block_mining_time      BIGINT,
-    txs_count              INT,
-    txs_size               INT,
-    miner_address          VARCHAR,
-    miner_reward           BIGINT,
-    miner_revenue          BIGINT,
-    block_fee              BIGINT,
-    block_chain_total_size BIGINT,
-    total_txs_count        BIGINT,
-    total_coins_issued     BIGINT,
-    total_mining_time      BIGINT,
-    total_fees             BIGINT,
-    total_miners_reward    BIGINT,
-    total_coins_in_txs     BIGINT,
-    max_tx_gix             BIGINT,
-    max_box_gix            BIGINT,
-);
-
 CREATE TABLE IF NOT EXISTS uexplorer.node_headers
 (
     header_id         VARCHAR,
@@ -45,7 +23,6 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_headers
     d                 VARCHAR,
     votes             VARCHAR,
     main_chain        BOOLEAN,
-    block_info        frozen<block_info>,
     PRIMARY KEY (header_id)
 );
 

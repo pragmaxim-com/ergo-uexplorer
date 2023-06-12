@@ -1,12 +1,12 @@
 package org.ergoplatform.uexplorer.utxo
 
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
+import org.ergoplatform.uexplorer.{Address, BlockId, BlockMetadata, BoxId, Height, Value}
 
 trait UtxoState {
 
   def isEmpty: Boolean
 
-  def getLastBlock: Option[(Height, BlockId)]
+  def getLastBlock: Option[(Height, BlockMetadata)]
 
   def getAddressStats(address: Address): Option[Address.Stats]
 
@@ -18,5 +18,5 @@ trait UtxoState {
 
   def getTopAddresses: Iterator[(Address, Address.Stats)]
 
-  def getBlocksByHeight: Iterator[(Height, BlockId)]
+  def getBlocksByHeight: Iterator[(Height, BlockMetadata)]
 }

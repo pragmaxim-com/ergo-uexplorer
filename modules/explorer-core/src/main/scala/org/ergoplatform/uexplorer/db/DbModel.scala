@@ -2,6 +2,7 @@ package org.ergoplatform.uexplorer.db
 
 import io.circe.Json
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.Const.Genesis.Emission
 
 import scala.collection.immutable.ArraySeq
 
@@ -42,7 +43,7 @@ final case class BlockExtension(
 final case class BlockInfo(
   blockSize: Int, // block size (bytes)
   blockCoins: Long, // total amount of nERGs in the block
-  blockMiningTime: Option[Long], // block mining time
+  blockMiningTime: Long, // block mining time
   txsCount: Int, // number of txs in the block
   txsSize: Int, // total size of all transactions in this block (bytes)
   minerAddress: Address,
@@ -58,7 +59,9 @@ final case class BlockInfo(
   totalCoinsInTxs: Long, // total amount of nERGs in all blocks
   maxTxGix: Long, // Global index of the last transaction in the block
   maxBoxGix: Long // Global index of the last output in the last transaction in the block
-)
+) {
+  def this() = this(0, 0, 0, 0, 0, Emission.address, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) // kryo needs a no-arg constructor
+}
 
 final case class BoxRegister(
   id: RegisterId,

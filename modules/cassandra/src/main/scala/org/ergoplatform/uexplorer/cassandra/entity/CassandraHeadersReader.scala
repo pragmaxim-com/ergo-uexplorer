@@ -29,19 +29,9 @@ trait CassandraHeadersReader extends LazyLogging {
 
   import CassandraHeadersReader.*
 
-  private lazy val blockInfoSelectWhereHeader = cqlSession.prepare(blockInfoSelectStatement)
-  private lazy val headerSelectWhereHeader    = cqlSession.prepare(headerIdSelectStatement)
+  private lazy val headerSelectWhereHeader = cqlSession.prepare(headerIdSelectStatement)
 
   def isEmpty: Boolean = !cqlSession.execute(headerSelectWhereHeader.bind()).iterator().hasNext
-
-  def getBlockInfo(
-    blockId: BlockId
-  ): Future[Option[BlockMetadata]] =
-    cqlSession
-      .executeAsync(blockInfoSelectWhereHeader.bind(blockId))
-      .asScala
-      .map(r => Option(r.one()).map(blockInfoRowReader))
-
 }
 
 object CassandraHeadersReader extends CassandraPersistenceSupport {
@@ -52,51 +42,5 @@ object CassandraHeadersReader extends CassandraPersistenceSupport {
       .columns(Headers.header_id)
       .limit(1)
       .build()
-
-  protected[cassandra] val blockInfoSelectStatement: SimpleStatement =
-    QueryBuilder
-      .selectFrom(cassandra.Const.CassandraKeyspace, Headers.node_headers_table)
-      .columns(
-        Headers.header_id,
-        Headers.parent_id,
-        Headers.timestamp,
-        Headers.height,
-        Headers.main_chain,
-        Headers.BlockInfo.udtName
-      )
-      .whereColumn(Headers.header_id)
-      .isEqualTo(QueryBuilder.bindMarker(Headers.header_id))
-      .build()
-
-  protected[cassandra] def blockInfoRowReader(row: Row): BlockMetadata = {
-    import Headers.BlockInfo.*
-    val blockInfoUdt = row.getUdtValue(Headers.BlockInfo.udtName)
-    BlockMetadata(
-      BlockId.fromStringUnsafe(row.getString(Headers.header_id)),
-      BlockId.fromStringUnsafe(row.getString(Headers.parent_id)),
-      row.getLong(Headers.timestamp),
-      row.getInt(Headers.height),
-      db.BlockInfo(
-        blockInfoUdt.getInt(block_size),
-        blockInfoUdt.getLong(block_coins),
-        Option(blockInfoUdt.getLong(block_mining_time)),
-        blockInfoUdt.getInt(txs_count),
-        blockInfoUdt.getInt(txs_size),
-        Address.fromStringUnsafe(blockInfoUdt.getString(miner_address)),
-        blockInfoUdt.getLong(miner_reward),
-        blockInfoUdt.getLong(miner_revenue),
-        blockInfoUdt.getLong(block_fee),
-        blockInfoUdt.getLong(block_chain_total_size),
-        blockInfoUdt.getLong(total_txs_count),
-        blockInfoUdt.getLong(total_coins_issued),
-        blockInfoUdt.getLong(total_mining_time),
-        blockInfoUdt.getLong(total_fees),
-        blockInfoUdt.getLong(total_miners_reward),
-        blockInfoUdt.getLong(total_coins_in_txs),
-        blockInfoUdt.getLong(max_tx_gix),
-        blockInfoUdt.getLong(max_box_gix)
-      )
-    )
-  }
 
 }

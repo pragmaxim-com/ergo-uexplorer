@@ -81,7 +81,7 @@ object BlockInfoBuilder {
       BlockInfo(
         blockSize       = apiBlock.size,
         blockCoins      = blockCoins,
-        blockMiningTime = prevBlock.map(parent => apiBlock.header.timestamp - parent.timestamp),
+        blockMiningTime = prevBlock.map(parent => apiBlock.header.timestamp - parent.timestamp).getOrElse(0),
         txsCount        = apiBlock.transactions.transactions.length,
         txsSize         = apiBlock.transactions.transactions.map(_.size).sum,
         minerAddress    = minerAddress,

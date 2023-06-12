@@ -42,15 +42,16 @@ class Scheduler(
     pollingInterval: FiniteDuration,
     verify: Boolean = true
   ): Future[Done] =
-    initializer.init
-      .flatMap {
-        case GraphInconsistency(error) =>
-          Future.failed(new IllegalStateException(error))
-        case ChainEmpty | ChainValid(_) =>
-          schedule(initialDelay, pollingInterval)(periodicSync).via(killSwitch.flow).run()
-        case MissingBlocks(_, missingHeights) =>
-          blockIndexer
-            .fixChain(missingHeights)
-            .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
-      }
+    initializer.init match {
+      case HalfEmptyInconsistency(error) =>
+        Future.failed(new IllegalStateException(error))
+      case GraphInconsistency(error) =>
+        Future.failed(new IllegalStateException(error))
+      case ChainEmpty | ChainValid =>
+        schedule(initialDelay, pollingInterval)(periodicSync).via(killSwitch.flow).run()
+      case MissingBlocks(_, missingHeights) =>
+        blockIndexer
+          .fixChain(missingHeights)
+          .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
+    }
 }
