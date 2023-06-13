@@ -6,7 +6,11 @@ trait UtxoState {
 
   def isEmpty: Boolean
 
-  def getLastBlock: Option[(Height, BlockMetadata)]
+  def getLastHeight: Option[Height]
+
+  def getLastBlocks: Map[BlockId, BlockMetadata]
+
+  def getFirstBlocks: Map[BlockId, BlockMetadata]
 
   def getAddressStats(address: Address): Option[Address.Stats]
 
@@ -18,5 +22,4 @@ trait UtxoState {
 
   def getTopAddresses: Iterator[(Address, Address.Stats)]
 
-  def getBlocksByHeight: Iterator[(Height, BlockMetadata)]
 }

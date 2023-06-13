@@ -81,11 +81,11 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   "Scheduler should sync from 1 to 4150 and then from 4150 to 4200" in {
     initializer.init shouldBe ChainEmpty
     scheduler.periodicSync.flatMap { mempoolState =>
-      utxoState.getLastBlock.map(_._1).get shouldBe 4150
+      utxoState.getLastHeight.get shouldBe 4150
       utxoState.findMissingHeights shouldBe empty
       mempoolState.stateTransitionByTx.size shouldBe 9
       scheduler.periodicSync.map { newMempoolState =>
-        utxoState.getLastBlock.map(_._1).get shouldBe 4200
+        utxoState.getLastHeight.get shouldBe 4200
         utxoState.findMissingHeights shouldBe empty
         newMempoolState.stateTransitionByTx.size shouldBe 0
       }

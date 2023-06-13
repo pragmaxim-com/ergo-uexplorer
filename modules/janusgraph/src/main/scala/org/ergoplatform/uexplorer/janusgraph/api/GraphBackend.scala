@@ -72,7 +72,7 @@ class InMemoryGraphBackend extends GraphBackend {
   def writeTxsAndCommit(
     txBoxesByHeight: IterableOnce[BestBlockInserted],
     addressStats: Address => Option[Address.Stats]
-  ): Unit = {}
+  ): IterableOnce[BestBlockInserted] = List.empty
   def isEmpty: Boolean = true
 
   def graphTraversalSource: GraphTraversalSource = EmptyGraph.instance.traversal()

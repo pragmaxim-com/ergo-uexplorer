@@ -93,7 +93,7 @@ class BlockIndexer(
   def indexChain: Future[ChainSyncResult] =
     for
       bestBlockHeight <- blockHttpClient.getBestBlockHeight
-      fromHeight = utxoState.getLastBlock.map(_._1).getOrElse(0) + 1
+      fromHeight = utxoState.getLastHeight.getOrElse(0) + 1
       _ = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
       _ = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
       syncResult <- Source(fromHeight to bestBlockHeight).runWith(indexingSink)

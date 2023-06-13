@@ -2,7 +2,9 @@ package org.ergoplatform.uexplorer.utxo
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ByteBufferOutput, Input}
-import com.esotericsoftware.kryo.serializers.MapSerializer
+import com.esotericsoftware.kryo.serializers.DefaultSerializers.CollectionsSingletonSetSerializer
+import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.JdkImmutableSetSerializer
+import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.{Address, BlockMetadata, Height}
@@ -11,7 +13,7 @@ import java.nio.ByteBuffer
 import java.util
 import scala.util.Try
 
-trait KryoSerialization extends UtxoSerialization {
+trait KryoSerialization extends UtxoSerialization with BlockIdsSerialization {
 
   protected def deserStats(bytes: Array[Byte]): Address.Stats = {
     val input = new Input(bytes)
@@ -62,17 +64,21 @@ object KryoSerialization {
 
   val pool: Pool[Kryo] = new Pool[Kryo](true, false, 8) {
     protected def create: Kryo = {
-      val kryo       = new Kryo()
-      val serializer = new MapSerializer()
+      val kryo          = new Kryo()
+      val mapSerializer = new MapSerializer()
+      val setSerializer = new CollectionsSingletonSetSerializer()
+
       kryo.setRegistrationRequired(true)
-      kryo.register(classOf[util.HashMap[_, _]], serializer)
+      kryo.register(classOf[util.HashMap[_, _]], mapSerializer)
+      kryo.register(classOf[util.HashSet[_]], setSerializer)
       kryo.register(classOf[BlockInfo])
       kryo.register(classOf[BlockMetadata])
       kryo.register(classOf[Address.Stats])
-      serializer.setKeyClass(classOf[String], kryo.getSerializer(classOf[String]))
-      serializer.setKeysCanBeNull(false)
-      serializer.setValueClass(classOf[java.lang.Long], kryo.getSerializer(classOf[java.lang.Long]))
-      serializer.setValuesCanBeNull(false)
+      setSerializer.setAcceptsNull(false)
+      mapSerializer.setKeyClass(classOf[String], kryo.getSerializer(classOf[String]))
+      mapSerializer.setKeysCanBeNull(false)
+      mapSerializer.setValueClass(classOf[java.lang.Long], kryo.getSerializer(classOf[java.lang.Long]))
+      mapSerializer.setValuesCanBeNull(false)
       kryo
     }
   }

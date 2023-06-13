@@ -15,7 +15,7 @@ class MempoolSyncer(blockHttpClient: BlockHttpClient) {
   )(implicit s: ActorSystem[Nothing], ref: ActorRef[UpdateTxs]): Future[MempoolStateChanges] = {
     import scala.concurrent.ExecutionContext.Implicits.global
     blockHttpClient.getBestBlockHeight.flatMap { bestBlockHeight =>
-      if (utxoState.getLastBlock.map(_._1).exists(_ >= bestBlockHeight)) {
+      if (utxoState.getLastBlocks.exists(_._2.height >= bestBlockHeight)) {
         for {
           txs          <- blockHttpClient.getUnconfirmedTxs
           stateChanges <- MempoolStateHolder.updateTransactions(txs)
