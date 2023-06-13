@@ -60,7 +60,8 @@ class InMemoryBackend extends Backend {
 
   override def close(): Future[Unit] = Future.successful(())
 
-  override def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Future[Done] = ???
+  override def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Future[Done] =
+    Future(blockIds.foreach(blocksById.remove)).map(_ => Done)
 
   override def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted].map { blockInserted =>
