@@ -34,7 +34,7 @@ trait GraphBackend {
   def writeTxsAndCommit(
     txBoxesByHeight: IterableOnce[BestBlockInserted],
     addressStats: Address => Option[Address.Stats]
-  ): Unit
+  ): IterableOnce[BestBlockInserted]
 
   def graphTraversalSource: GraphTraversalSource
 

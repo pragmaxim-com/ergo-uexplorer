@@ -52,19 +52,20 @@ trait JanusGraphWriter extends LazyLogging {
   def writeTxsAndCommit(
     txBoxesByHeight: IterableOnce[BestBlockInserted],
     addressStats: Address => Option[Address.Stats]
-  ): Unit = {
+  ): IterableOnce[BestBlockInserted] = {
     txBoxesByHeight.iterator
       .foreach { case BestBlockInserted(b, boxesByTx) =>
         writeTx(b.header.height, boxesByTx, addressStats, janusGraph)
       }
     janusGraph.tx().commit()
+    txBoxesByHeight
   }
 
   def graphWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted]
-      .grouped(64)
-      .mapConcat { blocks =>
-        writeTxsAndCommit(blocks, addressStats)
-        blocks
+      .grouped(32)
+      .mapAsync(1) { blocks =>
+        Future(writeTxsAndCommit(blocks, addressStats))
       }
+      .mapConcat(identity)
 }
