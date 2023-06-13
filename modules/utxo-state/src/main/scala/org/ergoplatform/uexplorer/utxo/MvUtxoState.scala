@@ -11,11 +11,11 @@ import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.{Address, *}
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, BlockBuilder, ForkInserted}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, BlockBuilder, ForkInserted, MvUeMap}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.utxo.MvUtxoState.*
 import org.h2.mvstore.{MVMap, MVStore}
-
+import KryoSerialization.Implicits.*
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.file.Paths
@@ -32,83 +32,58 @@ import scala.util.{Failure, Random, Success, Try}
 
 case class MvUtxoState(
   store: MVStore,
-  utxosByAddress: MVMap[Address, Array[Byte]],
-  addressByUtxo: MVMap[BoxId, Address],
-  topAddresses: MVMap[Address, Array[Byte]],
-  blockIdsByHeight: MVMap[Height, Array[Byte]],
-  blockById: MVMap[BlockId, Array[Byte]]
+  utxosByAddress: MvUeMap[Address, java.util.Map[BoxId, Value]],
+  addressByUtxo: MvUeMap[BoxId, Address],
+  topAddresses: MvUeMap[Address, Address.Stats],
+  blockIdsByHeight: MvUeMap[Height, java.util.Set[BlockId]],
+  blockById: MvUeMap[BlockId, BlockMetadata]
 ) extends UtxoState
-  with KryoSerialization
   with LazyLogging {
 
-  private def persistNewBlock(height: Height, block: BlockMetadata): Try[Unit] =
-    serBlock(block).map { b =>
-      blockById.put(block.headerId, b)
-      blockIdsByHeight.adjust(height)(
-        _.fold(serBlockIdNew(block.headerId))(arr => addBlockId(arr, block.headerId))
-      )
-    }
-
-  private def getBlockById(blockId: BlockId): Option[BlockMetadata] =
-    Option(blockById.get(blockId)).map(deserBlock)
+  private def persistNewBlock(height: Height, block: BlockMetadata): Try[Unit] = Try {
+    blockById.put(block.headerId, block)
+    blockIdsByHeight.adjust(height)(
+      _.fold(javaSetOf(block.headerId)) { existingBlockIds =>
+        existingBlockIds.add(block.headerId)
+        existingBlockIds
+      }
+    )
+    ()
+  }
 
   private def getBlocksByHeight(atHeight: Height): Set[BlockMetadata] =
-    Option(blockIdsByHeight.get(atHeight))
-      .map(deserBlockIds)
-      .map(_.asScala.toSet.flatMap(getBlockById))
+    blockIdsByHeight
+      .get(atHeight)
+      .map(_.asScala.toSet.flatMap(blockById.get))
       .getOrElse(Set.empty)
 
-  private def getTopAddress(address: Address): Option[Address.Stats] =
-    Option(topAddresses.get(address)).map(deserStats)
-
   def getUtxosByAddress(address: Address): Option[Map[BoxId, Value]] =
-    Option(utxosByAddress.get(address)).map(m => deserValueByBoxId(m).asScala.toMap)
+    utxosByAddress.get(address).map(_.asScala.toMap)
 
   def isEmpty: Boolean =
     utxosByAddress.isEmpty && addressByUtxo.isEmpty && topAddresses.isEmpty && blockIdsByHeight.isEmpty && blockById.isEmpty
 
-  def getLastHeight: Option[Height] = Option(blockIdsByHeight.lastKey())
+  def getLastHeight: Option[Height] = blockIdsByHeight.lastKey
 
   def getLastBlocks: Map[BlockId, BlockMetadata] =
-    Option(blockIdsByHeight.lastKey()).toSet.flatMap { lastHeight =>
+    blockIdsByHeight.lastKey.toSet.flatMap { lastHeight =>
       getBlocksByHeight(lastHeight).map(b => b.headerId -> b)
     }.toMap
 
-  def getFirstBlocks: Map[BlockId, BlockMetadata] =
-    Option(blockIdsByHeight.firstKey()).toSet.flatMap { lastHeight =>
-      getBlocksByHeight(lastHeight).map(b => b.headerId -> b)
-    }.toMap
-
-  def utxoBoxCount: Int = addressByUtxo.size()
-
-  def nonEmptyAddressCount: Int = utxosByAddress.size()
-
-  def getAddressStats(address: Address): Option[Address.Stats] = getTopAddress(address)
+  def getAddressStats(address: Address): Option[Address.Stats] = topAddresses.get(address)
 
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean =
-    getBlockById(blockId).exists(_.height == atHeight)
+    blockById.get(blockId).exists(_.height == atHeight)
 
-  def getAddressByUtxo(boxId: BoxId): Option[Address] = Option(addressByUtxo.get(boxId))
-
-  def getTopAddresses: Iterator[(Address, Address.Stats)] = new Iterator[(Address, Address.Stats)]() {
-    private val cursor = topAddresses.cursor(null.asInstanceOf[Address])
-
-    override def hasNext: Boolean = cursor.hasNext
-
-    override def next(): (Address, Address.Stats) = cursor.next() -> deserStats(cursor.getValue)
-  }
+  def getAddressByUtxo(boxId: BoxId): Option[Address] = addressByUtxo.get(boxId)
 
   def findMissingHeights: TreeSet[Height] = {
     val lastHeight = getLastHeight
     if (lastHeight.isEmpty || lastHeight.contains(1))
       TreeSet.empty
     else
-      TreeSet((1 to lastHeight.get): _*).diff(blockIdsByHeight.keySet().asScala)
+      TreeSet((1 to lastHeight.get): _*).diff(blockIdsByHeight.keySet.asScala)
   }
-
-  def compactFile(maxCompactTimeMillis: Int): Try[Unit] = Try(store.compactFile(maxCompactTimeMillis))
-
-  def commit(): Long = store.commit()
 
   private def mergeBlockBoxesUnsafe(
     block: Block,
@@ -120,18 +95,18 @@ case class MvUtxoState(
       outputBoxes
         .foldLeft(mutable.Map.empty[Address, Int]) { case (acc, (boxId, address, value)) =>
           addressByUtxo.put(boxId, address)
-          utxosByAddress.adjust(address)(
-            _.fold(serValueByBoxIdNew(boxId, value))(arr => addValue(arr, boxId, value))
-          )
+          utxosByAddress.adjust(address)(_.fold(javaMapOf(boxId, value)) { arr =>
+            arr.put(boxId, value)
+            arr
+          })
           acc.adjust(address)(_.fold(1)(_ + 1))
         }
         .foreach { case (address, boxCount) =>
           topAddresses.adjust(address) {
             case None =>
-              serStats(Address.Stats(blockMetadata.height, 1, boxCount))
-            case Some(bytes) =>
-              val Address.Stats(_, oldTxCount, oldBoxCount) = deserStats(bytes)
-              serStats(Address.Stats(blockMetadata.height, oldTxCount + 1, oldBoxCount + boxCount))
+              Address.Stats(blockMetadata.height, 1, boxCount)
+            case Some(Address.Stats(_, oldTxCount, oldBoxCount)) =>
+              Address.Stats(blockMetadata.height, oldTxCount + 1, oldBoxCount + boxCount)
           }
         }
       inputBoxes
@@ -142,9 +117,8 @@ case class MvUtxoState(
           utxosByAddress.putOrRemove(address) {
             case None => None
             case Some(existingBoxIds) =>
-              val map = deserValueByBoxId(existingBoxIds)
-              inputIds.foreach(map.remove)
-              Option(map).collect { case m if !m.isEmpty => serValueByBoxId(m) }
+              inputIds.foreach(existingBoxIds.remove)
+              Option(existingBoxIds).collect { case m if !m.isEmpty => m }
           }
         }
 
@@ -156,9 +130,9 @@ case class MvUtxoState(
   }.flatMap { blockMetadata =>
     persistNewBlock(blockMetadata.height, blockMetadata).map { _ =>
       if (blockMetadata.height % (MvUtxoState.MaxCacheSize * 1000) == 0) {
-        compactFile(60000 * 10) // 10 minutes
+        Try(store.compactFile(60000 * 10)) // 10 minutes
         logger.info(
-          s"Compacting at height ${blockMetadata.height}, utxo count: $utxoBoxCount, non-empty-address count: $nonEmptyAddressCount"
+          s"Compacting at height ${blockMetadata.height}, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}"
         )
       }
     }
@@ -175,7 +149,7 @@ case class MvUtxoState(
     if (apiBlock.header.height == 1)
       Try(Option.empty)
     else if (containsBlock(apiBlock.header.parentId, apiBlock.header.height - 1))
-      getBlockById(apiBlock.header.parentId).fold(fail)(parent => Try(Option(parent)))
+      blockById.get(apiBlock.header.parentId).fold(fail)(parent => Try(Option(parent)))
     else
       fail
   }
@@ -215,7 +189,7 @@ case class MvUtxoState(
                         val inputAddress =
                           valueByBoxId
                             .map(_._1)
-                            .orElse(Option(addressByUtxo.get(i.boxId)))
+                            .orElse(addressByUtxo.get(i.boxId))
                             .getOrElse(
                               throw new IllegalStateException(
                                 s"BoxId ${i.boxId} of block ${b.header.id} at height ${b.header.height} not found in utxo state" + outputs
@@ -261,7 +235,7 @@ case class MvUtxoState(
     } else {
       val supersededBlocks =
         winningFork.flatMap(w => getBlocksByHeight(w.header.height).filter(_.headerId != w.header.id))
-      Try(store.rollbackTo(getBlockById(winningFork.head.header.id).map(_.parentVersion).get))
+      Try(store.rollbackTo(blockById.get(winningFork.head.header.id).map(_.parentVersion).get))
         .flatMap { _ =>
           winningFork
             .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
@@ -296,14 +270,15 @@ object MvUtxoState extends LazyLogging {
 
     store.setVersionsToKeep(VersionsToKeep)
     store.setRetentionTime(3600 * 1000 * 24 * 7)
+
     val utxoState =
       MvUtxoState(
         store,
-        store.openMap[Address, Array[Byte]]("utxosByAddress"),
-        store.openMap[BoxId, Address]("addressByUtxo"),
-        store.openMap[Address, Array[Byte]]("topAddresses"),
-        store.openMap[Height, Array[Byte]]("blockIdsByHeight"),
-        store.openMap[BlockId, Array[Byte]]("blockById")
+        new MvUeMap[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
+        new MvUeMap[BoxId, Address]("addressByUtxo", store),
+        new MvUeMap[Address, Address.Stats]("topAddresses", store),
+        new MvUeMap[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),
+        new MvUeMap[BlockId, BlockMetadata]("blockById", store)
       )
     CoordinatedShutdown(s).addTask(
       CoordinatedShutdown.PhaseServiceStop,
@@ -316,23 +291,4 @@ object MvUtxoState extends LazyLogging {
 
   def withDefaultDir()(implicit s: ActorSystem[Nothing]): Try[MvUtxoState] =
     MvUtxoState(Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "utxo").toFile)
-
-  implicit class MVMapPimp[K, V](underlying: MVMap[K, V]) {
-
-    def putOrRemove(k: K)(f: Option[V] => Option[V]): MVMap[K, V] =
-      f(Option(underlying.get(k))) match {
-        case None =>
-          underlying.remove(k)
-          underlying
-        case Some(v) =>
-          underlying.put(k, v)
-          underlying
-      }
-
-    def adjust(k: K)(f: Option[V] => V): MVMap[K, V] = {
-      underlying.put(k, f(Option(underlying.get(k))))
-      underlying
-    }
-
-  }
 }

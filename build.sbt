@@ -82,7 +82,7 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `node-pool`, `utxo-state`, cassandra, janusgraph, `alert-plugin`, indexer)
+  ).aggregate(core, `node-pool`, database, `utxo-state`, cassandra, janusgraph, `alert-plugin`, indexer)
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
@@ -95,11 +95,17 @@ lazy val `node-pool` =
     .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ scalatest("3"))
     .dependsOn(core)
 
+lazy val database =
+  Utils.mkModule("database", "database")
+    .settings(commonSettings)
+    .settings(libraryDependencies ++= Seq(mvStore, kryo) ++ scalatest("3"))
+    .dependsOn(core)
+
 lazy val `utxo-state` =
   Utils.mkModule("utxo-state", "utxo-state")
     .settings(commonSettings)
     .settings(libraryDependencies ++= lightBend("3") ++ Seq(mvStore, kryo) ++ scalatest("3"))
-    .dependsOn(`node-pool` % "compile->compile;test->test") //TODO only snapshots depend on node-pool
+    .dependsOn(database, `node-pool` % "compile->compile;test->test") //TODO only snapshots depend on node-pool
 
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
