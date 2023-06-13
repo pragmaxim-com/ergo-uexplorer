@@ -19,8 +19,6 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Success, Try}
 import akka.Done
-import org.ergoplatform.uexplorer.Epoch.EpochCommand
-import org.ergoplatform.uexplorer.Epoch.WriteNewEpoch
 import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait Backend {

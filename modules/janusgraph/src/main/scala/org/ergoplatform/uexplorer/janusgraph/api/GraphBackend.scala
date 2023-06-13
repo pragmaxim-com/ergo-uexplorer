@@ -9,7 +9,6 @@ import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.BlockMetadata
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Epoch.EpochCommand
 import pureconfig.ConfigReader
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
 

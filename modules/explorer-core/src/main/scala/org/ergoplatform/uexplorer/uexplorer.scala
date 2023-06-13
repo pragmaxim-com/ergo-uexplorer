@@ -15,11 +15,10 @@ import scala.util.Try
 
 package object uexplorer {
 
-  type Value      = Long
-  type Height     = Int
-  type Timestamp  = Long
-  type EpochIndex = Int
-  type TxIndex    = Short
+  type Value     = Long
+  type Height    = Int
+  type Timestamp = Long
+  type TxIndex   = Short
 
   type BoxCount            = Int
   type TxCount             = Int

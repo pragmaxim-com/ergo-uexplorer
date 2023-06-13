@@ -9,7 +9,6 @@ import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.*
 import org.janusgraph.core.Multiplicity
-import org.ergoplatform.uexplorer.Epoch.{EpochCommand, IgnoreEpoch, WriteNewEpoch}
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
