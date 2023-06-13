@@ -7,7 +7,7 @@ Global / cancelable := true // Allow cancellation of forked task without killing
 
 lazy val commonSettings = Seq(
   organization := "org.ergoplatform",
-  scalaVersion := "3.2.2",
+  scalaVersion := "3.3.0",
   version := "0.0.1",
   resolvers ++= Resolver.sonatypeOssRepos("public") ++ Resolver.sonatypeOssRepos("snapshots"),
   ThisBuild / evictionErrorLevel := Level.Info,
