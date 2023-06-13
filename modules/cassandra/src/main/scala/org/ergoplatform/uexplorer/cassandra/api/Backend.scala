@@ -29,13 +29,7 @@ trait Backend {
 
   def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Future[Done]
 
-  def transactionBoxesByHeightFlow: Flow[(Height, BlockId), ((Height, BlockId), BoxesByTx), NotUsed]
-
-  def getAllBlockIdsAndHeight: Source[(Height, BlockId), NotUsed]
-
   def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
-
-  def addressWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
   def close(): Future[Unit]
 }
@@ -60,12 +54,9 @@ object Backend {
 
 class InMemoryBackend extends Backend {
 
-  private val boxesByHeight     = new ConcurrentHashMap[Height, BoxesByTx]()
   private val blocksById        = new ConcurrentHashMap[BlockId, BlockMetadata]()
   private val blocksByHeight    = new ConcurrentHashMap[Height, BlockMetadata]()
   override def isEmpty: Boolean = true
-
-  override def getAllBlockIdsAndHeight: Source[(Height, BlockId), NotUsed] = ???
 
   override def close(): Future[Unit] = Future.successful(())
 
@@ -77,13 +68,5 @@ class InMemoryBackend extends Backend {
       blocksById.put(blockInserted.block.header.id, BlockMetadata.fromBlock(blockInserted.block, 0))
       blockInserted
     }
-
-  override def addressWriteFlow(
-    addressStats: Address => Option[Address.Stats]
-  ): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
-    Flow[BestBlockInserted].map(identity)
-
-  override def transactionBoxesByHeightFlow: Flow[(Height, BlockId), ((Height, BlockId), BoxesByTx), NotUsed] =
-    Flow[(Height, BlockId)].map { case (height, blockId) => (height, blockId) -> boxesByHeight.get(height) }
 
 }

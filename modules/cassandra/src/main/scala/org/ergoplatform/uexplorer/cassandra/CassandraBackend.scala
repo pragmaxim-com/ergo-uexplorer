@@ -43,9 +43,7 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraInputsWriter
   with CassandraOutputsWriter
   with CassandraBlockUpdater
-  with CassandraAddressWriter
-  with CassandraHeadersReader
-  with CassandraUtxoReader {
+  with CassandraHeadersReader {
 
   def close(): Future[Unit] = {
     logger.info(s"Stopping Cassandra session")

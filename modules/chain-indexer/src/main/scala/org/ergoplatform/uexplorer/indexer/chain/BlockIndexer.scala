@@ -74,9 +74,6 @@ class BlockIndexer(
       }
       .async
       .buffer(100, OverflowStrategy.backpressure)
-      .via(backend.addressWriteFlow(utxoState.getAddressStats))
-      .async
-      .buffer(100, OverflowStrategy.backpressure)
       .via(graphBackend.graphWriteFlow(utxoState.getAddressStats))
       .via(killSwitch.flow)
       .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
