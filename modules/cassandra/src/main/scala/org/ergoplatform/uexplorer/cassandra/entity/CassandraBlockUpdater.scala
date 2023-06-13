@@ -24,8 +24,8 @@ trait CassandraBlockUpdater extends LazyLogging {
       table -> (keyOpt, cqlSession.prepare(statement))
     }.toMap
 
-  def removeBlocksFromMainChain(blockIds: List[BlockId]): Future[Done] =
-    Source(blockIds)
+  def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Future[Done] =
+    Source(blockIds.toList)
       .mapConcat(blockId => updateMainChainPreparedStatements.map { case (table, (key, _)) => (table, key, blockId) })
       .mapAsync(1) {
         case (table, Some(key), blockId) =>

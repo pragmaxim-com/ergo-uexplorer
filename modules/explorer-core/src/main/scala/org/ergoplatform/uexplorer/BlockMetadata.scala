@@ -5,7 +5,6 @@ import org.ergoplatform.uexplorer.db.BlockInfo
 
 case class BlockMetadata(
   parentVersion: Long,
-  headerId: BlockId,
   parentId: BlockId,
   timestamp: Long,
   height: Int,
@@ -14,7 +13,6 @@ case class BlockMetadata(
   def this() =
     this(
       0,
-      BlockMetadata.genesisBlock,
       BlockMetadata.genesisBlock,
       0,
       0,
@@ -25,5 +23,5 @@ case class BlockMetadata(
 object BlockMetadata {
   private val genesisBlock = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
   def fromBlock(b: Block, version: Long): BlockMetadata =
-    BlockMetadata(version, b.header.id, b.header.parentId, b.header.timestamp, b.header.height, b.info)
+    BlockMetadata(version, b.header.parentId, b.header.timestamp, b.header.height, b.info)
 }

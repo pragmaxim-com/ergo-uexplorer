@@ -43,7 +43,7 @@ class BlockIndexer(
       .mapAsync(parallelism) {
         case ForkInserted(newBlocksInserted, supersededFork) =>
           backend
-            .removeBlocksFromMainChain(supersededFork.map(_.headerId))
+            .removeBlocksFromMainChain(supersededFork.keys)
             .map(_ => newBlocksInserted)
         case bb: BestBlockInserted =>
           Future.successful(List(bb))

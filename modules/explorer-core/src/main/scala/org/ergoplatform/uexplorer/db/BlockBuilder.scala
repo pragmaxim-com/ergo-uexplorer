@@ -8,11 +8,10 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.parser.TokenPropsParser
-import org.ergoplatform.uexplorer.{Address, BlockMetadata, HexString, ProtocolSettings, SigmaType, TokenId, TokenType}
+import org.ergoplatform.uexplorer.{Address, BlockId, BlockMetadata, BoxesByTx, HexString, ProtocolSettings, SigmaType, TokenId, TokenType}
 
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
-import org.ergoplatform.uexplorer.BoxesByTx
 
 object BlockBuilder {
 
@@ -224,4 +223,4 @@ sealed trait Inserted
 
 case class BestBlockInserted(block: Block, boxesByTx: BoxesByTx) extends Inserted
 
-case class ForkInserted(newFork: List[BestBlockInserted], supersededFork: List[BlockMetadata]) extends Inserted
+case class ForkInserted(newFork: List[BestBlockInserted], supersededFork: Map[BlockId, BlockMetadata]) extends Inserted

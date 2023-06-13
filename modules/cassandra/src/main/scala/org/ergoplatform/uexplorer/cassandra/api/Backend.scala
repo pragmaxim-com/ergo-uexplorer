@@ -27,7 +27,7 @@ trait Backend {
 
   def isEmpty: Boolean
 
-  def removeBlocksFromMainChain(blockIds: List[BlockId]): Future[Done]
+  def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Future[Done]
 
   def transactionBoxesByHeightFlow: Flow[(Height, BlockId), ((Height, BlockId), BoxesByTx), NotUsed]
 
@@ -69,7 +69,7 @@ class InMemoryBackend extends Backend {
 
   override def close(): Future[Unit] = Future.successful(())
 
-  override def removeBlocksFromMainChain(blockIds: List[BlockId]): Future[Done] = ???
+  override def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Future[Done] = ???
 
   override def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted].map { blockInserted =>

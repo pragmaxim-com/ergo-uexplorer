@@ -40,22 +40,22 @@ case class MvUtxoState(
 ) extends UtxoState
   with LazyLogging {
 
-  private def persistNewBlock(height: Height, block: BlockMetadata): Try[Unit] = Try {
-    blockById.put(block.headerId, block)
+  private def persistNewBlock(blockId: BlockId, height: Height, block: BlockMetadata): Try[Unit] = Try {
+    blockById.put(blockId, block)
     blockIdsByHeight.adjust(height)(
-      _.fold(javaSetOf(block.headerId)) { existingBlockIds =>
-        existingBlockIds.add(block.headerId)
+      _.fold(javaSetOf(blockId)) { existingBlockIds =>
+        existingBlockIds.add(blockId)
         existingBlockIds
       }
     )
     ()
   }
 
-  private def getBlocksByHeight(atHeight: Height): Set[BlockMetadata] =
+  private def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockMetadata] =
     blockIdsByHeight
       .get(atHeight)
-      .map(_.asScala.toSet.flatMap(blockById.get))
-      .getOrElse(Set.empty)
+      .map(_.asScala.flatMap(blockId => blockById.get(blockId).map(blockId -> _)).toMap)
+      .getOrElse(Map.empty)
 
   def getUtxosByAddress(address: Address): Option[Map[BoxId, Value]] =
     utxosByAddress.get(address).map(_.asScala.toMap)
@@ -66,9 +66,11 @@ case class MvUtxoState(
   def getLastHeight: Option[Height] = blockIdsByHeight.lastKey
 
   def getLastBlocks: Map[BlockId, BlockMetadata] =
-    blockIdsByHeight.lastKey.toSet.flatMap { lastHeight =>
-      getBlocksByHeight(lastHeight).map(b => b.headerId -> b)
-    }.toMap
+    blockIdsByHeight.lastKey
+      .map { lastHeight =>
+        getBlocksByHeight(lastHeight)
+      }
+      .getOrElse(Map.empty)
 
   def getAddressStats(address: Address): Option[Address.Stats] = topAddresses.get(address)
 
@@ -126,9 +128,9 @@ case class MvUtxoState(
         addressByUtxo.remove(i._1)
       }
     }
-    blockMetadata
-  }.flatMap { blockMetadata =>
-    persistNewBlock(blockMetadata.height, blockMetadata).map { _ =>
+    block.header.id -> blockMetadata
+  }.flatMap { case (blockId, blockMetadata) =>
+    persistNewBlock(blockId, blockMetadata.height, blockMetadata).map { _ =>
       if (blockMetadata.height % (MvUtxoState.MaxCacheSize * 1000) == 0) {
         Try(store.compactFile(60000 * 10)) // 10 minutes
         logger.info(
@@ -234,7 +236,7 @@ case class MvUtxoState(
       )
     } else {
       val supersededBlocks =
-        winningFork.flatMap(w => getBlocksByHeight(w.header.height).filter(_.headerId != w.header.id))
+        winningFork.flatMap(w => getBlocksByHeight(w.header.height).filter(_._1 != w.header.id)).toMap
       Try(store.rollbackTo(blockById.get(winningFork.head.header.id).map(_.parentVersion).get))
         .flatMap { _ =>
           winningFork
