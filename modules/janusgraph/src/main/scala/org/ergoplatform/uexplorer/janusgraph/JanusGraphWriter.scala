@@ -44,28 +44,27 @@ trait JanusGraphWriter extends LazyLogging {
     }
   }
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, addressStats: Address => Option[Address.Stats], g: Graph): Unit =
+  def writeTx(height: Height, boxesByTx: BoxesByTx, g: Graph): Unit =
     boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-      TxGraphWriter.writeGraph(tx, height, inputs, outputs, addressStats)(g)
+      TxGraphWriter.writeGraph(tx, height, inputs, outputs)(g)
     }
 
   def writeTxsAndCommit(
-    txBoxesByHeight: IterableOnce[BestBlockInserted],
-    addressStats: Address => Option[Address.Stats]
+    txBoxesByHeight: IterableOnce[BestBlockInserted]
   ): IterableOnce[BestBlockInserted] = {
     txBoxesByHeight.iterator
       .foreach { case BestBlockInserted(b, boxesByTx) =>
-        writeTx(b.header.height, boxesByTx, addressStats, janusGraph)
+        writeTx(b.header.height, boxesByTx, janusGraph)
       }
     janusGraph.tx().commit()
     txBoxesByHeight
   }
 
-  def graphWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+  def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted]
       .grouped(32)
       .mapAsync(1) { blocks =>
-        Future(writeTxsAndCommit(blocks, addressStats))
+        Future(writeTxsAndCommit(blocks))
       }
       .mapConcat(identity)
 }

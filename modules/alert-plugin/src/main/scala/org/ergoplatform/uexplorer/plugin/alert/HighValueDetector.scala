@@ -19,7 +19,7 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
   def inspectNewPoolTx(
     tx: ApiTransaction,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): List[TxMatch] = {
     def sumAddressValues(addresses: Set[Address]): Map[Address, Address.State] =
       addresses
@@ -61,7 +61,7 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
   def inspectNewBlock(
     newBlock: BestBlockInserted,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): List[BlockMatch] = List.empty
 
 }

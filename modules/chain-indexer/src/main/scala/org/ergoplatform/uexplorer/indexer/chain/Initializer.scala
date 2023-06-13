@@ -20,24 +20,24 @@ import scala.util.Try
 
 class Initializer(
   utxoState: MvUtxoState,
-  backend: Backend,
-  graphBackend: GraphBackend
+  backendOpt: Option[Backend],
+  graphBackendOpt: Option[GraphBackend]
 ) extends LazyLogging {
 
   def init: ChainIntegrity =
-    if (!backend.isEmpty && utxoState.isEmpty) {
+    if (utxoState.isEmpty && backendOpt.exists(b => !b.isEmpty)) {
       HalfEmptyInconsistency("Backend must be empty when utxo state is.")
-    } else if (backend.isEmpty && !utxoState.isEmpty) {
+    } else if (!utxoState.isEmpty && backendOpt.exists(_.isEmpty)) {
       HalfEmptyInconsistency(s"utxoState must be empty when backend is.")
-    } else if (backend.isEmpty && utxoState.isEmpty) {
-      if (graphBackend.initGraph || graphBackend.isEmpty) {
+    } else if (utxoState.isEmpty && (backendOpt.isEmpty || backendOpt.exists(_.isEmpty))) {
+      if (graphBackendOpt.exists(_.initGraph) || graphBackendOpt.isEmpty) {
         logger.info(s"Chain is empty, loading from scratch ...")
         ChainEmpty
       } else {
         GraphInconsistency("Janus graph must be empty when main db is empty, drop janusgraph keyspace!")
       }
     } else {
-      if (!graphBackend.isEmpty)
+      if (graphBackendOpt.isEmpty || graphBackendOpt.exists(g => !g.isEmpty))
         ChainValid
       else
         GraphInconsistency("Janus graph cannot be empty when main db is not")

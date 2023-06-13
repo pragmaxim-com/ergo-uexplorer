@@ -10,13 +10,13 @@ trait Analyzer {
   def trackTx(
     txMatch: TxMatch,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): Option[TxMatch]
 
   def trackBlock(
     blockMatch: BlockMatch,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): Option[BlockMatch]
 
 }

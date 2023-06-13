@@ -23,8 +23,7 @@ object TxGraphWriter extends LazyLogging {
     tx: Tx,
     height: Int,
     inputs: ArraySeq[(BoxId, Address, Long)],
-    outputs: ArraySeq[(BoxId, Address, Long)],
-    addressStats: Address => Option[Address.Stats]
+    outputs: ArraySeq[(BoxId, Address, Long)]
   )(g: Graph): Unit = {
     val newTxVertex = g.addVertex(T.id, Utils.vertexHash(tx.id.unwrapped, g), T.label, "txId")
     newTxVertex.property("txId", tx.id)

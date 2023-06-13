@@ -70,12 +70,12 @@ object Application extends App with AkkaStreamSupport {
             for {
               blockHttpClient <- BlockHttpClient.withNodePoolBackend
               pluginManager   <- PluginManager.initialize
-              backend         <- Future.fromTry(Backend(conf.backendType))
-              graphBackend    <- Future.fromTry(GraphBackend(conf.graphBackendType))
+              backendOpt      <- Future.fromTry(Backend(conf.backendType))
+              graphBackendOpt <- Future.fromTry(GraphBackend(conf.graphBackendType))
               utxoState       <- Future.fromTry(MvUtxoState.withDefaultDir())
-              blockIndexer  = new BlockIndexer(backend, graphBackend, blockHttpClient, utxoState)
+              blockIndexer  = new BlockIndexer(backendOpt, graphBackendOpt, blockHttpClient, utxoState)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
-              initializer   = new Initializer(utxoState, backend, graphBackend)
+              initializer   = new Initializer(utxoState, backendOpt, graphBackendOpt)
               scheduler     = new Scheduler(pluginManager, blockIndexer, mempoolSyncer, initializer)
               done <- scheduler.validateAndSchedule(0.seconds, 5.seconds)
             } yield done

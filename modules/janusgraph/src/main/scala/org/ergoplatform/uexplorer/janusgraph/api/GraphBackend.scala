@@ -20,20 +20,19 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
-import scala.util.Try
+import scala.util.{Success, Try}
 import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait GraphBackend {
 
   def initGraph: Boolean
 
-  def graphWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed]
+  def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, addressStats: Address => Option[Address.Stats], g: Graph): Unit
+  def writeTx(height: Height, boxesByTx: BoxesByTx, g: Graph): Unit
 
   def writeTxsAndCommit(
-    txBoxesByHeight: IterableOnce[BestBlockInserted],
-    addressStats: Address => Option[Address.Stats]
+    txBoxesByHeight: IterableOnce[BestBlockInserted]
   ): IterableOnce[BestBlockInserted]
 
   def graphTraversalSource: GraphTraversalSource
@@ -50,13 +49,16 @@ object GraphBackend {
   sealed trait GraphBackendType derives ConfigReader
   case object JanusGraph extends GraphBackendType
   case object InMemoryGraph extends GraphBackendType
+  case object NoGraphBackend extends GraphBackendType
 
-  def apply(graphBackendType: GraphBackendType)(implicit system: ActorSystem[Nothing]): Try[GraphBackend] =
+  def apply(graphBackendType: GraphBackendType)(implicit system: ActorSystem[Nothing]): Try[Option[GraphBackend]] =
     graphBackendType match {
       case JanusGraph =>
-        JanusGraphBackend()
+        JanusGraphBackend().map(Some(_))
       case InMemoryGraph =>
-        Try(new InMemoryGraphBackend())
+        Try(Some(new InMemoryGraphBackend()))
+      case NoGraphBackend =>
+        Success(None)
     }
 
 }
@@ -67,17 +69,16 @@ class InMemoryGraphBackend extends GraphBackend {
 
   def tx: Transaction = ???
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, addressStats: Address => Option[Address.Stats], g: Graph): Unit = {}
+  def writeTx(height: Height, boxesByTx: BoxesByTx, g: Graph): Unit = {}
 
   def writeTxsAndCommit(
-    txBoxesByHeight: IterableOnce[BestBlockInserted],
-    addressStats: Address => Option[Address.Stats]
+    txBoxesByHeight: IterableOnce[BestBlockInserted]
   ): IterableOnce[BestBlockInserted] = List.empty
   def isEmpty: Boolean = true
 
   def graphTraversalSource: GraphTraversalSource = EmptyGraph.instance.traversal()
 
-  def graphWriteFlow(addressStats: Address => Option[Address.Stats]): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+  def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted].map(identity)
 
   def close(): Future[Unit] = Future.successful(())

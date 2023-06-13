@@ -31,8 +31,8 @@ import scala.collection.immutable.TreeSet
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 
 class BlockIndexer(
-  backend: Backend,
-  graphBackend: GraphBackend,
+  backendOpt: Option[Backend],
+  graphBackendOpt: Option[GraphBackend],
   blockHttpClient: BlockHttpClient,
   utxoState: MvUtxoState
 )(implicit s: ActorSystem[Nothing], ps: ProtocolSettings, killSwitch: SharedKillSwitch)
@@ -42,8 +42,8 @@ class BlockIndexer(
     Flow[Inserted]
       .mapAsync(parallelism) {
         case ForkInserted(newBlocksInserted, supersededFork) =>
-          backend
-            .removeBlocksFromMainChain(supersededFork.keys)
+          backendOpt
+            .fold(Future.successful(newBlocksInserted))(_.removeBlocksFromMainChain(supersededFork.keys))
             .map(_ => newBlocksInserted)
         case bb: BestBlockInserted =>
           Future.successful(List(bb))
@@ -66,7 +66,7 @@ class BlockIndexer(
       .via(forkDeleteFlow(1))
       .async
       .buffer(100, OverflowStrategy.backpressure)
-      .via(backend.blockWriteFlow)
+      .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
       .wireTap { bb =>
         if (bb.block.header.height % (MvUtxoState.MaxCacheSize * 10) == 0) {
           logger.info(s"Height ${bb.block.header.height}")
@@ -74,7 +74,11 @@ class BlockIndexer(
       }
       .async
       .buffer(100, OverflowStrategy.backpressure)
-      .via(graphBackend.graphWriteFlow(utxoState.getAddressStats))
+      .via(
+        graphBackendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(
+          _.graphWriteFlow
+        )
+      )
       .via(killSwitch.flow)
       .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
       .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
@@ -82,7 +86,7 @@ class BlockIndexer(
           ChainSyncResult(
             lastBlock,
             utxoState,
-            graphBackend.graphTraversalSource
+            graphBackendOpt.map(_.graphTraversalSource)
           )
         }
       }
@@ -106,6 +110,6 @@ object BlockIndexer {
   case class ChainSyncResult(
     lastBlock: Option[BestBlockInserted],
     utxoState: MvUtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   )
 }

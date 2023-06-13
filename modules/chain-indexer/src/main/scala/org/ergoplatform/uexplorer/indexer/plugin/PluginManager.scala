@@ -25,7 +25,7 @@ class PluginManager(plugins: List[Plugin]) extends LazyLogging {
   def executePlugins(
     utxoState: MvUtxoState,
     stateChanges: MempoolStateChanges,
-    graphTraversalSource: GraphTraversalSource,
+    graphTraversalSource: Option[GraphTraversalSource],
     newBlockOpt: Option[BestBlockInserted]
   )(implicit actorSystem: ActorSystem[Nothing]): Future[Done] = {
     val poolExecutionPlan =

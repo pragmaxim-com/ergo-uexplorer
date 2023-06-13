@@ -13,7 +13,7 @@ class SourceAnalyzer extends Analyzer {
   def trackTx(
     txMatch: TxMatch,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): Option[TxMatch] =
     // TODO currently lack of options for visualizing graphson/graphml besides https://gitlab.com/ouestware/retina
     Option(txMatch)
@@ -21,7 +21,7 @@ class SourceAnalyzer extends Analyzer {
   def trackBlock(
     blockMatch: BlockMatch,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): Option[BlockMatch] = Option.empty
 
 }

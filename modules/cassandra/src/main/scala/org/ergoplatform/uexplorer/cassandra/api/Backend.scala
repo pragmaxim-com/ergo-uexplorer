@@ -17,7 +17,7 @@ import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
-import scala.util.Try
+import scala.util.{Success, Try}
 import akka.Done
 import org.ergoplatform.uexplorer.Epoch.EpochCommand
 import org.ergoplatform.uexplorer.Epoch.WriteNewEpoch
@@ -43,11 +43,15 @@ object Backend {
 
   case object InMemoryDb extends BackendType
 
-  def apply(backendType: BackendType)(implicit system: ActorSystem[Nothing]): Try[Backend] = backendType match {
+  case object NoBackend extends BackendType
+
+  def apply(backendType: BackendType)(implicit system: ActorSystem[Nothing]): Try[Option[Backend]] = backendType match {
     case CassandraDb(parallelism) =>
-      CassandraBackend(parallelism)
+      CassandraBackend(parallelism).map(Some(_))
     case InMemoryDb =>
-      Try(new InMemoryBackend())
+      Try(Some(new InMemoryBackend()))
+    case NoBackend =>
+      Success(None)
   }
 
 }

@@ -21,12 +21,12 @@ trait Plugin {
   def processMempoolTx(
     newTx: ApiTransaction,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): Future[Unit]
 
   def processNewBlock(
     newBlock: BestBlockInserted,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): Future[Unit]
 }

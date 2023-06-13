@@ -13,13 +13,13 @@ trait Detector {
   def inspectNewPoolTx(
     tx: ApiTransaction,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): List[TxMatch]
 
   def inspectNewBlock(
     newBlock: BestBlockInserted,
     utxoState: UtxoState,
-    graphTraversalSource: GraphTraversalSource
+    graphTraversalSource: Option[GraphTraversalSource]
   ): List[BlockMatch]
 }
 
