@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.db
 
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockMetadata, Const, ProtocolSettings}
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}

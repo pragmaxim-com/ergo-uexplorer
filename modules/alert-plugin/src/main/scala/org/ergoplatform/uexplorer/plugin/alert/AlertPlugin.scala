@@ -5,11 +5,10 @@ import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.channel.MessageChannel
 import discord4j.core.{DiscordClient, GatewayDiscordClient}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.utxo.{MvUtxoState, UtxoState}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.{Flux, Mono}
 import retry.Policy
@@ -41,9 +40,9 @@ class AlertPlugin extends Plugin {
   def close: Future[Unit] = discord.flatMap(_.logout)
 
   def processMempoolTx(
-    newTx: ApiTransaction,
-    utxoState: UtxoState,
-    graphTraversalSource: Option[GraphTraversalSource]
+                        newTx: ApiTransaction,
+                        utxoState: Storage,
+                        graphTraversalSource: Option[GraphTraversalSource]
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
@@ -61,9 +60,9 @@ class AlertPlugin extends Plugin {
     }
 
   def processNewBlock(
-    newBlock: BestBlockInserted,
-    utxoState: UtxoState,
-    graphTraversalSource: Option[GraphTraversalSource]
+                       newBlock: BestBlockInserted,
+                       utxoState: Storage,
+                       graphTraversalSource: Option[GraphTraversalSource]
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(

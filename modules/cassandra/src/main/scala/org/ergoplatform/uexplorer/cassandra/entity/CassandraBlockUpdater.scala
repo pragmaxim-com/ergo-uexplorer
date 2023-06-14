@@ -6,10 +6,10 @@ import com.datastax.oss.driver.api.core.cql.*
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.cassandra.entity.CassandraBlockUpdater.*
 import org.ergoplatform.uexplorer.cassandra
+import org.ergoplatform.uexplorer.db.Block
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*

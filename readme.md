@@ -55,6 +55,7 @@ allows for flexible development. Major Data Views derived from Source of Truth :
       - cassandraDB = 1GB
       - stargate = 1GB
       - chain-indexer = 1GB
+  - 100GB free disk space for data in cassandra and 3GB for JanusGraph, MvStore ~ 10GB but it will increase   
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks automatically falls back to peer-network if local node is not available
 

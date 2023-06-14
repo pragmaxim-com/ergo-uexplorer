@@ -9,7 +9,6 @@ import akka.stream.{KillSwitches, SharedKillSwitch}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.cassandra.{AkkaStreamSupport, CassandraBackend}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
@@ -32,10 +31,11 @@ import org.ergoplatform.uexplorer.indexer.http.Routes
 import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, Initializer}
+import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, ChainIndexer, Initializer}
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.utxo.MvUtxoState
+import org.ergoplatform.uexplorer.mvstore.MvStorage
 
 object Application extends App with AkkaStreamSupport {
   ChainIndexerConf.loadWithFallback match {
@@ -72,11 +72,12 @@ object Application extends App with AkkaStreamSupport {
               pluginManager   <- PluginManager.initialize
               backendOpt      <- Future.fromTry(Backend(conf.backendType))
               graphBackendOpt <- Future.fromTry(GraphBackend(conf.graphBackendType))
-              utxoState       <- Future.fromTry(MvUtxoState.withDefaultDir())
-              blockIndexer  = new BlockIndexer(backendOpt, graphBackendOpt, blockHttpClient, utxoState)
+              storage         <- Future.fromTry(MvStorage.withDefaultDir())
+              blockIndexer  = new BlockIndexer(storage)
+              chainIndexer  = new ChainIndexer(backendOpt, graphBackendOpt, blockHttpClient, blockIndexer)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
-              initializer   = new Initializer(utxoState, backendOpt, graphBackendOpt)
-              scheduler     = new Scheduler(pluginManager, blockIndexer, mempoolSyncer, initializer)
+              initializer   = new Initializer(storage, backendOpt, graphBackendOpt)
+              scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
               done <- scheduler.validateAndSchedule(0.seconds, 5.seconds)
             } yield done
 
@@ -87,7 +88,6 @@ object Application extends App with AkkaStreamSupport {
               println(s"Shutting down due to unexpected error:\n$sw")
               CoordinatedShutdown.get(system).run(CoordinatedShutdown.ActorSystemTerminateReason)
             case Success(_) =>
-              println("Chain indexer should never stop successfully")
               CoordinatedShutdown.get(system).run(CoordinatedShutdown.ActorSystemTerminateReason)
           }
           Behaviors.same

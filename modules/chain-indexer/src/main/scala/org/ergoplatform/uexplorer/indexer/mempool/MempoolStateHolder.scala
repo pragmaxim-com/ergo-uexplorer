@@ -7,7 +7,6 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
-import org.ergoplatform.uexplorer.utxo.MvUtxoState
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 

@@ -8,7 +8,7 @@ import org.apache.tinkerpop.gremlin.structure.Graph
 import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
-import org.ergoplatform.uexplorer.utxo.MvUtxoState
+import org.ergoplatform.uexplorer.mvstore.MvStorage
 import org.ergoplatform.uexplorer.{BlockId, BoxesByTx, Const, Height}
 
 import java.nio.file.{Files, Paths}
@@ -19,17 +19,17 @@ import scala.concurrent.Future
 import scala.util.Try
 
 class Initializer(
-  utxoState: MvUtxoState,
+  storage: MvStorage,
   backendOpt: Option[Backend],
   graphBackendOpt: Option[GraphBackend]
 ) extends LazyLogging {
 
   def init: ChainIntegrity =
-    if (utxoState.isEmpty && backendOpt.exists(b => !b.isEmpty)) {
+    if (storage.isEmpty && backendOpt.exists(b => !b.isEmpty)) {
       HalfEmptyInconsistency("Backend must be empty when utxo state is.")
-    } else if (!utxoState.isEmpty && backendOpt.exists(_.isEmpty)) {
+    } else if (!storage.isEmpty && backendOpt.exists(_.isEmpty)) {
       HalfEmptyInconsistency(s"utxoState must be empty when backend is.")
-    } else if (utxoState.isEmpty && (backendOpt.isEmpty || backendOpt.exists(_.isEmpty))) {
+    } else if (storage.isEmpty && (backendOpt.isEmpty || backendOpt.exists(_.isEmpty))) {
       if (graphBackendOpt.exists(_.initGraph) || graphBackendOpt.isEmpty) {
         logger.info(s"Chain is empty, loading from scratch ...")
         ChainEmpty

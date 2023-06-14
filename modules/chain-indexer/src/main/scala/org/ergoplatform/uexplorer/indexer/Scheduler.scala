@@ -4,6 +4,12 @@ import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
+import org.ergoplatform.uexplorer.Resiliency
+import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
+import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
+import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
+import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, ChainIndexer, Initializer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
@@ -11,16 +17,10 @@ import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
-import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
-import org.ergoplatform.uexplorer.Resiliency
-import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, Initializer}
-import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.indexer.chain.BlockIndexer.ChainSyncResult
-import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
 
 class Scheduler(
   pluginManager: PluginManager,
-  blockIndexer: BlockIndexer,
+  chainIndexer: ChainIndexer,
   mempoolSyncer: MempoolSyncer,
   initializer: Initializer
 )(implicit
@@ -32,7 +32,7 @@ class Scheduler(
 
   def periodicSync: Future[MempoolStateChanges] =
     for {
-      ChainSyncResult(lastBlockOpt, utxoState, graphTraversalSource) <- blockIndexer.indexChain
+      ChainSyncResult(lastBlockOpt, utxoState, graphTraversalSource) <- chainIndexer.indexChain
       stateChanges                                                   <- mempoolSyncer.syncMempool(utxoState)
       _ <- pluginManager.executePlugins(utxoState, stateChanges, graphTraversalSource, lastBlockOpt)
     } yield stateChanges
@@ -50,7 +50,7 @@ class Scheduler(
       case ChainEmpty | ChainValid =>
         schedule(initialDelay, pollingInterval)(periodicSync).via(killSwitch.flow).run()
       case MissingBlocks(_, missingHeights) =>
-        blockIndexer
+        chainIndexer
           .fixChain(missingHeights)
           .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
     }

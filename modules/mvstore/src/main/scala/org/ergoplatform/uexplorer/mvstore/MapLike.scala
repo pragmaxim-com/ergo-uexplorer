@@ -1,8 +1,8 @@
-package org.ergoplatform.uexplorer.db
+package org.ergoplatform.uexplorer.mvstore
 
 import scala.util.Try
 
-trait UeMap[K, V] {
+trait MapLike[K, V] {
 
   def get(key: K): Option[V]
 

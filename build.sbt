@@ -82,7 +82,7 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `node-pool`, database, `utxo-state`, cassandra, janusgraph, `alert-plugin`, indexer)
+  ).aggregate(core, `node-pool`, mvstore, cassandra, janusgraph, `alert-plugin`, indexer)
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
@@ -95,17 +95,11 @@ lazy val `node-pool` =
     .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ scalatest("3"))
     .dependsOn(core)
 
-lazy val database =
-  Utils.mkModule("database", "database")
+lazy val mvstore =
+  Utils.mkModule("mvstore", "mvstore")
     .settings(commonSettings)
     .settings(libraryDependencies ++= Seq(mvStore, kryo) ++ scalatest("3"))
     .dependsOn(core)
-
-lazy val `utxo-state` =
-  Utils.mkModule("utxo-state", "utxo-state")
-    .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ Seq(mvStore, kryo) ++ scalatest("3"))
-    .dependsOn(database, `node-pool` % "compile->compile;test->test") //TODO only snapshots depend on node-pool
 
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
@@ -126,7 +120,7 @@ lazy val `alert-plugin` =
     .settings(pluginAssemblySettings("alert-plugin"))
     .settings(libraryDependencies ++= scalatest("3") ++ Seq(discord4j, logback))
     .settings(excludeDependencies += ExclusionRule(commonsLogging.organization, commonsLogging.name))
-    .dependsOn(core, `utxo-state`)
+    .dependsOn(core)
 
 lazy val indexer =
   Utils.mkModule("chain-indexer", "chain-indexer")
@@ -135,4 +129,4 @@ lazy val indexer =
     .settings(chainIndexerAssemblySettings)
     .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3"))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `node-pool` % "compile->compile;test->test", `utxo-state`, cassandra, janusgraph, `alert-plugin`)
+    .dependsOn(core, `node-pool` % "compile->compile;test->test", mvstore, cassandra, janusgraph, `alert-plugin`)

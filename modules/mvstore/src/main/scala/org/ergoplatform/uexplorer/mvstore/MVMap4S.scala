@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.db
+package org.ergoplatform.uexplorer.mvstore
 
 import org.ergoplatform.uexplorer.Address
 import org.h2.mvstore.MVMap.DecisionMaker
@@ -6,7 +6,7 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class MvUeMap[K, V: DbCodec](name: String, store: MVStore) extends UeMap[K, V] {
+class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
   private val underlying: MVMap[K, Array[Byte]] = store.openMap[K, Array[Byte]](name)
 

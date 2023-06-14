@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.db
+package org.ergoplatform.uexplorer.mvstore
 
 trait DbCodec[T] {
 

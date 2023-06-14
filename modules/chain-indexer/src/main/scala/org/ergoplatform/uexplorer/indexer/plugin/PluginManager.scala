@@ -6,16 +6,15 @@ import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.SortedTopAddressMap
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolStateChanges
 import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.utxo.MvUtxoState
+import org.ergoplatform.uexplorer.{SortedTopAddressMap, Storage}
 
-import scala.jdk.CollectionConverters.*
 import java.util.ServiceLoader
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 class PluginManager(plugins: List[Plugin]) extends LazyLogging {
@@ -23,7 +22,7 @@ class PluginManager(plugins: List[Plugin]) extends LazyLogging {
   def close(): Future[Unit] = Future.sequence(plugins.map(_.close)).map(_ => ())
 
   def executePlugins(
-    utxoState: MvUtxoState,
+    storage: Storage,
     stateChanges: MempoolStateChanges,
     graphTraversalSource: Option[GraphTraversalSource],
     newBlockOpt: Option[BestBlockInserted]
@@ -38,7 +37,7 @@ class PluginManager(plugins: List[Plugin]) extends LazyLogging {
       .mapAsync(1) { case (plugin, newTx) =>
         plugin.processMempoolTx(
           newTx,
-          utxoState,
+          storage,
           graphTraversalSource
         )
       }
@@ -46,7 +45,7 @@ class PluginManager(plugins: List[Plugin]) extends LazyLogging {
       .flatMap { _ =>
         Source(chainExecutionPlan)
           .mapAsync(1) { case (plugin, newBlock) =>
-            plugin.processNewBlock(newBlock, utxoState, graphTraversalSource)
+            plugin.processNewBlock(newBlock, storage, graphTraversalSource)
           }
           .run()
       }

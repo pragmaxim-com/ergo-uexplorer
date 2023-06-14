@@ -36,7 +36,7 @@ package object uexplorer {
     case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount) {
       def this() = this(0, 0, 0) // kryo needs a no-arg constructor
     }
-    case class State(value: Value, stats: Option[Address.Stats])
+    case class State(value: Value)
     def fromStringUnsafe(s: String): Address = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
   }
 

@@ -6,13 +6,12 @@ import akka.stream.scaladsl.{Flow, Source}
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.autoUnwrap
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 import org.janusgraph.core.Multiplicity
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait JanusGraphWriter extends LazyLogging {
   this: JanusGraphBackend =>

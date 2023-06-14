@@ -1,115 +1,208 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
-import org.ergoplatform.uexplorer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.utxo.MvUtxoState
+import akka.Done
+import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
-import akka.stream.SharedKillSwitch
-import com.typesafe.scalalogging.LazyLogging
-import akka.stream.scaladsl.Flow
-import org.ergoplatform.uexplorer.db.Block
-import akka.NotUsed
-import akka.stream.scaladsl.Sink
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, BlockBuilder, ForkInserted}
+import org.ergoplatform.uexplorer.mvstore.MvStorage
+import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 
+import scala.collection.compat.immutable.ArraySeq
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
-import org.ergoplatform.uexplorer.Height
-import akka.stream.OverflowStrategy
-import akka.stream.ActorAttributes
-import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.indexer.chain.BlockIndexer.ChainSyncResult
-import org.ergoplatform.uexplorer.ProtocolSettings
+import scala.util.{Failure, Success, Try}
+import com.esotericsoftware.kryo.Kryo
+import com.esotericsoftware.kryo.io.{ByteBufferInput, ByteBufferOutput, Input, Output}
+import com.esotericsoftware.kryo.serializers.MapSerializer
+import com.esotericsoftware.kryo.util.Pool
+import com.typesafe.scalalogging.LazyLogging
+import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
+import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.MvStorage.*
+import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
+import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
+import org.ergoplatform.uexplorer.mvstore.MvStorage
+import org.h2.mvstore.{MVMap, MVStore}
 
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.file.Paths
+import java.util
+import java.util.concurrent.ConcurrentSkipListMap
+import scala.collection.compat.immutable.ArraySeq
+import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
-import org.ergoplatform.uexplorer.Resiliency
-import org.ergoplatform.uexplorer.db.Inserted
-import org.ergoplatform.uexplorer.db.ForkInserted
-import org.ergoplatform.uexplorer.db.BestBlockInserted
-import akka.stream.scaladsl.Source
+import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
+import scala.util.{Failure, Random, Success, Try}
 
-import scala.collection.immutable.TreeSet
-import org.ergoplatform.uexplorer.ExeContext.Implicits
+class BlockIndexer(storage: MvStorage) extends LazyLogging {
 
-class BlockIndexer(
-  backendOpt: Option[Backend],
-  graphBackendOpt: Option[GraphBackend],
-  blockHttpClient: BlockHttpClient,
-  utxoState: MvUtxoState
-)(implicit s: ActorSystem[Nothing], ps: ProtocolSettings, killSwitch: SharedKillSwitch)
-  extends LazyLogging {
+  def readableStorage: Storage = storage
 
-  private def forkDeleteFlow(parallelism: Int): Flow[Inserted, BestBlockInserted, NotUsed] =
-    Flow[Inserted]
-      .mapAsync(parallelism) {
-        case ForkInserted(newBlocksInserted, supersededFork) =>
-          backendOpt
-            .fold(Future.successful(newBlocksInserted))(_.removeBlocksFromMainChain(supersededFork.keys))
-            .map(_ => newBlocksInserted)
-        case bb: BestBlockInserted =>
-          Future.successful(List(bb))
-      }
-      .mapConcat(identity)
-
-  private val indexingSink: Sink[Height, Future[ChainSyncResult]] =
-    Flow[Height]
-      .via(blockHttpClient.blockFlow)
-      .mapAsync(1) { block =>
-        blockHttpClient
-          .getBestBlockOrBranch(block, utxoState.containsBlock, List.empty)
-          .map {
-            case bestBlock :: Nil =>
-              utxoState.addBestBlock(bestBlock).get
-            case winningFork =>
-              utxoState.addWinningFork(winningFork).get
-          }(Implicits.trampoline)
-      }
-      .via(forkDeleteFlow(1))
-      .async
-      .buffer(100, OverflowStrategy.backpressure)
-      .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
-      .wireTap { bb =>
-        if (bb.block.header.height % (MvUtxoState.MaxCacheSize * 10) == 0) {
-          logger.info(s"Height ${bb.block.header.height}")
+  private def mergeBlockBoxesUnsafe(
+    block: Block,
+    boxes: Iterator[(Iterable[(BoxId, Address, Value)], Iterable[(BoxId, Address, Value)])]
+  ): Try[Unit] = Try {
+    val currentVersion = storage.getCurrentVersion
+    val blockMetadata  = BlockMetadata.fromBlock(block, currentVersion)
+    boxes.foreach { case (inputBoxes, outputBoxes) =>
+      outputBoxes
+        .foreach { case (boxId, address, value) =>
+          storage.persistBox(boxId, address, value)
         }
-      }
-      .async
-      .buffer(100, OverflowStrategy.backpressure)
-      .via(
-        graphBackendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(
-          _.graphWriteFlow
+      inputBoxes
+        .groupBy(_._2)
+        .view
+        .mapValues(_.map(_._1))
+        .foreach { case (address, inputIds) =>
+          storage.removeInputBoxesByAddress(address, inputIds)
+        }
+    }
+    block.header.id -> blockMetadata
+  }.flatMap { case (blockId, blockMetadata) =>
+    storage.persistNewBlock(blockId, blockMetadata.height, blockMetadata).flatMap { _ =>
+      if (blockMetadata.height % (MvStorage.MaxCacheSize * 1000) == 0) {
+        logger.info(storage.getReport)
+        storage.compact()
+      } else Success(())
+    }
+  }
+
+  /** Genesis block has no parent so we assert that any block either has its parent cached or its a first block */
+  private def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[BlockMetadata]] = {
+    def fail =
+      Failure(
+        new IllegalStateException(
+          s"Block ${apiBlock.header.id} at height ${apiBlock.header.height} has missing parent ${apiBlock.header.parentId}"
         )
       )
-      .via(killSwitch.flow)
-      .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
-      .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
-        lastBlockF.map { lastBlock =>
-          ChainSyncResult(
-            lastBlock,
-            utxoState,
-            graphBackendOpt.map(_.graphTraversalSource)
-          )
-        }
+
+    if (apiBlock.header.height == 1)
+      Try(Option.empty)
+    else if (storage.containsBlock(apiBlock.header.parentId, apiBlock.header.height - 1))
+      storage.getBlockById(apiBlock.header.parentId).fold(fail)(parent => Try(Option(parent)))
+    else
+      fail
+  }
+
+  def addBestBlock(apiFullBlock: ApiFullBlock)(implicit
+    ps: ProtocolSettings
+  ): Try[BestBlockInserted] =
+    getParentOrFail(apiFullBlock)
+      .flatMap { parentOpt =>
+        BlockBuilder(apiFullBlock, parentOpt)
+          .flatMap { b =>
+            val outputLookup =
+              apiFullBlock.transactions.transactions
+                .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
+                .toMap
+
+            val txs =
+              apiFullBlock.transactions.transactions.zipWithIndex.map { case (tx, txIndex) =>
+                val outputs = tx.outputs.map(o => (o.boxId, o.address, o.value))
+                val inputs =
+                  tx match {
+                    case tx if tx.id == Const.Genesis.Emission.tx =>
+                      ArraySeq(
+                        (Const.Genesis.Emission.box, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs)
+                      )
+                    case tx if tx.id == Const.Genesis.Foundation.tx =>
+                      ArraySeq(
+                        (
+                          Const.Genesis.Foundation.box,
+                          Const.Genesis.Foundation.address,
+                          Const.Genesis.Foundation.initialNanoErgs
+                        )
+                      )
+                    case tx =>
+                      tx.inputs.map { i =>
+                        val valueByBoxId = outputLookup.get(i.boxId)
+                        val inputAddress =
+                          valueByBoxId
+                            .map(_._1)
+                            .orElse(storage.getAddressByUtxo(i.boxId))
+                            .getOrElse(
+                              throw new IllegalStateException(
+                                s"BoxId ${i.boxId} of block ${b.header.id} at height ${b.header.height} not found in utxo state" + outputs
+                                  .mkString("\n", "\n", "\n")
+                              )
+                            )
+                        val inputValue =
+                          valueByBoxId
+                            .map(_._2)
+                            .orElse(storage.getUtxosByAddress(inputAddress).flatMap(_.get(i.boxId)))
+                            .getOrElse(
+                              throw new IllegalStateException(
+                                s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state" + outputs
+                                  .mkString("\n", "\n", "\n")
+                              )
+                            )
+                        (i.boxId, inputAddress, inputValue)
+                      }
+                  }
+                Tx(tx.id, txIndex.toShort, b.header.height, b.header.timestamp) -> (inputs, outputs)
+              }
+
+            mergeBlockBoxesUnsafe(b, txs.iterator.map(_._2)).map(_ => BestBlockInserted(b, txs))
+          }
       }
 
-  def indexChain: Future[ChainSyncResult] =
-    for
-      bestBlockHeight <- blockHttpClient.getBestBlockHeight
-      fromHeight = utxoState.getLastHeight.getOrElse(0) + 1
-      _ = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
-      _ = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
-      syncResult <- Source(fromHeight to bestBlockHeight).runWith(indexingSink)
-    yield syncResult
+  private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
+    fork.size > 1 && storage.containsBlock(fork.head.header.parentId, fork.head.header.height - 1) &&
+      fork.sliding(2).forall {
+        case first :: second :: Nil =>
+          first.header.id == second.header.parentId
+        case _ =>
+          false
+      }
 
-  def fixChain(missingHeights: TreeSet[Height]): Future[ChainSyncResult] =
-    Source(missingHeights)
-      .runWith(indexingSink)
+  def addWinningFork(winningFork: List[ApiFullBlock])(implicit protocol: ProtocolSettings): Try[ForkInserted] =
+    if (!hasParentAndIsChained(winningFork)) {
+      Failure(
+        new UnexpectedStateError(
+          s"Inserting fork ${winningFork.map(_.header.id).mkString(",")} at height ${winningFork.map(_.header.height).mkString(",")} illegal"
+        )
+      )
+    } else {
+      val supersededBlocks =
+        winningFork.flatMap(w => storage.getBlocksByHeight(w.header.height).filter(_._1 != w.header.id)).toMap
+      Try(storage.getBlockById(winningFork.head.header.id).map(_.parentVersion).get)
+        .flatMap { preForkVersion =>
+          storage
+            .rollbackTo(preForkVersion)
+            .flatMap { _ =>
+              winningFork
+                .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
+                  case (f @ Failure(_), _) =>
+                    f
+                  case (Success(insertedBlocksAcc), apiBlock) =>
+                    addBestBlock(apiBlock).map { insertedBlock =>
+                      insertedBlocksAcc :+ insertedBlock
+                    }
+                }
+                .map { newBlocks =>
+                  ForkInserted(newBlocks.toList, supersededBlocks)
+                }
+            }
+        }
+    }
 
 }
 
 object BlockIndexer {
-  case class ChainSyncResult(
-    lastBlock: Option[BestBlockInserted],
-    utxoState: MvUtxoState,
-    graphTraversalSource: Option[GraphTraversalSource]
-  )
+  def apply(storage: MvStorage)(implicit system: ActorSystem[Nothing]): BlockIndexer = {
+    CoordinatedShutdown(system).addTask(
+      CoordinatedShutdown.PhaseServiceStop,
+      "close-mv-store"
+    ) { () =>
+      Future(storage.close()).map(_ => Done)
+    }
+    new BlockIndexer(storage)
+  }
 }

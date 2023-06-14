@@ -14,7 +14,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.{Direction, T}
 import org.ergoplatform.uexplorer.Const
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend.BufferSize
 import org.ergoplatform.uexplorer.cassandra.entity.*
 
@@ -27,7 +26,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Try
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.BestBlockInserted
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,

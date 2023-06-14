@@ -6,9 +6,9 @@ import akka.stream.scaladsl.{Flow, Source}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.BlockMetadata
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 import pureconfig.ConfigReader
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
 
@@ -20,7 +20,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Success, Try}
-import org.ergoplatform.uexplorer.db.BestBlockInserted
 
 trait GraphBackend {
 
@@ -64,7 +63,15 @@ object GraphBackend {
 
 class InMemoryGraphBackend extends GraphBackend {
 
-  def initGraph: Boolean = false
+  private var initialized = true
+
+  def initGraph: Boolean =
+    if (initialized) {
+      initialized = false
+      true
+    } else {
+      false
+    }
 
   def tx: Transaction = ???
 

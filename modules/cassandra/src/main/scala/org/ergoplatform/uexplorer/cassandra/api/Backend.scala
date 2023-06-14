@@ -6,7 +6,6 @@ import akka.stream.scaladsl.{Flow, Source}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import pureconfig.ConfigReader
 
@@ -19,7 +18,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Success, Try}
 import akka.Done
-import org.ergoplatform.uexplorer.db.BestBlockInserted
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 
 trait Backend {
 

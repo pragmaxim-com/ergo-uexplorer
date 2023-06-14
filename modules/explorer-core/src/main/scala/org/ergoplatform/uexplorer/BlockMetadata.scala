@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer
 
-import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.db.BlockInfo
+import org.ergoplatform.uexplorer.db.{Block, BlockInfo}
 
 case class BlockMetadata(
   parentVersion: Long,
