@@ -85,9 +85,18 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
       fail
   }
 
-  def addBestBlock(apiFullBlock: ApiFullBlock)(implicit
-    ps: ProtocolSettings
-  ): Try[BestBlockInserted] =
+  def addBestBlocks(winningFork: List[ApiFullBlock])(implicit ps: ProtocolSettings): Try[ListBuffer[BestBlockInserted]] =
+    winningFork
+      .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
+        case (f @ Failure(_), _) =>
+          f
+        case (Success(insertedBlocksAcc), apiBlock) =>
+          addBestBlock(apiBlock).map { insertedBlock =>
+            insertedBlocksAcc :+ insertedBlock
+          }
+      }
+
+  def addBestBlock(apiFullBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
     for {
       parentOpt <- getParentOrFail(apiFullBlock)
       b         <- BlockBuilder(apiFullBlock, parentOpt, storage)
@@ -113,27 +122,15 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
         )
       )
     } else {
-      val supersededBlocks =
-        winningFork.flatMap(w => storage.getBlocksByHeight(w.header.height).filter(_._1 != w.header.id)).toMap
-      Try(storage.getBlockById(winningFork.head.header.id).map(_.parentVersion).get)
-        .flatMap { preForkVersion =>
-          storage
-            .rollbackTo(preForkVersion)
-            .flatMap { _ =>
-              winningFork
-                .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
-                  case (f @ Failure(_), _) =>
-                    f
-                  case (Success(insertedBlocksAcc), apiBlock) =>
-                    addBestBlock(apiBlock).map { insertedBlock =>
-                      insertedBlocksAcc :+ insertedBlock
-                    }
-                }
-                .map { newBlocks =>
-                  ForkInserted(newBlocks.toList, supersededBlocks)
-                }
-            }
-        }
+      for {
+        preForkVersion <- Try(storage.getBlockById(winningFork.head.header.id).map(_.parentVersion).get)
+        toRemove = winningFork.flatMap(b => storage.getBlocksByHeight(b.header.height).filter(_._1 != b.header.id)).toMap
+        _         <- storage.rollbackTo(preForkVersion)
+        newBlocks <- addBestBlocks(winningFork)
+      } yield ForkInserted(
+        newBlocks.toList,
+        toRemove
+      )
     }
 
 }
