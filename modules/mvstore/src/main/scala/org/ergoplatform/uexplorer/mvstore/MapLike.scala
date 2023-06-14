@@ -50,7 +50,7 @@ trait MapLike[K, V] {
 
   def putIfAbsent(key: K, value: V): Option[V]
 
-  def putIfAbsentOrFail(key: K, value: V): Unit
+  def putIfAbsentOrFail(key: K, value: V): Try[Unit]
 
   def putIfAbsentAndForget(key: K, value: V): Unit
 

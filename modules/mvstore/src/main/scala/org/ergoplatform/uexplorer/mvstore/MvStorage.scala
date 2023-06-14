@@ -134,6 +134,7 @@ object MvStorage extends LazyLogging {
     val store =
       new MVStore.Builder()
         .fileName(rootDir.toPath.resolve("mvstore").toFile.getAbsolutePath)
+        .cacheSize(512)
         .autoCommitDisabled()
         .open()
 

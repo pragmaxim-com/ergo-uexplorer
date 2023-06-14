@@ -105,17 +105,9 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
                 val inputs =
                   tx match {
                     case tx if tx.id == Const.Genesis.Emission.tx =>
-                      ArraySeq(
-                        (Const.Genesis.Emission.box, Const.Genesis.Emission.address, Const.Genesis.Emission.initialNanoErgs)
-                      )
+                      ArraySeq((Emission.box, Emission.address, Emission.initialNanoErgs))
                     case tx if tx.id == Const.Genesis.Foundation.tx =>
-                      ArraySeq(
-                        (
-                          Const.Genesis.Foundation.box,
-                          Const.Genesis.Foundation.address,
-                          Const.Genesis.Foundation.initialNanoErgs
-                        )
-                      )
+                      ArraySeq((Foundation.box, Foundation.address, Foundation.initialNanoErgs))
                     case tx =>
                       tx.inputs.map { i =>
                         val valueByBoxId = outputLookup.get(i.boxId)
