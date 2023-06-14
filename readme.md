@@ -129,7 +129,7 @@ query {
 }
 ```
 
-## Build
+## Production Build
 
 Not necessary as all docker images from docker-compose are publicly available :
 ```
@@ -153,7 +153,7 @@ $ docker build . -t pragmaxim/uexplorer-chain-indexer:latest
   └── drain-cassandra.sh            # cassandra must be stopped gracefully
 ```
 
-## Run
+### Run
 
 ```
 $ cd docker
@@ -168,6 +168,16 @@ $ docker compose logs uexplorer-chain-indexer
 12:37:45 New epoch 816 detected, utxo count: 1886283, non-empty-address count: 159562, persisted Epochs: 817[0 - 816], blocks cache size (heights): 32[836609 - 836640]
 
 $ start-querying.sh
+```
+
+## Development
+
+If Ergo Node is not running on localhost, it will use peers in the network
+
+```
+$ sbt stage
+$ cd modules/chain-indexer/target/universal/stage/
+$ ./bin/chain-indexer
 ```
 
 **Troubleshooting:**
