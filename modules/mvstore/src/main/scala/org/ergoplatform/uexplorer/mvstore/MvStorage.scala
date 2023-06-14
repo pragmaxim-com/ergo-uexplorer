@@ -39,9 +39,11 @@ case class MvStorage(
 
   def close(): Try[Unit] = Try(store.close())
 
-  def compact(): Try[Unit] = Try {
+  def compact(moveChunks: Boolean): Try[Unit] = Try {
     store.compactFile(60000 * 10)
-    store.compactMoveChunks()
+    if (moveChunks) {
+      store.compactMoveChunks()
+    }
   }
 
   def rollbackTo(version: Long): Try[Unit] = Try(store.rollbackTo(version))
@@ -120,8 +122,9 @@ case class MvStorage(
 }
 
 object MvStorage extends LazyLogging {
-  val VersionsToKeep = 10
-  val MaxCacheSize   = 10
+  val VersionsToKeep  = 10
+  val CompactFileRate = 10000
+  val MoveChunksRate  = 100000
 
   def apply(
     rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), Random.nextString(10)).toFile

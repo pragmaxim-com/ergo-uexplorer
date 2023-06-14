@@ -67,9 +67,9 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
     block.header.id -> blockMetadata
   }.flatMap { case (blockId, blockMetadata) =>
     storage.persistNewBlock(blockId, blockMetadata.height, blockMetadata).flatMap { _ =>
-      if (blockMetadata.height % (MvStorage.MaxCacheSize * 1000) == 0) {
+      if (blockMetadata.height % MvStorage.CompactFileRate == 0) {
         logger.info(storage.getReport)
-        storage.compact()
+        storage.compact(blockMetadata.height % MvStorage.MoveChunksRate == 0)
       } else Success(())
     }
   }
