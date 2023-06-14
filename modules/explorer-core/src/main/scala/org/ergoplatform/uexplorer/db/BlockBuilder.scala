@@ -8,14 +8,15 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.parser.TokenPropsParser
-import org.ergoplatform.uexplorer.{Address, BlockId, BlockMetadata, BoxesByTx, HexString, ProtocolSettings, SigmaType, TokenId, TokenType}
+import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
 
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
 
 object BlockBuilder {
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockMetadata])(implicit
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockMetadata], storage: Storage)(implicit
     protocolSettings: ProtocolSettings
   ): Try[Block] = {
     val apiHeader       = apiBlock.header
@@ -59,13 +60,15 @@ object BlockBuilder {
         )
       }
 
+    val zippedTxs = apiTransactions.transactions.zipWithIndex
+
     val txs: ArraySeq[Transaction] = {
       val lastTxGlobalIndex = prevBlock.map(_.info.maxTxGix).getOrElse(-1L)
       val headerId          = apiBlock.header.id
       val height            = apiBlock.header.height
       val ts                = apiBlock.header.timestamp
       val txs =
-        apiTransactions.transactions.zipWithIndex
+        zippedTxs
           .map { case (tx, i) =>
             val globalIndex = lastTxGlobalIndex + i + 1
             Transaction(tx.id, headerId, height, isCoinbase = false, ts, tx.size, i.toShort, globalIndex, mainChain = false)
@@ -102,7 +105,7 @@ object BlockBuilder {
 
     val outputs = {
       val lastOutputGlobalIndex = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
-      apiTransactions.transactions.zipWithIndex
+      zippedTxs
         .flatMap { case (tx, tix) =>
           tx.outputs.zipWithIndex
             .map { case (o, oix) => ((o, tx.id), oix, tix) }
@@ -133,7 +136,7 @@ object BlockBuilder {
     val assets =
       for {
         tx             <- apiTransactions.transactions
-        out            <- tx.outputs.toList
+        out            <- tx.outputs
         (asset, index) <- out.assets.zipWithIndex
       } yield Asset(asset.tokenId, out.boxId, apiTransactions.headerId, index, asset.amount)
 
@@ -156,7 +159,7 @@ object BlockBuilder {
       apiTransactions.transactions.flatMap { tx =>
         val allowedTokenId = TokenId.fromStringUnsafe(tx.inputs.head.boxId.unwrapped)
         for {
-          out <- tx.outputs.toList.find(_.assets.map(_.tokenId).contains(allowedTokenId))
+          out <- tx.outputs.find(_.assets.map(_.tokenId).contains(allowedTokenId))
           props  = TokenPropsParser.parse(out.additionalRegisters)
           assets = out.assets.filter(_.tokenId == allowedTokenId)
           headAsset <- assets.headOption
@@ -170,6 +173,45 @@ object BlockBuilder {
           props.map(_ => TokenType.Eip004),
           props.map(_.decimals)
         )
+      }
+
+    val outputLookup = outputs.iterator.map(o => (o.boxId, (o.address, o.value))).toMap
+    val boxesByTx =
+      zippedTxs.map { case (tx, txIndex) =>
+        val outputs = tx.outputs.map(o => (o.boxId, o.address, o.value))
+        val inputs =
+          tx match {
+            case tx if tx.id == Const.Genesis.Emission.tx =>
+              ArraySeq((Emission.box, Emission.address, Emission.initialNanoErgs))
+            case tx if tx.id == Const.Genesis.Foundation.tx =>
+              ArraySeq((Foundation.box, Foundation.address, Foundation.initialNanoErgs))
+            case tx =>
+              tx.inputs.map { i =>
+                val valueByBoxId = outputLookup.get(i.boxId)
+                val inputAddress =
+                  valueByBoxId
+                    .map(_._1)
+                    .orElse(storage.getAddressByUtxo(i.boxId))
+                    .getOrElse(
+                      throw new IllegalStateException(
+                        s"BoxId ${i.boxId} of block ${header.id} at height ${header.height} not found in utxo state" + outputs
+                          .mkString("\n", "\n", "\n")
+                      )
+                    )
+                val inputValue =
+                  valueByBoxId
+                    .map(_._2)
+                    .orElse(storage.getUtxosByAddress(inputAddress).flatMap(_.get(i.boxId)))
+                    .getOrElse(
+                      throw new IllegalStateException(
+                        s"Address $inputAddress of block ${header.id} at height ${header.height} not found in utxo state" + outputs
+                          .mkString("\n", "\n", "\n")
+                      )
+                    )
+                (i.boxId, inputAddress, inputValue)
+              }
+          }
+        Tx(tx.id, txIndex.toShort, header.height, header.timestamp) -> (inputs, outputs)
       }
 
     def updateTotalInfo(
@@ -212,7 +254,20 @@ object BlockBuilder {
 
     BlockInfoBuilder(apiBlock, prevBlock).map { info =>
       updateMainChain(
-        Block(header, extension, adProof, txs, inputs, dataInputs, outputs, assets, registers.flatten, tokens, info),
+        Block(
+          header,
+          extension,
+          adProof,
+          txs,
+          boxesByTx,
+          inputs,
+          dataInputs,
+          outputs,
+          assets,
+          registers.flatten,
+          tokens,
+          info
+        ),
         mainChain = true
       )
     }
@@ -221,6 +276,6 @@ object BlockBuilder {
 
 sealed trait Inserted
 
-case class BestBlockInserted(block: Block, boxesByTx: BoxesByTx) extends Inserted
+case class BestBlockInserted(block: Block) extends Inserted
 
 case class ForkInserted(newFork: List[BestBlockInserted], supersededFork: Map[BlockId, BlockMetadata]) extends Inserted

@@ -24,7 +24,7 @@ trait CassandraTokensWriter extends LazyLogging {
     )
 
   protected[cassandra] def tokensInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block, _), statement) =>
+    case (BestBlockInserted(block), statement) =>
       block.tokens.map { t =>
         val partialStatement =
           statement

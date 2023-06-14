@@ -22,7 +22,7 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
     )
 
   protected[cassandra] def outputInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block, _), statement) =>
+    case (BestBlockInserted(block), statement) =>
       block.outputs.map { output =>
         statement
           .bind()

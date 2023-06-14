@@ -51,8 +51,8 @@ trait JanusGraphWriter extends LazyLogging {
     txBoxesByHeight: IterableOnce[BestBlockInserted]
   ): IterableOnce[BestBlockInserted] = {
     txBoxesByHeight.iterator
-      .foreach { case BestBlockInserted(b, boxesByTx) =>
-        writeTx(b.header.height, boxesByTx, janusGraph)
+      .foreach { case BestBlockInserted(b) =>
+        writeTx(b.header.height, b.boxesByTx, janusGraph)
       }
     janusGraph.tx().commit()
     txBoxesByHeight

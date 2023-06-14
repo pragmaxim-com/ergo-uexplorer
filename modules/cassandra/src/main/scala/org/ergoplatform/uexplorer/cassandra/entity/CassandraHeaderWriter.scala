@@ -23,7 +23,7 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
     )
 
   protected[cassandra] def headerInsertBinder: (BestBlockInserted, PreparedStatement) => BoundStatement = {
-    case (BestBlockInserted(block, _), statement) =>
+    case (BestBlockInserted(block), statement) =>
       val validVersion =
         if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
           logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")

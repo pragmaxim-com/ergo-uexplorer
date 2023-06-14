@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.db
 
 import io.circe.Json
-import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.{BoxesByTx, *}
 import org.ergoplatform.uexplorer.Const.Genesis.Emission
 
 import scala.collection.immutable.ArraySeq
@@ -25,6 +25,7 @@ final case class Block(
   extension: BlockExtension,
   adProofOpt: Option[AdProof],
   txs: ArraySeq[Transaction],
+  boxesByTx: BoxesByTx,
   inputs: ArraySeq[Input],
   dataInputs: ArraySeq[DataInput],
   outputs: ArraySeq[Output],

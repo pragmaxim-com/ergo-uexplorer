@@ -24,7 +24,7 @@ trait CassandraRegistersWriter extends LazyLogging {
     )
 
   protected[cassandra] def registersInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block, _), statement) =>
+    case (BestBlockInserted(block), statement) =>
       block.registers.map { r =>
         // format: off
         statement

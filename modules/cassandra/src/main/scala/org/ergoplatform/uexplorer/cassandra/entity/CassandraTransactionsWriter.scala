@@ -22,7 +22,7 @@ trait CassandraTransactionsWriter extends LazyLogging { this: CassandraBackend =
     )
 
   protected[cassandra] def transactionsInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block, _), statement) =>
+    case (BestBlockInserted(block), statement) =>
       block.txs.map { tx =>
         // format: off
         statement

@@ -39,9 +39,12 @@ case class MvStorage(
 
   def close(): Try[Unit] = Try(store.close())
 
-  def compact(moveChunks: Boolean): Try[Unit] = Try {
-    store.compactFile(10000)
-    if (moveChunks) {
+  def compact(height: Height): Try[Unit] = Try {
+    if (height % MvStorage.CompactFileRate == 0) {
+      logger.info(s"Compacting file at $getReport")
+      store.compactFile(10000)
+    }
+    if (height % MvStorage.MoveChunksRate == 0) {
       logger.info("Compacting chunks ...")
       store.compactMoveChunks()
     }
@@ -80,7 +83,7 @@ case class MvStorage(
 
   def getReport: String = {
     val height = getLastHeight.getOrElse(0)
-    s"Storage height $height, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}"
+    s"storage height $height, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}"
   }
 
   def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockMetadata] =

@@ -46,10 +46,8 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
 
   def readableStorage: Storage = storage
 
-  private def mergeBlockBoxesUnsafe(
-    block: Block,
-    boxes: Iterator[(Iterable[(BoxId, Address, Value)], Iterable[(BoxId, Address, Value)])]
-  ): Try[Unit] = Try {
+  private def mergeBlockBoxesUnsafe(block: Block): Try[Unit] = Try {
+    val boxes          = block.boxesByTx.iterator.map(_._2)
     val currentVersion = storage.getCurrentVersion
     val blockMetadata  = BlockMetadata.fromBlock(block, currentVersion)
     boxes.foreach { case (inputBoxes, outputBoxes) =>
@@ -90,62 +88,13 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
   def addBestBlock(apiFullBlock: ApiFullBlock)(implicit
     ps: ProtocolSettings
   ): Try[BestBlockInserted] =
-    getParentOrFail(apiFullBlock)
-      .flatMap { parentOpt =>
-        BlockBuilder(apiFullBlock, parentOpt)
-          .flatMap { b =>
-            val outputLookup =
-              apiFullBlock.transactions.transactions
-                .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))))
-                .toMap
-
-            val txs =
-              apiFullBlock.transactions.transactions.zipWithIndex.map { case (tx, txIndex) =>
-                val outputs = tx.outputs.map(o => (o.boxId, o.address, o.value))
-                val inputs =
-                  tx match {
-                    case tx if tx.id == Const.Genesis.Emission.tx =>
-                      ArraySeq((Emission.box, Emission.address, Emission.initialNanoErgs))
-                    case tx if tx.id == Const.Genesis.Foundation.tx =>
-                      ArraySeq((Foundation.box, Foundation.address, Foundation.initialNanoErgs))
-                    case tx =>
-                      tx.inputs.map { i =>
-                        val valueByBoxId = outputLookup.get(i.boxId)
-                        val inputAddress =
-                          valueByBoxId
-                            .map(_._1)
-                            .orElse(storage.getAddressByUtxo(i.boxId))
-                            .getOrElse(
-                              throw new IllegalStateException(
-                                s"BoxId ${i.boxId} of block ${b.header.id} at height ${b.header.height} not found in utxo state" + outputs
-                                  .mkString("\n", "\n", "\n")
-                              )
-                            )
-                        val inputValue =
-                          valueByBoxId
-                            .map(_._2)
-                            .orElse(storage.getUtxosByAddress(inputAddress).flatMap(_.get(i.boxId)))
-                            .getOrElse(
-                              throw new IllegalStateException(
-                                s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state" + outputs
-                                  .mkString("\n", "\n", "\n")
-                              )
-                            )
-                        (i.boxId, inputAddress, inputValue)
-                      }
-                  }
-                Tx(tx.id, txIndex.toShort, b.header.height, b.header.timestamp) -> (inputs, outputs)
-              }
-
-            mergeBlockBoxesUnsafe(b, txs.iterator.map(_._2)).flatMap { _ =>
-              val blockInserted = BestBlockInserted(b, txs)
-              if (b.header.height % MvStorage.CompactFileRate == 0) {
-                logger.info(storage.getReport)
-                storage.compact(b.header.height % MvStorage.MoveChunksRate == 0).map(_ => blockInserted)
-              } else Success(blockInserted)
-            }
-          }
-      }
+    for {
+      parentOpt <- getParentOrFail(apiFullBlock)
+      b         <- BlockBuilder(apiFullBlock, parentOpt, storage)
+      blockInserted = BestBlockInserted(b)
+      _ <- mergeBlockBoxesUnsafe(b)
+      _ <- storage.compact(b.header.height)
+    } yield blockInserted
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
     fork.size > 1 && storage.containsBlock(fork.head.header.parentId, fork.head.header.height - 1) &&

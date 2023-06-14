@@ -24,7 +24,7 @@ trait CassandraAssetsWriter extends LazyLogging {
     )
 
   protected[cassandra] def assetsInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block, _), statement) =>
+    case (BestBlockInserted(block), statement) =>
       block.assets.map { asset =>
         statement
           .bind()

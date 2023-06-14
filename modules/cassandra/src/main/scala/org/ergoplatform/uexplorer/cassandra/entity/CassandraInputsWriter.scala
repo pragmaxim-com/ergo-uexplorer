@@ -21,7 +21,7 @@ trait CassandraInputsWriter { this: CassandraBackend =>
     )
 
   protected[cassandra] def inputInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block, _), statement) =>
+    case (BestBlockInserted(block), statement) =>
       block.inputs.map { input =>
         val partialStatement =
           statement
