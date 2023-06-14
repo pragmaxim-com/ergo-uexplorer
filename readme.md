@@ -18,8 +18,8 @@ Explorer weak spot? **Data distribution**
 
 Supplementary, lightweight (μ = micro) Ergo explorer/analyzer with multiple modes of operation :
   - `embedded` - running as single jvm process, only some blockchain data in embedded [MvStore](https://www.h2database.com/html/mvstore.html) 
-  - `cassandra` - additional cassandra backend with all blockchain data
-  - `janusgraph` - all transactions are fed into a graph for analysis (takes all day to index)
+  - `cassandra` - additional cassandra backend with all blockchain data (very fast, it does not slow indexing down)
+  - `janusgraph` - all transactions are fed into a graph for analysis (**takes all day to index!**)
 
 Properties : 
   - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`16GB RAM`
