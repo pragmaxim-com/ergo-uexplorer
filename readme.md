@@ -6,9 +6,13 @@ Blockchain weak spot? **Efficient block persistence**
   - Reason? **Peer-to-peer architecture**
      => key-value store without analytical possibilities => requires Explorer that indexes data into queryable representation
 
-Explorer weak spot? **Data distribution**
-  - Reason? [Supernode problem](https://www.datastax.com/blog/solution-supernode-problem)
-     => queries for hot addresses overload DBs => requires Explorer that indexes data in supernode-resistant manner
+Explorer weak spot? 
+  - **Data distribution**
+    - Reason? [Supernode problem](https://www.datastax.com/blog/solution-supernode-problem)
+       => queries for hot addresses overload DBs => requires Explorer that indexes data in supernode-resistant manner
+  - **Utxo model**
+    - Reason? Finding out if anything box related have been spent or not in query time puts huge pressure on DB
+      => let's do that at indexing time so that queries are real-time 
 
 [Watch](https://youtu.be/5W2KIcw9Pp0)
 
