@@ -132,7 +132,10 @@ case class MvUtxoState(
   }.flatMap { case (blockId, blockMetadata) =>
     persistNewBlock(blockId, blockMetadata.height, blockMetadata).map { _ =>
       if (blockMetadata.height % (MvUtxoState.MaxCacheSize * 1000) == 0) {
-        Try(store.compactFile(60000 * 30)) // 30 minutes
+        Try {
+          store.compactFile(60000 * 10)
+          store.compactMoveChunks()
+        } // 30 minutes
         logger.info(
           s"Compacting at height ${blockMetadata.height}, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}"
         )
