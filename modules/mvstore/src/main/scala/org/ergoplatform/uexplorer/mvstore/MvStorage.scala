@@ -40,26 +40,28 @@ case class MvStorage(
   def close(): Try[Unit] = Try(store.close())
 
   def compact(moveChunks: Boolean): Try[Unit] = Try {
-    store.compactFile(60000 * 10)
+    store.compactFile(10000)
     if (moveChunks) {
+      logger.info("Compacting chunks ...")
       store.compactMoveChunks()
     }
   }
 
   def rollbackTo(version: Long): Try[Unit] = Try(store.rollbackTo(version))
 
-  def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Unit = {
-    inputBoxes.foreach(addressByUtxo.removeAndForget)
-    utxosByAddress.putOrRemoveAndForget(address) {
-      case None => None
-      case Some(existingBoxIds) =>
-        inputBoxes.foreach(existingBoxIds.remove)
-        Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+  def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Try[Unit] =
+    // removeAll is a heavy hitter : 30% of runtime
+    addressByUtxo.removeAllOrFail(inputBoxes).flatMap { _ =>
+      utxosByAddress
+        .removeOrUpdateOrFail(address) { existingBoxIds =>
+          inputBoxes.foreach(existingBoxIds.remove)
+          Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+        }
     }
-  }
 
   def persistBox(boxId: BoxId, address: Address, value: Value): Unit = { // Without Try for perf reasons
     addressByUtxo.putAndForget(boxId, address)
+    // heavy method, 50% of runtime
     utxosByAddress.adjustAndForget(address)(_.fold(javaMapOf(boxId, value)) { arr =>
       arr.put(boxId, value)
       arr
@@ -121,9 +123,9 @@ case class MvStorage(
 }
 
 object MvStorage extends LazyLogging {
-  val VersionsToKeep  = 10
-  val CompactFileRate = 10000
-  val MoveChunksRate  = 100000
+  private val VersionsToKeep = 10
+  val CompactFileRate        = 10000
+  val MoveChunksRate         = 100000
 
   def apply(
     rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), Random.nextString(10)).toFile

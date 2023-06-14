@@ -3,8 +3,9 @@ package org.ergoplatform.uexplorer.mvstore
 import org.ergoplatform.uexplorer.Address
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
+
 import scala.jdk.CollectionConverters.*
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
@@ -21,6 +22,13 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
   def remove(key: K): Option[V] = Option(underlying.remove(key)).map(codec.read)
 
   def removeAndForget(key: K): Unit = underlying.remove(key)
+
+  def removeOrFail(key: K): Try[Unit] =
+    Try(assert(underlying.remove(key) != null, s"Removing non-existing key $key"))
+
+  def removeAllOrFail(keys: Iterable[K]): Try[Unit] = Try {
+    keys.foreach(key => assert(underlying.remove(key) != null, s"Removing non-existing key $key"))
+  }
 
   def ceilingKey(key: K): Option[K] = Option(underlying.ceilingKey(key))
 
@@ -58,6 +66,9 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
 
   def putAndForget(key: K, value: V): Unit = underlying.put(key, codec.write(value))
 
+  def putIfAbsentOrFail(key: K, value: V): Try[Unit] =
+    Try(assert(underlying.put(key, codec.write(value)) != null, s"Putting key $key that was already present"))
+
   def putIfAbsent(key: K, value: V): Option[V] = Option(underlying.putIfAbsent(key, codec.write(value))).map(codec.read)
 
   def putIfAbsentAndForget(key: K, value: V): Unit = underlying.putIfAbsent(key, codec.write(value))
@@ -67,20 +78,32 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
   def replace(key: K, oldValue: V, newValue: V): Boolean =
     underlying.replace(key, codec.write(oldValue), codec.write(newValue))
 
-  def putOrRemove(k: K)(f: Option[V] => Option[V]): Option[V] =
-    f(Option(underlying.get(k)).map(codec.read)) match {
+  def removeOrUpdate(k: K)(f: V => Option[V]): Option[V] =
+    Option(underlying.get(k)).map(codec.read) match {
       case None =>
-        Option(underlying.remove(k)).map(codec.read)
+        None
       case Some(v) =>
-        Option(underlying.put(k, codec.write(v))).map(codec.read)
+        f(v) match {
+          case None =>
+            Option(underlying.remove(k)).map(codec.read)
+          case Some(v) =>
+            Option(underlying.put(k, codec.write(v))).map(codec.read)
+        }
     }
 
-  def putOrRemoveAndForget(k: K)(f: Option[V] => Option[V]): Unit =
-    f(Option(underlying.get(k)).map(codec.read)) match {
+  def removeOrUpdateOrFail(k: K)(f: V => Option[V]): Try[Unit] =
+    Option(underlying.get(k)).map(codec.read) match {
       case None =>
-        underlying.remove(k)
+        Failure(new AssertionError(s"Removing or updating non-existing key $k"))
       case Some(v) =>
-        underlying.put(k, codec.write(v))
+        Try {
+          f(v) match {
+            case None =>
+              underlying.remove(k)
+            case Some(v) =>
+              underlying.put(k, codec.write(v))
+          }
+        }
     }
 
   def adjust(k: K)(f: Option[V] => V): Option[V] =

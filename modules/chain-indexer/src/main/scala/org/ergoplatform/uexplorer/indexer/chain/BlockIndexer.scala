@@ -20,6 +20,7 @@ import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.MvStorage.*
 import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
@@ -59,19 +60,14 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
       inputBoxes
         .groupBy(_._2)
         .view
-        .mapValues(_.map(_._1))
+        .mapValues(_.collect { case (boxId, _, _) if boxId != Emission.box && boxId != Foundation.box => boxId })
         .foreach { case (address, inputIds) =>
-          storage.removeInputBoxesByAddress(address, inputIds)
+          storage.removeInputBoxesByAddress(address, inputIds).get
         }
     }
     block.header.id -> blockMetadata
   }.flatMap { case (blockId, blockMetadata) =>
-    storage.persistNewBlock(blockId, blockMetadata.height, blockMetadata).flatMap { _ =>
-      if (blockMetadata.height % MvStorage.CompactFileRate == 0) {
-        logger.info(storage.getReport)
-        storage.compact(blockMetadata.height % MvStorage.MoveChunksRate == 0)
-      } else Success(())
-    }
+    storage.persistNewBlock(blockId, blockMetadata.height, blockMetadata)
   }
 
   /** Genesis block has no parent so we assert that any block either has its parent cached or its a first block */
@@ -100,7 +96,7 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
           .flatMap { b =>
             val outputLookup =
               apiFullBlock.transactions.transactions
-                .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))).toMap)
+                .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))))
                 .toMap
 
             val txs =
@@ -149,7 +145,13 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
                 Tx(tx.id, txIndex.toShort, b.header.height, b.header.timestamp) -> (inputs, outputs)
               }
 
-            mergeBlockBoxesUnsafe(b, txs.iterator.map(_._2)).map(_ => BestBlockInserted(b, txs))
+            mergeBlockBoxesUnsafe(b, txs.iterator.map(_._2)).flatMap { _ =>
+              val blockInserted = BestBlockInserted(b, txs)
+              if (b.header.height % MvStorage.CompactFileRate == 0) {
+                logger.info(storage.getReport)
+                storage.compact(b.header.height % MvStorage.MoveChunksRate == 0).map(_ => blockInserted)
+              } else Success(blockInserted)
+            }
           }
       }
 
