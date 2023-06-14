@@ -4,11 +4,10 @@ import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.chain.{ChainIndexer, ChainLoader, ChainState, ChainStateHolder}
+import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolState
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
-import org.ergoplatform.uexplorer.utxo.UtxoState
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -20,12 +19,16 @@ import org.ergoplatform.uexplorer.janusgraph.api.InMemoryGraphBackend
 
 import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.Future
-import org.ergoplatform.uexplorer.ProtocolSettings
+import org.ergoplatform.uexplorer.{ProtocolSettings, Storage}
 import org.ergoplatform.uexplorer.cassandra.api.InMemoryBackend
 import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, Rest, TestSupport}
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.http.MetadataHttpClient
+import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
+import org.ergoplatform.uexplorer.mvstore.MvStorage
+
+import java.nio.file.Paths
 
 class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
 
@@ -40,9 +43,6 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
     super.afterAll()
     sys.terminate()
   }
-
-  implicit val chainSyncerRef: ActorRef[ChainStateHolder.ChainStateHolderRequest] =
-    testKit.spawn(new ChainStateHolder().initialBehavior, "ChainSyncer")
 
   implicit val mempoolSyncerSyncerRef: ActorRef[MempoolStateHolder.MempoolStateHolderRequest] =
     testKit.spawn(MempoolStateHolder.behavior(MempoolState(ListMap.empty)), "MempoolSyncer")
@@ -68,28 +68,27 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
         Response.ok(Rest.blocks.byId(blockId))
     }
 
-  val blockClient     = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
-  val backend         = new InMemoryBackend
-  val graphBackend    = new InMemoryGraphBackend
-  val snapshotManager = new NoUtxoSnapshotManager()
-  val pluginManager   = new PluginManager(List.empty)
-  val chainIndexer    = new ChainIndexer(backend, graphBackend, blockClient, snapshotManager)
-  val mempoolSyncer   = new MempoolSyncer(blockClient)
-  val chainLoader     = new ChainLoader(backend, graphBackend, snapshotManager)
-
-  val scheduler = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, chainLoader)
+  val storage       = MvStorage().get
+  val blockClient   = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
+  val backend       = Some(new InMemoryBackend)
+  val graphBackend  = Some(new InMemoryGraphBackend)
+  val pluginManager = new PluginManager(List.empty)
+  val blockIndexer  = new BlockIndexer(storage)
+  val chainIndexer  = new ChainIndexer(backend, graphBackend, blockClient, blockIndexer)
+  val mempoolSyncer = new MempoolSyncer(blockClient)
+  val initializer   = new Initializer(storage, backend, graphBackend)
+  val scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
 
   "Scheduler should sync from 1 to 4150 and then from 4150 to 4200" in {
-    ChainStateHolder.initialize(ChainState.empty).flatMap { _ =>
-      scheduler.periodicSync.flatMap { case (chainState, mempoolState) =>
-        chainState.getLastCachedBlock.map(_.height).get shouldBe 4150
-        chainState.findMissingEpochIndexes shouldBe empty
-        mempoolState.stateTransitionByTx.size shouldBe 9
-        scheduler.periodicSync.map { case (newChainState, newMempoolState) =>
-          newChainState.getLastCachedBlock.map(_.height).get shouldBe 4200
-          newChainState.findMissingEpochIndexes shouldBe empty
-          newMempoolState.stateTransitionByTx.size shouldBe 0
-        }
+    initializer.init shouldBe ChainEmpty
+    scheduler.periodicSync.flatMap { mempoolState =>
+      storage.getLastHeight.get shouldBe 4150
+      storage.findMissingHeights shouldBe empty
+      mempoolState.stateTransitionByTx.size shouldBe 9
+      scheduler.periodicSync.map { newMempoolState =>
+        storage.getLastHeight.get shouldBe 4200
+        storage.findMissingHeights shouldBe empty
+        newMempoolState.stateTransitionByTx.size shouldBe 0
       }
     }
   }

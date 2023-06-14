@@ -10,7 +10,6 @@ import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.{Flux, Mono}
 import retry.Policy

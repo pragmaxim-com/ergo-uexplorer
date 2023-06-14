@@ -4,9 +4,9 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 
 import scala.collection.immutable.ArraySeq
 
@@ -15,7 +15,7 @@ trait CassandraTokensWriter extends LazyLogging {
 
   import Tokens._
 
-  def tokensWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
+  def tokensWriteFlow(parallelism: Int): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
@@ -23,8 +23,8 @@ trait CassandraTokensWriter extends LazyLogging {
       tokensInsertBinder
     )
 
-  protected[cassandra] def tokensInsertBinder: (Block, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (block, statement) =>
+  protected[cassandra] def tokensInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
+    case (BestBlockInserted(block, _), statement) =>
       block.tokens.map { t =>
         val partialStatement =
           statement

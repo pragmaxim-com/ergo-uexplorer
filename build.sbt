@@ -7,7 +7,7 @@ Global / cancelable := true // Allow cancellation of forked task without killing
 
 lazy val commonSettings = Seq(
   organization := "org.ergoplatform",
-  scalaVersion := "3.2.2",
+  scalaVersion := "3.3.0",
   version := "0.0.1",
   resolvers ++= Resolver.sonatypeOssRepos("public") ++ Resolver.sonatypeOssRepos("snapshots"),
   ThisBuild / evictionErrorLevel := Level.Info,
@@ -82,7 +82,7 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `node-pool`, `utxo-state`, cassandra, janusgraph, `alert-plugin`, indexer)
+  ).aggregate(core, `node-pool`, mvstore, cassandra, janusgraph, `alert-plugin`, indexer)
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
@@ -95,11 +95,11 @@ lazy val `node-pool` =
     .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ scalatest("3"))
     .dependsOn(core)
 
-lazy val `utxo-state` =
-  Utils.mkModule("utxo-state", "utxo-state")
+lazy val mvstore =
+  Utils.mkModule("mvstore", "mvstore")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ Seq(mvStore) ++ scalatest("3"))
-    .dependsOn(`node-pool` % "compile->compile;test->test") //TODO only snapshots depend on node-pool
+    .settings(libraryDependencies ++= Seq(mvStore, kryo) ++ scalatest("3"))
+    .dependsOn(core)
 
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
@@ -129,4 +129,4 @@ lazy val indexer =
     .settings(chainIndexerAssemblySettings)
     .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3"))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `node-pool` % "compile->compile;test->test", `utxo-state`, cassandra, janusgraph, `alert-plugin`)
+    .dependsOn(core, `node-pool` % "compile->compile;test->test", mvstore, cassandra, janusgraph, `alert-plugin`)

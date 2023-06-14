@@ -133,13 +133,6 @@ trait CassandraPersistenceSupport extends LazyLogging {
       .mapMaterializedValue(_ => NotUsed)
 }
 
-trait EpochPersistenceSupport {
-  protected[cassandra] val node_epoch_last_headers_table = "node_epoch_last_headers"
-
-  protected[cassandra] val epoch_index    = "epoch_index"
-  protected[cassandra] val last_header_id = "last_header_id"
-}
-
 trait AddressPersistenceSupport {
   protected[cassandra] val node_addresses_table = "node_addresses"
 

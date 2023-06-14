@@ -1,61 +1,41 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import akka.actor.CoordinatedShutdown
-import akka.actor.typed.scaladsl.ActorContext
-import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.stream.ActorAttributes.supervisionStrategy
-import akka.stream.{ActorAttributes, KillSwitches, OverflowStrategy, SharedKillSwitch}
+import akka.NotUsed
+import akka.actor.typed.ActorSystem
+import akka.stream.{ActorAttributes, OverflowStrategy, SharedKillSwitch}
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.ExeContext.Implicits
+import org.ergoplatform.uexplorer.{Height, ProtocolSettings, Resiliency, Storage}
+import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, ForkInserted, Inserted}
+import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
-import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
-import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.*
-import org.ergoplatform.uexplorer.indexer.chain.{ChainLoader, ChainState, ChainStateHolder}
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
-import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
-import org.ergoplatform.uexplorer.utxo.UtxoState
-import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
-import org.ergoplatform.uexplorer.{Address, BoxId, Const, Height, SortedTopAddressMap}
+import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
+import org.ergoplatform.uexplorer.mvstore.MvStorage
 
-import java.util.ServiceLoader
-import scala.collection.immutable.{ArraySeq, ListMap}
+import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.jdk.CollectionConverters.*
-import scala.util.{Failure, Try}
-import org.ergoplatform.uexplorer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.Resiliency
-import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
-import org.ergoplatform.uexplorer.utxo.UtxoSnapshotManager
-import org.ergoplatform.uexplorer.Epoch
-import org.ergoplatform.uexplorer.Epoch.EpochCommand
-import org.ergoplatform.uexplorer.Epoch.WriteNewEpoch
 
 class ChainIndexer(
-  backend: Backend,
-  graphBackend: GraphBackend,
+  backendOpt: Option[Backend],
+  graphBackendOpt: Option[GraphBackend],
   blockHttpClient: BlockHttpClient,
-  snapshotManager: UtxoSnapshotManager
-)(implicit s: ActorSystem[Nothing], ref: ActorRef[ChainStateHolderRequest], killSwitch: SharedKillSwitch)
+  blockIndexer: BlockIndexer
+)(implicit s: ActorSystem[Nothing], ps: ProtocolSettings, killSwitch: SharedKillSwitch)
   extends LazyLogging {
 
-  private def forkDeleteFlow(parallelism: Int): Flow[Inserted, Block, NotUsed] =
+  private def forkDeleteFlow(parallelism: Int): Flow[Inserted, BestBlockInserted, NotUsed] =
     Flow[Inserted]
       .mapAsync(parallelism) {
-        case BestBlockInserted(flatBlock) =>
-          Future.successful(List(flatBlock))
-        case ForkInserted(newFlatBlocks, supersededFork) =>
-          backend
-            .removeBlocksFromMainChain(supersededFork.map(_.headerId))
-            .map(_ => newFlatBlocks)
+        case ForkInserted(newBlocksInserted, supersededFork) =>
+          backendOpt
+            .fold(Future.successful(newBlocksInserted))(_.removeBlocksFromMainChain(supersededFork.keys))
+            .map(_ => newBlocksInserted)
+        case bb: BestBlockInserted =>
+          Future.successful(List(bb))
       }
       .mapConcat(identity)
 
@@ -64,78 +44,61 @@ class ChainIndexer(
       .via(blockHttpClient.blockFlow)
       .mapAsync(1) { block =>
         blockHttpClient
-          .getBestBlockOrBranch(block, ChainStateHolder.containsBlock, List.empty)
-          .flatMap {
+          .getBestBlockOrBranch(block, blockIndexer.readableStorage.containsBlock, List.empty)
+          .map {
             case bestBlock :: Nil =>
-              ChainStateHolder.insertBestBlock(bestBlock)
+              blockIndexer.addBestBlock(bestBlock).get
             case winningFork =>
-              ChainStateHolder.insertWinningFork(winningFork)
-          }
+              blockIndexer.addWinningFork(winningFork).get
+          }(Implicits.trampoline)
       }
       .via(forkDeleteFlow(1))
-      .via(backend.blockWriteFlow)
-      .mapAsync(1) {
-        case block if Epoch.heightAtFlushPoint(block.header.height) =>
-          ChainStateHolder
-            .finishEpoch(Epoch.epochIndexForHeight(block.header.height) - 1)
-            .map(e => block -> Option(e.toEpochCommand))
-        case block =>
-          Future.successful(block -> Option.empty[EpochCommand])
+      .async
+      .buffer(100, OverflowStrategy.backpressure)
+      .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
+      .wireTap { bb =>
+        if (bb.block.header.height % (MvStorage.MaxCacheSize * 10) == 0) {
+          logger.info(s"Height ${bb.block.header.height}")
+        }
       }
       .async
-      .buffer(2, OverflowStrategy.backpressure)
-      .via(backend.addressWriteFlow)
-      .async
-      .buffer(2, OverflowStrategy.backpressure)
-      .via(graphBackend.graphWriteFlow)
-      .via(backend.epochsWriteFlow)
+      .buffer(100, OverflowStrategy.backpressure)
+      .via(
+        graphBackendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(
+          _.graphWriteFlow
+        )
+      )
       .via(killSwitch.flow)
-      .withAttributes(supervisionStrategy(Resiliency.decider))
-      .toMat(
-        Sink
-          .fold((Option.empty[Block], Option.empty[WriteNewEpoch])) {
-            case (_, (block, Some(e @ WriteNewEpoch(_, _, _)))) =>
-              Option(block) -> Option(e)
-            case ((_, lastEpoch), (block, _)) =>
-              Option(block) -> lastEpoch
-          }
-      ) { case (_, mat) =>
-        mat.flatMap { case (lastBlock, lastEpoch) =>
-          ChainStateHolder.getChainState.flatMap { chainState =>
-            snapshotManager
-              .makeSnapshotOnEpoch(lastEpoch.map(_.epoch), chainState.utxoState)
-              .map { _ =>
-                ChainSyncResult(
-                  chainState,
-                  lastBlock,
-                  graphBackend.graphTraversalSource,
-                  chainState.utxoState.topAddresses.sortedByBoxCount
-                )
-              }
-          }
+      .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
+      .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
+        lastBlockF.map { lastBlock =>
+          ChainSyncResult(
+            lastBlock,
+            blockIndexer.readableStorage,
+            graphBackendOpt.map(_.graphTraversalSource)
+          )
         }
       }
 
-  def indexChain: Future[ChainSyncResult] = for {
-    bestBlockHeight <- blockHttpClient.getBestBlockHeight
-    chainState      <- getChainState
-    fromHeight = chainState.getLastCachedBlock.map(_.height).getOrElse(0) + 1
-    _          = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
-    _          = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
-    syncResult <- Source(fromHeight to bestBlockHeight).runWith(indexingSink)
-  } yield syncResult
+  def indexChain: Future[ChainSyncResult] =
+    for
+      bestBlockHeight <- blockHttpClient.getBestBlockHeight
+      fromHeight = blockIndexer.readableStorage.getLastHeight.getOrElse(0) + 1
+      _ = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
+      _ = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
+      syncResult <- Source(fromHeight to bestBlockHeight).runWith(indexingSink)
+    yield syncResult
 
-  def fixChain(missingEpochs: MissingEpochs): Future[ChainSyncResult] =
-    Source(missingEpochs.missingHeights)
+  def fixChain(missingHeights: TreeSet[Height]): Future[ChainSyncResult] =
+    Source(missingHeights)
       .runWith(indexingSink)
+
 }
 
 object ChainIndexer {
-
   case class ChainSyncResult(
-    chainState: ChainState,
-    lastBlock: Option[Block],
-    graphTraversalSource: GraphTraversalSource,
-    topAddressMap: SortedTopAddressMap
+    lastBlock: Option[BestBlockInserted],
+    storage: Storage,
+    graphTraversalSource: Option[GraphTraversalSource]
   )
 }

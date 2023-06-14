@@ -6,10 +6,9 @@ import akka.stream.scaladsl.{Flow, Source}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.BlockMetadata
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Epoch.EpochCommand
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 import pureconfig.ConfigReader
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
 
@@ -20,17 +19,19 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
-import scala.util.Try
+import scala.util.{Success, Try}
 
 trait GraphBackend {
 
   def initGraph: Boolean
 
-  def graphWriteFlow: Flow[(Block, Option[EpochCommand]), (Block, Option[EpochCommand]), NotUsed]
+  def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, topAddresses: TopAddressMap, g: Graph): Unit
+  def writeTx(height: Height, boxesByTx: BoxesByTx, g: Graph): Unit
 
-  def writeTxsAndCommit(txBoxesByHeight: IterableOnce[(Height, BoxesByTx)], topAddresses: TopAddressMap): Unit
+  def writeTxsAndCommit(
+    txBoxesByHeight: IterableOnce[BestBlockInserted]
+  ): IterableOnce[BestBlockInserted]
 
   def graphTraversalSource: GraphTraversalSource
 
@@ -46,33 +47,45 @@ object GraphBackend {
   sealed trait GraphBackendType derives ConfigReader
   case object JanusGraph extends GraphBackendType
   case object InMemoryGraph extends GraphBackendType
+  case object NoGraphBackend extends GraphBackendType
 
-  def apply(graphBackendType: GraphBackendType)(implicit system: ActorSystem[Nothing]): Try[GraphBackend] =
+  def apply(graphBackendType: GraphBackendType)(implicit system: ActorSystem[Nothing]): Try[Option[GraphBackend]] =
     graphBackendType match {
       case JanusGraph =>
-        JanusGraphBackend()
+        JanusGraphBackend().map(Some(_))
       case InMemoryGraph =>
-        Try(new InMemoryGraphBackend())
+        Try(Some(new InMemoryGraphBackend()))
+      case NoGraphBackend =>
+        Success(None)
     }
 
 }
 
 class InMemoryGraphBackend extends GraphBackend {
 
-  def initGraph: Boolean = false
+  private var initialized = true
+
+  def initGraph: Boolean =
+    if (initialized) {
+      initialized = false
+      true
+    } else {
+      false
+    }
 
   def tx: Transaction = ???
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, topAddresses: TopAddressMap, g: Graph): Unit = ()
+  def writeTx(height: Height, boxesByTx: BoxesByTx, g: Graph): Unit = {}
 
+  def writeTxsAndCommit(
+    txBoxesByHeight: IterableOnce[BestBlockInserted]
+  ): IterableOnce[BestBlockInserted] = List.empty
   def isEmpty: Boolean = true
 
   def graphTraversalSource: GraphTraversalSource = EmptyGraph.instance.traversal()
 
-  def graphWriteFlow: Flow[(Block, Option[EpochCommand]), (Block, Option[EpochCommand]), NotUsed] =
-    Flow[(Block, Option[EpochCommand])].map(identity)
-
-  def writeTxsAndCommit(txBoxesByHeight: IterableOnce[(Height, BoxesByTx)], topAddresses: TopAddressMap): Unit = ()
+  def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+    Flow[BestBlockInserted].map(identity)
 
   def close(): Future[Unit] = Future.successful(())
 }

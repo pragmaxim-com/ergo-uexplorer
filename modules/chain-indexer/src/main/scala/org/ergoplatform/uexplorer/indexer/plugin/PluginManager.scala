@@ -6,17 +6,15 @@ import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.SortedTopAddressMap
-import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.indexer.chain.ChainState
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolStateChanges
 import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.plugin.Plugin.{UtxoStateWithPool, UtxoStateWithoutPool}
+import org.ergoplatform.uexplorer.{SortedTopAddressMap, Storage}
 
-import scala.jdk.CollectionConverters.*
 import java.util.ServiceLoader
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 class PluginManager(plugins: List[Plugin]) extends LazyLogging {
@@ -24,43 +22,38 @@ class PluginManager(plugins: List[Plugin]) extends LazyLogging {
   def close(): Future[Unit] = Future.sequence(plugins.map(_.close)).map(_ => ())
 
   def executePlugins(
-    chainState: ChainState,
+    storage: Storage,
     stateChanges: MempoolStateChanges,
-    graphTraversalSource: GraphTraversalSource,
-    newBlockOpt: Option[Block],
-    topAddresses: SortedTopAddressMap
-  )(implicit actorSystem: ActorSystem[Nothing]): Future[Done] =
-    Future(chainState.utxoState.utxoStateWithCurrentEpochBoxes).flatMap { utxoState =>
-      val utxoStateWoPool = UtxoStateWithoutPool(utxoState.addressByUtxo, utxoState.utxosByAddress)
-      val poolExecutionPlan =
-        stateChanges.utxoStateTransitionByTx(chainState.utxoState).flatMap { case (newTx, utxoStateWithPool) =>
-          plugins.map(p => (p, newTx, utxoStateWithPool))
-        }
-      val chainExecutionPlan = newBlockOpt.toList.flatMap(newBlock => plugins.map(_ -> newBlock))
-      Source
-        .fromIterator(() => poolExecutionPlan)
-        .mapAsync(1) { case (plugin, newTx, utxoStateWithPool) =>
-          plugin.processMempoolTx(
-            newTx,
-            utxoStateWoPool,
-            UtxoStateWithPool(utxoStateWithPool.addressByUtxo, utxoStateWithPool.utxosByAddress),
-            topAddresses,
-            graphTraversalSource
-          )
-        }
-        .run()
-        .flatMap { _ =>
-          Source(chainExecutionPlan)
-            .mapAsync(1) { case (plugin, newBlock) =>
-              plugin.processNewBlock(newBlock, utxoStateWoPool, topAddresses, graphTraversalSource)
-            }
-            .run()
-        }
-        .recover { case ex: Throwable =>
-          logger.error("Plugin failure should not propagate upstream", ex)
-          Done
-        }
-    }
+    graphTraversalSource: Option[GraphTraversalSource],
+    newBlockOpt: Option[BestBlockInserted]
+  )(implicit actorSystem: ActorSystem[Nothing]): Future[Done] = {
+    val poolExecutionPlan =
+      stateChanges.stateTransitionByTx.flatMap { case (newTx, _) =>
+        plugins.map(p => (p, newTx))
+      }
+    val chainExecutionPlan = newBlockOpt.toList.flatMap(newBlock => plugins.map(_ -> newBlock))
+    Source
+      .fromIterator(() => poolExecutionPlan.iterator)
+      .mapAsync(1) { case (plugin, newTx) =>
+        plugin.processMempoolTx(
+          newTx,
+          storage,
+          graphTraversalSource
+        )
+      }
+      .run()
+      .flatMap { _ =>
+        Source(chainExecutionPlan)
+          .mapAsync(1) { case (plugin, newBlock) =>
+            plugin.processNewBlock(newBlock, storage, graphTraversalSource)
+          }
+          .run()
+      }
+      .recover { case ex: Throwable =>
+        logger.error("Plugin failure should not propagate upstream", ex)
+        Done
+      }
+  }
 
 }
 

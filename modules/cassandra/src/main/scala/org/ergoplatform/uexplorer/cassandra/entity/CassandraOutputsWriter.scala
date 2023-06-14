@@ -3,17 +3,17 @@ package org.ergoplatform.uexplorer.cassandra.entity
 import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.Const
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 
 import scala.collection.immutable.ArraySeq
 
 trait CassandraOutputsWriter { this: CassandraBackend =>
   import Outputs._
 
-  def outputsWriteFlow(parallelism: Int): Flow[Block, Block, NotUsed] =
+  def outputsWriteFlow(parallelism: Int): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     storeBatchFlow(
       parallelism,
       batchType = DefaultBatchType.LOGGED,
@@ -21,8 +21,8 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
       outputInsertBinder
     )
 
-  protected[cassandra] def outputInsertBinder: (Block, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (block, statement) =>
+  protected[cassandra] def outputInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
+    case (BestBlockInserted(block, _), statement) =>
       block.outputs.map { output =>
         statement
           .bind()

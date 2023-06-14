@@ -15,10 +15,10 @@ import scala.util.Try
 
 package object uexplorer {
 
-  type Value      = Long
-  type Height     = Int
-  type EpochIndex = Int
-  type TxIndex    = Short
+  type Value     = Long
+  type Height    = Int
+  type Timestamp = Long
+  type TxIndex   = Short
 
   type BoxCount            = Int
   type TxCount             = Int
@@ -30,13 +30,13 @@ package object uexplorer {
   type Address       = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
 
-  type BoxesByTx     = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
-  type BoxesByHeight = TreeMap[Height, BoxesByTx]
-  type InputsByHeight = Map[Height, Map[BoxId, (Address, Value)]]
+  type BoxesByTx = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
 
   object Address {
-    case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount)
-    case class State(value: Value, stats: Option[Address.Stats])
+    case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount) {
+      def this() = this(0, 0, 0) // kryo needs a no-arg constructor
+    }
+    case class State(value: Value)
     def fromStringUnsafe(s: String): Address = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
   }
 
@@ -74,7 +74,7 @@ package object uexplorer {
     def fromStringUnsafe(s: String): ErgoTree = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
-  case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Long)
+  case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Timestamp)
 
   opaque type TxId = String
 

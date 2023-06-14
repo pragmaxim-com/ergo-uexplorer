@@ -5,10 +5,8 @@ import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
 import akka.util.Timeout
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.indexer.chain.ChainState
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
-import org.ergoplatform.uexplorer.utxo.UtxoState
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 
@@ -34,31 +32,7 @@ object MempoolStateHolder extends LazyLogging {
   sealed trait MempoolStateHolderResponse
 
   case class MempoolStateChanges(stateTransitionByTx: List[(ApiTransaction, ListMap[TxId, ApiTransaction])])
-    extends MempoolStateHolderResponse {
-
-    def utxoStateTransitionByTx(utxoState: UtxoState): Iterator[(ApiTransaction, UtxoState)] =
-      stateTransitionByTx.iterator.map { case (newTx, poolTxs) =>
-        val boxesByTxBuilder =
-          poolTxs.values.foldLeft(
-            Map.newBuilder[Tx, (ArraySeq[(BoxId, Address, Long)], ArraySeq[(BoxId, Address, Long)])]
-          ) { case (acc, tx) =>
-            val inputSet = tx.inputs.toSet.map(_.boxId)
-            val inputsWithAddrValue =
-              ArraySeq.from(
-                utxoState.inputsByHeightBuffer.valuesIterator.flatMap { boxes =>
-                  val shared = boxes.keySet.intersect(inputSet)
-                  shared.map { boxId =>
-                    val (addr, value) = boxes(boxId)
-                    (boxId, addr, value)
-                  }
-                }
-              )
-            acc.addOne(Tx(tx.id, 0, 0, 0) -> (inputsWithAddrValue, tx.outputs.map(o => (o.boxId, o.address, o.value))))
-          }
-        newTx -> utxoState.mergeBlockBoxes(0, boxesByTxBuilder.result().iterator)
-      }
-  }
-
+    extends MempoolStateHolderResponse
   case class UpdateTxs(allTxs: ListMap[TxId, ApiTransaction], replyTo: ActorRef[MempoolStateChanges])
     extends MempoolStateHolderRequest
 

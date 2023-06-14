@@ -16,10 +16,15 @@ Explorer weak spot? **Data distribution**
 
 ## Solution
 
-Supplementary, lightweight (μ = micro) Ergo explorer/analyzer with CassandraDB backend :
+Supplementary, lightweight (μ = micro) Ergo explorer/analyzer with multiple modes of operation :
+  - `embedded` - running as single jvm process, only some blockchain data in embedded [MvStore](https://www.h2database.com/html/mvstore.html) 
+  - `cassandra` - additional cassandra backend with all blockchain data (very fast, it does not slow indexing down)
+  - `janusgraph` - all transactions are fed into a graph for analysis (**takes all day to index!**)
+
+Properties : 
   - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`16GB RAM`
   - datastructures accessible in real-time
-    - whole utxo state
+    - whole utxo state persisted in [MvStore](https://www.h2database.com/html/mvstore.html)
     - hot address statistics (box and tx counts, last tx height, etc.)
   - janus graph of the whole chain (good to use in combination with hot address statistics to avoid infinite traversals)
   - plugin framework, add a plugin that is supplied with
@@ -36,24 +41,21 @@ Chain indexer syncs with Node and keeps polling blocks while discarding supersed
 Valid "Source of Truth" transaction data downloaded from Nodes is persisted into cassandra within an hour.
 Secondary Data Views that are derived from Source of Truth can be easily reindexed very fast which
 allows for flexible development. Major Data Views derived from Source of Truth :
-  - janus graph of transfers within address network
-  - utxo state
-  - cassandra view of all transactions and their boxes grouped by address, including address type and optional description
-  - size limited MinMax Queue of hot addresses and their statistics which helps solve the SuperNode problem
 
 **Requirements:**
   - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
-  - `16GB+` of RAM and `4vCPU+` for rapid sync from local Ergo Node
+  - `12GB+` of RAM and `4vCPU+` for rapid sync from local Ergo Node
       - `start-indexing.sh` script asks you if you are syncing chain from scratch or not
       - ergo-node = 2GB
       - cassandraDB = 9GB
-      - chain-indexer = 4GB
-  - `8GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
+      - chain-indexer = 1GB
+  - `6GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
       - `start-querying.sh` (note that this script creates db indexes which are being built some time)
       - ergo-node = 1GB
       - cassandraDB = 1GB
       - stargate = 1GB
-      - chain-indexer = 4GB
+      - chain-indexer = 1GB
+  - 100GB free disk space for data in cassandra and 3GB for JanusGraph, MvStore ~ 10GB but it will increase   
   - local fully synced Ergo Node is running if you are syncing from scratch
       - polling new blocks automatically falls back to peer-network if local node is not available
 
@@ -64,17 +66,14 @@ together with all instances necessary for analysis:
 ```
   def processMempoolTx(
     newTx: Transaction,                    // new Tx is passed to all plugins whenever it appears in mempool of connected Nodes
-    utxoStateWoPool: UtxoStateWithoutPool, // Utxo State without mempool merged into it
-    utxoStateWithPool: UtxoStateWithPool,  // Utxo State with mempool merged into it (needed for chained transactions)
-    topAddresses: SortedTopAddressMap,     // hot addresses are needed for dealing with SuperNode problem during graph traversal
-    graph: GraphTraversalSource            // Janus Graph for executing arbitrary gremlin traversal queries
+    utxoState: UtxoState,                  // Utxo State
+    graph: Option[GraphTraversalSource]    // Janus Graph for executing arbitrary gremlin traversal queries
   ): Future[Unit]
 
   def processNewBlock(
     newBlock: Block,                       // new Block is passed to all plugins whenever it is applied to chain of connected Nodes
-    utxoStateWoPool: UtxoStateWithoutPool, // Utxo State without mempool merged into it
-    topAddresses: SortedTopAddressMap,     // hot addresses are needed for dealing with SuperNode problem during graph traversal
-    graph: GraphTraversalSource            // Janus Graph for executing arbitrary gremlin traversal queries
+    utxoState: UtxoState,                  // Utxo State
+    graph: Option[GraphTraversalSource]    // Janus Graph for executing arbitrary gremlin traversal queries
   ): Future[Unit]
 ```
 
@@ -130,7 +129,7 @@ query {
 }
 ```
 
-## Build
+## Production Build
 
 Not necessary as all docker images from docker-compose are publicly available :
 ```
@@ -154,7 +153,7 @@ $ docker build . -t pragmaxim/uexplorer-chain-indexer:latest
   └── drain-cassandra.sh            # cassandra must be stopped gracefully
 ```
 
-## Run
+### Run
 
 ```
 $ cd docker
@@ -169,6 +168,16 @@ $ docker compose logs uexplorer-chain-indexer
 12:37:45 New epoch 816 detected, utxo count: 1886283, non-empty-address count: 159562, persisted Epochs: 817[0 - 816], blocks cache size (heights): 32[836609 - 836640]
 
 $ start-querying.sh
+```
+
+## Development
+
+If Ergo Node is not running on localhost, it will use peers in the network
+
+```
+$ sbt stage
+$ cd modules/chain-indexer/target/universal/stage/
+$ ./bin/chain-indexer
 ```
 
 **Troubleshooting:**
@@ -204,7 +213,3 @@ $ docker volume ls # cassandra and ergo volumes contain a lot of data
   - UI that would render all the interesting data
   - using approximate datastructures like [datasketches](https://datasketches.apache.org/) or [algebird](https://twitter.github.io/algebird/)
   - using [overflowdb](https://github.com/ShiftLeftSecurity/overflowdb) instead of JanusGraph for performance reasons
-  - using persistent-offheap datastructures
-     - [SwayDB](https://swaydb.io)
-     - [MVStore](https://www.h2database.com/html/mvstore.html) partially [done](https://github.com/pragmaxim/ergo-uexplorer/pull/2) but performs very slowly
-     - or RocksDB

@@ -4,10 +4,12 @@ import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
+import org.ergoplatform.uexplorer.Resiliency
+import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
+import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
-import org.ergoplatform.uexplorer.indexer.chain.ChainLoader.{ChainValid, MissingEpochs}
-import org.ergoplatform.uexplorer.indexer.chain.ChainStateHolder.ChainStateHolderRequest
-import org.ergoplatform.uexplorer.indexer.chain.{ChainIndexer, ChainLoader, ChainState, ChainStateHolder}
+import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
+import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, ChainIndexer, Initializer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
@@ -15,53 +17,41 @@ import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
-import scala.util.Failure
-import org.ergoplatform.uexplorer.AkkaStreamSupport
-import org.ergoplatform.uexplorer.Resiliency
 
 class Scheduler(
   pluginManager: PluginManager,
   chainIndexer: ChainIndexer,
   mempoolSyncer: MempoolSyncer,
-  chainLoader: ChainLoader
+  initializer: Initializer
 )(implicit
   s: ActorSystem[Nothing],
-  cRef: ActorRef[ChainStateHolderRequest],
   mRef: ActorRef[MempoolStateHolderRequest],
   killSwitch: SharedKillSwitch
 ) extends AkkaStreamSupport
   with Resiliency {
 
-  def periodicSync: Future[(ChainState, MempoolStateChanges)] =
+  def periodicSync: Future[MempoolStateChanges] =
     for {
-      ChainSyncResult(chainState, lastBlock, gts, topAddressMap) <- chainIndexer.indexChain
-      stateChanges                                               <- mempoolSyncer.syncMempool(chainState)
-      _ <- pluginManager.executePlugins(chainState, stateChanges, gts, lastBlock, topAddressMap)
-    } yield (chainState, stateChanges)
+      ChainSyncResult(lastBlockOpt, utxoState, graphTraversalSource) <- chainIndexer.indexChain
+      stateChanges                                                   <- mempoolSyncer.syncMempool(utxoState)
+      _ <- pluginManager.executePlugins(utxoState, stateChanges, graphTraversalSource, lastBlockOpt)
+    } yield stateChanges
 
   def validateAndSchedule(
     initialDelay: FiniteDuration,
     pollingInterval: FiniteDuration,
     verify: Boolean = true
   ): Future[Done] =
-    chainLoader.initChainStateFromDbAndDisk
-      .flatMap { chainState =>
-        ChainStateHolder
-          .initialize(chainState)
-          .flatMap { _ =>
-            if (verify)
-              chainLoader.verifyStateIntegrity(chainState)
-            else
-              Future.successful(ChainValid(chainState))
-          }
-          .flatMap {
-            case ChainValid(_) =>
-              schedule(initialDelay, pollingInterval)(periodicSync).via(killSwitch.flow).run()
-            case missingEpochs: MissingEpochs =>
-              chainIndexer
-                .fixChain(missingEpochs)
-                .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
-          }
-      }
-
+    initializer.init match {
+      case HalfEmptyInconsistency(error) =>
+        Future.failed(new IllegalStateException(error))
+      case GraphInconsistency(error) =>
+        Future.failed(new IllegalStateException(error))
+      case ChainEmpty | ChainValid =>
+        schedule(initialDelay, pollingInterval)(periodicSync).via(killSwitch.flow).run()
+      case MissingBlocks(_, missingHeights) =>
+        chainIndexer
+          .fixChain(missingHeights)
+          .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
+    }
 }

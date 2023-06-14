@@ -21,6 +21,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.ResiliencySupport
+import org.ergoplatform.uexplorer.ExeContext.Implicits
 
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   protocol: ProtocolSettings,
@@ -82,27 +83,26 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
 
   def getBestBlockOrBranch(
     block: ApiFullBlock,
-    isBlockCached: BlockId => Future[Boolean],
+    isBlockCached: (BlockId, Height) => Boolean,
     acc: List[ApiFullBlock]
   ): Future[List[ApiFullBlock]] =
-    isBlockCached(block.header.parentId)
-      .flatMap {
-        case blockCached if blockCached =>
-          Future.successful(block :: acc)
-        case _ if block.header.height == 1 =>
-          Future.successful(block :: acc)
-        case _ =>
-          logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
-          getBlockForId(block.header.parentId)
-            .flatMap(b => getBestBlockOrBranch(b, isBlockCached, block :: acc))
-      }
+    isBlockCached(block.header.parentId, block.header.height - 1) match {
+      case blockCached if blockCached =>
+        Future.successful(block :: acc)
+      case _ if block.header.height == 1 =>
+        Future.successful(block :: acc)
+      case _ =>
+        logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
+        getBlockForId(block.header.parentId)
+          .flatMap(b => getBestBlockOrBranch(b, isBlockCached, block :: acc))(Implicits.trampoline)
+    }
 
   def blockFlow: Flow[Height, ApiFullBlock, NotUsed] =
     Flow[Height]
       .mapAsync(1)(getBlockIdForHeight)
-      .buffer(64, OverflowStrategy.backpressure)
-      .mapAsync(1)(getBlockForId)
-      .buffer(32, OverflowStrategy.backpressure)
+      .buffer(128, OverflowStrategy.backpressure)
+      .mapAsync(1)(getBlockForId) // parallelism could be parameterized - low or big pressure on Node
+      .buffer(128, OverflowStrategy.backpressure)
 
   def close(): Future[Unit] = {
     logger.info(s"Stopping Block http client")

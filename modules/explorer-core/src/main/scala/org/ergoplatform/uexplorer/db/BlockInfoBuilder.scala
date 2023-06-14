@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.db
 
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, BlockMetadata, Const, ProtocolSettings}
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
@@ -81,7 +80,7 @@ object BlockInfoBuilder {
       BlockInfo(
         blockSize       = apiBlock.size,
         blockCoins      = blockCoins,
-        blockMiningTime = prevBlock.map(parent => apiBlock.header.timestamp - parent.timestamp),
+        blockMiningTime = prevBlock.map(parent => apiBlock.header.timestamp - parent.timestamp).getOrElse(0),
         txsCount        = apiBlock.transactions.transactions.length,
         txsSize         = apiBlock.transactions.transactions.map(_.size).sum,
         minerAddress    = minerAddress,

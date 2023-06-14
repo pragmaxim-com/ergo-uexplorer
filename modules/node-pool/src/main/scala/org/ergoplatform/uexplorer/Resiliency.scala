@@ -45,7 +45,7 @@ object Resiliency extends LazyLogging {
     minBackoff   = 3.seconds,
     maxBackoff   = 30.seconds,
     randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
-  ).withMaxRestarts(300, 60.minutes) // limits the amount of restarts to 20 within 5 minutes
+  ).withMaxRestarts(20, 60.minutes) // limits the amount of restarts to 20 within 5 minutes
 
   def decider: Supervision.Decider = {
     case ex: UnexpectedStateError =>

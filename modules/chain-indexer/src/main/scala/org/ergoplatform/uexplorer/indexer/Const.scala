@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.indexer
 
-import org.ergoplatform.uexplorer.Const.{EpochLength, MinerRewardDelta}
+import org.ergoplatform.uexplorer.Const.MinerRewardDelta
 import org.ergoplatform.uexplorer.{Address, HexString}
 import org.ergoplatform.ErgoScriptPredef
 import scorex.util.encode.{Base16, Base58}

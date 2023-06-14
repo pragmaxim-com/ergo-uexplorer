@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer
+package org.ergoplatform.uexplorer.cassandra
 
 import akka.NotUsed
 import akka.stream.scaladsl.{Balance, Flow, GraphDSL, Merge, RestartSource, Source}

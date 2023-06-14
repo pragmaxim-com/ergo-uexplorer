@@ -14,7 +14,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.{Direction, T}
 import org.ergoplatform.uexplorer.Const
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend.BufferSize
 import org.ergoplatform.uexplorer.cassandra.entity.*
 
@@ -27,6 +26,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Try
 import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
@@ -42,18 +42,15 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraInputsWriter
   with CassandraOutputsWriter
   with CassandraBlockUpdater
-  with CassandraEpochWriter
-  with CassandraAddressWriter
-  with CassandraEpochReader
-  with CassandraUtxoReader {
+  with CassandraHeadersReader {
 
   def close(): Future[Unit] = {
     logger.info(s"Stopping Cassandra session")
     cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
   }
 
-  val blockWriteFlow: Flow[Block, Block, NotUsed] =
-    Flow[Block]
+  val blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+    Flow[BestBlockInserted]
       // format: off
       .via(headerWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
       .via(transactionsWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
