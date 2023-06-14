@@ -49,8 +49,8 @@ case class MvStorage(
   def rollbackTo(version: Long): Try[Unit] = Try(store.rollbackTo(version))
 
   def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Unit = {
-    inputBoxes.foreach(addressByUtxo.remove)
-    utxosByAddress.putOrRemove(address) {
+    inputBoxes.foreach(addressByUtxo.removeAndForget)
+    utxosByAddress.putOrRemoveAndForget(address) {
       case None => None
       case Some(existingBoxIds) =>
         inputBoxes.foreach(existingBoxIds.remove)
@@ -59,22 +59,21 @@ case class MvStorage(
   }
 
   def persistBox(boxId: BoxId, address: Address, value: Value): Unit = { // Without Try for perf reasons
-    addressByUtxo.put(boxId, address)
-    utxosByAddress.adjust(address)(_.fold(javaMapOf(boxId, value)) { arr =>
+    addressByUtxo.putAndForget(boxId, address)
+    utxosByAddress.adjustAndForget(address)(_.fold(javaMapOf(boxId, value)) { arr =>
       arr.put(boxId, value)
       arr
     })
   }
 
   def persistNewBlock(blockId: BlockId, height: Height, block: BlockMetadata): Try[Unit] = Try {
-    blockById.put(blockId, block)
-    blockIdsByHeight.adjust(height)(
+    blockById.putAndForget(blockId, block)
+    blockIdsByHeight.adjustAndForget(height)(
       _.fold(javaSetOf(blockId)) { existingBlockIds =>
         existingBlockIds.add(blockId)
         existingBlockIds
       }
     )
-    ()
   }
 
   def getReport: String = {

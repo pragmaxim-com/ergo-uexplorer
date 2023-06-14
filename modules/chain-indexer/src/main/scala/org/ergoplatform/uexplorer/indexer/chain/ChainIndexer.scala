@@ -57,7 +57,7 @@ class ChainIndexer(
       .buffer(100, OverflowStrategy.backpressure)
       .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
       .wireTap { bb =>
-        if (bb.block.header.height % (MvStorage.MaxCacheSize * 10) == 0) {
+        if (bb.block.header.height % 100 == 0) {
           logger.info(s"Height ${bb.block.header.height}")
         }
       }

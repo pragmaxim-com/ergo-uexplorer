@@ -20,6 +20,8 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
 
   def remove(key: K): Option[V] = Option(underlying.remove(key)).map(codec.read)
 
+  def removeAndForget(key: K): Unit = underlying.remove(key)
+
   def ceilingKey(key: K): Option[K] = Option(underlying.ceilingKey(key))
 
   def clear(): Try[Unit] = Try(underlying.clear())
@@ -54,7 +56,11 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
 
   def put(key: K, value: V): Option[V] = Option(underlying.put(key, codec.write(value))).map(codec.read)
 
+  def putAndForget(key: K, value: V): Unit = underlying.put(key, codec.write(value))
+
   def putIfAbsent(key: K, value: V): Option[V] = Option(underlying.putIfAbsent(key, codec.write(value))).map(codec.read)
+
+  def putIfAbsentAndForget(key: K, value: V): Unit = underlying.putIfAbsent(key, codec.write(value))
 
   def replace(key: K, value: V): Option[V] = Option(underlying.replace(key, codec.write(value))).map(codec.read)
 
@@ -69,8 +75,19 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
         Option(underlying.put(k, codec.write(v))).map(codec.read)
     }
 
+  def putOrRemoveAndForget(k: K)(f: Option[V] => Option[V]): Unit =
+    f(Option(underlying.get(k)).map(codec.read)) match {
+      case None =>
+        underlying.remove(k)
+      case Some(v) =>
+        underlying.put(k, codec.write(v))
+    }
+
   def adjust(k: K)(f: Option[V] => V): Option[V] =
     Option(underlying.put(k, codec.write(f(Option(underlying.get(k)).map(codec.read)))))
       .map(codec.read)
+
+  def adjustAndForget(k: K)(f: Option[V] => V): Unit =
+    underlying.put(k, codec.write(f(Option(underlying.get(k)).map(codec.read))))
 
 }
