@@ -33,15 +33,6 @@ final case class FullBlock(
   tokens: ArraySeq[Token]
 )
 
-final case class LightBlock(
-  headerId: BlockId,
-  parentId: BlockId,
-  timestamp: Long,
-  height: Int,
-  boxesByTx: BoxesByTx,
-  info: BlockInfo
-)
-
 final case class BlockExtension(
   headerId: BlockId,
   digest: HexString,

@@ -16,7 +16,7 @@ import scala.util.Try
 
 object FullBlockBuilder {
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockMetadata]): Try[FullBlock] = Try {
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[VersionedBlock]): Try[FullBlock] = Try {
     val apiHeader       = apiBlock.header
     val apiExtension    = apiBlock.extension
     val apiAdProofOpt   = apiBlock.adProofs

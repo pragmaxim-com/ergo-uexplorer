@@ -11,6 +11,7 @@ import org.ergoplatform.uexplorer.{MapPimp, MutableMapPimp}
 import org.ergoplatform.uexplorer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.cassandra
+import org.ergoplatform.uexplorer.db.VersionedBlock
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.collection.mutable
@@ -20,7 +21,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
-import org.ergoplatform.uexplorer.BlockMetadata
 
 trait CassandraHeadersReader extends LazyLogging {
   this: CassandraBackend =>

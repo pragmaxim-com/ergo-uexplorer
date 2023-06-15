@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer
 
-import org.ergoplatform.uexplorer.{Address, BlockId, BlockMetadata, BoxId, Height, Value}
+import org.ergoplatform.uexplorer.db.VersionedBlock
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
 
 import scala.collection.immutable.TreeSet
 
@@ -14,13 +15,13 @@ trait Storage {
 
   def getCurrentVersion: Long
 
-  def getBlockById(blockId: BlockId): Option[BlockMetadata]
+  def getBlockById(blockId: BlockId): Option[VersionedBlock]
 
   def getLastHeight: Option[Height]
 
-  def getLastBlocks: Map[BlockId, BlockMetadata]
+  def getLastBlocks: Map[BlockId, VersionedBlock]
 
-  def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockMetadata]
+  def getBlocksByHeight(atHeight: Height): Map[BlockId, VersionedBlock]
 
   def getAddressByUtxo(boxId: BoxId): Option[Address]
 

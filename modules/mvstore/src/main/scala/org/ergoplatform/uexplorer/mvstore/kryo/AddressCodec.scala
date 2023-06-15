@@ -6,9 +6,9 @@ import com.esotericsoftware.kryo.serializers.DefaultSerializers.CollectionsSingl
 import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.JdkImmutableSetSerializer
 import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
-import org.ergoplatform.uexplorer.db.BlockInfo
-import org.ergoplatform.uexplorer.mvstore.{DbCodec}
-import org.ergoplatform.uexplorer.{Address, BlockMetadata, Height}
+import org.ergoplatform.uexplorer.db.{BlockInfo, VersionedBlock}
+import org.ergoplatform.uexplorer.mvstore.DbCodec
+import org.ergoplatform.uexplorer.{Address, Height}
 
 import java.nio.ByteBuffer
 import java.util

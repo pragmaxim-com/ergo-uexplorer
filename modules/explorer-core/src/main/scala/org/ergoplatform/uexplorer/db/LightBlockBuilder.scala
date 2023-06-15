@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
-import org.ergoplatform.uexplorer.{Address, BlockMetadata, BoxId, ProtocolSettings, Tx, Value}
+import org.ergoplatform.uexplorer.{Address, BoxId, ProtocolSettings, Tx, Value}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import scala.collection.compat.immutable.ArraySeq
@@ -10,10 +10,10 @@ import scala.util.Try
 object LightBlockBuilder {
 
   def apply(
-    apiBlock: ApiFullBlock,
-    parentOpt: Option[BlockMetadata],
-    addressByUtxo: BoxId => Option[Address],
-    utxosByAddress: Address => Option[Map[BoxId, Value]]
+             apiBlock: ApiFullBlock,
+             parentOpt: Option[VersionedBlock],
+             addressByUtxo: BoxId => Option[Address],
+             utxosByAddress: Address => Option[Map[BoxId, Value]]
   )(implicit
     ps: ProtocolSettings
   ): Try[LightBlock] =

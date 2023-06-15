@@ -49,7 +49,6 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
   private def mergeBlockBoxesUnsafe(block: LightBlock): Try[Unit] = Try {
     val boxes          = block.boxesByTx.iterator.map(_._2)
     val currentVersion = storage.getCurrentVersion
-    val blockMetadata  = BlockMetadata.fromBlock(block, currentVersion)
     boxes.foreach { case (inputBoxes, outputBoxes) =>
       outputBoxes
         .foreach { case (boxId, address, value) =>
@@ -63,13 +62,13 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
           storage.removeInputBoxesByAddress(address, inputIds).get
         }
     }
-    block.headerId -> blockMetadata
-  }.flatMap { case (blockId, blockMetadata) =>
-    storage.persistNewBlock(blockId, blockMetadata.height, blockMetadata)
+    block.headerId -> block.toVersionedBlock(currentVersion)
+  }.flatMap { case (blockId, versionedBlock) =>
+    storage.persistNewBlock(blockId, versionedBlock.height, versionedBlock)
   }
 
   /** Genesis block has no parent so we assert that any block either has its parent cached or its a first block */
-  private def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[BlockMetadata]] = {
+  private def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[VersionedBlock]] = {
     def fail =
       Failure(
         new IllegalStateException(

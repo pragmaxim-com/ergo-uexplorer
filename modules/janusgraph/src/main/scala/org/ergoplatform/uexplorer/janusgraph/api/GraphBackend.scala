@@ -6,9 +6,8 @@ import akka.stream.scaladsl.{Flow, Source}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
-import org.ergoplatform.uexplorer.BlockMetadata
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, VersionedBlock, FullBlock}
 import pureconfig.ConfigReader
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
 

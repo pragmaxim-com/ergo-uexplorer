@@ -6,10 +6,10 @@ import com.esotericsoftware.kryo.serializers.DefaultSerializers.CollectionsSingl
 import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.JdkImmutableSetSerializer
 import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
-import org.ergoplatform.uexplorer.db.BlockInfo
+import org.ergoplatform.uexplorer.db.{BlockInfo, VersionedBlock}
 import org.ergoplatform.uexplorer.mvstore.kryo.{AddressCodec, AddressStatsCodec, BlockIdsCodec, BlockMetadataCodec, ValueByBoxCodec}
-import org.ergoplatform.uexplorer.mvstore.{DbCodec}
-import org.ergoplatform.uexplorer.{Address, BlockId, BlockMetadata, BoxId, Height, Value}
+import org.ergoplatform.uexplorer.mvstore.DbCodec
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
 
 import java.nio.ByteBuffer
 import java.util
@@ -21,7 +21,7 @@ object KryoSerialization {
     implicit val addressStatsCodec: DbCodec[Address.Stats]             = AddressStatsCodec
     implicit val blockIdsCodec: DbCodec[java.util.Set[BlockId]]        = BlockIdsCodec
     implicit val valueByBoxCodec: DbCodec[java.util.Map[BoxId, Value]] = ValueByBoxCodec
-    implicit val blockMetadataCodec: DbCodec[BlockMetadata]            = BlockMetadataCodec
+    implicit val blockMetadataCodec: DbCodec[VersionedBlock]            = BlockMetadataCodec
     implicit val addressCodec: DbCodec[Address]                        = AddressCodec
 
     def javaSetOf[T](e: T): java.util.Set[T] = {
@@ -46,7 +46,7 @@ object KryoSerialization {
       kryo.register(classOf[util.HashMap[_, _]], mapSerializer)
       kryo.register(classOf[util.HashSet[_]], setSerializer)
       kryo.register(classOf[BlockInfo])
-      kryo.register(classOf[BlockMetadata])
+      kryo.register(classOf[VersionedBlock])
       kryo.register(classOf[Address.Stats])
       setSerializer.setAcceptsNull(false)
       mapSerializer.setKeyClass(classOf[String], kryo.getSerializer(classOf[String]))
