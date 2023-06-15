@@ -2,8 +2,8 @@ package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
 import org.ergoplatform.uexplorer.Storage.StorageVersion
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, BoxesByTx, ProtocolSettings, Tx, Value}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.*
 
 import scala.collection.compat.immutable.ArraySeq
 import scala.util.Try
@@ -11,22 +11,51 @@ import scala.util.Try
 object LightBlockBuilder {
 
   def apply(
-    apiBlock: ApiFullBlock,
-    parentOpt: Option[BlockInfo],
-    parentVersion: StorageVersion,
+    b: ApiFullBlock,
+    bInfo: BlockInfo,
     addressByUtxo: BoxId => Option[Address],
     utxosByAddress: Address => Option[Map[BoxId, Value]]
-  )(implicit
-    ps: ProtocolSettings
-  ): Try[LightBlock] =
-    BlockInfoBuilder(apiBlock, parentOpt, parentVersion).map { blockInfo =>
-      val apiHeader = apiBlock.header
-      val outputLookup =
-        apiBlock.transactions.transactions.iterator
-          .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))))
-          .toMap
-      val boxesByTx =
-        apiBlock.transactions.transactions.zipWithIndex.map { case (tx, txIndex) =>
+  ): Try[LightBlock] = Try {
+    val outputLookup =
+      b.transactions.transactions.iterator
+        .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))))
+        .toMap
+
+    def getInputAddress(inputBoxId: BoxId) =
+      outputLookup
+        .get(inputBoxId)
+        .map(_._1)
+        .orElse(addressByUtxo(inputBoxId))
+        .getOrElse(
+          throw new IllegalStateException(
+            s"BoxId $inputBoxId of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+          )
+        )
+
+    def getInputValue(inputAddress: Address, inputBoxId: BoxId) =
+      outputLookup
+        .get(inputBoxId)
+        .map(_._2)
+        .orElse(utxosByAddress(inputAddress).flatMap(_.get(inputBoxId)))
+        .getOrElse(
+          throw new IllegalStateException(
+            s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+          )
+        )
+
+    def validateInputSumEqualsOutputSum(boxesByTx: BoxesByTx): Unit =
+      boxesByTx.foreach { case (txId, (inputs, outputs)) =>
+        val inputSum  = inputs.iterator.map(_._3).sum
+        val outputSum = outputs.iterator.map(_._3).sum
+        assert(
+          inputSum == outputSum,
+          s"Transaction $txId at block ${b.header.id} invalid as sum of inputs $inputSum != $outputSum"
+        )
+      }
+
+    val boxesByTx =
+      b.transactions.transactions
+        .map { tx =>
           val txOutputs = tx.outputs.map(o => (o.boxId, o.address, o.value))
           val txInputs =
             tx match {
@@ -36,42 +65,14 @@ object LightBlockBuilder {
                 ArraySeq((Foundation.box, Foundation.address, Foundation.initialNanoErgs))
               case tx =>
                 tx.inputs.map { i =>
-                  val valueByAddress = outputLookup.get(i.boxId)
-                  val inputAddress =
-                    valueByAddress
-                      .map(_._1)
-                      .orElse(addressByUtxo(i.boxId))
-                      .getOrElse(
-                        throw new IllegalStateException(
-                          s"BoxId ${i.boxId} of block ${apiHeader.id} at height ${apiHeader.height} not found in utxo state" + txOutputs
-                            .mkString("\n", "\n", "\n")
-                        )
-                      )
-                  val inputValue =
-                    valueByAddress
-                      .map(_._2)
-                      .orElse(utxosByAddress(inputAddress).flatMap(_.get(i.boxId)))
-                      .getOrElse(
-                        throw new IllegalStateException(
-                          s"Address $inputAddress of block ${apiHeader.id} at height ${apiHeader.height} not found in utxo state" + txOutputs
-                            .mkString("\n", "\n", "\n")
-                        )
-                      )
-                  (i.boxId, inputAddress, inputValue)
+                  val inputAddress = getInputAddress(i.boxId)
+                  (i.boxId, inputAddress, getInputValue(inputAddress, i.boxId))
                 }
             }
-          val inputSum  = txInputs.iterator.map(_._3).sum
-          val outputSum = txOutputs.iterator.map(_._3).sum
-          assert(
-            inputSum == outputSum,
-            s"Transaction ${tx.id} at block ${apiBlock.header.id} invalid as sum of inputs $inputSum != $outputSum"
-          )
-
-          Tx(tx.id, txIndex.toShort) -> (txInputs, txOutputs)
+          tx.id -> (txInputs, txOutputs)
         }
-      LightBlock(apiHeader.id, boxesByTx, blockInfo)
-    }
+    validateInputSumEqualsOutputSum(boxesByTx)
+    LightBlock(b.header.id, boxesByTx, bInfo)
+  }
 
 }
-
-final case class LightBlock(headerId: BlockId, boxesByTx: BoxesByTx, info: BlockInfo)
