@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
-import org.ergoplatform.uexplorer.Storage.StorageVersion
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
 
@@ -60,7 +59,7 @@ object LightBlockBuilder {
           val txInputs =
             tx match {
               case tx if tx.id == Emission.tx =>
-                ArraySeq((Emission.box, Emission.address, Emission.initialNanoErgs))
+                ArraySeq((Emission.inputBox, Emission.address, Emission.initialNanoErgs))
               case tx if tx.id == Foundation.tx =>
                 ArraySeq((Foundation.box, Foundation.address, Foundation.initialNanoErgs))
               case tx =>

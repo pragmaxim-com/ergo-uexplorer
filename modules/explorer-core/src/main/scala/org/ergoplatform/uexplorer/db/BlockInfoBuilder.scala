@@ -1,9 +1,8 @@
 package org.ergoplatform.uexplorer.db
 
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.Storage.StorageVersion
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.{Address, Const, ProtocolSettings}
+import org.ergoplatform.uexplorer.{Address, Const, ProtocolSettings, Revision}
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
 import scorex.util.encode.Base16
 import sigmastate.basics.DLogProtocol.ProveDlog
@@ -58,7 +57,7 @@ object BlockInfoBuilder {
     }
   }
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockInfo], parentVersion: StorageVersion)(implicit
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockInfo], parentVersion: Revision)(implicit
     protocolSettings: ProtocolSettings
   ): Try[BlockInfo] =
     minerRewardAddress(apiBlock)(protocolSettings).map { minerAddress =>
@@ -80,7 +79,7 @@ object BlockInfoBuilder {
       }
 
       BlockInfo(
-        parentVersion   = parentVersion,
+        revision   = parentVersion,
         parentId        = apiBlock.header.parentId,
         timestamp       = apiBlock.header.timestamp,
         height          = apiBlock.header.height,

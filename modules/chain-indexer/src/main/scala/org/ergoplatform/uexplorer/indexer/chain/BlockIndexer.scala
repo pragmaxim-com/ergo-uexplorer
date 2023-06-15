@@ -39,6 +39,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Random, Success, Try}
 
@@ -74,15 +75,20 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
           }
       }
 
+  def compact(maxTime: FiniteDuration): Try[Unit] = Try {
+    logger.info(s"Compacting file at ${storage.getReport}")
+    storage.store.compactFile(maxTime.toMillis.toInt)
+  }
+
   def addBestBlock(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
     for {
-      parentOpt  <- getParentOrFail(apiBlock)
-      blockInfo  <- BlockInfoBuilder(apiBlock, parentOpt, storage.getCurrentVersion)
-      lightBlock <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxosByAddress)
-      fullBlock  <- if (backendEnabled) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
-      _          <- storage.persistNewBlock(lightBlock)
-      _          <- storage.compact(lightBlock.info.height)
-    } yield BestBlockInserted(lightBlock, fullBlock)
+      parentOpt <- getParentOrFail(apiBlock)
+      blockInfo <- BlockInfoBuilder(apiBlock, parentOpt, storage.getCurrentRevision)
+      lb        <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxosByAddress)
+      _         <- storage.persistNewBlock(lb)
+      fbOpt     <- if (backendEnabled) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
+      _         <- if (lb.info.height % MvStorage.CompactFileRate == 0) compact(MaxCompactTime) else Success(())
+    } yield BestBlockInserted(lb, fbOpt)
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
     fork.size > 1 && storage.containsBlock(fork.head.header.parentId, fork.head.header.height - 1) &&
@@ -103,7 +109,7 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
     } else {
       logger.info(s"Adding fork from height ${winningFork.head.header.height} until ${winningFork.last.header.height}")
       for {
-        preForkVersion <- Try(storage.getBlockById(winningFork.head.header.id).map(_.parentVersion).get)
+        preForkVersion <- Try(storage.getBlockById(winningFork.head.header.id).map(_.revision).get)
         toRemove = winningFork.flatMap(b => storage.getBlocksByHeight(b.header.height).filter(_._1 != b.header.id)).toMap
         _         <- storage.rollbackTo(preForkVersion)
         newBlocks <- addBestBlocks(winningFork)

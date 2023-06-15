@@ -36,8 +36,9 @@ import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, ChainIndexer, Ini
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.mvstore.MvStorage
+import org.ergoplatform.uexplorer.mvstore.MvStorage.MaxCompactTime
 
-object Application extends App with AkkaStreamSupport {
+object Application extends App with AkkaStreamSupport with LazyLogging {
   ChainIndexerConf.loadWithFallback match {
     case Left(failures) =>
       failures.toList.foreach(f => println(s"Config error ${f.description} at ${f.origin}"))
@@ -60,7 +61,8 @@ object Application extends App with AkkaStreamSupport {
             "stop-akka-streams"
           ) { () =>
             for {
-              _       <- Future(killSwitch.shutdown())
+              _ <- Future(killSwitch.shutdown())
+              _ = logger.info("Stopping akka-streams and http server")
               binding <- bindingFuture
               done    <- binding.unbind()
             } yield done
@@ -78,7 +80,7 @@ object Application extends App with AkkaStreamSupport {
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
               initializer   = new Initializer(storage, backendOpt, graphBackendOpt)
               scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
-              done <- scheduler.validateAndSchedule(0.seconds, 5.seconds)
+              done <- scheduler.validateAndSchedule(0.seconds, MaxCompactTime + 1.second)
             } yield done
 
           initializationF.andThen {

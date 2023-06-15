@@ -32,9 +32,9 @@ class Scheduler(
 
   def periodicSync: Future[MempoolStateChanges] =
     for {
-      ChainSyncResult(lastBlockOpt, utxoState, graphTraversalSource) <- chainIndexer.indexChain
-      stateChanges                                                   <- mempoolSyncer.syncMempool(utxoState)
-      _ <- pluginManager.executePlugins(utxoState, stateChanges, graphTraversalSource, lastBlockOpt)
+      ChainSyncResult(lastBlockOpt, storage, graphTraversalSource) <- chainIndexer.indexChain
+      stateChanges                                                   <- mempoolSyncer.syncMempool(storage)
+      _ <- pluginManager.executePlugins(storage, stateChanges, graphTraversalSource, lastBlockOpt)
     } yield stateChanges
 
   def validateAndSchedule(

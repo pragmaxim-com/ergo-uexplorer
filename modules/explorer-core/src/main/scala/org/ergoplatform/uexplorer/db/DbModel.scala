@@ -43,7 +43,7 @@ final case class BlockExtension(
 )
 
 final case class BlockInfo(
-  parentVersion: Long,
+  revision: Revision,
   parentId: BlockId,
   timestamp: Long,
   height: Int,

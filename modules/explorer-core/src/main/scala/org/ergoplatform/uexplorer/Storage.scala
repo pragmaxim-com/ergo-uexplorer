@@ -13,7 +13,7 @@ trait Storage {
 
   def findMissingHeights: TreeSet[Height]
 
-  def getCurrentVersion: Long
+  def getCurrentRevision: Long
 
   def getBlockById(blockId: BlockId): Option[BlockInfo]
 
@@ -27,8 +27,4 @@ trait Storage {
 
   def getUtxosByAddress(address: Address): Option[Map[BoxId, Value]]
 
-}
-
-object Storage {
-  type StorageVersion = Long
 }

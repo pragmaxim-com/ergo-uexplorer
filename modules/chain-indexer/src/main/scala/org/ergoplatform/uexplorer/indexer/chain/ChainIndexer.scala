@@ -14,6 +14,7 @@ import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.mvstore.MvStorage
+import org.ergoplatform.uexplorer.mvstore.MvStorage.{CompactTime, MaxCompactTime}
 
 import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -72,6 +73,7 @@ class ChainIndexer(
       .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
       .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
         lastBlockF.map { lastBlock =>
+          blockIndexer.compact(MaxCompactTime)
           ChainSyncResult(
             lastBlock,
             blockIndexer.readableStorage,

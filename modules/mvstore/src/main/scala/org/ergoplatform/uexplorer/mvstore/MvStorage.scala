@@ -8,7 +8,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
-import org.ergoplatform.uexplorer.Storage.StorageVersion
 import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock}
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.MvStorage.*
@@ -42,18 +41,7 @@ case class MvStorage(
 
   def close(): Try[Unit] = Try(store.close())
 
-  def compact(height: Height): Try[Unit] = Try {
-    if (height % MvStorage.CompactFileRate == 0) {
-      logger.info(s"Compacting file at $getReport")
-      store.compactFile(10000)
-    }
-    if (height % MvStorage.MoveChunksRate == 0) {
-      logger.info("Compacting chunks ...")
-      store.compactMoveChunks()
-    }
-  }
-
-  def rollbackTo(version: Long): Try[Unit] = Try(store.rollbackTo(version))
+  def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
 
   private def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Try[Unit] =
     // removeAll is a heavy hitter : 30% of runtime
@@ -66,7 +54,7 @@ case class MvStorage(
     }
 
   private def persistBox(boxId: BoxId, address: Address, value: Value): Unit = { // Without Try for perf reasons
-    addressByUtxo.putAndForget(boxId, address)
+    addressByUtxo.putIfAbsentOrFail(boxId, address).get
     // heavy method, 50% of runtime
     utxosByAddress.adjustAndForget(address)(_.fold(javaMapOf(boxId, value)) { arr =>
       arr.put(boxId, value)
@@ -84,24 +72,41 @@ case class MvStorage(
         inputBoxes
           .groupBy(_._2)
           .view
-          .mapValues(_.collect { case (boxId, _, _) if boxId != Emission.box && boxId != Foundation.box => boxId })
+          .mapValues(_.collect { case (boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId })
           .foreach { case (address, inputIds) =>
             removeInputBoxesByAddress(address, inputIds).get
           }
       }
-    blockById.putAndForget(lightBlock.headerId, lightBlock.info)
+    blockById.putIfAbsentAndForget(lightBlock.headerId, lightBlock.info)
     blockIdsByHeight.adjustAndForget(lightBlock.info.height)(
       _.fold(javaSetOf(lightBlock.headerId)) { existingBlockIds =>
         existingBlockIds.add(lightBlock.headerId)
         existingBlockIds
       }
     )
+    store.commit()
     lightBlock
   }
 
   def getReport: String = {
     val height = getLastHeight.getOrElse(0)
-    s"storage height $height, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}"
+    val progress =
+      s"storage height $height, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}\n"
+
+    val cs  = store.getCacheSize
+    val csu = store.getCacheSizeUsed
+    val chr = store.getCacheHitRatio
+    val cc  = store.getChunkCount
+    val cfr = store.getChunksFillRate
+    val fr  = store.getFillRate
+    val lr  = store.getLeafRatio
+    val pc  = store.getPageCount
+    val mps = store.getMaxPageSize
+    val kpp = store.getKeysPerPage
+    val debug =
+      s"cache size used $csu from $cs at ratio $chr, chunks $cc at fill rate $cfr, fill rate $fr\n" +
+        s"leaf ratio $lr, page count $pc, max page size $mps, keys per page $kpp"
+    progress + debug
   }
 
   def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockInfo] =
@@ -140,13 +145,16 @@ case class MvStorage(
       TreeSet((1 to lastHeight.get): _*).diff(blockIdsByHeight.keySet.asScala)
   }
 
-  override def getCurrentVersion: StorageVersion = store.getCurrentVersion
+  override def getCurrentRevision: Revision = store.getCurrentVersion
 }
 
 object MvStorage extends LazyLogging {
+  import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+
+  type CompactTime = Int
+  val MaxCompactTime         = 10.seconds
   private val VersionsToKeep = 10
   val CompactFileRate        = 10000
-  val MoveChunksRate         = 100000
 
   def apply(
     rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), Random.nextString(10)).toFile
@@ -155,7 +163,7 @@ object MvStorage extends LazyLogging {
     val store =
       new MVStore.Builder()
         .fileName(rootDir.toPath.resolve("mvstore").toFile.getAbsolutePath)
-        .cacheSize(512)
+        .cacheSize(4096)
         .autoCommitDisabled()
         .open()
 

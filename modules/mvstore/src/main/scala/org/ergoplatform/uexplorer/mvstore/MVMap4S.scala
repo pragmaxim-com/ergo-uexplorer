@@ -5,7 +5,7 @@ import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
 import scala.jdk.CollectionConverters.*
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
@@ -24,11 +24,15 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
   def removeAndForget(key: K): Unit = underlying.remove(key)
 
   def removeOrFail(key: K): Try[Unit] =
-    Try(assert(underlying.remove(key) != null, s"Removing non-existing key $key"))
+    if (underlying.remove(key) != null)
+      Success(())
+    else
+      Failure(new AssertionError(s"Removing non-existing key $key"))
 
-  def removeAllOrFail(keys: Iterable[K]): Try[Unit] = Try {
-    keys.foreach(key => assert(underlying.remove(key) != null, s"Removing non-existing key $key"))
-  }
+  def removeAllOrFail(keys: Iterable[K]): Try[Unit] =
+    keys.find(key => underlying.remove(key) == null).fold(Success(())) { key =>
+      Failure(new AssertionError(s"Removing non-existing key $key"))
+    }
 
   def ceilingKey(key: K): Option[K] = Option(underlying.ceilingKey(key))
 
@@ -67,7 +71,10 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
   def putAndForget(key: K, value: V): Unit = underlying.put(key, codec.write(value))
 
   def putIfAbsentOrFail(key: K, value: V): Try[Unit] =
-    Try(assert(underlying.put(key, codec.write(value)) != null, s"Putting key $key that was already present"))
+    if (underlying.put(key, codec.write(value)) == null)
+      Success(())
+    else
+      Failure(new AssertionError(s"Putting key $key that was already present"))
 
   def putIfAbsent(key: K, value: V): Option[V] = Option(underlying.putIfAbsent(key, codec.write(value))).map(codec.read)
 

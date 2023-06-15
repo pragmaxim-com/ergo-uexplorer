@@ -25,6 +25,8 @@ package object uexplorer {
   type TopAddressMap       = Map[Address, Address.Stats]
   type SortedTopAddressMap = ListMap[Address, Address.Stats]
 
+  type Revision = Long
+
   type Base58Spec    = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
   type Address       = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
