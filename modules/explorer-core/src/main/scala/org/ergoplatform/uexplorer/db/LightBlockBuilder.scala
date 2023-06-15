@@ -35,39 +35,38 @@ object LightBlockBuilder {
               case tx if tx.id == Foundation.tx =>
                 ArraySeq((Foundation.box, Foundation.address, Foundation.initialNanoErgs))
               case tx =>
-                val inputs =
-                  tx.inputs.map { i =>
-                    val valueByAddress = outputLookup.get(i.boxId)
-                    val inputAddress =
-                      valueByAddress
-                        .map(_._1)
-                        .orElse(addressByUtxo(i.boxId))
-                        .getOrElse(
-                          throw new IllegalStateException(
-                            s"BoxId ${i.boxId} of block ${apiHeader.id} at height ${apiHeader.height} not found in utxo state" + txOutputs
-                              .mkString("\n", "\n", "\n")
-                          )
+                tx.inputs.map { i =>
+                  val valueByAddress = outputLookup.get(i.boxId)
+                  val inputAddress =
+                    valueByAddress
+                      .map(_._1)
+                      .orElse(addressByUtxo(i.boxId))
+                      .getOrElse(
+                        throw new IllegalStateException(
+                          s"BoxId ${i.boxId} of block ${apiHeader.id} at height ${apiHeader.height} not found in utxo state" + txOutputs
+                            .mkString("\n", "\n", "\n")
                         )
-                    val inputValue =
-                      valueByAddress
-                        .map(_._2)
-                        .orElse(utxosByAddress(inputAddress).flatMap(_.get(i.boxId)))
-                        .getOrElse(
-                          throw new IllegalStateException(
-                            s"Address $inputAddress of block ${apiHeader.id} at height ${apiHeader.height} not found in utxo state" + txOutputs
-                              .mkString("\n", "\n", "\n")
-                          )
+                      )
+                  val inputValue =
+                    valueByAddress
+                      .map(_._2)
+                      .orElse(utxosByAddress(inputAddress).flatMap(_.get(i.boxId)))
+                      .getOrElse(
+                        throw new IllegalStateException(
+                          s"Address $inputAddress of block ${apiHeader.id} at height ${apiHeader.height} not found in utxo state" + txOutputs
+                            .mkString("\n", "\n", "\n")
                         )
-                    (i.boxId, inputAddress, inputValue)
-                  }
-                val inputSum  = inputs.iterator.map(_._3).sum
-                val outputSum = txOutputs.iterator.map(_._3).sum
-                assert(
-                  inputSum == outputSum,
-                  s"Transaction ${tx.id} at block ${apiBlock.header.id} invalid as sum of inputs $inputSum != $outputSum"
-                )
-                inputs
+                      )
+                  (i.boxId, inputAddress, inputValue)
+                }
             }
+          val inputSum  = txInputs.iterator.map(_._3).sum
+          val outputSum = txOutputs.iterator.map(_._3).sum
+          assert(
+            inputSum == outputSum,
+            s"Transaction ${tx.id} at block ${apiBlock.header.id} invalid as sum of inputs $inputSum != $outputSum"
+          )
+
           Tx(tx.id, txIndex.toShort) -> (txInputs, txOutputs)
         }
       LightBlock(apiHeader.id, boxesByTx, blockInfo)

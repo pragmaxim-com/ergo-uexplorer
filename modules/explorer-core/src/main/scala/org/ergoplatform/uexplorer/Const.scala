@@ -10,10 +10,10 @@ object Const {
   object Genesis {
 
     val blockId = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
-    
+
     object Emission {
       val tx                    = TxId("4c6282be413c6e300a530618b37790be5f286ded758accc2aebd41554a1be308")
-      val initialNanoErgs: Long = 93409132 * CoinsInOneErgo
+      val initialNanoErgs: Long = (93409132.5d * CoinsInOneErgo).toLong
       val box: BoxId            = BoxId("b69575e11c5c43400bfead5976ee0d6245a1168396b2e2a4f384691f275d501c")
 
       val address: Address = Address.fromStringUnsafe(

@@ -47,20 +47,21 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
   def readableStorage: Storage = storage
 
   private def mergeBlockBoxesUnsafe(block: LightBlock): Try[Unit] = Try {
-    val boxes = block.boxesByTx.iterator.map(_._2)
-    boxes.foreach { case (inputBoxes, outputBoxes) =>
-      outputBoxes
-        .foreach { case (boxId, address, value) =>
-          storage.persistBox(boxId, address, value)
-        }
-      inputBoxes
-        .groupBy(_._2)
-        .view
-        .mapValues(_.collect { case (boxId, _, _) if boxId != Emission.box && boxId != Foundation.box => boxId })
-        .foreach { case (address, inputIds) =>
-          storage.removeInputBoxesByAddress(address, inputIds).get
-        }
-    }
+    block.boxesByTx.iterator
+      .map(_._2)
+      .foreach { case (inputBoxes, outputBoxes) =>
+        outputBoxes
+          .foreach { case (boxId, address, value) =>
+            storage.persistBox(boxId, address, value)
+          }
+        inputBoxes
+          .groupBy(_._2)
+          .view
+          .mapValues(_.collect { case (boxId, _, _) if boxId != Emission.box && boxId != Foundation.box => boxId })
+          .foreach { case (address, inputIds) =>
+            storage.removeInputBoxesByAddress(address, inputIds).get
+          }
+      }
     block.headerId -> block.info
   }.flatMap { case (blockId, blockInfo) =>
     storage.persistNewBlock(blockId, blockInfo)
