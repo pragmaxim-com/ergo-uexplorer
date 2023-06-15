@@ -13,7 +13,7 @@ class MvStorePlayground extends AsyncFreeSpec with Matchers {
 
     val store =
       new MVStore.Builder()
-        .fileName("/tmp/troloo4")
+        .fileName(null)
         .cacheSize(512)
         .autoCommitDisabled()
         .open()
