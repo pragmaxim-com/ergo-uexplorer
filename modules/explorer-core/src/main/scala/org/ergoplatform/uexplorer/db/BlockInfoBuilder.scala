@@ -12,6 +12,7 @@ import scala.util.Try
 
 object BlockInfoBuilder {
 
+  // CPU greedy (2% of all runtime)
   private def minerRewardAddress(
     apiBlock: ApiFullBlock
   )(protocolSettings: ProtocolSettings): Try[Address] =
@@ -57,7 +58,7 @@ object BlockInfoBuilder {
   }
 
   def apply(apiBlock: ApiFullBlock, prevBlock: Option[VersionedBlock])(implicit
-                                                                       protocolSettings: ProtocolSettings
+    protocolSettings: ProtocolSettings
   ): Try[BlockInfo] =
     minerRewardAddress(apiBlock)(protocolSettings).map { minerAddress =>
       val (reward, fee) = minerRewardAndFee(apiBlock)(protocolSettings)

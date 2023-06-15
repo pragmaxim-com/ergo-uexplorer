@@ -123,6 +123,7 @@ trait Codecs {
     } yield ApiTransaction(id, inputs, dataInputs, outputs, size)
   }
 
+  // extremely CPU greedy (6% of all runtime)
   implicit def apiFullBlockDecoder(implicit enc: ErgoAddressEncoder): Decoder[ApiFullBlock] = { (c: HCursor) =>
     for {
       header       <- c.downField("header").as[ApiHeader]
