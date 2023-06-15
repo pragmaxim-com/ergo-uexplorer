@@ -47,8 +47,7 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
   def readableStorage: Storage = storage
 
   private def mergeBlockBoxesUnsafe(block: LightBlock): Try[Unit] = Try {
-    val boxes          = block.boxesByTx.iterator.map(_._2)
-    val currentVersion = storage.getCurrentVersion
+    val boxes = block.boxesByTx.iterator.map(_._2)
     boxes.foreach { case (inputBoxes, outputBoxes) =>
       outputBoxes
         .foreach { case (boxId, address, value) =>
@@ -62,13 +61,13 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
           storage.removeInputBoxesByAddress(address, inputIds).get
         }
     }
-    block.headerId -> block.toVersionedBlock(currentVersion)
-  }.flatMap { case (blockId, versionedBlock) =>
-    storage.persistNewBlock(blockId, versionedBlock.height, versionedBlock)
+    block.headerId -> block.info
+  }.flatMap { case (blockId, blockInfo) =>
+    storage.persistNewBlock(blockId, blockInfo)
   }
 
   /** Genesis block has no parent so we assert that any block either has its parent cached or its a first block */
-  private def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[VersionedBlock]] = {
+  private def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[BlockInfo]] = {
     def fail =
       Failure(
         new IllegalStateException(
@@ -98,10 +97,16 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
   def addBestBlock(apiFullBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
     for {
       parentOpt <- getParentOrFail(apiFullBlock)
-      lb        <- LightBlockBuilder(apiFullBlock, parentOpt, storage.getAddressByUtxo, storage.getUtxosByAddress)
-      fb        <- if (backendEnabled) FullBlockBuilder(apiFullBlock, parentOpt).map(Some(_)) else Try(None)
-      _         <- mergeBlockBoxesUnsafe(lb)
-      _         <- storage.compact(lb.height)
+      lb <- LightBlockBuilder(
+              apiFullBlock,
+              parentOpt,
+              storage.getCurrentVersion,
+              storage.getAddressByUtxo,
+              storage.getUtxosByAddress
+            )
+      fb <- if (backendEnabled) FullBlockBuilder(apiFullBlock, parentOpt).map(Some(_)) else Try(None)
+      _  <- mergeBlockBoxesUnsafe(lb)
+      _  <- storage.compact(lb.info.height)
     } yield BestBlockInserted(lb, fb)
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =

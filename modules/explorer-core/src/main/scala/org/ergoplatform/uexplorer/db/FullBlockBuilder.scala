@@ -16,7 +16,7 @@ import scala.util.Try
 
 object FullBlockBuilder {
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[VersionedBlock]): Try[FullBlock] = Try {
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockInfo]): Try[FullBlock] = Try {
     val apiHeader       = apiBlock.header
     val apiExtension    = apiBlock.extension
     val apiAdProofOpt   = apiBlock.adProofs
@@ -61,7 +61,7 @@ object FullBlockBuilder {
       }
 
     val txs: ArraySeq[Transaction] = {
-      val lastTxGlobalIndex = prevBlock.map(_.info.maxTxGix).getOrElse(-1L)
+      val lastTxGlobalIndex = prevBlock.map(_.maxTxGix).getOrElse(-1L)
       val headerId          = apiBlock.header.id
       val height            = apiBlock.header.height
       val ts                = apiBlock.header.timestamp
@@ -112,7 +112,7 @@ object FullBlockBuilder {
       }
 
     val outputs = {
-      val lastOutputGlobalIndex = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
+      val lastOutputGlobalIndex = prevBlock.map(_.maxBoxGix).getOrElse(-1L)
       zippedTxs
         .flatMap { case (tx, tix) =>
           tx.outputs.zipWithIndex

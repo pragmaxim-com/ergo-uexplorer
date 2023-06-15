@@ -7,7 +7,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, VersionedBlock, FullBlock}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockInfo, FullBlock}
 import pureconfig.ConfigReader
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
 

@@ -11,7 +11,6 @@ import org.ergoplatform.uexplorer.{MapPimp, MutableMapPimp}
 import org.ergoplatform.uexplorer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
 import org.ergoplatform.uexplorer.cassandra
-import org.ergoplatform.uexplorer.db.VersionedBlock
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.collection.mutable

@@ -7,7 +7,8 @@ import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.VersionedBlock
+import org.ergoplatform.uexplorer.Storage.StorageVersion
+import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.MvStorage.*
 import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
@@ -34,7 +35,7 @@ case class MvStorage(
   utxosByAddress: MapLike[Address, java.util.Map[BoxId, Value]],
   addressByUtxo: MapLike[BoxId, Address],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
-  blockById: MapLike[BlockId, VersionedBlock]
+  blockById: MapLike[BlockId, BlockInfo]
 ) extends Storage
   with LazyLogging {
 
@@ -72,9 +73,9 @@ case class MvStorage(
     })
   }
 
-  def persistNewBlock(blockId: BlockId, height: Height, block: VersionedBlock): Try[Unit] = Try {
+  def persistNewBlock(blockId: BlockId, block: BlockInfo): Try[Unit] = Try {
     blockById.putAndForget(blockId, block)
-    blockIdsByHeight.adjustAndForget(height)(
+    blockIdsByHeight.adjustAndForget(block.height)(
       _.fold(javaSetOf(blockId)) { existingBlockIds =>
         existingBlockIds.add(blockId)
         existingBlockIds
@@ -87,7 +88,7 @@ case class MvStorage(
     s"storage height $height, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}"
   }
 
-  def getBlocksByHeight(atHeight: Height): Map[BlockId, VersionedBlock] =
+  def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockInfo] =
     blockIdsByHeight
       .get(atHeight)
       .map(_.asScala.flatMap(blockId => blockById.get(blockId).map(blockId -> _)).toMap)
@@ -101,7 +102,7 @@ case class MvStorage(
 
   def getLastHeight: Option[Height] = blockIdsByHeight.lastKey
 
-  def getLastBlocks: Map[BlockId, VersionedBlock] =
+  def getLastBlocks: Map[BlockId, BlockInfo] =
     blockIdsByHeight.lastKey
       .map { lastHeight =>
         getBlocksByHeight(lastHeight)
@@ -109,9 +110,9 @@ case class MvStorage(
       .getOrElse(Map.empty)
 
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean =
-    blockById.get(blockId).exists(_.height == atHeight)
+    blockById.containsKey(blockId) && blockIdsByHeight.containsKey(atHeight)
 
-  def getBlockById(blockId: BlockId): Option[VersionedBlock] = blockById.get(blockId)
+  def getBlockById(blockId: BlockId): Option[BlockInfo] = blockById.get(blockId)
 
   def getAddressByUtxo(boxId: BoxId): Option[Address] = addressByUtxo.get(boxId)
 
@@ -123,7 +124,7 @@ case class MvStorage(
       TreeSet((1 to lastHeight.get): _*).diff(blockIdsByHeight.keySet.asScala)
   }
 
-  override def getCurrentVersion: Long = store.getCurrentVersion
+  override def getCurrentVersion: StorageVersion = store.getCurrentVersion
 }
 
 object MvStorage extends LazyLogging {
@@ -149,7 +150,7 @@ object MvStorage extends LazyLogging {
       new MVMap4S[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
       new MVMap4S[BoxId, Address]("addressByUtxo", store),
       new MVMap4S[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),
-      new MVMap4S[BlockId, VersionedBlock]("blockById", store)
+      new MVMap4S[BlockId, BlockInfo]("blockById", store)
     )
   }
 

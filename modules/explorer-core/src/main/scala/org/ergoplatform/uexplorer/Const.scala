@@ -9,6 +9,8 @@ object Const {
 
   object Genesis {
 
+    val blockId = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
+    
     object Emission {
       val tx                    = TxId("4c6282be413c6e300a530618b37790be5f286ded758accc2aebd41554a1be308")
       val initialNanoErgs: Long = 93409132 * CoinsInOneErgo

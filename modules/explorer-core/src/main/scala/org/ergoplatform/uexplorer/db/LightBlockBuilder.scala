@@ -1,7 +1,8 @@
 package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
-import org.ergoplatform.uexplorer.{Address, BoxId, ProtocolSettings, Tx, Value}
+import org.ergoplatform.uexplorer.Storage.StorageVersion
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, BoxesByTx, ProtocolSettings, Tx, Value}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
 import scala.collection.compat.immutable.ArraySeq
@@ -11,16 +12,19 @@ object LightBlockBuilder {
 
   def apply(
     apiBlock: ApiFullBlock,
-    parentOpt: Option[VersionedBlock],
+    parentOpt: Option[BlockInfo],
+    parentVersion: StorageVersion,
     addressByUtxo: BoxId => Option[Address],
     utxosByAddress: Address => Option[Map[BoxId, Value]]
   )(implicit
     ps: ProtocolSettings
   ): Try[LightBlock] =
-    BlockInfoBuilder(apiBlock, parentOpt).map { blockInfo =>
+    BlockInfoBuilder(apiBlock, parentOpt, parentVersion).map { blockInfo =>
       val apiHeader = apiBlock.header
       val outputLookup =
-        apiBlock.transactions.transactions.iterator.flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value)))).toMap
+        apiBlock.transactions.transactions.iterator
+          .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))))
+          .toMap
       val boxesByTx =
         apiBlock.transactions.transactions.zipWithIndex.map { case (tx, txIndex) =>
           val txOutputs = tx.outputs.map(o => (o.boxId, o.address, o.value))
@@ -66,7 +70,9 @@ object LightBlockBuilder {
             }
           Tx(tx.id, txIndex.toShort) -> (txInputs, txOutputs)
         }
-      LightBlock(apiHeader.id, apiHeader.parentId, apiHeader.timestamp, apiHeader.height, boxesByTx, blockInfo)
+      LightBlock(apiHeader.id, boxesByTx, blockInfo)
     }
 
 }
+
+final case class LightBlock(headerId: BlockId, boxesByTx: BoxesByTx, info: BlockInfo)

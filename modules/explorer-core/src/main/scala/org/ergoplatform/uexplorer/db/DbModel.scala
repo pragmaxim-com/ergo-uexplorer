@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.db
 
 import io.circe.Json
+import org.ergoplatform.uexplorer.Const.Genesis
 import org.ergoplatform.uexplorer.{BoxesByTx, *}
 import org.ergoplatform.uexplorer.Const.Genesis.Emission
 
@@ -40,6 +41,10 @@ final case class BlockExtension(
 )
 
 final case class BlockInfo(
+  parentVersion: Long,
+  parentId: BlockId,
+  timestamp: Long,
+  height: Int,
   blockSize: Int, // block size (bytes)
   blockCoins: Long, // total amount of nERGs in the block
   blockMiningTime: Long, // block mining time
@@ -59,7 +64,30 @@ final case class BlockInfo(
   maxTxGix: Long, // Global index of the last transaction in the block
   maxBoxGix: Long // Global index of the last output in the last transaction in the block
 ) {
-  def this() = this(0, 0, 0, 0, 0, Emission.address, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) // kryo needs a no-arg constructor
+  def this() = this(
+    0,
+    Genesis.blockId,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    Emission.address,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ) // kryo needs a no-arg constructor
 }
 
 final case class BoxRegister(

@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.db
 
 import eu.timepit.refined.auto.*
+import org.ergoplatform.uexplorer.Storage.StorageVersion
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{Address, Const, ProtocolSettings}
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
@@ -57,7 +58,7 @@ object BlockInfoBuilder {
     }
   }
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[VersionedBlock])(implicit
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockInfo], parentVersion: StorageVersion)(implicit
     protocolSettings: ProtocolSettings
   ): Try[BlockInfo] =
     minerRewardAddress(apiBlock)(protocolSettings).map { minerAddress =>
@@ -71,14 +72,18 @@ object BlockInfoBuilder {
         .map(_.timestamp)
         .getOrElse(0L)
 
-      val lastGlobalTxIndex  = prevBlock.map(_.info.maxTxGix).getOrElse(-1L)
-      val lastGlobalBoxIndex = prevBlock.map(_.info.maxBoxGix).getOrElse(-1L)
+      val lastGlobalTxIndex  = prevBlock.map(_.maxTxGix).getOrElse(-1L)
+      val lastGlobalBoxIndex = prevBlock.map(_.maxBoxGix).getOrElse(-1L)
       val maxGlobalTxIndex   = lastGlobalTxIndex + apiBlock.transactions.transactions.size
       val maxGlobalBoxIndex = lastGlobalBoxIndex + apiBlock.transactions.transactions.foldLeft(0) { case (sum, tx) =>
         sum + tx.outputs.size
       }
 
       BlockInfo(
+        parentVersion   = parentVersion,
+        parentId        = apiBlock.header.parentId,
+        timestamp       = apiBlock.header.timestamp,
+        height          = apiBlock.header.height,
         blockSize       = apiBlock.size,
         blockCoins      = blockCoins,
         blockMiningTime = prevBlock.map(parent => apiBlock.header.timestamp - parent.timestamp).getOrElse(0),
@@ -89,20 +94,20 @@ object BlockInfoBuilder {
         minerRevenue    = reward + fee,
         blockFee        = fee,
         blockChainTotalSize = prevBlock
-          .map(_.info.blockChainTotalSize)
+          .map(_.blockChainTotalSize)
           .getOrElse(0L) + apiBlock.size,
         totalTxsCount = apiBlock.transactions.transactions.length.toLong + prevBlock
-          .map(_.info.totalTxsCount)
+          .map(_.totalTxsCount)
           .getOrElse(0L),
         totalCoinsIssued = protocolSettings.emission.issuedCoinsAfterHeight(apiBlock.header.height.toLong),
         totalMiningTime = prevBlock
-          .map(_.info.totalMiningTime)
+          .map(_.totalMiningTime)
           .getOrElse(0L) + miningTime,
-        totalFees = prevBlock.map(_.info.totalFees).getOrElse(0L) + fee,
+        totalFees = prevBlock.map(_.totalFees).getOrElse(0L) + fee,
         totalMinersReward = prevBlock
-          .map(_.info.totalMinersReward)
+          .map(_.totalMinersReward)
           .getOrElse(0L) + reward,
-        totalCoinsInTxs = prevBlock.map(_.info.totalCoinsInTxs).getOrElse(0L) + blockCoins,
+        totalCoinsInTxs = prevBlock.map(_.totalCoinsInTxs).getOrElse(0L) + blockCoins,
         maxTxGix        = maxGlobalTxIndex,
         maxBoxGix       = maxGlobalBoxIndex
       )

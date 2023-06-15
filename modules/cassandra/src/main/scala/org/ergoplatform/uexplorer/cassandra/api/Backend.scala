@@ -18,7 +18,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Success, Try}
 import akka.Done
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock, VersionedBlock}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockInfo, FullBlock}
 
 trait Backend {
 
@@ -55,8 +55,8 @@ object Backend {
 
 class InMemoryBackend extends Backend {
 
-  private val blocksById        = new ConcurrentHashMap[BlockId, VersionedBlock]()
-  private val blocksByHeight    = new ConcurrentHashMap[Height, VersionedBlock]()
+  private val blocksById        = new ConcurrentHashMap[BlockId, BlockInfo]()
+  private val blocksByHeight    = new ConcurrentHashMap[Height, BlockInfo]()
   override def isEmpty: Boolean = true
 
   override def close(): Future[Unit] = Future.successful(())
@@ -66,8 +66,8 @@ class InMemoryBackend extends Backend {
 
   override def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted].map { blockInserted =>
-      blocksByHeight.put(blockInserted.lightBlock.height, blockInserted.lightBlock.toVersionedBlock(0))
-      blocksById.put(blockInserted.lightBlock.headerId, blockInserted.lightBlock.toVersionedBlock(0))
+      blocksByHeight.put(blockInserted.lightBlock.info.height, blockInserted.lightBlock.info)
+      blocksById.put(blockInserted.lightBlock.headerId, blockInserted.lightBlock.info)
       blockInserted
     }
 

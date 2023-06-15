@@ -57,8 +57,8 @@ class ChainIndexer(
       .buffer(100, OverflowStrategy.backpressure)
       .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
       .wireTap { bb =>
-        if (bb.lightBlock.height % 100 == 0) {
-          logger.info(s"Height ${bb.lightBlock.height}")
+        if (bb.lightBlock.info.height % 100 == 0) {
+          logger.info(s"Height ${bb.lightBlock.info.height}")
         }
       }
       .async
