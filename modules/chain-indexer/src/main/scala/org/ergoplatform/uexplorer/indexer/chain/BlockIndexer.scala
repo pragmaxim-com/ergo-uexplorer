@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.indexer.chain
 import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockBuilder, ForkInserted, FullBlock, LightBlock}
+import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.MvStorage
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
@@ -99,10 +99,11 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
   def addBestBlock(apiFullBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
     for {
       parentOpt <- getParentOrFail(apiFullBlock)
-      b         <- BlockBuilder(apiFullBlock, parentOpt, storage, backendEnabled)
-      _         <- mergeBlockBoxesUnsafe(b.lightBlock)
-      _         <- storage.compact(b.lightBlock.height)
-    } yield b
+      lb        <- LightBlockBuilder(apiFullBlock, parentOpt, storage.getAddressByUtxo, storage.getUtxosByAddress)
+      fb        <- if (backendEnabled) FullBlockBuilder(apiFullBlock, parentOpt).map(Some(_)) else Try(None)
+      _         <- mergeBlockBoxesUnsafe(lb)
+      _         <- storage.compact(lb.height)
+    } yield BestBlockInserted(lb, fb)
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
     fork.size > 1 && storage.containsBlock(fork.head.header.parentId, fork.head.header.height - 1) &&

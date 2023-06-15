@@ -9,7 +9,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.{Height, ProtocolSettings, Resiliency, Storage}
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, ForkInserted, FullBlock, Inserted}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, ForkInserted, FullBlock, Insertable}
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
@@ -27,8 +27,8 @@ class ChainIndexer(
 )(implicit s: ActorSystem[Nothing], ps: ProtocolSettings, killSwitch: SharedKillSwitch)
   extends LazyLogging {
 
-  private def forkDeleteFlow(parallelism: Int): Flow[Inserted, BestBlockInserted, NotUsed] =
-    Flow[Inserted]
+  private def forkDeleteFlow(parallelism: Int): Flow[Insertable, BestBlockInserted, NotUsed] =
+    Flow[Insertable]
       .mapAsync(parallelism) {
         case ForkInserted(newBlocksInserted, supersededFork) =>
           backendOpt
