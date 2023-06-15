@@ -5,7 +5,7 @@ import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 
 import scala.collection.immutable.ArraySeq
 
@@ -21,7 +21,7 @@ trait CassandraInputsWriter { this: CassandraBackend =>
     )
 
   protected[cassandra] def inputInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block), statement) =>
+    case (BestBlockInserted(_, Some(block)), statement) =>
       block.inputs.map { input =>
         val partialStatement =
           statement
@@ -41,6 +41,9 @@ trait CassandraInputsWriter { this: CassandraBackend =>
             partialStatement // .setToNull(proof_bytes)  // this would create a cassandra tombstone
         }
       }
+    case _ =>
+      throw new IllegalStateException("Backend must be enabled")
+
   }
 
 }

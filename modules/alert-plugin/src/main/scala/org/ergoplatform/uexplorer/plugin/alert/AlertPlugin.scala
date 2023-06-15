@@ -8,7 +8,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.{Flux, Mono}
 import retry.Policy

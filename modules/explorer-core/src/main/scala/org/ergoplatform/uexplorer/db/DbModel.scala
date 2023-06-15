@@ -20,18 +20,25 @@ final case class Asset(
   amount: Long
 )
 
-final case class Block(
+final case class FullBlock(
   header: Header,
   extension: BlockExtension,
   adProofOpt: Option[AdProof],
   txs: ArraySeq[Transaction],
-  boxesByTx: BoxesByTx,
   inputs: ArraySeq[Input],
   dataInputs: ArraySeq[DataInput],
   outputs: ArraySeq[Output],
   assets: ArraySeq[Asset],
   registers: ArraySeq[BoxRegister],
-  tokens: ArraySeq[Token],
+  tokens: ArraySeq[Token]
+)
+
+final case class LightBlock(
+  headerId: BlockId,
+  parentId: BlockId,
+  timestamp: Long,
+  height: Int,
+  boxesByTx: BoxesByTx,
   info: BlockInfo
 )
 

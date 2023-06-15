@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.cassandra
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 
 trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
   import Headers._
@@ -23,7 +23,7 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
     )
 
   protected[cassandra] def headerInsertBinder: (BestBlockInserted, PreparedStatement) => BoundStatement = {
-    case (BestBlockInserted(block), statement) =>
+    case (BestBlockInserted(_, Some(block)), statement) =>
       val validVersion =
         if (block.header.version.toInt > 255 || block.header.version.toInt < 0) {
           logger.error(s"Version of block ${block.header.id} is out of [8-bit unsigned] range : ${block.header.version}")
@@ -62,6 +62,9 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
           .setString(ad_proofs_bytes, adProof.proofBytes)
           .setString(ad_proofs_digest, adProof.digest)
       }
+    case _ =>
+      throw new IllegalStateException("Backend must be enabled")
+
   }
 
 }

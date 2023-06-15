@@ -5,7 +5,7 @@ import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.alert.Detector.AlertMessage
 import HighValueDetector.*
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.text.DecimalFormat
@@ -69,10 +69,10 @@ object HighValueDetector {
   private val valueFormat = new DecimalFormat("#,###")
 
   case class BlockMatch(
-    block: Block,
-    blockValue: Value,
-    inputs: Map[Address, Address.State],
-    outputs: Map[Address, Address.State]
+                         block: FullBlock,
+                         blockValue: Value,
+                         inputs: Map[Address, Address.State],
+                         outputs: Map[Address, Address.State]
   )
 
   case class TxMatch(

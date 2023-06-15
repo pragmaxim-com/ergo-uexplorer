@@ -26,7 +26,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Try
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,

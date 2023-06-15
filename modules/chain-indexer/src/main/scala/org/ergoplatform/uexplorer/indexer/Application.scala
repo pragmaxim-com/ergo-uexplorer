@@ -31,7 +31,7 @@ import org.ergoplatform.uexplorer.indexer.http.Routes
 import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.db.FullBlock
 import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, ChainIndexer, Initializer}
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
@@ -73,7 +73,7 @@ object Application extends App with AkkaStreamSupport {
               backendOpt      <- Future.fromTry(Backend(conf.backendType))
               graphBackendOpt <- Future.fromTry(GraphBackend(conf.graphBackendType))
               storage         <- Future.fromTry(MvStorage.withDefaultDir())
-              blockIndexer  = new BlockIndexer(storage)
+              blockIndexer  = new BlockIndexer(storage, backendOpt.isDefined)
               chainIndexer  = new ChainIndexer(backendOpt, graphBackendOpt, blockHttpClient, blockIndexer)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
               initializer   = new Initializer(storage, backendOpt, graphBackendOpt)

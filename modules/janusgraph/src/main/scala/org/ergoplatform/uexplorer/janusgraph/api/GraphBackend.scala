@@ -8,7 +8,7 @@ import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.ergoplatform.uexplorer.BlockMetadata
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 import pureconfig.ConfigReader
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
 
@@ -27,7 +27,7 @@ trait GraphBackend {
 
   def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, g: Graph): Unit
+  def writeTx(height: Height, timestamp: Timestamp, boxesByTx: BoxesByTx, g: Graph): Unit
 
   def writeTxsAndCommit(
     txBoxesByHeight: IterableOnce[BestBlockInserted]
@@ -75,7 +75,7 @@ class InMemoryGraphBackend extends GraphBackend {
 
   def tx: Transaction = ???
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, g: Graph): Unit = {}
+  def writeTx(height: Height, timestamp: Timestamp, boxesByTx: BoxesByTx, g: Graph): Unit = {}
 
   def writeTxsAndCommit(
     txBoxesByHeight: IterableOnce[BestBlockInserted]

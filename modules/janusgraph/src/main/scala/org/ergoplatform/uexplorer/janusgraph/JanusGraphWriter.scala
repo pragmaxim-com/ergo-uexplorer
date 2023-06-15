@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.autoUnwrap
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 import org.janusgraph.core.Multiplicity
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -42,17 +42,17 @@ trait JanusGraphWriter extends LazyLogging {
     }
   }
 
-  def writeTx(height: Height, boxesByTx: BoxesByTx, g: Graph): Unit =
+  def writeTx(height: Height, timestamp: Timestamp, boxesByTx: BoxesByTx, g: Graph): Unit =
     boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-      TxGraphWriter.writeGraph(tx, height, inputs, outputs)(g)
+      TxGraphWriter.writeGraph(tx, height, timestamp, inputs, outputs)(g)
     }
 
   def writeTxsAndCommit(
     txBoxesByHeight: IterableOnce[BestBlockInserted]
   ): IterableOnce[BestBlockInserted] = {
     txBoxesByHeight.iterator
-      .foreach { case BestBlockInserted(b) =>
-        writeTx(b.header.height, b.boxesByTx, janusGraph)
+      .foreach { case BestBlockInserted(b, _) =>
+        writeTx(b.height, b.timestamp, b.boxesByTx, janusGraph)
       }
     janusGraph.tx().commit()
     txBoxesByHeight

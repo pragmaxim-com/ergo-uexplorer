@@ -74,7 +74,7 @@ package object uexplorer {
     def fromStringUnsafe(s: String): ErgoTree = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
-  case class Tx(id: TxId, index: TxIndex, height: Height, timestamp: Timestamp)
+  case class Tx(id: TxId, index: TxIndex)
 
   opaque type TxId = String
 

@@ -9,7 +9,7 @@ import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.cassandra.entity.CassandraBlockUpdater.*
 import org.ergoplatform.uexplorer.cassandra
-import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.db.FullBlock
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*

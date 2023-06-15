@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.indexer.chain
 import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, BlockBuilder, ForkInserted}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockBuilder, ForkInserted, FullBlock, LightBlock}
 import org.ergoplatform.uexplorer.mvstore.MvStorage
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
@@ -42,11 +42,11 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Random, Success, Try}
 
-class BlockIndexer(storage: MvStorage) extends LazyLogging {
+class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogging {
 
   def readableStorage: Storage = storage
 
-  private def mergeBlockBoxesUnsafe(block: Block): Try[Unit] = Try {
+  private def mergeBlockBoxesUnsafe(block: LightBlock): Try[Unit] = Try {
     val boxes          = block.boxesByTx.iterator.map(_._2)
     val currentVersion = storage.getCurrentVersion
     val blockMetadata  = BlockMetadata.fromBlock(block, currentVersion)
@@ -63,7 +63,7 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
           storage.removeInputBoxesByAddress(address, inputIds).get
         }
     }
-    block.header.id -> blockMetadata
+    block.headerId -> blockMetadata
   }.flatMap { case (blockId, blockMetadata) =>
     storage.persistNewBlock(blockId, blockMetadata.height, blockMetadata)
   }
@@ -99,11 +99,10 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
   def addBestBlock(apiFullBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
     for {
       parentOpt <- getParentOrFail(apiFullBlock)
-      b         <- BlockBuilder(apiFullBlock, parentOpt, storage)
-      blockInserted = BestBlockInserted(b)
-      _ <- mergeBlockBoxesUnsafe(b)
-      _ <- storage.compact(b.header.height)
-    } yield blockInserted
+      b         <- BlockBuilder(apiFullBlock, parentOpt, storage, backendEnabled)
+      _         <- mergeBlockBoxesUnsafe(b.lightBlock)
+      _         <- storage.compact(b.lightBlock.height)
+    } yield b
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
     fork.size > 1 && storage.containsBlock(fork.head.header.parentId, fork.head.header.height - 1) &&
@@ -122,6 +121,7 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
         )
       )
     } else {
+      logger.info(s"Adding fork from height ${winningFork.head.header.height} until ${winningFork.last.header.height}")
       for {
         preForkVersion <- Try(storage.getBlockById(winningFork.head.header.id).map(_.parentVersion).get)
         toRemove = winningFork.flatMap(b => storage.getBlocksByHeight(b.header.height).filter(_._1 != b.header.id)).toMap
@@ -132,17 +132,16 @@ class BlockIndexer(storage: MvStorage) extends LazyLogging {
         toRemove
       )
     }
-
 }
 
 object BlockIndexer {
-  def apply(storage: MvStorage)(implicit system: ActorSystem[Nothing]): BlockIndexer = {
+  def apply(storage: MvStorage, backendEnabled: Boolean)(implicit system: ActorSystem[Nothing]): BlockIndexer = {
     CoordinatedShutdown(system).addTask(
       CoordinatedShutdown.PhaseServiceStop,
       "close-mv-store"
     ) { () =>
       Future(storage.close()).map(_ => Done)
     }
-    new BlockIndexer(storage)
+    new BlockIndexer(storage, backendEnabled)
   }
 }

@@ -18,7 +18,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Success, Try}
 import akka.Done
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 
 trait Backend {
 
@@ -66,8 +66,8 @@ class InMemoryBackend extends Backend {
 
   override def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted].map { blockInserted =>
-      blocksByHeight.put(blockInserted.block.header.height, BlockMetadata.fromBlock(blockInserted.block, 0))
-      blocksById.put(blockInserted.block.header.id, BlockMetadata.fromBlock(blockInserted.block, 0))
+      blocksByHeight.put(blockInserted.lightBlock.height, BlockMetadata.fromBlock(blockInserted.lightBlock, 0))
+      blocksById.put(blockInserted.lightBlock.headerId, BlockMetadata.fromBlock(blockInserted.lightBlock, 0))
       blockInserted
     }
 

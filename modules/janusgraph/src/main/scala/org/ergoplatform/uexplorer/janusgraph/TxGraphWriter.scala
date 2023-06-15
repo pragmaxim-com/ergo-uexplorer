@@ -21,14 +21,15 @@ object TxGraphWriter extends LazyLogging {
 
   def writeGraph(
     tx: Tx,
-    height: Int,
+    height: Height,
+    timestamp: Timestamp,
     inputs: ArraySeq[(BoxId, Address, Long)],
     outputs: ArraySeq[(BoxId, Address, Long)]
   )(g: Graph): Unit = {
     val newTxVertex = g.addVertex(T.id, Utils.vertexHash(tx.id.unwrapped, g), T.label, "txId")
     newTxVertex.property("txId", tx.id)
-    newTxVertex.property("height", tx.height)
-    newTxVertex.property("timestamp", tx.timestamp)
+    newTxVertex.property("height", height)
+    newTxVertex.property("timestamp", timestamp)
     val inputsByAddress =
       inputs
         .filterNot(t => blackListBoxes.contains(t._1) || blackListAddresses.contains(t._2) || t._3 < CoinsInOneErgo)
@@ -50,7 +51,7 @@ object TxGraphWriter extends LazyLogging {
         ) || t._3 < CoinsInOneErgo
       )
       .groupBy(_._2)
-      .foreach { case (address, inputs) =>
+      .foreach { case (address, outputs) =>
         val outputAddressVertexIt = g.vertices(Utils.vertexHash(address, g))
         val newOutputAddressVertex =
           if (outputAddressVertexIt.hasNext) {
@@ -60,7 +61,7 @@ object TxGraphWriter extends LazyLogging {
             newOutputAddressVertex.property("address", address)
             newOutputAddressVertex
           }
-        newTxVertex.addEdge("to", newOutputAddressVertex, "value", inputs.iterator.map(_._3).sum)
+        newTxVertex.addEdge("to", newOutputAddressVertex, "value", outputs.iterator.map(_._3).sum)
       }
   }
 

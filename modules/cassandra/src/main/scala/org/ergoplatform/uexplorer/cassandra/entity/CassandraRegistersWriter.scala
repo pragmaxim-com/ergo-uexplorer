@@ -6,7 +6,7 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, P
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 
 import scala.collection.immutable.ArraySeq
 
@@ -24,7 +24,7 @@ trait CassandraRegistersWriter extends LazyLogging {
     )
 
   protected[cassandra] def registersInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block), statement) =>
+    case (BestBlockInserted(_, Some(block)), statement) =>
       block.registers.map { r =>
         // format: off
         statement
@@ -36,6 +36,8 @@ trait CassandraRegistersWriter extends LazyLogging {
           .setString(serialized_value,      r.renderedValue)
         // format: on
       }
+    case _ =>
+      throw new IllegalStateException("Backend must be enabled")
   }
 
 }

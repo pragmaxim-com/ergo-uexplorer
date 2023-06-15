@@ -6,7 +6,7 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, P
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.Const
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 
 import scala.collection.immutable.ArraySeq
 
@@ -22,7 +22,7 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
     )
 
   protected[cassandra] def outputInsertBinder: (BestBlockInserted, PreparedStatement) => ArraySeq[BoundStatement] = {
-    case (BestBlockInserted(block), statement) =>
+    case (BestBlockInserted(_, Some(block)), statement) =>
       block.outputs.map { output =>
         statement
           .bind()
@@ -43,6 +43,9 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
           .setBoolean(main_chain,                 output.mainChain)
         // format: on
       }
+    case _ =>
+      throw new IllegalStateException("Backend must be enabled")
+
   }
 }
 

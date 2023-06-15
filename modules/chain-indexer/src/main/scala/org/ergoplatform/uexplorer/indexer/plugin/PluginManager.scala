@@ -6,7 +6,7 @@ import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolStateChanges
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.{SortedTopAddressMap, Storage}

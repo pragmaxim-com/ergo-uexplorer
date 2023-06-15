@@ -9,7 +9,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.{Height, ProtocolSettings, Resiliency, Storage}
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block, ForkInserted, Inserted}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, ForkInserted, FullBlock, Inserted}
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
@@ -57,8 +57,8 @@ class ChainIndexer(
       .buffer(100, OverflowStrategy.backpressure)
       .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
       .wireTap { bb =>
-        if (bb.block.header.height % 100 == 0) {
-          logger.info(s"Height ${bb.block.header.height}")
+        if (bb.lightBlock.height % 100 == 0) {
+          logger.info(s"Height ${bb.lightBlock.height}")
         }
       }
       .async

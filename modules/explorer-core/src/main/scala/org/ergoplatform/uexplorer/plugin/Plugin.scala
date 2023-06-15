@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.plugin
 
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, Block}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{Address, BoxId, SortedTopAddressMap, Storage, TopAddressMap, TxId, Value}
 

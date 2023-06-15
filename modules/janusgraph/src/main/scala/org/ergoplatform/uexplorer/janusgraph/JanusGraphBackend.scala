@@ -7,7 +7,7 @@ import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Transaction
-import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.db.FullBlock
 import org.ergoplatform.uexplorer.{BoxesByTx, Height, TopAddressMap}
 import org.janusgraph.core.JanusGraphFactory
 import org.janusgraph.graphdb.database.StandardJanusGraph
