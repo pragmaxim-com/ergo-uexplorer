@@ -7,8 +7,9 @@ import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
 import org.ergoplatform.uexplorer.Storage.StorageVersion
-import org.ergoplatform.uexplorer.db.BlockInfo
+import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock}
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.MvStorage.*
 import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
@@ -54,7 +55,7 @@ case class MvStorage(
 
   def rollbackTo(version: Long): Try[Unit] = Try(store.rollbackTo(version))
 
-  def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Try[Unit] =
+  private def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Try[Unit] =
     // removeAll is a heavy hitter : 30% of runtime
     addressByUtxo.removeAllOrFail(inputBoxes).flatMap { _ =>
       utxosByAddress
@@ -64,7 +65,7 @@ case class MvStorage(
         }
     }
 
-  def persistBox(boxId: BoxId, address: Address, value: Value): Unit = { // Without Try for perf reasons
+  private def persistBox(boxId: BoxId, address: Address, value: Value): Unit = { // Without Try for perf reasons
     addressByUtxo.putAndForget(boxId, address)
     // heavy method, 50% of runtime
     utxosByAddress.adjustAndForget(address)(_.fold(javaMapOf(boxId, value)) { arr =>
@@ -73,14 +74,29 @@ case class MvStorage(
     })
   }
 
-  def persistNewBlock(blockId: BlockId, block: BlockInfo): Try[Unit] = Try {
-    blockById.putAndForget(blockId, block)
-    blockIdsByHeight.adjustAndForget(block.height)(
-      _.fold(javaSetOf(blockId)) { existingBlockIds =>
-        existingBlockIds.add(blockId)
+  def persistNewBlock(lightBlock: LightBlock): Try[LightBlock] = Try {
+    lightBlock.boxesByTx
+      .foreach { case (_, (inputBoxes, outputBoxes)) =>
+        outputBoxes
+          .foreach { case (boxId, address, value) =>
+            persistBox(boxId, address, value)
+          }
+        inputBoxes
+          .groupBy(_._2)
+          .view
+          .mapValues(_.collect { case (boxId, _, _) if boxId != Emission.box && boxId != Foundation.box => boxId })
+          .foreach { case (address, inputIds) =>
+            removeInputBoxesByAddress(address, inputIds).get
+          }
+      }
+    blockById.putAndForget(lightBlock.headerId, lightBlock.info)
+    blockIdsByHeight.adjustAndForget(lightBlock.info.height)(
+      _.fold(javaSetOf(lightBlock.headerId)) { existingBlockIds =>
+        existingBlockIds.add(lightBlock.headerId)
         existingBlockIds
       }
     )
+    lightBlock
   }
 
   def getReport: String = {

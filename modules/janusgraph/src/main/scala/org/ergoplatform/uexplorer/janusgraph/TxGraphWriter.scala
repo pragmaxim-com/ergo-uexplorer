@@ -20,14 +20,14 @@ object TxGraphWriter extends LazyLogging {
     Set(FeeContract.address, Genesis.Emission.address, Genesis.NoPremine.address, Genesis.Foundation.address)
 
   def writeGraph(
-    tx: Tx,
+    txId: TxId,
     height: Height,
     timestamp: Timestamp,
     inputs: ArraySeq[(BoxId, Address, Long)],
     outputs: ArraySeq[(BoxId, Address, Long)]
   )(g: Graph): Unit = {
-    val newTxVertex = g.addVertex(T.id, Utils.vertexHash(tx.id.unwrapped, g), T.label, "txId")
-    newTxVertex.property("txId", tx.id)
+    val newTxVertex = g.addVertex(T.id, Utils.vertexHash(txId.unwrapped, g), T.label, "txId")
+    newTxVertex.property("txId", txId)
     newTxVertex.property("height", height)
     newTxVertex.property("timestamp", timestamp)
     val inputsByAddress =

@@ -46,27 +46,6 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
 
   def readableStorage: Storage = storage
 
-  private def mergeBlockBoxesUnsafe(block: LightBlock): Try[Unit] = Try {
-    block.boxesByTx.iterator
-      .map(_._2)
-      .foreach { case (inputBoxes, outputBoxes) =>
-        outputBoxes
-          .foreach { case (boxId, address, value) =>
-            storage.persistBox(boxId, address, value)
-          }
-        inputBoxes
-          .groupBy(_._2)
-          .view
-          .mapValues(_.collect { case (boxId, _, _) if boxId != Emission.box && boxId != Foundation.box => boxId })
-          .foreach { case (address, inputIds) =>
-            storage.removeInputBoxesByAddress(address, inputIds).get
-          }
-      }
-    block.headerId -> block.info
-  }.flatMap { case (blockId, blockInfo) =>
-    storage.persistNewBlock(blockId, blockInfo)
-  }
-
   /** Genesis block has no parent so we assert that any block either has its parent cached or its a first block */
   private def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[BlockInfo]] = {
     def fail =
@@ -95,20 +74,15 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
           }
       }
 
-  def addBestBlock(apiFullBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
+  def addBestBlock(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
     for {
-      parentOpt <- getParentOrFail(apiFullBlock)
-      lb <- LightBlockBuilder(
-              apiFullBlock,
-              parentOpt,
-              storage.getCurrentVersion,
-              storage.getAddressByUtxo,
-              storage.getUtxosByAddress
-            )
-      fb <- if (backendEnabled) FullBlockBuilder(apiFullBlock, parentOpt).map(Some(_)) else Try(None)
-      _  <- mergeBlockBoxesUnsafe(lb)
-      _  <- storage.compact(lb.info.height)
-    } yield BestBlockInserted(lb, fb)
+      parentOpt  <- getParentOrFail(apiBlock)
+      blockInfo  <- BlockInfoBuilder(apiBlock, parentOpt, storage.getCurrentVersion)
+      lightBlock <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxosByAddress)
+      fullBlock  <- if (backendEnabled) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
+      _          <- storage.persistNewBlock(lightBlock)
+      _          <- storage.compact(lightBlock.info.height)
+    } yield BestBlockInserted(lightBlock, fullBlock)
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
     fork.size > 1 && storage.containsBlock(fork.head.header.parentId, fork.head.header.height - 1) &&

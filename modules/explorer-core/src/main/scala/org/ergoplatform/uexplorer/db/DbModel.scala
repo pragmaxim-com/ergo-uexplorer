@@ -21,6 +21,8 @@ final case class Asset(
   amount: Long
 )
 
+final case class LightBlock(headerId: BlockId, boxesByTx: BoxesByTx, info: BlockInfo)
+
 final case class FullBlock(
   header: Header,
   extension: BlockExtension,

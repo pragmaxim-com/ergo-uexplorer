@@ -13,7 +13,6 @@ import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import org.ergoplatform.uexplorer.Tx
 
 object MempoolStateHolder extends LazyLogging {
 

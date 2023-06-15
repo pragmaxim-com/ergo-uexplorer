@@ -18,7 +18,6 @@ package object uexplorer {
   type Value     = Long
   type Height    = Int
   type Timestamp = Long
-  type TxIndex   = Short
 
   type BoxCount            = Int
   type TxCount             = Int
@@ -30,7 +29,7 @@ package object uexplorer {
   type Address       = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
 
-  type BoxesByTx = Seq[(Tx, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
+  type BoxesByTx = Seq[(TxId, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
 
   object Address {
     case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount) {
@@ -73,8 +72,6 @@ package object uexplorer {
   object ErgoTree {
     def fromStringUnsafe(s: String): ErgoTree = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
-
-  case class Tx(id: TxId, index: TxIndex)
 
   opaque type TxId = String
 
