@@ -48,6 +48,8 @@ trait MapLike[K, V] {
 
   def putAndForget(key: K, value: V): Unit
 
+  def putAllOrFail(keys: IterableOnce[(K, V)]): Try[Unit]
+  
   def putIfAbsent(key: K, value: V): Option[V]
 
   def putIfAbsentOrFail(key: K, value: V): Try[Unit]

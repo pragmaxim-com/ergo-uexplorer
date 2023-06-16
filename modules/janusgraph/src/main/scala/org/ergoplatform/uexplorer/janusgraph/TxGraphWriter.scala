@@ -7,6 +7,7 @@ import eu.timepit.refined.auto.autoUnwrap
 import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.*
+import org.ergoplatform.uexplorer.db.Record
 
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.collection.mutable
@@ -23,8 +24,8 @@ object TxGraphWriter extends LazyLogging {
     txId: TxId,
     height: Height,
     timestamp: Timestamp,
-    inputs: ArraySeq[(BoxId, Address, Long)],
-    outputs: ArraySeq[(BoxId, Address, Long)]
+    inputs: Iterable[Record],
+    outputs: Iterable[Record]
   )(g: Graph): Unit = {
     val newTxVertex = g.addVertex(T.id, Utils.vertexHash(txId.unwrapped, g), T.label, "txId")
     newTxVertex.property("txId", txId)
@@ -32,8 +33,10 @@ object TxGraphWriter extends LazyLogging {
     newTxVertex.property("timestamp", timestamp)
     val inputsByAddress =
       inputs
-        .filterNot(t => blackListBoxes.contains(t._1) || blackListAddresses.contains(t._2) || t._3 < CoinsInOneErgo)
-        .groupBy(_._2)
+        .filterNot(t =>
+          blackListBoxes.contains(t.boxId) || blackListAddresses.contains(t.address) || t.value < CoinsInOneErgo
+        )
+        .groupBy(_.address)
 
     inputsByAddress
       .foreach { case (address, inputs) =>
@@ -41,16 +44,16 @@ object TxGraphWriter extends LazyLogging {
         if (!inputAddressVertexIt.hasNext) {
           logger.error(s"inputAddress $address from height $height lacks corresponding vertex")
         }
-        newTxVertex.addEdge("from", inputAddressVertexIt.next(), "value", inputs.iterator.map(_._3).sum)
+        newTxVertex.addEdge("from", inputAddressVertexIt.next(), "value", inputs.iterator.map(_.value).sum)
       }
 
     outputs
       .filterNot(t =>
-        inputsByAddress.contains(t._2) || blackListBoxes.contains(t._1) || blackListAddresses.contains(
-          t._2
-        ) || t._3 < CoinsInOneErgo
+        inputsByAddress.contains(t.address) || blackListBoxes.contains(t.boxId) || blackListAddresses.contains(
+          t.address
+        ) || t.value < CoinsInOneErgo
       )
-      .groupBy(_._2)
+      .groupBy(_.address)
       .foreach { case (address, outputs) =>
         val outputAddressVertexIt = g.vertices(Utils.vertexHash(address, g))
         val newOutputAddressVertex =
@@ -61,7 +64,7 @@ object TxGraphWriter extends LazyLogging {
             newOutputAddressVertex.property("address", address)
             newOutputAddressVertex
           }
-        newTxVertex.addEdge("to", newOutputAddressVertex, "value", outputs.iterator.map(_._3).sum)
+        newTxVertex.addEdge("to", newOutputAddressVertex, "value", outputs.iterator.map(_.value).sum)
       }
   }
 

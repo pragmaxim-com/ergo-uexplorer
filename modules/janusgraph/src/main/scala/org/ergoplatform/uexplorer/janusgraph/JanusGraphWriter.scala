@@ -7,8 +7,9 @@ import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.autoUnwrap
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock, LightBlock}
 import org.janusgraph.core.Multiplicity
+
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -42,20 +43,17 @@ trait JanusGraphWriter extends LazyLogging {
     }
   }
 
-  def writeTx(height: Height, timestamp: Timestamp, boxesByTx: BoxesByTx, g: Graph): Unit =
-    boxesByTx.foreach { case (tx, (inputs, outputs)) =>
-      TxGraphWriter.writeGraph(tx, height, timestamp, inputs, outputs)(g)
-    }
-
-  def writeTxsAndCommit(
-    txBoxesByHeight: IterableOnce[BestBlockInserted]
-  ): IterableOnce[BestBlockInserted] = {
-    txBoxesByHeight.iterator
+  def writeTxsAndCommit(blocks: Seq[BestBlockInserted]): IterableOnce[BestBlockInserted] = {
+    blocks.iterator
       .foreach { case BestBlockInserted(b, _) =>
-        writeTx(b.info.height, b.info.timestamp, b.boxesByTx, janusGraph)
+        b.inputBoxes.groupBy(_.txId).foreach { case (txId, inputRecords) =>
+          val outputRecords = b.outputBoxes.filter(_.txId == txId)
+          TxGraphWriter.writeGraph(txId, b.info.height, b.info.timestamp, inputRecords, outputRecords)(janusGraph)
+
+        }
       }
     janusGraph.tx().commit()
-    txBoxesByHeight
+    blocks
   }
 
   def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =

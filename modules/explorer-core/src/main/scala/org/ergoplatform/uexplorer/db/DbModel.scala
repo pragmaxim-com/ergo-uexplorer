@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.db
 
 import io.circe.Json
 import org.ergoplatform.uexplorer.Const.Genesis
-import org.ergoplatform.uexplorer.{BoxesByTx, *}
+import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Genesis.Emission
 
 import scala.collection.immutable.ArraySeq
@@ -21,7 +21,8 @@ final case class Asset(
   amount: Long
 )
 
-final case class LightBlock(headerId: BlockId, boxesByTx: BoxesByTx, info: BlockInfo)
+case class Record(txId: TxId, boxId: BoxId, address: Address, value: Value)
+final case class LightBlock(headerId: BlockId, inputBoxes: Iterable[Record], outputBoxes: Iterable[Record], info: BlockInfo)
 
 final case class FullBlock(
   header: Header,

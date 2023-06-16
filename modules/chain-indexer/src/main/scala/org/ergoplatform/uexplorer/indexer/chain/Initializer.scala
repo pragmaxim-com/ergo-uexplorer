@@ -9,7 +9,7 @@ import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.mvstore.MvStorage
-import org.ergoplatform.uexplorer.{BlockId, BoxesByTx, Const, Height}
+import org.ergoplatform.uexplorer.{BlockId, Const, Height}
 
 import java.nio.file.{Files, Paths}
 import scala.collection.immutable.TreeSet

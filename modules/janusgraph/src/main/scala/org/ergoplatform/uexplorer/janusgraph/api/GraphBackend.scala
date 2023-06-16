@@ -7,7 +7,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockInfo, FullBlock}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockInfo, FullBlock, LightBlock}
 import pureconfig.ConfigReader
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
 
@@ -26,11 +26,7 @@ trait GraphBackend {
 
   def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
-  def writeTx(height: Height, timestamp: Timestamp, boxesByTx: BoxesByTx, g: Graph): Unit
-
-  def writeTxsAndCommit(
-    txBoxesByHeight: IterableOnce[BestBlockInserted]
-  ): IterableOnce[BestBlockInserted]
+  def writeTxsAndCommit(blocks: Seq[BestBlockInserted]): IterableOnce[BestBlockInserted]
 
   def graphTraversalSource: GraphTraversalSource
 
@@ -74,11 +70,8 @@ class InMemoryGraphBackend extends GraphBackend {
 
   def tx: Transaction = ???
 
-  def writeTx(height: Height, timestamp: Timestamp, boxesByTx: BoxesByTx, g: Graph): Unit = {}
+  def writeTxsAndCommit(blocks: Seq[BestBlockInserted]): IterableOnce[BestBlockInserted] = List.empty
 
-  def writeTxsAndCommit(
-    txBoxesByHeight: IterableOnce[BestBlockInserted]
-  ): IterableOnce[BestBlockInserted] = List.empty
   def isEmpty: Boolean = true
 
   def graphTraversalSource: GraphTraversalSource = EmptyGraph.instance.traversal()

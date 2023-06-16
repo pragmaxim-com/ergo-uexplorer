@@ -31,8 +31,6 @@ package object uexplorer {
   type Address       = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
 
-  type BoxesByTx = Seq[(TxId, (ArraySeq[(BoxId, Address, Value)], ArraySeq[(BoxId, Address, Value)]))]
-
   object Address {
     case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount) {
       def this() = this(0, 0, 0) // kryo needs a no-arg constructor

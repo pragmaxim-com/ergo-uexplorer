@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
-import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock}
+import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock, Record}
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.MvStorage.*
 import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
@@ -44,7 +44,7 @@ case class MvStorage(
   def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
 
   private def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Try[Unit] =
-    // removeAll is a heavy hitter : 30% of runtime
+    // heavy hitters : 20% of runtime
     addressByUtxo.removeAllOrFail(inputBoxes).flatMap { _ =>
       utxosByAddress
         .removeOrUpdateOrFail(address) { existingBoxIds =>
@@ -53,29 +53,31 @@ case class MvStorage(
         }
     }
 
-  private def persistBox(boxId: BoxId, address: Address, value: Value): Unit = { // Without Try for perf reasons
-    addressByUtxo.putIfAbsentOrFail(boxId, address).get
-    // heavy method, 50% of runtime
-    utxosByAddress.adjustAndForget(address)(_.fold(javaMapOf(boxId, value)) { arr =>
-      arr.put(boxId, value)
+  private def persistUtxos(address: Address, boxes: Iterable[Record]): Unit = { // Without Try for perf reasons
+    addressByUtxo.putAllOrFail(boxes.iterator.map(b => b.boxId -> b.address)).get
+    // heavy hitter, 20% of runtime
+    utxosByAddress.adjustAndForget(address)(_.fold(javaMapOf(boxes.iterator.map(b => b.boxId -> b.value))) { arr =>
+      boxes.iterator.foreach { case Record(_, boxId, _, value) =>
+        arr.put(boxId, value)
+      }
       arr
     })
   }
 
   def persistNewBlock(lightBlock: LightBlock): Try[LightBlock] = Try {
-    lightBlock.boxesByTx
-      .foreach { case (_, (inputBoxes, outputBoxes)) =>
-        outputBoxes
-          .foreach { case (boxId, address, value) =>
-            persistBox(boxId, address, value)
-          }
-        inputBoxes
-          .groupBy(_._2)
-          .view
-          .mapValues(_.collect { case (boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId })
-          .foreach { case (address, inputIds) =>
-            removeInputBoxesByAddress(address, inputIds).get
-          }
+    lightBlock.outputBoxes
+      .groupBy(_.address)
+      .foreach { case (address, boxes) =>
+        persistUtxos(address, boxes)
+      }
+    lightBlock.inputBoxes
+      .groupBy(_.address)
+      .view
+      .mapValues(_.collect {
+        case Record(_, boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId
+      })
+      .foreach { case (address, inputIds) =>
+        removeInputBoxesByAddress(address, inputIds).get
       }
     blockById.putIfAbsentAndForget(lightBlock.headerId, lightBlock.info)
     blockIdsByHeight.adjustAndForget(lightBlock.info.height)(

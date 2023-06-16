@@ -27,7 +27,7 @@ object KryoSerialization {
     implicit val addressStatsCodec: DbCodec[Address.Stats]             = AddressStatsCodec
     implicit val blockIdsCodec: DbCodec[java.util.Set[BlockId]]        = BlockIdsCodec
     implicit val valueByBoxCodec: DbCodec[java.util.Map[BoxId, Value]] = ValueByBoxCodec
-    implicit val blockMetadataCodec: DbCodec[BlockInfo]           = BlockInfoCodec
+    implicit val blockMetadataCodec: DbCodec[BlockInfo]                = BlockInfoCodec
     implicit val addressCodec: DbCodec[Address]                        = AddressCodec
 
     def javaSetOf[T](e: T): java.util.Set[T] = {
@@ -38,6 +38,13 @@ object KryoSerialization {
     def javaMapOf[K, V](k: K, v: V): java.util.Map[K, V] = {
       val map = new java.util.HashMap[K, V]()
       map.put(k, v)
+      map
+    }
+    def javaMapOf[K, V](kvs: IterableOnce[(K, V)]): java.util.Map[K, V] = {
+      val map = new java.util.HashMap[K, V]()
+      kvs.iterator.foreach { case (k, v) =>
+        map.put(k, v)
+      }
       map
     }
   }

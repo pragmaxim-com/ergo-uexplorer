@@ -70,6 +70,13 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
 
   def putAndForget(key: K, value: V): Unit = underlying.put(key, codec.write(value))
 
+  def putAllOrFail(keys: IterableOnce[(K, V)]): Try[Unit] =
+    keys.iterator
+      .find { case (key, value) => putIfAbsentOrFail(key, value).isFailure }
+      .fold(Success(())) { key =>
+        Failure(new AssertionError(s"Putting key $key that was already present"))
+      }
+
   def putIfAbsentOrFail(key: K, value: V): Try[Unit] =
     if (underlying.put(key, codec.write(value)) == null)
       Success(())

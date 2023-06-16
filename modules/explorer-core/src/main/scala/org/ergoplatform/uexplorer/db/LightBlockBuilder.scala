@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.db
 import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.db.Record
 
 import scala.collection.compat.immutable.ArraySeq
 import scala.util.Try
@@ -42,36 +43,39 @@ object LightBlockBuilder {
           )
         )
 
-    def validateInputSumEqualsOutputSum(boxesByTx: BoxesByTx): Unit =
-      boxesByTx.foreach { case (txId, (inputs, outputs)) =>
-        val inputSum  = inputs.iterator.map(_._3).sum
-        val outputSum = outputs.iterator.map(_._3).sum
-        assert(
-          inputSum == outputSum,
-          s"Transaction $txId at block ${b.header.id} invalid as sum of inputs $inputSum != $outputSum"
-        )
-      }
+    def validateInputSumEqualsOutputSum(
+      inputs: IterableOnce[Record],
+      outputs: IterableOnce[Record]
+    ): Unit = {
+      val inputSum  = inputs.iterator.map(_.value).sum
+      val outputSum = outputs.iterator.map(_.value).sum
+      assert(
+        inputSum == outputSum,
+        s"Block ${b.header.id} invalid as sum of inputs $inputSum != $outputSum"
+      )
+    }
 
-    val boxesByTx =
+    val outputs =
       b.transactions.transactions
-        .map { tx =>
-          val txOutputs = tx.outputs.map(o => (o.boxId, o.address, o.value))
-          val txInputs =
-            tx match {
-              case tx if tx.id == Emission.tx =>
-                ArraySeq((Emission.inputBox, Emission.address, Emission.initialNanoErgs))
-              case tx if tx.id == Foundation.tx =>
-                ArraySeq((Foundation.box, Foundation.address, Foundation.initialNanoErgs))
-              case tx =>
-                tx.inputs.map { i =>
-                  val inputAddress = getInputAddress(i.boxId)
-                  (i.boxId, inputAddress, getInputValue(inputAddress, i.boxId))
-                }
-            }
-          tx.id -> (txInputs, txOutputs)
+        .flatMap(tx => tx.outputs.map(o => Record(tx.id, o.boxId, o.address, o.value)))
+
+    val inputs =
+      b.transactions.transactions
+        .flatMap { tx =>
+          tx match {
+            case tx if tx.id == Emission.tx =>
+              Iterator(Record(tx.id, Emission.inputBox, Emission.address, Emission.initialNanoErgs))
+            case tx if tx.id == Foundation.tx =>
+              Iterator(Record(tx.id, Foundation.box, Foundation.address, Foundation.initialNanoErgs))
+            case tx =>
+              tx.inputs.iterator.map { i =>
+                val inputAddress = getInputAddress(i.boxId)
+                Record(tx.id, i.boxId, inputAddress, getInputValue(inputAddress, i.boxId))
+              }
+          }
         }
-    validateInputSumEqualsOutputSum(boxesByTx)
-    LightBlock(b.header.id, boxesByTx, bInfo)
+    validateInputSumEqualsOutputSum(inputs, outputs)
+    LightBlock(b.header.id, inputs, outputs, bInfo)
   }
 
 }
