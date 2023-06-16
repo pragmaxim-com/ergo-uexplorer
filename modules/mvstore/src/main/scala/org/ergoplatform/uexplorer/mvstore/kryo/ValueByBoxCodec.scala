@@ -26,7 +26,7 @@ object ValueByBoxCodec extends DbCodec[java.util.Map[BoxId, Value]] {
   }
 
   override def write(valueByBoxId: java.util.Map[BoxId, Value]): Array[Byte] = {
-    val buffer = ByteBuffer.allocate(valueByBoxId.size() * 256)
+    val buffer = ByteBuffer.allocate(valueByBoxId.size() * 128)
     val output = new ByteBufferOutput(buffer)
     val kryo   = KryoSerialization.pool.obtain()
     try kryo.writeObject(output, valueByBoxId)
