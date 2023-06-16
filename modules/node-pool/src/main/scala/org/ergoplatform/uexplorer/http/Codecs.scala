@@ -72,11 +72,12 @@ trait Codecs {
 
   implicit def apiOutputDecoder(implicit enc: ErgoAddressEncoder): Decoder[ApiOutput] = { (c: HCursor) =>
     for {
-      boxId               <- c.downField("boxId").as[BoxId]
-      value               <- c.downField("value").as[Value]
-      creationHeight      <- c.downField("creationHeight").as[Height]
-      ergoTree            <- c.downField("ergoTree").as[HexString]
-      address             <- Right(ErgoTreeParser.ergoTreeToAddress(ergoTree))
+      boxId          <- c.downField("boxId").as[BoxId]
+      value          <- c.downField("value").as[Value]
+      creationHeight <- c.downField("creationHeight").as[Height]
+      ergoTree       <- c.downField("ergoTree").as[HexString]
+      address <-
+        ErgoTreeParser.ergoTreeToAddress(ergoTree).toEither.left.map(ex => DecodingFailure.fromThrowable(ex, List.empty))
       scriptTemplateHash  <- ErgoTreeParser.deriveErgoTreeTemplateHash(ergoTree)
       assets              <- c.downField("assets").as[List[ApiAsset]]
       additionalRegisters <- c.downField("additionalRegisters").as[Map[RegisterId, HexString]]
