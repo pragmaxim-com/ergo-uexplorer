@@ -55,13 +55,10 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
           s"Block ${apiBlock.header.id} at height ${apiBlock.header.height} has missing parent ${apiBlock.header.parentId}"
         )
       )
-
     if (apiBlock.header.height == 1)
       Try(Option.empty)
-    else if (storage.containsBlock(apiBlock.header.parentId, apiBlock.header.height - 1))
-      storage.getBlockById(apiBlock.header.parentId).fold(fail)(parent => Try(Option(parent)))
     else
-      fail
+      storage.getBlockById(apiBlock.header.parentId).fold(fail)(parent => Try(Option(parent)))
   }
 
   def addBestBlocks(winningFork: List[ApiFullBlock])(implicit ps: ProtocolSettings): Try[ListBuffer[BestBlockInserted]] =
