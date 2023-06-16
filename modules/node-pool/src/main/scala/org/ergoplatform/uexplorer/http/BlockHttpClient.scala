@@ -76,7 +76,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
         .get(proxyUri.addPath("blocks", blockId.toString))
         .response(asJson[ApiFullBlock])
         .responseGetRight
-        .readTimeout(3.seconds)
+        .readTimeout(5.seconds)
         .send(sttpB)
         .map(_.body)
     }(retry.Success.always, global)
@@ -101,7 +101,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
     Flow[Height]
       .mapAsync(1)(getBlockIdForHeight)
       .buffer(128, OverflowStrategy.backpressure)
-      .mapAsync(1)(getBlockForId) // parallelism could be parameterized - low or big pressure on Node
+      .mapAsync(2)(getBlockForId) // parallelism could be parameterized - low or big pressure on Node
       .buffer(128, OverflowStrategy.backpressure)
 
   def close(): Future[Unit] = {

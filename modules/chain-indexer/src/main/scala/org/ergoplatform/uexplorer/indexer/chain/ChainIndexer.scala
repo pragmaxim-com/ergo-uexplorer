@@ -15,7 +15,7 @@ import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.mvstore.MvStorage
 import org.ergoplatform.uexplorer.mvstore.MvStorage.{CompactTime, MaxCompactTime}
-
+import scala.concurrent.blocking
 import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -44,14 +44,16 @@ class ChainIndexer(
     Flow[Height]
       .via(blockHttpClient.blockFlow)
       .mapAsync(1) { block =>
-        blockHttpClient
-          .getBestBlockOrBranch(block, blockIndexer.readableStorage.containsBlock, List.empty)
-          .map {
-            case bestBlock :: Nil =>
-              blockIndexer.addBestBlock(bestBlock).get
-            case winningFork =>
-              blockIndexer.addWinningFork(winningFork).get
-          }(Implicits.trampoline)
+        blocking {
+          blockHttpClient
+            .getBestBlockOrBranch(block, blockIndexer.readableStorage.containsBlock, List.empty)
+            .map {
+              case bestBlock :: Nil =>
+                blockIndexer.addBestBlock(bestBlock).get
+              case winningFork =>
+                blockIndexer.addWinningFork(winningFork).get
+            }(Implicits.trampoline)
+        }
       }
       .via(forkDeleteFlow(1))
       .async

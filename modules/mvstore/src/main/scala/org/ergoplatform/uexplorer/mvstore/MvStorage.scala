@@ -115,8 +115,11 @@ case class MvStorage(
       .map(_.asScala.flatMap(blockId => blockById.get(blockId).map(blockId -> _)).toMap)
       .getOrElse(Map.empty)
 
-  def getUtxosByAddress(address: Address): Option[Map[BoxId, Value]] =
-    utxosByAddress.get(address).map(_.asScala.toMap)
+  def getUtxosByAddress(address: Address): Option[java.util.Map[BoxId, Value]] =
+    utxosByAddress.get(address)
+
+  def getUtxoValueByAddress(address: Address, utxo: BoxId): Option[Value] =
+    utxosByAddress.get(address).flatMap(m => Option(m.get(utxo)))
 
   def isEmpty: Boolean =
     utxosByAddress.isEmpty && addressByUtxo.isEmpty && blockIdsByHeight.isEmpty && blockById.isEmpty
@@ -152,18 +155,21 @@ object MvStorage extends LazyLogging {
   import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 
   type CompactTime = Int
+  type CacheSize   = Int
   val MaxCompactTime         = 10.seconds
   private val VersionsToKeep = 10
   val CompactFileRate        = 10000
 
   def apply(
+    cacheSize: CacheSize,
     rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), Random.nextString(10)).toFile
   ): Try[MvStorage] = Try {
     rootDir.mkdirs()
     val store =
       new MVStore.Builder()
         .fileName(rootDir.toPath.resolve("mvstore").toFile.getAbsolutePath)
-        .cacheSize(4096)
+        .cacheSize(cacheSize)
+        .cacheConcurrency(2)
         .autoCommitDisabled()
         .open()
 
@@ -178,6 +184,6 @@ object MvStorage extends LazyLogging {
     )
   }
 
-  def withDefaultDir(): Try[MvStorage] =
-    MvStorage(Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "utxo").toFile)
+  def withDefaultDir(cacheSize: CacheSize): Try[MvStorage] =
+    MvStorage(cacheSize, Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "utxo").toFile)
 }

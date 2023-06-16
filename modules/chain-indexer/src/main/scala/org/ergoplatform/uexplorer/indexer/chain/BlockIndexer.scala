@@ -84,7 +84,7 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
     for {
       parentOpt <- getParentOrFail(apiBlock)
       blockInfo <- BlockInfoBuilder(apiBlock, parentOpt, storage.getCurrentRevision)
-      lb        <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxosByAddress)
+      lb        <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
       _         <- storage.persistNewBlock(lb)
       fbOpt     <- if (backendEnabled) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
       _         <- if (lb.info.height % MvStorage.CompactFileRate == 0) compact(MaxCompactTime) else Success(())

@@ -74,7 +74,7 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
               pluginManager   <- PluginManager.initialize
               backendOpt      <- Future.fromTry(Backend(conf.backendType))
               graphBackendOpt <- Future.fromTry(GraphBackend(conf.graphBackendType))
-              storage         <- Future.fromTry(MvStorage.withDefaultDir())
+              storage         <- Future.fromTry(MvStorage.withDefaultDir(conf.mvStoreCacheSize))
               blockIndexer  = new BlockIndexer(storage, backendOpt.isDefined)
               chainIndexer  = new ChainIndexer(backendOpt, graphBackendOpt, blockHttpClient, blockIndexer)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)

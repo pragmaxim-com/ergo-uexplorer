@@ -25,6 +25,7 @@ trait Storage {
 
   def getAddressByUtxo(boxId: BoxId): Option[Address]
 
-  def getUtxosByAddress(address: Address): Option[Map[BoxId, Value]]
+  def getUtxosByAddress(address: Address): Option[java.util.Map[BoxId, Value]]
 
+  def getUtxoValueByAddress(address: Address, utxo: BoxId): Option[Value]
 }

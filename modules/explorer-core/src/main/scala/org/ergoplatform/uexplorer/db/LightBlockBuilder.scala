@@ -13,7 +13,7 @@ object LightBlockBuilder {
     b: ApiFullBlock,
     bInfo: BlockInfo,
     addressByUtxo: BoxId => Option[Address],
-    utxosByAddress: Address => Option[Map[BoxId, Value]]
+    utxoValueByAddress: (Address, BoxId) => Option[Value]
   ): Try[LightBlock] = Try {
     val outputLookup =
       b.transactions.transactions.iterator
@@ -35,7 +35,7 @@ object LightBlockBuilder {
       outputLookup
         .get(inputBoxId)
         .map(_._2)
-        .orElse(utxosByAddress(inputAddress).flatMap(_.get(inputBoxId)))
+        .orElse(utxoValueByAddress(inputAddress, inputBoxId))
         .getOrElse(
           throw new IllegalStateException(
             s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state"

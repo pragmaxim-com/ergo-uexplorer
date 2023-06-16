@@ -48,14 +48,15 @@ allows for flexible development. Major Data Views derived from Source of Truth :
 
 **Requirements:**
   - `SBT 1.7.x` for building and `OpenJDK 11.x` for running both `chain-indexer` and `ergo-node`
-  - `12GB+` of RAM and `4vCPU+` for rapid sync from local Ergo Node
+  - `16GB+` of RAM and `4vCPU+` for fast sync from local Ergo Node
       - `start-indexing.sh` script asks you if you are syncing chain from scratch or not
       - ergo-node = 2GB
-      - cassandraDB = 9GB
-      - chain-indexer = 1GB
-  - `6GB+` of RAM and `4vCPU+` for slow sync from peer-network, polling and querying
-      - `start-querying.sh` (note that this script creates db indexes which are being built some time)
-      - ergo-node = 1GB
+      - cassandraDB = 6GB
+      - chain-indexer = 6GB
+  - `8GB+` of RAM and `4vCPU+` for fast sync from local Ergo Node with embedded storage only
+      - ergo-node = 2GB
+      - chain-indexer = 6GB
+  - `3GB+` of RAM and `1vCPU+` for synced db, that can run from peer-network
       - cassandraDB = 1GB
       - stargate = 1GB
       - chain-indexer = 1GB

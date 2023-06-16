@@ -10,6 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.text.DecimalFormat
 import scala.collection.immutable.ArraySeq
+import scala.jdk.CollectionConverters.*
 
 class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long) extends Detector {
 
@@ -24,7 +25,7 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
       addresses
         .flatMap(a => storage.getUtxosByAddress(a).map(a -> _))
         .foldLeft(Map.empty[Address, Address.State]) { case (acc, (address, valueByBox)) =>
-          acc.updated(address, Address.State(valueByBox.values.sum))
+          acc.updated(address, Address.State(valueByBox.values.asScala.sum))
         }
 
     val outputsWithoutPaybacksAndFees =
@@ -69,10 +70,10 @@ object HighValueDetector {
   private val valueFormat = new DecimalFormat("#,###")
 
   case class BlockMatch(
-                         block: FullBlock,
-                         blockValue: Value,
-                         inputs: Map[Address, Address.State],
-                         outputs: Map[Address, Address.State]
+    block: FullBlock,
+    blockValue: Value,
+    inputs: Map[Address, Address.State],
+    outputs: Map[Address, Address.State]
   )
 
   case class TxMatch(

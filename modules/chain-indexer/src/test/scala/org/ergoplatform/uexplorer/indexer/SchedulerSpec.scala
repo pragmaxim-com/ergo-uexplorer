@@ -68,7 +68,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
         Response.ok(Rest.blocks.byId(blockId))
     }
 
-  val storage       = MvStorage().get
+  val storage       = MvStorage(64).get
   val blockClient   = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val backend       = Some(new InMemoryBackend)
   val graphBackend  = Some(new InMemoryGraphBackend)
