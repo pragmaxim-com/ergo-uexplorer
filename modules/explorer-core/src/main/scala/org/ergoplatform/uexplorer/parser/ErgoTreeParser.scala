@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.parser
 
+import com.google.bitcoin.core.Base58
 import org.ergoplatform.uexplorer.{Address, ErgoTreeTemplateHash, HexString}
 import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, Pay2SAddress}
 import scorex.crypto.hash.Sha256
@@ -28,16 +29,25 @@ object ErgoTreeParser {
       case Failure(ex) => Left(DecodingFailure.fromThrowable(ex, List.empty))
     }
 
+  private def addressToString(address: ErgoAddress)(implicit enc: ErgoAddressEncoder): String = {
+    val withNetworkByte = (enc.networkPrefix + address.addressTypePrefix).toByte +: address.contentBytes
+
+    val checksum = ErgoAddressEncoder.hash256(withNetworkByte).take(ErgoAddressEncoder.ChecksumLength)
+    Base58.encode(withNetworkByte ++ checksum)
+  }
+
   @inline def ergoTreeToAddress(
     ergoTree: HexString
-  )(implicit enc: ErgoAddressEncoder): Address =
+  )(implicit enc: ErgoAddressEncoder): Try[Address] = Try {
     Address.fromStringUnsafe(
-      Base16
-        .decode(ergoTree)
-        .flatMap { bytes =>
-          enc.fromProposition(treeSerializer.deserializeErgoTree(bytes))
-        }
-        .getOrElse(Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress)
-        .toString
+      addressToString(
+        Base16
+          .decode(ergoTree)
+          .flatMap { bytes =>
+            enc.fromProposition(treeSerializer.deserializeErgoTree(bytes))
+          }
+          .getOrElse(Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress)
+      )
     )
+  }
 }
