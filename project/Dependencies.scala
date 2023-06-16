@@ -1,4 +1,4 @@
-import sbt._
+import sbt.*
 
 object Version {
   lazy val akka            = "2.7.0"
@@ -13,7 +13,8 @@ object Version {
 
 object Dependencies {
 
-  lazy val scorexUtil = "org.scorexfoundation"  %% "scorex-util"     % "0.1.8" cross CrossVersion.for3Use2_13
+  lazy val scrypto    = "org.scorexfoundation"  %% "scrypto"         % "2.3.0" cross CrossVersion.for3Use2_13
+  lazy val scorexUtil = "org.scorexfoundation"  %% "scorex-util"     % "0.2.0" cross CrossVersion.for3Use2_13
   lazy val ergoWallet = "org.ergoplatform"      %% "ergo-wallet"     % Version.ergo cross CrossVersion.for3Use2_13
   lazy val pureConfig = "com.github.pureconfig" %% "pureconfig-core" % "0.17.1"
 
