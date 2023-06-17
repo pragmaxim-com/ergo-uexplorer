@@ -4,10 +4,11 @@ import org.ergoplatform.uexplorer.Address
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
+import java.util.Map.copyOf
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
+class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
   private val underlying: MVMap[K, Array[Byte]] = store.openMap[K, Array[Byte]](name)
 
@@ -21,13 +22,21 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
 
   def remove(key: K): Option[V] = Option(underlying.remove(key)).map(codec.read)
 
-  def removeAndForget(key: K): Unit = underlying.remove(key)
+  def removeAndForget(key: K): Boolean = underlying.remove(key) != null
 
-  def removeOrFail(key: K): Try[Unit] =
+  def removeAndForgetOrFail(key: K): Try[Unit] =
     if (underlying.remove(key) != null)
       Success(())
     else
       Failure(new AssertionError(s"Removing non-existing key $key"))
+
+  def removeOrFail(key: K): Try[V] =
+    Try(underlying.remove(key)).flatMap {
+      case v if v != null =>
+        Failure(new AssertionError(s"Removing non-existing key $key"))
+      case v =>
+        Success(codec.read(v))
+    }
 
   def removeAllOrFail(keys: Iterable[K]): Try[Unit] =
     keys.find(key => underlying.remove(key) == null).fold(Success(())) { key =>
@@ -68,22 +77,20 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
 
   def put(key: K, value: V): Option[V] = Option(underlying.put(key, codec.write(value))).map(codec.read)
 
-  def putAndForget(key: K, value: V): Unit = underlying.put(key, codec.write(value))
+  def putAndForget(key: K, value: V): Boolean = underlying.put(key, codec.write(value)) == null
 
-  def putAllOrFail(keys: IterableOnce[(K, V)]): Try[Unit] =
-    keys.iterator
-      .find { case (key, value) => putIfAbsentOrFail(key, value).isFailure }
-      .fold(Success(())) { key =>
-        Failure(new AssertionError(s"Putting key $key that was already present"))
-      }
-
-  def putIfAbsentOrFail(key: K, value: V): Try[Unit] =
-    if (underlying.put(key, codec.write(value)) == null)
-      Success(())
-    else
-      Failure(new AssertionError(s"Putting key $key that was already present"))
+  def putAllNewOrFail(entries: IterableOnce[(K, V)]): Try[Unit] =
+    entries.iterator
+      .find(e => underlying.put(e._1, codec.write(e._2)) != null)
+      .map(e => Failure(new AssertionError(s"Key ${e._1} was already present!")))
+      .getOrElse(Success(()))
 
   def putIfAbsent(key: K, value: V): Option[V] = Option(underlying.putIfAbsent(key, codec.write(value))).map(codec.read)
+
+  def putIfAbsentOrFail(key: K, value: V): Try[Unit] =
+    Option(underlying.putIfAbsent(key, codec.write(value))).fold(Success(())) { oldVal =>
+      Failure(new AssertionError(s"Key $key already present with value ${codec.read(oldVal)}"))
+    }
 
   def putIfAbsentAndForget(key: K, value: V): Unit = underlying.putIfAbsent(key, codec.write(value))
 
@@ -110,21 +117,16 @@ class MVMap4S[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V]
       case None =>
         Failure(new AssertionError(s"Removing or updating non-existing key $k"))
       case Some(v) =>
-        Try {
-          f(v) match {
-            case None =>
-              underlying.remove(k)
-            case Some(v) =>
-              underlying.put(k, codec.write(v))
-          }
+        f(v) match {
+          case None =>
+            Try(assert(underlying.remove(k) != null, s"Removing non-existing key $k"))
+          case Some(v) =>
+            underlying.put(k, codec.write(v))
+            Success(())
         }
     }
 
-  def adjust(k: K)(f: Option[V] => V): Option[V] =
-    Option(underlying.put(k, codec.write(f(Option(underlying.get(k)).map(codec.read)))))
-      .map(codec.read)
-
-  def adjustAndForget(k: K)(f: Option[V] => V): Unit =
-    underlying.put(k, codec.write(f(Option(underlying.get(k)).map(codec.read))))
+  def adjustAndForget(k: K)(f: Option[V] => V): Boolean =
+    underlying.put(k, codec.write(f(Option(underlying.get(k)).map(codec.read)))) == null
 
 }

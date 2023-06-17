@@ -7,6 +7,7 @@ import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.Const.FeeContract
 import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
 import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock, Record}
 import org.ergoplatform.uexplorer.mvstore.*
@@ -20,7 +21,9 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.file.Paths
 import java.util
+import java.util.Map.Entry
 import java.util.concurrent.ConcurrentSkipListMap
+import java.util.stream.Collectors
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.collection.mutable
@@ -32,7 +35,7 @@ import scala.util.{Failure, Random, Success, Try}
 
 case class MvStorage(
   store: MVStore,
-  utxosByAddress: MapLike[Address, java.util.Map[BoxId, Value]],
+  utxosByAddress: MultiMapLike[Address, java.util.Map, BoxId, Value],
   addressByUtxo: MapLike[BoxId, Address],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, BlockInfo]
@@ -43,51 +46,64 @@ case class MvStorage(
 
   def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
 
-  private def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Try[Unit] =
-    // heavy hitters : 20% of runtime
+  private def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Try[_] =
     addressByUtxo.removeAllOrFail(inputBoxes).flatMap { _ =>
-      utxosByAddress
-        .removeOrUpdateOrFail(address) { existingBoxIds =>
-          inputBoxes.foreach(existingBoxIds.remove)
-          Option(existingBoxIds).collect { case m if !m.isEmpty => m }
-        }
+      utxosByAddress.removeAllOrFail(address, inputBoxes) { existingBoxIds =>
+        inputBoxes.foreach(existingBoxIds.remove)
+        Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+      }
     }
 
-  private def persistUtxos(address: Address, boxes: Iterable[Record]): Unit = { // Without Try for perf reasons
-    addressByUtxo.putAllOrFail(boxes.iterator.map(b => b.boxId -> b.address)).get
-    // heavy hitter, 20% of runtime
-    utxosByAddress.adjustAndForget(address)(_.fold(javaMapOf(boxes.iterator.map(b => b.boxId -> b.value))) { arr =>
-      boxes.iterator.foreach { case Record(_, boxId, _, value) =>
-        arr.put(boxId, value)
-      }
-      arr
-    })
-  }
-
-  def persistNewBlock(lightBlock: LightBlock): Try[LightBlock] = Try {
-    lightBlock.outputBoxes
-      .groupBy(_.address)
-      .foreach { case (address, boxes) =>
-        persistUtxos(address, boxes)
-      }
-    lightBlock.inputBoxes
-      .groupBy(_.address)
-      .view
-      .mapValues(_.collect {
-        case Record(_, boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId
+  private def persistUtxos(address: Address, boxes: Iterable[Record]): Try[_] =
+    addressByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.address)).flatMap { _ =>
+      val valueByBoxIt = boxes.iterator.map(b => b.boxId -> b.value)
+      utxosByAddress.adjustAndForget(address, valueByBoxIt)(_.fold(javaMapOf(valueByBoxIt)) { existingMap =>
+        if (existingMap.size() > 5000) {
+          logger.warn(s"Address $address is getting too big : ${existingMap.size()}")
+        }
+        boxes.iterator.foreach { case Record(_, boxId, _, value) =>
+          existingMap.put(boxId, value)
+        }
+        existingMap
       })
-      .foreach { case (address, inputIds) =>
-        removeInputBoxesByAddress(address, inputIds).get
+    }
+
+  def persistNewBlock(lightBlock: LightBlock): Try[LightBlock] = {
+    val outputExceptionOpt =
+      lightBlock.outputBoxes
+        .groupBy(_.address)
+        .map { case (address, boxes) =>
+          persistUtxos(address, boxes)
+        }
+        .collectFirst { case f @ Failure(_) => f }
+
+    val inputExceptionOpt =
+      lightBlock.inputBoxes
+        .groupBy(_.address)
+        .view
+        .mapValues(_.collect {
+          case Record(_, boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId
+        })
+        .map { case (address, inputIds) =>
+          removeInputBoxesByAddress(address, inputIds)
+        }
+        .collectFirst { case f @ Failure(_) => f }
+
+    blockById
+      .putIfAbsentOrFail(lightBlock.headerId, lightBlock.info)
+      .flatMap { _ =>
+        blockIdsByHeight.adjustAndForget(lightBlock.info.height)(
+          _.fold(javaSetOf(lightBlock.headerId)) { existingBlockIds =>
+            existingBlockIds.add(lightBlock.headerId)
+            existingBlockIds
+          }
+        )
+        List(outputExceptionOpt, inputExceptionOpt).flatten.headOption.getOrElse(Success(()))
       }
-    blockById.putIfAbsentAndForget(lightBlock.headerId, lightBlock.info)
-    blockIdsByHeight.adjustAndForget(lightBlock.info.height)(
-      _.fold(javaSetOf(lightBlock.headerId)) { existingBlockIds =>
-        existingBlockIds.add(lightBlock.headerId)
-        existingBlockIds
+      .map { _ =>
+        store.commit()
+        lightBlock
       }
-    )
-    store.commit()
-    lightBlock
   }
 
   def getReport: String = {
@@ -179,10 +195,19 @@ object MvStorage extends LazyLogging {
     store.setRetentionTime(3600 * 1000 * 24 * 7)
     MvStorage(
       store,
-      new MVMap4S[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
-      new MVMap4S[BoxId, Address]("addressByUtxo", store),
-      new MVMap4S[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),
-      new MVMap4S[BlockId, BlockInfo]("blockById", store)
+      new MultiMvMap[Address, java.util.Map, BoxId, Value](
+        new MvMap[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
+        new SuperNodeMvMap[Address, java.util.Map, BoxId, Value](
+          Map(
+            FeeContract.address -> "feeContractAddress",
+            Emission.address    -> "emissionAddress"
+          ),
+          store
+        )
+      ),
+      new MvMap[BoxId, Address]("addressByUtxo", store),
+      new MvMap[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),
+      new MvMap[BlockId, BlockInfo]("blockById", store)
     )
   }
 
