@@ -4,7 +4,7 @@ import org.ergoplatform.uexplorer.{Address, BoxId, Height, Value}
 import org.h2.mvstore.MVStore
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
-import org.ergoplatform.uexplorer.Const.Genesis.Emission
+import org.ergoplatform.uexplorer.Const.Protocol.Emission
 case class Shit(field: String)
 
 class MvStorePlayground extends AsyncFreeSpec with Matchers {

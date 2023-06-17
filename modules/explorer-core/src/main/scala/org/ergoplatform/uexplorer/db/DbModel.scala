@@ -1,9 +1,9 @@
 package org.ergoplatform.uexplorer.db
 
 import io.circe.Json
-import org.ergoplatform.uexplorer.Const.Genesis
+import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Const.Genesis.Emission
+import org.ergoplatform.uexplorer.Const.Protocol.Emission
 
 import scala.collection.immutable.ArraySeq
 
@@ -69,7 +69,7 @@ final case class BlockInfo(
 ) {
   def this() = this(
     0,
-    Genesis.blockId,
+    Protocol.blockId,
     0,
     0,
     0,

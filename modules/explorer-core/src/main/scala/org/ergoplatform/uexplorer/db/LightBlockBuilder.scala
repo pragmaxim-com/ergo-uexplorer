@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.db
 
-import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
+import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.db.Record

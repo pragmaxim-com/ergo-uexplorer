@@ -9,7 +9,7 @@ import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.parser.TokenPropsParser
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
+import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 
 import scala.collection.immutable.ArraySeq
 import scala.util.Try

@@ -15,10 +15,10 @@ import scala.jdk.CollectionConverters.*
 
 object TxGraphWriter extends LazyLogging {
 
-  private val blackListBoxes = Set(Genesis.Emission.inputBox, Genesis.NoPremine.box, Genesis.Foundation.box)
+  private val blackListBoxes = Set(Protocol.Emission.inputBox, Protocol.NoPremine.box, Protocol.Foundation.box)
 
   private val blackListAddresses =
-    Set(FeeContract.address, Genesis.Emission.address, Genesis.NoPremine.address, Genesis.Foundation.address)
+    Set(FeeContract.address, Protocol.Emission.address, Protocol.NoPremine.address, Protocol.Foundation.address)
 
   def writeGraph(
     txId: TxId,

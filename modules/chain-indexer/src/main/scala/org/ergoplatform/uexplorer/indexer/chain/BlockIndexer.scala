@@ -20,7 +20,7 @@ import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
+import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.MvStorage.*
 import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*

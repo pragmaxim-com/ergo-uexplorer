@@ -7,8 +7,8 @@ import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Const.FeeContract
-import org.ergoplatform.uexplorer.Const.Genesis.{Emission, Foundation}
+import org.ergoplatform.uexplorer.Const.{FeeContract, SuperNode}
+import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock, Record}
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.MvStorage.*
@@ -58,7 +58,7 @@ case class MvStorage(
     addressByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.address)).flatMap { _ =>
       val valueByBoxIt = boxes.iterator.map(b => b.boxId -> b.value)
       utxosByAddress.adjustAndForget(address, valueByBoxIt)(_.fold(javaMapOf(valueByBoxIt)) { existingMap =>
-        if (existingMap.size() > 5000) {
+        if (existingMap.size() > 3000) {
           logger.warn(s"Address $address is getting too big : ${existingMap.size()}")
         }
         boxes.iterator.foreach { case Record(_, boxId, _, value) =>
@@ -197,13 +197,7 @@ object MvStorage extends LazyLogging {
       store,
       new MultiMvMap[Address, java.util.Map, BoxId, Value](
         new MvMap[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
-        new SuperNodeMvMap[Address, java.util.Map, BoxId, Value](
-          Map(
-            FeeContract.address -> "feeContractAddress",
-            Emission.address    -> "emissionAddress"
-          ),
-          store
-        )
+        new SuperNodeMvMap[Address, java.util.Map, BoxId, Value](SuperNode.addresses, store)
       ),
       new MvMap[BoxId, Address]("addressByUtxo", store),
       new MvMap[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),
