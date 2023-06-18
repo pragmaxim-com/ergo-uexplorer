@@ -82,7 +82,7 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `node-pool`, mvstore, cassandra, janusgraph, `alert-plugin`, indexer)
+  ).aggregate(core, `node-pool`, mvstore, storage, cassandra, janusgraph, `alert-plugin`, indexer)
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
@@ -98,8 +98,13 @@ lazy val `node-pool` =
 lazy val mvstore =
   Utils.mkModule("mvstore", "mvstore")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= Seq(mvStore, kryo) ++ scalatest("3"))
-    .dependsOn(core)
+    .settings(libraryDependencies ++= Seq(mvStore, loggingApi, scalaLogging("3")) ++ scalatest("3"))
+
+lazy val storage =
+  Utils.mkModule("storage", "storage")
+    .settings(commonSettings)
+    .settings(libraryDependencies ++= Seq(kryo) ++ scalatest("3"))
+    .dependsOn(mvstore, core)
 
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
@@ -129,4 +134,4 @@ lazy val indexer =
     .settings(chainIndexerAssemblySettings)
     .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3"))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `node-pool` % "compile->compile;test->test", mvstore, cassandra, janusgraph, `alert-plugin`)
+    .dependsOn(core, `node-pool` % "compile->compile;test->test", storage, cassandra, janusgraph, `alert-plugin`)

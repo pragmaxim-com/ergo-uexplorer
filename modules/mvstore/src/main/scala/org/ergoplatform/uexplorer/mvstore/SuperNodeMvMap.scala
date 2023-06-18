@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.mvstore
 
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Address, BoxId, Value}
 import org.h2.mvstore.{MVMap, MVStore}
 
 import java.util.Map.Entry

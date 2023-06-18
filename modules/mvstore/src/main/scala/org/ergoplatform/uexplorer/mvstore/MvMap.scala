@@ -1,10 +1,8 @@
 package org.ergoplatform.uexplorer.mvstore
 
-import org.ergoplatform.uexplorer.Address
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
-import java.util.Map.copyOf
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
@@ -85,7 +83,8 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
       .map(e => Failure(new AssertionError(s"Key ${e._1} was already present!")))
       .getOrElse(Success(()))
 
-  def putIfAbsent(key: K, value: V): Option[V] = Option(underlying.putIfAbsent(key, codec.writeAll(value))).map(codec.readAll)
+  def putIfAbsent(key: K, value: V): Option[V] =
+    Option(underlying.putIfAbsent(key, codec.writeAll(value))).map(codec.readAll)
 
   def putIfAbsentOrFail(key: K, value: V): Try[Unit] =
     Option(underlying.putIfAbsent(key, codec.writeAll(value))).fold(Success(())) { oldVal =>

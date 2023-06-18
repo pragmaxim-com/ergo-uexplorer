@@ -4,7 +4,6 @@ import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.mvstore.MvStorage
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 
@@ -21,11 +20,8 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
-import org.ergoplatform.uexplorer.mvstore.*
-import org.ergoplatform.uexplorer.mvstore.MvStorage.*
-import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.ergoplatform.uexplorer.mvstore.MvStorage
+import org.ergoplatform.uexplorer.storage.MvStorage
 import org.h2.mvstore.{MVMap, MVStore}
 
 import java.io.File
@@ -43,7 +39,8 @@ import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Random, Success, Try}
 
-class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogging {
+class BlockIndexer(storage: MvStorage, backendEnabled: Boolean, mvStoreMaxCompactionTime: FiniteDuration)
+  extends LazyLogging {
 
   def readableStorage: Storage = storage
 
@@ -72,9 +69,9 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
           }
       }
 
-  def compact(maxTime: FiniteDuration): Try[Unit] = Try {
+  def compact(): Try[Unit] = Try {
     logger.info(s"Compacting file at ${storage.getReport}")
-    storage.store.compactFile(maxTime.toMillis.toInt)
+    storage.store.compactFile(mvStoreMaxCompactionTime.toMillis.toInt)
   }
 
   def addBestBlock(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
@@ -84,7 +81,7 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
       lb        <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
       _         <- storage.persistNewBlock(lb)
       fbOpt     <- if (backendEnabled) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
-      _         <- if (lb.info.height % MvStorage.CompactFileRate == 0) compact(MaxCompactTime) else Success(())
+      _         <- if (lb.info.height % MvStorage.CompactFileRate == 0) compact() else Success(())
     } yield BestBlockInserted(lb, fbOpt)
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
@@ -118,13 +115,15 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean) extends LazyLogg
 }
 
 object BlockIndexer {
-  def apply(storage: MvStorage, backendEnabled: Boolean)(implicit system: ActorSystem[Nothing]): BlockIndexer = {
+  def apply(storage: MvStorage, backendEnabled: Boolean, mvStoreMaxCompactionTime: FiniteDuration)(implicit
+    system: ActorSystem[Nothing]
+  ): BlockIndexer = {
     CoordinatedShutdown(system).addTask(
       CoordinatedShutdown.PhaseServiceStop,
       "close-mv-store"
     ) { () =>
       Future(storage.close()).map(_ => Done)
     }
-    new BlockIndexer(storage, backendEnabled)
+    new BlockIndexer(storage, backendEnabled, mvStoreMaxCompactionTime)
   }
 }

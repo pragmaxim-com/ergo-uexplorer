@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.mvstore
 
-import org.ergoplatform.uexplorer.Address
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
@@ -10,7 +9,6 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 import java.util.stream.Collectors
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
-import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
 
 //TODO make SuperNodePCol
 class MultiMvMap[PK, C[_, _], K, V](

@@ -8,7 +8,7 @@ import org.apache.tinkerpop.gremlin.structure.Graph
 import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
-import org.ergoplatform.uexplorer.mvstore.MvStorage
+import org.ergoplatform.uexplorer.storage.MvStorage
 import org.ergoplatform.uexplorer.{BlockId, Const, Height}
 
 import java.nio.file.{Files, Paths}

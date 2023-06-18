@@ -35,8 +35,7 @@ import org.ergoplatform.uexplorer.db.FullBlock
 import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, ChainIndexer, Initializer}
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.mvstore.MvStorage
-import org.ergoplatform.uexplorer.mvstore.MvStorage.MaxCompactTime
+import org.ergoplatform.uexplorer.storage.MvStorage
 
 object Application extends App with AkkaStreamSupport with LazyLogging {
   ChainIndexerConf.loadWithFallback match {
@@ -75,12 +74,12 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
               backendOpt      <- Future.fromTry(Backend(conf.backendType))
               graphBackendOpt <- Future.fromTry(GraphBackend(conf.graphBackendType))
               storage         <- Future.fromTry(MvStorage.withDefaultDir(conf.mvStoreCacheSize))
-              blockIndexer  = new BlockIndexer(storage, backendOpt.isDefined)
+              blockIndexer  = BlockIndexer(storage, backendOpt.isDefined, conf.mvStoreMaxCompactTime)
               chainIndexer  = new ChainIndexer(backendOpt, graphBackendOpt, blockHttpClient, blockIndexer)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
               initializer   = new Initializer(storage, backendOpt, graphBackendOpt)
               scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
-              done <- scheduler.validateAndSchedule(0.seconds, MaxCompactTime + 1.second)
+              done <- scheduler.validateAndSchedule(0.seconds, conf.mvStoreMaxCompactTime + 2.seconds)
             } yield done
 
           initializationF.andThen {

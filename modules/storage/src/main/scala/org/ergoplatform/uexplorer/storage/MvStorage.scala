@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.mvstore
+package org.ergoplatform.uexplorer.storage
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ByteBufferInput, ByteBufferOutput, Input, Output}
@@ -11,10 +11,9 @@ import org.ergoplatform.uexplorer.Const.{FeeContract, SuperNode}
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock, Record}
 import org.ergoplatform.uexplorer.mvstore.*
-import org.ergoplatform.uexplorer.mvstore.MvStorage.*
-import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
+import MvStorage.*
+import org.ergoplatform.uexplorer.storage.kryo.KryoSerialization.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.ergoplatform.uexplorer.mvstore.MvStorage
 import org.h2.mvstore.{MVMap, MVStore}
 
 import java.io.File
@@ -178,7 +177,6 @@ object MvStorage extends LazyLogging {
 
   type CompactTime = Int
   type CacheSize   = Int
-  val MaxCompactTime         = 10.seconds
   private val VersionsToKeep = 10
   val CompactFileRate        = 10000
 

@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.mvstore.kryo
+package org.ergoplatform.uexplorer.storage.kryo
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ByteBufferOutput, Input}
@@ -7,7 +7,7 @@ import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.Jdk
 import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
-import org.ergoplatform.uexplorer.mvstore.kryo.*
+import org.ergoplatform.uexplorer.storage.kryo.*
 import org.ergoplatform.uexplorer.mvstore.{DbCodec, MultiMapCodec}
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
 

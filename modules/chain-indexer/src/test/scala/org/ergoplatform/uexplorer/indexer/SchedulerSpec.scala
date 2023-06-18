@@ -26,9 +26,10 @@ import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.http.MetadataHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
-import org.ergoplatform.uexplorer.mvstore.MvStorage
+import org.ergoplatform.uexplorer.storage.MvStorage
 
 import java.nio.file.Paths
+import scala.concurrent.duration.*
 
 class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
 
@@ -73,7 +74,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val backend       = Some(new InMemoryBackend)
   val graphBackend  = Some(new InMemoryGraphBackend)
   val pluginManager = new PluginManager(List.empty)
-  val blockIndexer  = new BlockIndexer(storage, graphBackend.isDefined)
+  val blockIndexer  = BlockIndexer(storage, graphBackend.isDefined, 1.second)
   val chainIndexer  = new ChainIndexer(backend, graphBackend, blockClient, blockIndexer)
   val mempoolSyncer = new MempoolSyncer(blockClient)
   val initializer   = new Initializer(storage, backend, graphBackend)
