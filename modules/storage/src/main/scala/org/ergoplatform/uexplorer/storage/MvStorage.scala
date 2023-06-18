@@ -43,9 +43,6 @@ case class MvStorage(
 ) extends Storage
   with LazyLogging {
 
-  // temporary for collecting supernode addresses in whole chain
-  val superNodeAddresses: concurrent.Map[Address, Int] = new ConcurrentHashMap().asScala
-
   def close(): Try[Unit] = Try(store.close())
 
   def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
@@ -63,7 +60,7 @@ case class MvStorage(
       val valueByBoxIt = boxes.iterator.map(b => b.boxId -> b.value)
       utxosByAddress.adjustAndForget(address, valueByBoxIt)(_.fold(javaMapOf(valueByBoxIt)) { existingMap =>
         if (existingMap.size() > 1000) {
-          superNodeAddresses.put(address, existingMap.size())
+          SuperNodeUtils.superNodeAddresses.put(address, existingMap.size())
         }
         boxes.iterator.foreach { case Record(_, boxId, _, value) =>
           existingMap.put(boxId, value)
@@ -175,39 +172,17 @@ case class MvStorage(
 
 object MvStorage extends LazyLogging {
   import scala.concurrent.duration.*
-  import Address.unwrapped
 
   type CacheSize         = Int
   type HeightCompactRate = Int
   type MaxCompactTime    = FiniteDuration
   private val VersionsToKeep = 10
-
-  private val superNodeAddressesFilePath = "supernode-addresses.csv.gz"
-
-  def superNodeAddresses: Map[Address, String] =
-    Source
-      .fromInputStream(
-        new GZIPInputStream(
-          new BufferedInputStream(
-            Thread
-              .currentThread()
-              .getContextClassLoader
-              .getResourceAsStream(superNodeAddressesFilePath)
-          )
-        )
-      )
-      .getLines()
-      .map(_.trim)
-      .filterNot(_.isEmpty)
-      .map(Address.fromStringUnsafe)
-      .toSet
-      .incl(FeeContract.address)
-      .map(a => a -> a.unwrapped.take(32))
-      .toMap
+  private val dbFileNameTemp = s"mv-store-${SuperNodeUtils.randomNumber(5)}.db"
+  private val dbFileName     = s"mv-store.db"
 
   def apply(
     cacheSize: CacheSize,
-    rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), Random.nextString(10)).toFile
+    rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), dbFileNameTemp).toFile
   ): Try[MvStorage] = Try {
     rootDir.mkdirs()
     val store =
@@ -226,7 +201,7 @@ object MvStorage extends LazyLogging {
       store,
       new MultiMvMap[Address, java.util.Map, BoxId, Value](
         new MvMap[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
-        new SuperNodeMvMap[Address, java.util.Map, BoxId, Value](superNodeAddresses, store)
+        new SuperNodeMvMap[Address, java.util.Map, BoxId, Value](SuperNodeUtils.superNodeAddressesWithPrefix, store)
       ),
       new MvMap[BoxId, Address]("addressByUtxo", store),
       new MvMap[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),
@@ -235,5 +210,5 @@ object MvStorage extends LazyLogging {
   }
 
   def withDefaultDir(cacheSize: CacheSize): Try[MvStorage] =
-    MvStorage(cacheSize, Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "utxo").toFile)
+    MvStorage(cacheSize, Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", dbFileName).toFile)
 }

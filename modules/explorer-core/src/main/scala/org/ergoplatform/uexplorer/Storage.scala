@@ -8,8 +8,6 @@ import scala.collection.concurrent
 
 trait Storage {
 
-  def superNodeAddresses: concurrent.Map[Address, Int]
-
   def isEmpty: Boolean
 
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean
