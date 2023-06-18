@@ -73,6 +73,10 @@ class ChainIndexer(
       .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
       .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
         lastBlockF.map { lastBlock =>
+          logger.info(s"Collected ${blockIndexer.readableStorage.superNodeAddresses.size} supernode address : ")
+          blockIndexer.readableStorage.superNodeAddresses.toSeq.sortBy(_._2).foreach { case (addr, count) =>
+            println(s"$addr   $count")
+          }
           blockIndexer.compact(MaxCompactTime)
           ChainSyncResult(
             lastBlock,
