@@ -22,7 +22,8 @@ import java.nio.ByteBuffer
 import java.nio.file.Paths
 import java.util
 import java.util.Map.Entry
-import java.util.concurrent.ConcurrentSkipListMap
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
+import scala.collection.concurrent
 import java.util.stream.Collectors
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{TreeMap, TreeSet}
@@ -42,6 +43,9 @@ case class MvStorage(
 ) extends Storage
   with LazyLogging {
 
+  // temporary for collecting supernode addresses in whole chain
+  val superNodeAddresses: concurrent.Map[Address, Int] = new ConcurrentHashMap().asScala
+
   def close(): Try[Unit] = Try(store.close())
 
   def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
@@ -58,8 +62,8 @@ case class MvStorage(
     addressByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.address)).flatMap { _ =>
       val valueByBoxIt = boxes.iterator.map(b => b.boxId -> b.value)
       utxosByAddress.adjustAndForget(address, valueByBoxIt)(_.fold(javaMapOf(valueByBoxIt)) { existingMap =>
-        if (existingMap.size() > 3000) {
-          logger.warn(s"Address $address is getting too big : ${existingMap.size()}")
+        if (existingMap.size() > 1000) {
+          superNodeAddresses.put(address, existingMap.size())
         }
         boxes.iterator.foreach { case Record(_, boxId, _, value) =>
           existingMap.put(boxId, value)
@@ -134,10 +138,10 @@ case class MvStorage(
       .getOrElse(Map.empty)
 
   def getUtxosByAddress(address: Address): Option[java.util.Map[BoxId, Value]] =
-    utxosByAddress.get(address)
+    utxosByAddress.getAll(address)
 
   def getUtxoValueByAddress(address: Address, utxo: BoxId): Option[Value] =
-    utxosByAddress.get(address).flatMap(m => Option(m.get(utxo)))
+    utxosByAddress.get(address, utxo: BoxId)
 
   def isEmpty: Boolean =
     utxosByAddress.isEmpty && addressByUtxo.isEmpty && blockIdsByHeight.isEmpty && blockById.isEmpty

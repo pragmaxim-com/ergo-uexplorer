@@ -15,7 +15,7 @@ import java.util
 import scala.util.Try
 
 object BlockInfoCodec extends DbCodec[BlockInfo] {
-  override def read(bytes: Array[Byte]): BlockInfo = {
+  override def readAll(bytes: Array[Byte]): BlockInfo = {
     val input = new Input(bytes)
     val kryo  = KryoSerialization.pool.obtain()
     try kryo.readObject(input, classOf[BlockInfo])
@@ -25,7 +25,7 @@ object BlockInfoCodec extends DbCodec[BlockInfo] {
     }
   }
 
-  override def write(obj: BlockInfo): Array[Byte] = {
+  override def writeAll(obj: BlockInfo): Array[Byte] = {
     val buffer = ByteBuffer.allocate(2048)
     val output = new ByteBufferOutput(buffer)
     val kryo   = KryoSerialization.pool.obtain()

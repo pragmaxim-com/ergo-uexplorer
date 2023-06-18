@@ -4,7 +4,9 @@ import scala.util.Try
 
 trait SuperNodeMapLike[SK, SV[_, _], K, V] {
 
-  def get(key: SK): Option[SV[K, V]]
+  def get(key: SK, secondaryKey: K): Option[V]
+
+  def getAll(key: SK): Option[SV[K, V]]
 
   def putOnlyNew(key: SK, secondaryKey: K, value: V): Option[Boolean]
 

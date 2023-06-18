@@ -4,8 +4,11 @@ import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
 
 import scala.collection.immutable.TreeSet
+import scala.collection.concurrent
 
 trait Storage {
+
+  def superNodeAddresses: concurrent.Map[Address, Int]
 
   def isEmpty: Boolean
 

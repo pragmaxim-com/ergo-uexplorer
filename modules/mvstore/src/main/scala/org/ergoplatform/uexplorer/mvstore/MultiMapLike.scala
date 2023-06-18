@@ -4,7 +4,9 @@ import scala.util.Try
 
 trait MultiMapLike[PK, C[_, _], K, V] {
 
-  def get(key: PK): Option[C[K, V]]
+  def get(key: PK, secondaryKey: K)(implicit c: MultiMapCodec[C, K, V]): Option[V]
+
+  def getAll(key: PK): Option[C[K, V]]
 
   def remove(key: PK): Boolean
 

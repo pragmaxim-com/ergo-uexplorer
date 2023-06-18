@@ -14,13 +14,13 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
   private val codec: DbCodec[V] = implicitly[DbCodec[V]]
 
-  def get(key: K): Option[V] = Option(underlying.get(key)).map(codec.read)
+  def get(key: K): Option[V] = Option(underlying.get(key)).map(codec.readAll)
 
   def isEmpty: Boolean = underlying.isEmpty
 
   def size: Int = underlying.size()
 
-  def remove(key: K): Option[V] = Option(underlying.remove(key)).map(codec.read)
+  def remove(key: K): Option[V] = Option(underlying.remove(key)).map(codec.readAll)
 
   def removeAndForget(key: K): Boolean = underlying.remove(key) != null
 
@@ -35,7 +35,7 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
       case v if v != null =>
         Failure(new AssertionError(s"Removing non-existing key $key"))
       case v =>
-        Success(codec.read(v))
+        Success(codec.readAll(v))
     }
 
   def removeAllOrFail(keys: Iterable[K]): Try[Unit] =
@@ -54,7 +54,7 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
     override def hasNext: Boolean = cursor.hasNext
 
-    override def next(): (K, V) = cursor.next() -> codec.read(cursor.getValue)
+    override def next(): (K, V) = cursor.next() -> codec.readAll(cursor.getValue)
   }
 
   def keyIterator(from: Option[K]): Iterator[K] = underlying.keyIterator(from.orNull.asInstanceOf[K]).asScala
@@ -75,45 +75,45 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
   def keyList: java.util.List[K] = underlying.keyList()
 
-  def put(key: K, value: V): Option[V] = Option(underlying.put(key, codec.write(value))).map(codec.read)
+  def put(key: K, value: V): Option[V] = Option(underlying.put(key, codec.writeAll(value))).map(codec.readAll)
 
-  def putAndForget(key: K, value: V): Boolean = underlying.put(key, codec.write(value)) == null
+  def putAndForget(key: K, value: V): Boolean = underlying.put(key, codec.writeAll(value)) == null
 
   def putAllNewOrFail(entries: IterableOnce[(K, V)]): Try[Unit] =
     entries.iterator
-      .find(e => underlying.put(e._1, codec.write(e._2)) != null)
+      .find(e => underlying.put(e._1, codec.writeAll(e._2)) != null)
       .map(e => Failure(new AssertionError(s"Key ${e._1} was already present!")))
       .getOrElse(Success(()))
 
-  def putIfAbsent(key: K, value: V): Option[V] = Option(underlying.putIfAbsent(key, codec.write(value))).map(codec.read)
+  def putIfAbsent(key: K, value: V): Option[V] = Option(underlying.putIfAbsent(key, codec.writeAll(value))).map(codec.readAll)
 
   def putIfAbsentOrFail(key: K, value: V): Try[Unit] =
-    Option(underlying.putIfAbsent(key, codec.write(value))).fold(Success(())) { oldVal =>
-      Failure(new AssertionError(s"Key $key already present with value ${codec.read(oldVal)}"))
+    Option(underlying.putIfAbsent(key, codec.writeAll(value))).fold(Success(())) { oldVal =>
+      Failure(new AssertionError(s"Key $key already present with value ${codec.readAll(oldVal)}"))
     }
 
-  def putIfAbsentAndForget(key: K, value: V): Unit = underlying.putIfAbsent(key, codec.write(value))
+  def putIfAbsentAndForget(key: K, value: V): Unit = underlying.putIfAbsent(key, codec.writeAll(value))
 
-  def replace(key: K, value: V): Option[V] = Option(underlying.replace(key, codec.write(value))).map(codec.read)
+  def replace(key: K, value: V): Option[V] = Option(underlying.replace(key, codec.writeAll(value))).map(codec.readAll)
 
   def replace(key: K, oldValue: V, newValue: V): Boolean =
-    underlying.replace(key, codec.write(oldValue), codec.write(newValue))
+    underlying.replace(key, codec.writeAll(oldValue), codec.writeAll(newValue))
 
   def removeOrUpdate(k: K)(f: V => Option[V]): Option[V] =
-    Option(underlying.get(k)).map(codec.read) match {
+    Option(underlying.get(k)).map(codec.readAll) match {
       case None =>
         None
       case Some(v) =>
         f(v) match {
           case None =>
-            Option(underlying.remove(k)).map(codec.read)
+            Option(underlying.remove(k)).map(codec.readAll)
           case Some(v) =>
-            Option(underlying.put(k, codec.write(v))).map(codec.read)
+            Option(underlying.put(k, codec.writeAll(v))).map(codec.readAll)
         }
     }
 
   def removeOrUpdateOrFail(k: K)(f: V => Option[V]): Try[Unit] =
-    Option(underlying.get(k)).map(codec.read) match {
+    Option(underlying.get(k)).map(codec.readAll) match {
       case None =>
         Failure(new AssertionError(s"Removing or updating non-existing key $k"))
       case Some(v) =>
@@ -121,12 +121,12 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
           case None =>
             Try(assert(underlying.remove(k) != null, s"Removing non-existing key $k"))
           case Some(v) =>
-            underlying.put(k, codec.write(v))
+            underlying.put(k, codec.writeAll(v))
             Success(())
         }
     }
 
   def adjustAndForget(k: K)(f: Option[V] => V): Boolean =
-    underlying.put(k, codec.write(f(Option(underlying.get(k)).map(codec.read)))) == null
+    underlying.put(k, codec.writeAll(f(Option(underlying.get(k)).map(codec.readAll)))) == null
 
 }

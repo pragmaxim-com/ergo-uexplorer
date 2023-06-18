@@ -10,6 +10,7 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 import java.util.stream.Collectors
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
+import org.ergoplatform.uexplorer.mvstore.kryo.KryoSerialization.Implicits.*
 
 //TODO make SuperNodePCol
 class MultiMvMap[PK, C[_, _], K, V](
@@ -17,8 +18,13 @@ class MultiMvMap[PK, C[_, _], K, V](
   superNodeMap: SuperNodeMapLike[PK, C, K, V]
 ) extends MultiMapLike[PK, C, K, V] {
 
-  def get(key: PK): Option[C[K, V]] =
-    superNodeMap.get(key).orElse(commonMap.get(key))
+  def get(key: PK, secondaryKey: K)(implicit c: MultiMapCodec[C, K, V]): Option[V] =
+    superNodeMap
+      .get(key, secondaryKey)
+      .orElse(commonMap.get(key).flatMap(v => c.read(secondaryKey, v)))
+
+  def getAll(key: PK): Option[C[K, V]] =
+    superNodeMap.getAll(key).orElse(commonMap.get(key))
 
   def remove(key: PK): Boolean =
     superNodeMap.remove(key).isDefined || commonMap.removeAndForget(key)

@@ -8,7 +8,7 @@ import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, M
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.kryo.*
-import org.ergoplatform.uexplorer.mvstore.DbCodec
+import org.ergoplatform.uexplorer.mvstore.{DbCodec, MultiMapCodec}
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
 
 import java.nio.ByteBuffer
@@ -18,10 +18,10 @@ import scala.util.Try
 object KryoSerialization {
 
   object Implicits {
-    implicit val blockIdsCodec: DbCodec[java.util.Set[BlockId]]        = BlockIdsCodec
-    implicit val valueByBoxCodec: DbCodec[java.util.Map[BoxId, Value]] = ValueByBoxCodec
-    implicit val blockMetadataCodec: DbCodec[BlockInfo]                = BlockInfoCodec
-    implicit val addressCodec: DbCodec[Address]                        = AddressCodec
+    implicit val blockIdsCodec: DbCodec[java.util.Set[BlockId]]              = BlockIdsCodec
+    implicit val valueByBoxCodec: MultiMapCodec[java.util.Map, BoxId, Value] = ValueByBoxCodec
+    implicit val blockMetadataCodec: DbCodec[BlockInfo]                      = BlockInfoCodec
+    implicit val addressCodec: DbCodec[Address]                              = AddressCodec
   }
 
   val pool: Pool[Kryo] = new Pool[Kryo](true, false, 8) {

@@ -15,8 +15,8 @@ import java.util
 import scala.util.Try
 
 object AddressCodec extends DbCodec[Address] {
-  override def read(bytes: Array[Byte]): Address =
+  override def readAll(bytes: Array[Byte]): Address =
     new String(bytes).asInstanceOf[Address] // do not call Address.fromStringUnsafe as it has been already validated
 
-  override def write(obj: Address): Array[Byte] = obj.asInstanceOf[String].getBytes("UTF-8")
+  override def writeAll(obj: Address): Array[Byte] = obj.asInstanceOf[String].getBytes("UTF-8")
 }

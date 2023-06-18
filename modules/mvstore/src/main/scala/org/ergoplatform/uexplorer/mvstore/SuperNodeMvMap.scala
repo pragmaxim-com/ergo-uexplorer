@@ -20,7 +20,10 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
 
   private val supernodeByKey: concurrent.Map[SK, MVMap[K, V]] = new ConcurrentHashMap().asScala
 
-  def get(sk: SK): Option[SV[K, V]] =
+  def get(sk: SK, secondaryKey: K): Option[V] =
+    supernodeByKey.get(sk).flatMap(m => Option(m.get(secondaryKey)))
+
+  def getAll(sk: SK): Option[SV[K, V]] =
     supernodeByKey.get(sk).map(codec.readAll)
 
   def putOnlyNew(sk: SK, k: K, v: V): Option[Boolean] =
@@ -60,9 +63,9 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
       .get(sk)
       .flatMap { superNodeName =>
         supernodeByKey.remove(sk).map { mvMapToRemove =>
-          logger.info(s"Clearing supernode map $superNodeName")
+          logger.info(s"Removing supernode map $superNodeName")
           val result = codec.readAll(mvMapToRemove)
-          mvMapToRemove.clear()
+          store.removeMap(superNodeName)
           result
         }
       }
