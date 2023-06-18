@@ -22,8 +22,8 @@ import scala.jdk.FutureConverters.*
 import scala.util.Try
 
 class AlertPlugin extends Plugin {
-  protected val logger: Logger         = LoggerFactory.getLogger(getClass.getName)
-  private val discord: Future[Discord] = Discord.fromEnv
+  protected val logger: Logger              = LoggerFactory.getLogger(getClass.getName)
+  private lazy val discord: Future[Discord] = Discord.fromEnv
 
   private lazy val detectors = List(
     new HighValueDetector(3 * 1000, 10 * 1000)
@@ -40,9 +40,9 @@ class AlertPlugin extends Plugin {
   def close: Future[Unit] = discord.flatMap(_.logout)
 
   def processMempoolTx(
-                        newTx: ApiTransaction,
-                        utxoState: Storage,
-                        graphTraversalSource: Option[GraphTraversalSource]
+    newTx: ApiTransaction,
+    utxoState: Storage,
+    graphTraversalSource: Option[GraphTraversalSource]
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
@@ -60,9 +60,9 @@ class AlertPlugin extends Plugin {
     }
 
   def processNewBlock(
-                       newBlock: BestBlockInserted,
-                       utxoState: Storage,
-                       graphTraversalSource: Option[GraphTraversalSource]
+    newBlock: BestBlockInserted,
+    utxoState: Storage,
+    graphTraversalSource: Option[GraphTraversalSource]
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(

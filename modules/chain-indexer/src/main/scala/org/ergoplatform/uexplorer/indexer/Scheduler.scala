@@ -33,7 +33,7 @@ class Scheduler(
   def periodicSync: Future[MempoolStateChanges] =
     for {
       ChainSyncResult(lastBlockOpt, storage, graphTraversalSource) <- chainIndexer.indexChain
-      stateChanges                                                   <- mempoolSyncer.syncMempool(storage)
+      stateChanges                                                 <- mempoolSyncer.syncMempool(storage)
       _ <- pluginManager.executePlugins(storage, stateChanges, graphTraversalSource, lastBlockOpt)
     } yield stateChanges
 

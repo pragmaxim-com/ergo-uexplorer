@@ -17,7 +17,7 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
   extends SuperNodeMapLike[SK, SV, K, V]
   with LazyLogging {
 
-  logger.info(s"Creating SuperNodeMap with ${superNodeNameByKey.size} keys")
+  logger.info(s"Creating SuperNodeMap for ${superNodeNameByKey.size} keys")
 
   private val supernodeByKey: concurrent.Map[SK, MVMap[K, V]] = new ConcurrentHashMap().asScala
 
@@ -33,7 +33,7 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
       .map { superNodeName =>
         supernodeByKey.get(sk) match {
           case None =>
-            logger.info(s"Creating new supernode map $superNodeName")
+            logger.info(s"Creating new supernode map for $superNodeName")
             codec.write(store.openMap[K, V](superNodeName), k, v)
           case Some(m) =>
             codec.write(m, k, v)
@@ -47,7 +47,7 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
         val replacedValueOpt =
           supernodeByKey.get(sk) match {
             case None =>
-              logger.info(s"Creating new supernode map $superNodeName")
+              logger.info(s"Creating new supernode map for $superNodeName")
               val newSuperNodeMap = store.openMap[K, V](superNodeName)
               supernodeByKey.putIfAbsent(sk, newSuperNodeMap)
               codec.writeAll(newSuperNodeMap, entries)
@@ -64,7 +64,7 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
       .get(sk)
       .flatMap { superNodeName =>
         supernodeByKey.remove(sk).map { mvMapToRemove =>
-          logger.info(s"Removing supernode map $superNodeName")
+          logger.info(s"Removing supernode map for $superNodeName")
           val result = codec.readAll(mvMapToRemove)
           store.removeMap(superNodeName)
           result
