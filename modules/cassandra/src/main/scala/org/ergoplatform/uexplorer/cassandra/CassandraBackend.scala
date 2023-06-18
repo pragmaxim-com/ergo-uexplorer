@@ -77,6 +77,10 @@ object CassandraBackend extends LazyLogging {
         .withConfigLoader(new CassandraConfigLoader(datastaxDriverConf))
         .build()
     logger.info(s"Cassandra session created")
+    val cassandraContactPoints =
+      datastaxDriverConf.getStringList("basic.contact-points").asScala
+    logger.info(s"Cassandra contact points: ${cassandraContactPoints.mkString(", ")}")
+
     val backend = new CassandraBackend(parallelism)
     CoordinatedShutdown(system).addTask(
       CoordinatedShutdown.PhaseServiceStop,

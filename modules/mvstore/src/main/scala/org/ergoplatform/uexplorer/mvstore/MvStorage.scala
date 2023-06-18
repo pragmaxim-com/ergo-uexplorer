@@ -191,6 +191,8 @@ object MvStorage extends LazyLogging {
         .autoCommitDisabled()
         .open()
 
+    logger.info(s"Opening mvstore at version ${store.getCurrentVersion}")
+
     store.setVersionsToKeep(VersionsToKeep)
     store.setRetentionTime(3600 * 1000 * 24 * 7)
     MvStorage(
