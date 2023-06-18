@@ -105,8 +105,11 @@ class MetadataHttpClient[P](minNodeHeight: Int = EpochLength * 800)(implicit
 
 object MetadataHttpClient {
 
-  def apply[P](
-    implicit localNodeUriMagnet: LocalNodeUriMagnet, remoteNodeUriMagnet: RemoteNodeUriMagnet, underlyingB: SttpBackend[Future, P], system: ActorSystem[Nothing]
+  def apply[P](implicit
+    localNodeUriMagnet: LocalNodeUriMagnet,
+    remoteNodeUriMagnet: RemoteNodeUriMagnet,
+    underlyingB: SttpBackend[Future, P],
+    system: ActorSystem[Nothing]
   ): MetadataHttpClient[P] = {
     val metadataClient = new MetadataHttpClient[P]()
     CoordinatedShutdown(system).addTask(

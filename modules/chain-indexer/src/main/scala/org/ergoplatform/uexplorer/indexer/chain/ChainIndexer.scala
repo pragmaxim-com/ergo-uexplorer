@@ -44,16 +44,14 @@ class ChainIndexer(
     Flow[Height]
       .via(blockHttpClient.blockFlow)
       .mapAsync(1) { block =>
-        blocking {
-          blockHttpClient
-            .getBestBlockOrBranch(block, blockIndexer.readableStorage.containsBlock, List.empty)
-            .map {
-              case bestBlock :: Nil =>
-                blockIndexer.addBestBlock(bestBlock).get
-              case winningFork =>
-                blockIndexer.addWinningFork(winningFork).get
-            }(Implicits.trampoline)
-        }
+        blockHttpClient
+          .getBestBlockOrBranch(block, blockIndexer.readableStorage.containsBlock, List.empty)(Implicits.trampoline)
+          .map {
+            case bestBlock :: Nil =>
+              blockIndexer.addBestBlock(bestBlock).get
+            case winningFork =>
+              blockIndexer.addWinningFork(winningFork).get
+          }(Implicits.trampoline)
       }
       .via(forkDeleteFlow(1))
       .async

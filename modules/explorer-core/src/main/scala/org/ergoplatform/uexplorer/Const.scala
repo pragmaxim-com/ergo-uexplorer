@@ -10,20 +10,22 @@ import scala.util.Try
 object Const {
 
   object SuperNode {
+    import Address.fromStringUnsafe
     val addresses = Map(
       /** until height 500 000 */
-      Address.fromStringUnsafe("9gmNsqrqdSppLUBqg2UzREmmivgqh1r3jmNcLAc53hk3YCvAGWE") -> "1",
-      Address.fromStringUnsafe("9hD4D5rAcTyMuw7eVSENfRBmdCZiz3cwmW8xSnoEvZ1H64rFGMn") -> "2",
-      Address.fromStringUnsafe("9hi3xmKtKf3FVwt9jTiXQsrjMjjtzKzTNCsBUrVMKA2xcYMsvyc") -> "3",
-      Address.fromStringUnsafe("9fckoJSnYpR38EkCzintbJoKaDwWN86wCmNdByiWyeQ22Hq5Sbj") -> "4",
-      Address.fromStringUnsafe("9g4Kek6iWspXPAURU3zxT4RGoKvFdvqgxgkANisNFbvDwK1KoxW") -> "5",
-      Address.fromStringUnsafe("9em1ShUCkTa43fALGgzwKQ5znuXY2dMnnfHqq4bX3wSWytH11t7") -> "6",
-      Address.fromStringUnsafe("9gXPZWxQZQpKsBCW2QCiBjJbhtghxEFtA9Ba6WygnKmrD4g2e8B") -> "7",
-      Address.fromStringUnsafe("9fQHnth8J6BgVNs9BQjxj5s4e5JGCjiH4fYTBA52ZWrMh6hz2si") -> "8",
-      Address.fromStringUnsafe("9gqhrGQN3eQmTFAW9J6KNX8ffUhe8BmTesE45b9nBmL7VJohhtY") -> "9"
+      fromStringUnsafe("9gmNsqrqdSppLUBqg2UzREmmivgqh1r3jmNcLAc53hk3YCvAGWE")                              -> "1",
+      fromStringUnsafe("9hD4D5rAcTyMuw7eVSENfRBmdCZiz3cwmW8xSnoEvZ1H64rFGMn")                              -> "2",
+      fromStringUnsafe("9hi3xmKtKf3FVwt9jTiXQsrjMjjtzKzTNCsBUrVMKA2xcYMsvyc")                              -> "3",
+      fromStringUnsafe("9fckoJSnYpR38EkCzintbJoKaDwWN86wCmNdByiWyeQ22Hq5Sbj")                              -> "4",
+      fromStringUnsafe("9g4Kek6iWspXPAURU3zxT4RGoKvFdvqgxgkANisNFbvDwK1KoxW")                              -> "5",
+      fromStringUnsafe("9em1ShUCkTa43fALGgzwKQ5znuXY2dMnnfHqq4bX3wSWytH11t7")                              -> "6",
+      fromStringUnsafe("9gXPZWxQZQpKsBCW2QCiBjJbhtghxEFtA9Ba6WygnKmrD4g2e8B")                              -> "7",
+      fromStringUnsafe("9fQHnth8J6BgVNs9BQjxj5s4e5JGCjiH4fYTBA52ZWrMh6hz2si")                              -> "8",
+      fromStringUnsafe("9gqhrGQN3eQmTFAW9J6KNX8ffUhe8BmTesE45b9nBmL7VJohhtY")                              -> "9",
+      fromStringUnsafe("9gEn3XctxRx7GwLNpu1pevckKMvSVrx5ZizBwMxFZaWa2UbVBLo")                              -> "10",
+      fromStringUnsafe("88dhgzEuTXaSsLA9CXxAG75h7e3m8jgPsRdgEz91LWJJAqm7zNiptP3iLVSGhD129x2LhH6VUXQcoK5p") -> "11"
     ) ++ Map(
-      FeeContract.address -> "feeContractAddress",
-      Emission.address    -> "emissionAddress"
+      FeeContract.address -> "feeContractAddress"
     )
   }
 

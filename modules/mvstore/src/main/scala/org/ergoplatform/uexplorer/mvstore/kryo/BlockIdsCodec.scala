@@ -26,7 +26,7 @@ object BlockIdsCodec extends DbCodec[java.util.Set[BlockId]] {
   }
 
   override def write(blockIds: java.util.Set[BlockId]): Array[Byte] = {
-    val buffer = ByteBuffer.allocate(blockIds.size() * 128)
+    val buffer = ByteBuffer.allocate((blockIds.size() * 64) + 32)
     val output = new ByteBufferOutput(buffer)
     val kryo   = KryoSerialization.pool.obtain()
     try kryo.writeObject(output, blockIds)
