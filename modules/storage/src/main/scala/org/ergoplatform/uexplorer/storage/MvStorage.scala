@@ -177,17 +177,19 @@ object MvStorage extends LazyLogging {
   type HeightCompactRate = Int
   type MaxCompactTime    = FiniteDuration
   private val VersionsToKeep = 10
-  private val dbFileNameTemp = s"mv-store-${SuperNodeUtils.randomNumber(5)}.db"
   private val dbFileName     = s"mv-store.db"
+  private val dbDir          = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer").toFile
+  private val tempDbDir =
+    Paths.get(System.getProperty("java.io.tmpdir"), s"mv-store-${SuperNodeUtils.randomNumber(5)}.db").toFile
 
   def apply(
     cacheSize: CacheSize,
-    rootDir: File = Paths.get(System.getProperty("java.io.tmpdir"), dbFileNameTemp).toFile
+    rootDir: File = tempDbDir
   ): Try[MvStorage] = Try {
     rootDir.mkdirs()
     val store =
       new MVStore.Builder()
-        .fileName(rootDir.toPath.resolve("mvstore").toFile.getAbsolutePath)
+        .fileName(rootDir.toPath.resolve(dbFileName).toFile.getAbsolutePath)
         .cacheSize(cacheSize)
         .cacheConcurrency(2)
         .autoCommitDisabled()
@@ -210,5 +212,5 @@ object MvStorage extends LazyLogging {
   }
 
   def withDefaultDir(cacheSize: CacheSize): Try[MvStorage] =
-    MvStorage(cacheSize, Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", dbFileName).toFile)
+    MvStorage(cacheSize, dbDir)
 }

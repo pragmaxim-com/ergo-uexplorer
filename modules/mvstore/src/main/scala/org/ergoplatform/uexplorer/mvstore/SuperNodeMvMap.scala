@@ -17,6 +17,8 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
   extends SuperNodeMapLike[SK, SV, K, V]
   with LazyLogging {
 
+  logger.info(s"Creating SuperNodeMap with ${superNodeNameByKey.size} keys")
+
   private val supernodeByKey: concurrent.Map[SK, MVMap[K, V]] = new ConcurrentHashMap().asScala
 
   def get(sk: SK, secondaryKey: K): Option[V] =
