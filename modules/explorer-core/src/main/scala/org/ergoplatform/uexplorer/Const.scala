@@ -9,42 +9,6 @@ import scala.util.Try
 
 object Const {
 
-  object SuperNode {
-    import Address.fromStringUnsafe
-    val addresses = List(
-      /** until height 500 000 */
-      fromStringUnsafe("9gmNsqrqdSppLUBqg2UzREmmivgqh1r3jmNcLAc53hk3YCvAGWE"),
-      fromStringUnsafe("9hD4D5rAcTyMuw7eVSENfRBmdCZiz3cwmW8xSnoEvZ1H64rFGMn"),
-      fromStringUnsafe("9hi3xmKtKf3FVwt9jTiXQsrjMjjtzKzTNCsBUrVMKA2xcYMsvyc"),
-      fromStringUnsafe("9fckoJSnYpR38EkCzintbJoKaDwWN86wCmNdByiWyeQ22Hq5Sbj"),
-      fromStringUnsafe("9g4Kek6iWspXPAURU3zxT4RGoKvFdvqgxgkANisNFbvDwK1KoxW"),
-      fromStringUnsafe("9em1ShUCkTa43fALGgzwKQ5znuXY2dMnnfHqq4bX3wSWytH11t7"),
-      fromStringUnsafe("9gXPZWxQZQpKsBCW2QCiBjJbhtghxEFtA9Ba6WygnKmrD4g2e8B"),
-      fromStringUnsafe("9fQHnth8J6BgVNs9BQjxj5s4e5JGCjiH4fYTBA52ZWrMh6hz2si"),
-      fromStringUnsafe("9gqhrGQN3eQmTFAW9J6KNX8ffUhe8BmTesE45b9nBmL7VJohhtY"),
-      fromStringUnsafe("9gEn3XctxRx7GwLNpu1pevckKMvSVrx5ZizBwMxFZaWa2UbVBLo"),
-      fromStringUnsafe("88dhgzEuTXaSsLA9CXxAG75h7e3m8jgPsRdgEz91LWJJAqm7zNiptP3iLVSGhD129x2LhH6VUXQcoK5p"),
-      fromStringUnsafe("9fj9NJpzo13HfNyCdzyfNP8zAfjiTY3pys1JP5wCzez8MiP8QbF"),
-      fromStringUnsafe("88dhgzEuTXaSaB7wgZxUXKbN1pfKQfUSKx8YvTo5fA46nEw2NXRBiRhvzjbu2nLAhGzbpTeTmooU1NRV"),
-      fromStringUnsafe("88dhgzEuTXaQ5DirP3hoFiLiJaBmG7TJKqw5ikk932yVvEjfYZu2rEesYFACVo4cKk8L72NQjeJbkMBY"),
-      fromStringUnsafe("88dhgzEuTXaV6tcJe942nHAAnJThRVbtexWWy2bfvQLjvpnA7gML9VPx5GU8cnEN53d4K7T8Kytxrp93"),
-      fromStringUnsafe("88dhgzEuTXaQk4wCvgrdVbiqCKZrh9KtyJi99Qzbjn6ZFehnMcx9eiUCuPL8duXeYULsaENAfVqJ3vue"),
-      fromStringUnsafe("88dhgzEuTXaUZiSJbio9ziSWyuzuob5qpgMqRGAPyD847Hktum6cY6T2MxB1UHBeqfAVAPhZGQYZW9Kq"),
-      fromStringUnsafe("88dhgzEuTXaSLUWK1Ro8mB5xfhwP4y8osUycdBV16EBgycjcBebwd2He7QGiXC1qiSM1KZ6bAcpE2iCv"),
-      fromStringUnsafe("88dhgzEuTXaQKWhFAuJzXk63F5oLtrENDYgx9iiGNHTL6X3aWVU3mDMNbNmf8YPH1RUuSQk4zSQJuZHi"),
-      fromStringUnsafe("88dhgzEuTXaUfbUzoc9PkTH5R5ucyu7MqwuGtDzbPwLKtGJ15rNLtmxaBsedm9iu7QQZJhSkSgSLwdRM"),
-      fromStringUnsafe("88dhgzEuTXaSGHnwPExLNZCzVzKUkymXqPpeXS7FwCW7mhvHvVuxv8qTqMCDZ5KWFPsSSHbFZLuBvGko"),
-      fromStringUnsafe("88dhgzEuTXaQHZ2QRyM9YuNAGDuzzNd1ZEnJR1Xqjfa4EXuLhLDrtt7ZuTKmuCtCswjQ5ADUcBttVNep"),
-      fromStringUnsafe("88dhgzEuTXaVegP8wPoFqus6cGZ76G7jD39B3JyMRapK6VtV76hfa3d9VDZnu7AocZ4dZ2df8oQgiUkv"),
-      fromStringUnsafe("88dhgzEuTXaThPeZU6FUDhr25iSuiCM59s8d7a1wXwznVgYRCAYc59svpxhZvyZ3CAb7yYjXmzRRD6w4"),
-      fromStringUnsafe("88dhgzEuTXaUmyADDoeGh1SmFNePuZVMwcN2Q1tXEBLMDbCcVezcdbcXiubrv2w9n9fK3cixxqkiTKZR"),
-      fromStringUnsafe("88dhgzEuTXaR1y7FHTKBmRS3wpzkfNY3dUHQEttSjWuRBjondiYjzZbpXyxSsfg3NVaKatp19K7KBrYn"),
-      fromStringUnsafe("88dhgzEuTXaVn1SH23fUZj4NnhACJkUciYr5WDLdJPJYRX52Pk9YZFXr7JFVwSGLKKa2mqcfpCE8wL5f")
-    ).zipWithIndex.toMap.view.mapValues(_.toString).toMap ++ Map(
-      FeeContract.address -> "feeContractAddress"
-    )
-  }
-
   object Protocol {
 
     val blockId = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")

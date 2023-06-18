@@ -20,8 +20,10 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
+import org.ergoplatform.uexplorer.indexer.config.MvStore
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.storage.MvStorage
+import org.ergoplatform.uexplorer.storage.MvStorage.*
 import org.h2.mvstore.{MVMap, MVStore}
 
 import java.io.File
@@ -39,8 +41,11 @@ import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Random, Success, Try}
 
-class BlockIndexer(storage: MvStorage, backendEnabled: Boolean, mvStoreMaxCompactionTime: FiniteDuration)
-  extends LazyLogging {
+class BlockIndexer(
+  storage: MvStorage,
+  backendEnabled: Boolean,
+  mvStoreConf: MvStore
+) extends LazyLogging {
 
   def readableStorage: Storage = storage
 
@@ -71,7 +76,7 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean, mvStoreMaxCompac
 
   def compact(): Try[Unit] = Try {
     logger.info(s"Compacting file at ${storage.getReport}")
-    storage.store.compactFile(mvStoreMaxCompactionTime.toMillis.toInt)
+    storage.store.compactFile(mvStoreConf.maxCompactTime.toMillis.toInt)
   }
 
   def addBestBlock(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
@@ -81,7 +86,7 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean, mvStoreMaxCompac
       lb        <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
       _         <- storage.persistNewBlock(lb)
       fbOpt     <- if (backendEnabled) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
-      _         <- if (lb.info.height % MvStorage.CompactFileRate == 0) compact() else Success(())
+      _         <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact() else Success(())
     } yield BestBlockInserted(lb, fbOpt)
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
@@ -115,7 +120,11 @@ class BlockIndexer(storage: MvStorage, backendEnabled: Boolean, mvStoreMaxCompac
 }
 
 object BlockIndexer {
-  def apply(storage: MvStorage, backendEnabled: Boolean, mvStoreMaxCompactionTime: FiniteDuration)(implicit
+  def apply(
+    storage: MvStorage,
+    backendEnabled: Boolean,
+    mvStoreConf: MvStore
+  )(implicit
     system: ActorSystem[Nothing]
   ): BlockIndexer = {
     CoordinatedShutdown(system).addTask(
@@ -124,6 +133,6 @@ object BlockIndexer {
     ) { () =>
       Future(storage.close()).map(_ => Done)
     }
-    new BlockIndexer(storage, backendEnabled, mvStoreMaxCompactionTime)
+    new BlockIndexer(storage, backendEnabled, mvStoreConf)
   }
 }

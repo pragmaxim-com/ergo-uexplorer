@@ -73,13 +73,13 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
               pluginManager   <- PluginManager.initialize
               backendOpt      <- Future.fromTry(Backend(conf.backendType))
               graphBackendOpt <- Future.fromTry(GraphBackend(conf.graphBackendType))
-              storage         <- Future.fromTry(MvStorage.withDefaultDir(conf.mvStoreCacheSize))
-              blockIndexer  = BlockIndexer(storage, backendOpt.isDefined, conf.mvStoreMaxCompactTime)
+              storage         <- Future.fromTry(MvStorage.withDefaultDir(conf.mvStore.cacheSize))
+              blockIndexer  = BlockIndexer(storage, backendOpt.isDefined, conf.mvStore)
               chainIndexer  = new ChainIndexer(backendOpt, graphBackendOpt, blockHttpClient, blockIndexer)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
               initializer   = new Initializer(storage, backendOpt, graphBackendOpt)
               scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
-              done <- scheduler.validateAndSchedule(0.seconds, conf.mvStoreMaxCompactTime + 2.seconds)
+              done <- scheduler.validateAndSchedule(0.seconds, conf.mvStore.maxCompactTime + 2.seconds)
             } yield done
 
           initializationF.andThen {

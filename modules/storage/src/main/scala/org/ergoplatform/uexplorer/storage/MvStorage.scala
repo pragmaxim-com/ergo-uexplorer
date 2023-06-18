@@ -7,7 +7,7 @@ import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Const.{FeeContract, SuperNode}
+import org.ergoplatform.uexplorer.Const.FeeContract
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock, Record}
 import org.ergoplatform.uexplorer.mvstore.*
@@ -15,8 +15,7 @@ import MvStorage.*
 import org.ergoplatform.uexplorer.storage.kryo.KryoSerialization.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.h2.mvstore.{MVMap, MVStore}
-
-import java.io.File
+import java.io.{BufferedInputStream, File}
 import java.nio.ByteBuffer
 import java.nio.file.Paths
 import java.util
@@ -24,12 +23,14 @@ import java.util.Map.Entry
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
 import scala.collection.concurrent
 import java.util.stream.Collectors
+import java.util.zip.GZIPInputStream
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{TreeMap, TreeSet}
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Random, Success, Try}
 
@@ -173,12 +174,36 @@ case class MvStorage(
 }
 
 object MvStorage extends LazyLogging {
-  import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+  import scala.concurrent.duration.*
+  import Address.unwrapped
 
-  type CompactTime = Int
-  type CacheSize   = Int
+  type CacheSize         = Int
+  type HeightCompactRate = Int
+  type MaxCompactTime    = FiniteDuration
   private val VersionsToKeep = 10
-  val CompactFileRate        = 10000
+
+  private val superNodeAddressesFilePath = "supernode-addresses.csv.gz"
+
+  def superNodeAddresses: Map[Address, String] =
+    Source
+      .fromInputStream(
+        new GZIPInputStream(
+          new BufferedInputStream(
+            Thread
+              .currentThread()
+              .getContextClassLoader
+              .getResourceAsStream(superNodeAddressesFilePath)
+          )
+        )
+      )
+      .getLines()
+      .map(_.trim)
+      .filterNot(_.isEmpty)
+      .map(Address.fromStringUnsafe)
+      .toSet
+      .incl(FeeContract.address)
+      .map(a => a -> a.unwrapped.take(32))
+      .toMap
 
   def apply(
     cacheSize: CacheSize,
@@ -201,7 +226,7 @@ object MvStorage extends LazyLogging {
       store,
       new MultiMvMap[Address, java.util.Map, BoxId, Value](
         new MvMap[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
-        new SuperNodeMvMap[Address, java.util.Map, BoxId, Value](SuperNode.addresses, store)
+        new SuperNodeMvMap[Address, java.util.Map, BoxId, Value](superNodeAddresses, store)
       ),
       new MvMap[BoxId, Address]("addressByUtxo", store),
       new MvMap[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),

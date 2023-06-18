@@ -22,13 +22,18 @@ import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
 import org.ergoplatform.uexplorer.cassandra.api.Backend.BackendType
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend.GraphBackendType
-import org.ergoplatform.uexplorer.storage.MvStorage.CacheSize
+import org.ergoplatform.uexplorer.storage.MvStorage.*
 
 import scala.concurrent.duration.FiniteDuration
 
+case class MvStore(
+  cacheSize: CacheSize,
+  maxCompactTime: MaxCompactTime,
+  heightCompactRate: HeightCompactRate
+)
+
 case class ChainIndexerConf(
-  mvStoreCacheSize: CacheSize,
-  mvStoreMaxCompactTime: FiniteDuration,
+  mvStore: MvStore,
   nodeAddressToInitFrom: Uri,
   peerAddressToPollFrom: Uri,
   backendType: BackendType,

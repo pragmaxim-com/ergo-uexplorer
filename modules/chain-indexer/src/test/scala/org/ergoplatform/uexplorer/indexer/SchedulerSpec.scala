@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.indexer
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, MvStore}
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolState
@@ -69,12 +69,13 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
         Response.ok(Rest.blocks.byId(blockId))
     }
 
+  val mvStoreConf   = MvStore(10, 500.millis, 10000)
   val storage       = MvStorage(64).get
   val blockClient   = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val backend       = Some(new InMemoryBackend)
   val graphBackend  = Some(new InMemoryGraphBackend)
   val pluginManager = new PluginManager(List.empty)
-  val blockIndexer  = BlockIndexer(storage, graphBackend.isDefined, 1.second)
+  val blockIndexer  = BlockIndexer(storage, graphBackend.isDefined, mvStoreConf)
   val chainIndexer  = new ChainIndexer(backend, graphBackend, blockClient, blockIndexer)
   val mempoolSyncer = new MempoolSyncer(blockClient)
   val initializer   = new Initializer(storage, backend, graphBackend)

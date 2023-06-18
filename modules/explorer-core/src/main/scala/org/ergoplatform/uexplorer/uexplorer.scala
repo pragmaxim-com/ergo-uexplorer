@@ -32,11 +32,13 @@ package object uexplorer {
   type NetworkPrefix = String Refined ValidByte
 
   object Address {
+    import eu.timepit.refined.auto.autoUnwrap
     case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount) {
       def this() = this(0, 0, 0) // kryo needs a no-arg constructor
     }
     case class State(value: Value)
-    def fromStringUnsafe(s: String): Address = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
+    extension (x: Address) def unwrapped: String = x
+    def fromStringUnsafe(s: String): Address     = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
   }
 
   object NetworkPrefix {
