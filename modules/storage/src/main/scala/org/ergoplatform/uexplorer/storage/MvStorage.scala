@@ -172,15 +172,18 @@ case class MvStorage(
 
 object MvStorage extends LazyLogging {
   import scala.concurrent.duration.*
+  import SuperNodeUtils.randomNumberPerRun
 
   type CacheSize         = Int
   type HeightCompactRate = Int
   type MaxCompactTime    = FiniteDuration
+
+  private val userHomeDir    = System.getProperty("user.home")
+  private val tempDir        = System.getProperty("java.io.tmpdir")
   private val VersionsToKeep = 10
-  private val dbFileName     = s"mv-store.db"
-  private val dbDir          = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer").toFile
-  private val tempDbDir =
-    Paths.get(System.getProperty("java.io.tmpdir"), s"mv-store-${SuperNodeUtils.randomNumber(5)}.db").toFile
+  private val dbFileName     = "mv-store.db"
+  private val dbDir          = Paths.get(userHomeDir, ".ergo-uexplorer").toFile
+  private val tempDbDir      = Paths.get(tempDir, s"mv-store-$randomNumberPerRun.db").toFile
 
   def apply(
     cacheSize: CacheSize,

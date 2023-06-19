@@ -17,9 +17,9 @@ import scala.util.Random
 
 object SuperNodeUtils extends LazyLogging {
 
-  def randomNumber(digits: Int): String = Random.alphanumeric.filter(_.isDigit).take(digits).mkString
+  val randomNumberPerRun: String = Random.alphanumeric.filter(_.isDigit).take(5).mkString
 
-  private val superNodeAddressFileName   = s"supernode-addresses-${randomNumber(5)}.csv"
+  private val superNodeAddressFileName   = s"supernode-addresses-$randomNumberPerRun.csv"
   private val superNodeAddressFileNameGz = "supernode-addresses.csv.gz"
 
   // temporary for collecting supernode addresses in whole chain
