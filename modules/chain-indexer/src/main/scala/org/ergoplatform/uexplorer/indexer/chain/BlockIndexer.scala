@@ -75,7 +75,7 @@ class BlockIndexer(
       }
 
   def compact(): Try[Unit] = Try {
-    logger.info(s"Compacting file at ${storage.getReport}")
+    logger.info(s"Compacting file at ${storage.getCompactReport}")
     storage.store.compactFile(mvStoreConf.maxCompactTime.toMillis.toInt)
   }
 

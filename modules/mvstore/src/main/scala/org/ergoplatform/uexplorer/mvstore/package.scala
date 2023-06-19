@@ -2,6 +2,11 @@ package org.ergoplatform.uexplorer
 
 package object mvstore {
 
+  type Appended = Boolean // put & not replaced
+  type Updated  = Boolean // put & replaced
+  type Removed  = Boolean // removed existing
+  type Replaced = Boolean // replaced given value
+
   def javaSetOf[T](e: T): java.util.Set[T] = {
     val set = new java.util.HashSet[T]()
     set.add(e)

@@ -12,12 +12,13 @@ import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock, Record}
 import org.ergoplatform.uexplorer.mvstore.*
 import MvStorage.*
-import org.ergoplatform.uexplorer.storage.kryo.KryoSerialization.Implicits.*
+import org.ergoplatform.uexplorer.storage.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.h2.mvstore.{MVMap, MVStore}
+
 import java.io.{BufferedInputStream, File}
 import java.nio.ByteBuffer
-import java.nio.file.Paths
+import java.nio.file.{CopyOption, Files, Paths}
 import java.util
 import java.util.Map.Entry
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
@@ -47,9 +48,9 @@ case class MvStorage(
 
   def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
 
-  private def removeInputBoxesByAddress(address: Address, inputBoxes: Iterable[BoxId]): Try[_] =
+  private def removeInputBoxesByAddress(address: Address, inputBoxes: ArraySeq[BoxId]): Try[_] =
     addressByUtxo.removeAllOrFail(inputBoxes).flatMap { _ =>
-      utxosByAddress.removeAllOrFail(address, inputBoxes) { existingBoxIds =>
+      utxosByAddress.removeAllOrFail(address, inputBoxes, inputBoxes.size) { existingBoxIds =>
         inputBoxes.foreach(existingBoxIds.remove)
         Option(existingBoxIds).collect { case m if !m.isEmpty => m }
       }
@@ -57,16 +58,7 @@ case class MvStorage(
 
   private def persistUtxos(address: Address, boxes: Iterable[Record]): Try[_] =
     addressByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.address)).flatMap { _ =>
-      val valueByBoxIt = boxes.iterator.map(b => b.boxId -> b.value)
-      utxosByAddress.adjustAndForget(address, valueByBoxIt)(_.fold(javaMapOf(valueByBoxIt)) { existingMap =>
-        if (existingMap.size() > 1000) {
-          SuperNodeUtils.superNodeAddresses.put(address, existingMap.size())
-        }
-        boxes.iterator.foreach { case Record(_, boxId, _, value) =>
-          existingMap.put(boxId, value)
-        }
-        existingMap
-      })
+      utxosByAddress.adjustAndForget(address, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
     }
 
   def persistNewBlock(lightBlock: LightBlock): Try[LightBlock] = {
@@ -93,7 +85,7 @@ case class MvStorage(
     blockById
       .putIfAbsentOrFail(lightBlock.headerId, lightBlock.info)
       .flatMap { _ =>
-        blockIdsByHeight.adjustAndForget(lightBlock.info.height)(
+        blockIdsByHeight.adjust(lightBlock.info.height)(
           _.fold(javaSetOf(lightBlock.headerId)) { existingBlockIds =>
             existingBlockIds.add(lightBlock.headerId)
             existingBlockIds
@@ -107,7 +99,9 @@ case class MvStorage(
       }
   }
 
-  def getReport: String = {
+  def getFinalReport: Option[String] = utxosByAddress.getFinalReport
+
+  def getCompactReport: String = {
     val height = getLastHeight.getOrElse(0)
     val progress =
       s"storage height $height, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}\n"
@@ -172,27 +166,39 @@ case class MvStorage(
 
 object MvStorage extends LazyLogging {
   import scala.concurrent.duration.*
-  import SuperNodeUtils.randomNumberPerRun
+  import SuperNodeCollector.randomNumberPerRun
 
   type CacheSize         = Int
   type HeightCompactRate = Int
   type MaxCompactTime    = FiniteDuration
+  type Index             = Long
 
-  private val userHomeDir    = System.getProperty("user.home")
-  private val tempDir        = System.getProperty("java.io.tmpdir")
-  private val VersionsToKeep = 10
-  private val dbFileName     = "mv-store.db"
-  private val dbDir          = Paths.get(userHomeDir, ".ergo-uexplorer").toFile
-  private val tempDbDir      = Paths.get(tempDir, s"mv-store-$randomNumberPerRun.db").toFile
+  private val userHomeDir             = System.getProperty("user.home")
+  private val tempDir                 = System.getProperty("java.io.tmpdir")
+  private val VersionsToKeep          = 10
+  private val dbFileName              = "mv-store.db"
+  private val superNodeFileName       = "supernode-keys.csv"
+  private val superNodeBackupFileName = "supernode-keys.csv.backup"
+  private val tempDbFile              = Paths.get(tempDir, s"mv-store-$randomNumberPerRun.db").toFile
+  private val tempSuperNodeFile       = Paths.get(tempDir, s"supernode-keys-$randomNumberPerRun.csv").toFile
+  private val dbFile                  = Paths.get(userHomeDir, ".ergo-uexplorer", dbFileName).toFile
+  private val superNodeFile           = Paths.get(userHomeDir, ".ergo-uexplorer", superNodeFileName).toFile
+  private val superNodeFileBackup     = Paths.get(userHomeDir, ".ergo-uexplorer", superNodeBackupFileName).toFile
 
   def apply(
     cacheSize: CacheSize,
-    rootDir: File = tempDbDir
+    dbFile: File        = tempDbFile,
+    superNodeFile: File = tempSuperNodeFile
   ): Try[MvStorage] = Try {
-    rootDir.mkdirs()
+    dbFile.getParentFile.mkdirs()
+    superNodeFile.getParentFile.mkdirs()
+    if (superNodeFile.exists()) {
+      logger.warn(s"Moving file ${superNodeFile.getAbsolutePath} to ${superNodeFileBackup.getAbsolutePath}")
+      Files.move(superNodeFile.toPath, superNodeFileBackup.toPath)
+    }
     val store =
       new MVStore.Builder()
-        .fileName(rootDir.toPath.resolve(dbFileName).toFile.getAbsolutePath)
+        .fileName(dbFile.getAbsolutePath)
         .cacheSize(cacheSize)
         .cacheConcurrency(2)
         .autoCommitDisabled()
@@ -206,7 +212,7 @@ object MvStorage extends LazyLogging {
       store,
       new MultiMvMap[Address, java.util.Map, BoxId, Value](
         new MvMap[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
-        new SuperNodeMvMap[Address, java.util.Map, BoxId, Value](SuperNodeUtils.superNodeAddressesWithPrefix, store)
+        SuperNodeMvMap[Address, java.util.Map, BoxId, Value](store, superNodeFile)
       ),
       new MvMap[BoxId, Address]("addressByUtxo", store),
       new MvMap[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),
@@ -215,5 +221,5 @@ object MvStorage extends LazyLogging {
   }
 
   def withDefaultDir(cacheSize: CacheSize): Try[MvStorage] =
-    MvStorage(cacheSize, dbDir)
+    MvStorage(cacheSize, dbFile, superNodeFile)
 }

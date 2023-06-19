@@ -14,17 +14,20 @@ import scala.util.{Failure, Success, Try}
 class MultiMvMap[PK, C[_, _], K, V](
   commonMap: MapLike[PK, C[K, V]],
   superNodeMap: SuperNodeMapLike[PK, C, K, V]
-) extends MultiMapLike[PK, C, K, V] {
+)(implicit c: MultiMapCodec[C, K, V])
+  extends MultiMapLike[PK, C, K, V] {
 
-  def get(key: PK, secondaryKey: K)(implicit c: MultiMapCodec[C, K, V]): Option[V] =
+  def getFinalReport: Option[String] = superNodeMap.getFinalReport
+
+  def get(key: PK, secondaryKey: K): Option[V] =
     superNodeMap
       .get(key, secondaryKey)
-      .orElse(commonMap.get(key).flatMap(v => c.read(secondaryKey, v)))
+      .orElse(commonMap.get(key).flatMap(v => c.readOne(secondaryKey, v)))
 
   def getAll(key: PK): Option[C[K, V]] =
     superNodeMap.getAll(key).orElse(commonMap.get(key))
 
-  def remove(key: PK): Boolean =
+  def remove(key: PK): Removed =
     superNodeMap.remove(key).isDefined || commonMap.removeAndForget(key)
 
   def removeOrFail(key: PK): Try[C[K, V]] =
@@ -36,10 +39,16 @@ class MultiMvMap[PK, C[_, _], K, V](
 
   def size: Int = superNodeMap.size + commonMap.size
 
-  def removeAllOrFail(k: PK, secondaryKeys: IterableOnce[K])(f: C[K, V] => Option[C[K, V]]): Try[Unit] =
-    superNodeMap.removeAllOrFail(k, secondaryKeys).fold(commonMap.removeOrUpdateOrFail(k)(f))(identity)
+  def removeAllOrFail(k: PK, secondaryKeys: IterableOnce[K], size: Int)(f: C[K, V] => Option[C[K, V]]): Try[Unit] =
+    superNodeMap.removeAllOrFail(k, secondaryKeys, size).fold(commonMap.removeOrUpdateOrFail(k)(f))(identity)
 
-  def adjustAndForget(key: PK, entries: IterableOnce[(K, V)])(f: Option[C[K, V]] => C[K, V]): Try[_] =
-    superNodeMap.putAllNewOrFail(key, entries).getOrElse(Try(commonMap.adjustAndForget(key)(f)))
+  def adjustAndForget(key: PK, entries: IterableOnce[(K, V)], size: Int): Try[_] =
+    superNodeMap.putAllNewOrFail(key, entries, size).getOrElse {
+      val (appended, _) = commonMap.adjustCollection(key)(c.append(entries))
+      if (appended)
+        Success(())
+      else
+        Failure(new AssertionError(s"All inserted values under key $key should be appended"))
+    }
 
 }
