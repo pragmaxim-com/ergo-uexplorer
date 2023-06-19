@@ -11,27 +11,43 @@ import scala.collection.concurrent
 import scala.util.{Failure, Success, Try}
 
 class SuperNodeMvMap[SK, SV[_, _], K, V](
-  superNodeNameByKey: Map[SK, String],
+  registeredSuperNodeNamesByKey: Map[SK, String],
   store: MVStore
 )(implicit codec: SuperNodeCodec[SV, K, V])
   extends SuperNodeMapLike[SK, SV, K, V]
   with LazyLogging {
 
-  logger.info(s"Creating SuperNodeMap for ${superNodeNameByKey.size} keys")
-
-  private val supernodeByKey: concurrent.Map[SK, MVMap[K, V]] = new ConcurrentHashMap().asScala
+  private val existingSupernodeMapsByKey: concurrent.Map[SK, MVMap[K, V]] = {
+    val existingMapNames = store.getMapNames.asScala.toSet
+    val nonEmptySuperNodeMapsByKey =
+      registeredSuperNodeNamesByKey.collect {
+        case (sk, name) if existingMapNames.contains(name) =>
+          sk -> store.openMap[K, V](name)
+      }
+    logger.info(
+      s"Opened ${nonEmptySuperNodeMapsByKey.size} SuperNodeMaps from ${registeredSuperNodeNamesByKey.size} registered"
+    )
+    nonEmptySuperNodeMapsByKey.foreach { case (sk, map) =>
+      if (map.isEmpty) {
+        logger.warn(s"Supernode map $sk is not empty however we add new on")
+      }
+    }
+    new ConcurrentHashMap[SK, MVMap[K, V]]().asScala.addAll(
+      nonEmptySuperNodeMapsByKey
+    )
+  }
 
   def get(sk: SK, secondaryKey: K): Option[V] =
-    supernodeByKey.get(sk).flatMap(m => Option(m.get(secondaryKey)))
+    existingSupernodeMapsByKey.get(sk).flatMap(m => Option(m.get(secondaryKey)))
 
   def getAll(sk: SK): Option[SV[K, V]] =
-    supernodeByKey.get(sk).map(codec.readAll)
+    existingSupernodeMapsByKey.get(sk).map(codec.readAll)
 
   def putOnlyNew(sk: SK, k: K, v: V): Option[Boolean] =
-    superNodeNameByKey
+    registeredSuperNodeNamesByKey
       .get(sk)
       .map { superNodeName =>
-        supernodeByKey.get(sk) match {
+        existingSupernodeMapsByKey.get(sk) match {
           case None =>
             logger.info(s"Creating new supernode map for $superNodeName")
             codec.write(store.openMap[K, V](superNodeName), k, v)
@@ -41,29 +57,29 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
       }
 
   def putAllNewOrFail(sk: SK, entries: IterableOnce[(K, V)]): Option[Try[Unit]] =
-    superNodeNameByKey
+    registeredSuperNodeNamesByKey
       .get(sk)
       .map { superNodeName =>
         val replacedValueOpt =
-          supernodeByKey.get(sk) match {
+          existingSupernodeMapsByKey.get(sk) match {
             case None =>
               logger.info(s"Creating new supernode map for $superNodeName")
               val newSuperNodeMap = store.openMap[K, V](superNodeName)
-              supernodeByKey.putIfAbsent(sk, newSuperNodeMap)
+              existingSupernodeMapsByKey.putIfAbsent(sk, newSuperNodeMap)
               codec.writeAll(newSuperNodeMap, entries)
             case Some(m) =>
               codec.writeAll(m, entries)
           }
         replacedValueOpt
-          .map(e => Failure(new AssertionError(s"Key ${e._1} was already present!")))
+          .map(e => Failure(new AssertionError(s"Key ${e._1} was already present in supernode $sk!")))
           .getOrElse(Success(()))
       }
 
   def remove(sk: SK): Option[SV[K, V]] =
-    superNodeNameByKey
+    registeredSuperNodeNamesByKey
       .get(sk)
       .flatMap { superNodeName =>
-        supernodeByKey.remove(sk).map { mvMapToRemove =>
+        existingSupernodeMapsByKey.remove(sk).map { mvMapToRemove =>
           logger.info(s"Removing supernode map for $superNodeName")
           val result = codec.readAll(mvMapToRemove)
           store.removeMap(superNodeName)
@@ -71,19 +87,32 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
         }
       }
 
-  def removeAllOrFail(sk: SK, values: IterableOnce[K]): Option[Try[Unit]] =
-    superNodeNameByKey
+  def removeAllOrFail(sk: SK, keys: IterableOnce[K]): Option[Try[Unit]] =
+    registeredSuperNodeNamesByKey
       .get(sk)
-      .flatMap { _ =>
-        supernodeByKey.get(sk).map { mvMap =>
-          values.iterator.find(v => mvMap.remove(v) == null).fold(Success(())) { key =>
-            Failure(new AssertionError(s"Removing non-existing key $key"))
-          }
+      .flatMap { superNodeName =>
+        existingSupernodeMapsByKey.get(sk).map { mvMap =>
+          keys.iterator
+            .find(k => mvMap.remove(k) == null)
+            .fold(Success(())) { key =>
+              Failure(new AssertionError(s"Removing non-existing key $key from superNode $sk"))
+            } // we don't remove supernode map when it gets empty as common map as  on/off/on/off is expensive
+        /*
+            .flatMap { _ =>
+              if (mvMap.isEmpty) {
+                logger.info(s"Removing supernode map for $superNodeName as it was emptied")
+                existingSupernodeMapsByKey.remove(sk).fold(Try(store.removeMap(superNodeName))) { m =>
+                  Try(store.removeMap(m))
+                }
+              } else
+                Success(())
+            }
+         */
         }
       }
 
-  def isEmpty: Boolean = supernodeByKey.forall(_._2.isEmpty)
+  def isEmpty: Boolean = existingSupernodeMapsByKey.forall(_._2.isEmpty)
 
-  def size: Int = supernodeByKey.iterator.map(_._2.size()).sum
+  def size: Int = existingSupernodeMapsByKey.iterator.map(_._2.size()).sum
 
 }

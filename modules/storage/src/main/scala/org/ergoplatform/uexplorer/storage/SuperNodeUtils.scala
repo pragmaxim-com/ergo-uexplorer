@@ -47,7 +47,7 @@ object SuperNodeUtils extends LazyLogging {
       .toMap
 
   def report(): Unit = {
-    logger.info(s"Collected ${superNodeAddresses.size} supernode address : ")
+    logger.info(s"Collected ${superNodeAddresses.size} supernode addresses, add them to $superNodeAddressFileNameGz : ")
     val addressesByCount =
       superNodeAddresses.toSeq
         .sortBy(_._2)
@@ -55,7 +55,6 @@ object SuperNodeUtils extends LazyLogging {
         .map { case (addr, count) =>
           s"$count $addr"
         }
-    addressesByCount.foreach(println)
     addressesByCount.headOption.foreach { _ =>
       val destination = Paths.get(System.getProperty("java.io.tmpdir"), superNodeAddressFileName).toFile
       logger.info(s"Writing supernode addresses to ${destination.getAbsolutePath}")
