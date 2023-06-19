@@ -6,11 +6,11 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
+class MvMap[K, V: ValueCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
   private val underlying: MVMap[K, Array[Byte]] = store.openMap[K, Array[Byte]](name)
 
-  private val codec: DbCodec[V] = implicitly[DbCodec[V]]
+  private val codec: ValueCodec[V] = implicitly[ValueCodec[V]]
 
   def get(key: K): Option[V] = Option(underlying.get(key)).map(codec.readAll)
 
@@ -20,7 +20,7 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
   def remove(key: K): Option[V] = Option(underlying.remove(key)).map(codec.readAll)
 
-  def removeAndForget(key: K): Boolean = underlying.remove(key) != null
+  def removeAndForget(key: K): Removed = underlying.remove(key) != null
 
   def removeAndForgetOrFail(key: K): Try[Unit] =
     if (underlying.remove(key) != null)
@@ -75,7 +75,7 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
   def put(key: K, value: V): Option[V] = Option(underlying.put(key, codec.writeAll(value))).map(codec.readAll)
 
-  def putAndForget(key: K, value: V): Boolean = underlying.put(key, codec.writeAll(value)) == null
+  def putAndForget(key: K, value: V): Appended = underlying.put(key, codec.writeAll(value)) == null
 
   def putAllNewOrFail(entries: IterableOnce[(K, V)]): Try[Unit] =
     entries.iterator
@@ -95,7 +95,7 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
 
   def replace(key: K, value: V): Option[V] = Option(underlying.replace(key, codec.writeAll(value))).map(codec.readAll)
 
-  def replace(key: K, oldValue: V, newValue: V): Boolean =
+  def replace(key: K, oldValue: V, newValue: V): Replaced =
     underlying.replace(key, codec.writeAll(oldValue), codec.writeAll(newValue))
 
   def removeOrUpdate(k: K)(f: V => Option[V]): Option[V] =
@@ -125,7 +125,16 @@ class MvMap[K, V: DbCodec](name: String, store: MVStore) extends MapLike[K, V] {
         }
     }
 
-  def adjustAndForget(k: K)(f: Option[V] => V): Boolean =
-    underlying.put(k, codec.writeAll(f(Option(underlying.get(k)).map(codec.readAll)))) == null
+  def adjust(k: K)(f: Option[V] => V): V = {
+    val newVal = f(Option(underlying.get(k)).map(codec.readAll))
+    underlying.put(k, codec.writeAll(newVal))
+    newVal
+  }
+
+  def adjustCollection(k: K)(f: Option[V] => (Appended, V)): (Appended, V) = {
+    val (appended, newVal) = f(Option(underlying.get(k)).map(codec.readAll))
+    underlying.put(k, codec.writeAll(newVal))
+    appended -> newVal
+  }
 
 }

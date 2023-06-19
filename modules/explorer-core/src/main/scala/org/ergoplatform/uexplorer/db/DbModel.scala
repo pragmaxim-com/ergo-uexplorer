@@ -22,7 +22,7 @@ final case class Asset(
 )
 
 case class Record(txId: TxId, boxId: BoxId, address: Address, value: Value)
-final case class LightBlock(headerId: BlockId, inputBoxes: Iterable[Record], outputBoxes: Iterable[Record], info: BlockInfo)
+final case class LightBlock(headerId: BlockId, inputBoxes: ArraySeq[Record], outputBoxes: ArraySeq[Record], info: BlockInfo)
 
 final case class FullBlock(
   header: Header,

@@ -7,14 +7,14 @@ import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.Jdk
 import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
-import org.ergoplatform.uexplorer.mvstore.DbCodec
+import org.ergoplatform.uexplorer.mvstore.ValueCodec
 import org.ergoplatform.uexplorer.{Address, Height}
 
 import java.nio.ByteBuffer
 import java.util
 import scala.util.Try
 
-object AddressCodec extends DbCodec[Address] {
+object AddressCodec extends ValueCodec[Address] {
   override def readAll(bytes: Array[Byte]): Address =
     new String(bytes).asInstanceOf[Address] // do not call Address.fromStringUnsafe as it has been already validated
 

@@ -12,7 +12,7 @@ trait SuperNodeCodec[SV[_, _], K, V] {
 
   def readAll(m: MVMap[K, V]): SV[K, V]
 
-  def write(to: MVMap[K, V], key: K, value: V): Boolean
+  def write(to: MVMap[K, V], key: K, value: V): Appended
 
   def writeAll(to: MVMap[K, V], from: IterableOnce[(K, V)]): Option[(K, V)]
 
@@ -32,6 +32,6 @@ object SuperNodeCodec {
 
       override def read(key: SK, m: MVMap[SK, SV]): Option[SV] = Option(m.get(key))
 
-      override def write(to: MVMap[SK, SV], key: SK, value: SV): Boolean = to.put(key, value) == null
+      override def write(to: MVMap[SK, SV], key: SK, value: SV): Appended = to.put(key, value) == null
     }
 }

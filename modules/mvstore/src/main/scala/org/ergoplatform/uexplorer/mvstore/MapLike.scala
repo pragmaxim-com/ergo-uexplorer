@@ -12,7 +12,7 @@ trait MapLike[K, V] {
 
   def remove(key: K): Option[V]
 
-  def removeAndForget(key: K): Boolean
+  def removeAndForget(key: K): Removed
 
   def removeAndForgetOrFail(key: K): Try[Unit]
 
@@ -48,7 +48,7 @@ trait MapLike[K, V] {
 
   def put(key: K, value: V): Option[V]
 
-  def putAndForget(key: K, value: V): Boolean
+  def putAndForget(key: K, value: V): Appended
 
   def putIfAbsent(key: K, value: V): Option[V]
 
@@ -60,11 +60,13 @@ trait MapLike[K, V] {
 
   def replace(key: K, value: V): Option[V]
 
-  def replace(key: K, oldValue: V, newValue: V): Boolean
+  def replace(key: K, oldValue: V, newValue: V): Replaced
 
   def removeOrUpdate(k: K)(f: V => Option[V]): Option[V]
 
   def removeOrUpdateOrFail(k: K)(f: V => Option[V]): Try[Unit]
 
-  def adjustAndForget(k: K)(f: Option[V] => V): Boolean
+  def adjust(k: K)(f: Option[V] => V): V
+  
+  def adjustCollection(k: K)(f: Option[V] => (Appended, V)): (Appended, V)
 }

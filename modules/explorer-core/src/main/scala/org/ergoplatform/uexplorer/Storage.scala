@@ -8,6 +8,8 @@ import scala.collection.concurrent
 
 trait Storage {
 
+  def getFinalReport: Option[String]
+
   def isEmpty: Boolean
 
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean

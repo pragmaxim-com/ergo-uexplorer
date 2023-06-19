@@ -13,7 +13,7 @@ import org.ergoplatform.uexplorer.db.{BestBlockInserted, ForkInserted, FullBlock
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
-import org.ergoplatform.uexplorer.storage.{MvStorage, SuperNodeUtils}
+import org.ergoplatform.uexplorer.storage.MvStorage
 
 import scala.concurrent.blocking
 import scala.collection.immutable.TreeSet
@@ -73,11 +73,12 @@ class ChainIndexer(
       .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
       .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
         lastBlockF.map { lastBlock =>
-          SuperNodeUtils.report()
+          val storage = blockIndexer.readableStorage
+          storage.getFinalReport.foreach(println)
           blockIndexer.compact()
           ChainSyncResult(
             lastBlock,
-            blockIndexer.readableStorage,
+            storage,
             graphBackendOpt.map(_.graphTraversalSource)
           )
         }

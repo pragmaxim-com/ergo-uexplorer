@@ -7,14 +7,14 @@ import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.Jdk
 import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
-import org.ergoplatform.uexplorer.mvstore.DbCodec
+import org.ergoplatform.uexplorer.mvstore.ValueCodec
 import org.ergoplatform.uexplorer.{Address, BlockId, Height}
 
 import java.nio.ByteBuffer
 import java.util
 import scala.util.Try
 
-object BlockIdsCodec extends DbCodec[java.util.Set[BlockId]] {
+object BlockIdsCodec extends ValueCodec[java.util.Set[BlockId]] {
   override def readAll(bytes: Array[Byte]): java.util.Set[BlockId] = {
     val input = new Input(bytes)
     val kryo  = KryoSerialization.pool.obtain()
