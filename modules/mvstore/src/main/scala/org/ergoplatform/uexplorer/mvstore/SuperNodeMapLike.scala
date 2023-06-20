@@ -21,5 +21,7 @@ trait SuperNodeMapLike[SK, SV[_, _], K, V] {
   def isEmpty: Boolean
 
   def size: Int
+  
+  def totalSize: Int
 
 }

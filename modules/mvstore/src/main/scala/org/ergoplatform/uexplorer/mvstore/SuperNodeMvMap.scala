@@ -154,7 +154,9 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
 
   def isEmpty: Boolean = existingSupernodeMapsByKey.forall(_._2.isEmpty)
 
-  def size: Int = existingSupernodeMapsByKey.iterator.map(_._2.size()).sum
+  def size: Int = existingSupernodeMapsByKey.size
+
+  def totalSize: Int = existingSupernodeMapsByKey.iterator.map(_._2.size()).sum
 
 }
 
