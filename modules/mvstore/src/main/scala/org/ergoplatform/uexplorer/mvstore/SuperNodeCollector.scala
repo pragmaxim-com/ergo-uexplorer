@@ -11,7 +11,7 @@ import java.util.zip.GZIPInputStream
 import scala.collection.concurrent
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
-import scala.util.Random
+import scala.util.{Random, Try}
 
 class SuperNodeCollector[K: KeyCodec](superNodeFile: File) extends LazyLogging {
   private val keyCodec: KeyCodec[K] = implicitly[KeyCodec[K]]
@@ -46,25 +46,32 @@ class SuperNodeCollector[K: KeyCodec](superNodeFile: File) extends LazyLogging {
 
   def getSuperNodeNameByKey(k: K): Option[String] = superNodeKeysWithName.get(k)
 
-  def report(iterator: Iterator[(K, Counter)]): Option[String] = {
+  def report(iterator: Iterator[(K, Counter)]): Try[String] = {
     val keysByCount =
       iterator
-        .filter(_._2.isHot)
+        .collect {
+          case (k, counter) if counter.isHot && !superNodeKeysWithName.contains(k) =>
+            keyCodec.serialize(k) -> counter
+        }
         .toVector
         .sortBy(_._2.writeOps)(Ordering[Long].reverse)
         .map { case (key, Counter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
-          val stats = s"$writeOps $readOps $boxesAdded $boxesRemoved"
+          val stats  = s"$writeOps $readOps $boxesAdded $boxesRemoved"
           val indent = 48
-          s"$stats ${List.fill(Math.max(1, indent - stats.length))(" ").mkString("")} ${keyCodec.serialize(key)}"
+          s"$stats ${List.fill(Math.max(1, indent - stats.length))(" ").mkString("")} $key"
         }
     logger.info(s"Collected ${keysByCount.size} supernodes, writing to ${superNodeFile.getAbsolutePath} : ")
-    keysByCount.headOption.map { _ =>
-      logger.info(s"Writing supernode keys to ${superNodeFile.getAbsolutePath}")
-      val report     = keysByCount.mkString("", "\n", "\n")
-      val fileWriter = new FileWriter(superNodeFile)
-      try fileWriter.write(report)
-      finally fileWriter.close()
-      report
+    Try {
+      keysByCount.headOption
+        .map { _ =>
+          logger.info(s"Writing supernode keys to ${superNodeFile.getAbsolutePath}")
+          val report     = keysByCount.mkString("", "\n", "\n")
+          val fileWriter = new FileWriter(superNodeFile)
+          try fileWriter.write(report)
+          finally fileWriter.close()
+          report
+        }
+        .getOrElse("")
     }
   }
 }

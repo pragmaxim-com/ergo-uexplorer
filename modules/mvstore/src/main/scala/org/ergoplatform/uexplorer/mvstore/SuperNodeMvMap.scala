@@ -46,7 +46,7 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
       Some(Counter(writeOps + 1, readOps, added, removed + size))
     }
 
-  def getFinalReport: Option[String] =
+  def getFinalReport: Try[String] =
     superNodeCollector
       .report(counterBySuperNode.iterator(None, None, false))
 

@@ -18,7 +18,7 @@ class MultiMvMap[PK, C[_, _], K, V](
 )(implicit c: MultiMapCodec[C, K, V])
   extends MultiMapLike[PK, C, K, V] {
 
-  def getFinalReport: Option[String] = superNodeMap.getFinalReport
+  def getFinalReport: Try[String] = superNodeMap.getFinalReport
 
   def get(key: PK, secondaryKey: K): Option[V] =
     superNodeMap

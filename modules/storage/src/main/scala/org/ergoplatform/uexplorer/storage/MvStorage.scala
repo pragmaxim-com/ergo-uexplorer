@@ -98,7 +98,7 @@ case class MvStorage(
       }
   }
 
-  def getFinalReport: Option[String] = utxosByAddress.getFinalReport
+  def getFinalReport: Try[String] = utxosByAddress.getFinalReport
 
   def getCompactReport: String = {
     val height                                                      = getLastHeight.getOrElse(0)

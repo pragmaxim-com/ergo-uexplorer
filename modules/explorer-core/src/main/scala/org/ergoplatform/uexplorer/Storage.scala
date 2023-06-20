@@ -5,10 +5,11 @@ import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
 
 import scala.collection.immutable.TreeSet
 import scala.collection.concurrent
+import scala.util.Try
 
 trait Storage {
 
-  def getFinalReport: Option[String]
+  def getFinalReport: Try[String]
 
   def isEmpty: Boolean
 

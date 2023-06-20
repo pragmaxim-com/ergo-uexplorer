@@ -74,8 +74,16 @@ class ChainIndexer(
       .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
         lastBlockF.map { lastBlock =>
           val storage = blockIndexer.readableStorage
-          storage.getFinalReport.foreach(println)
-          blockIndexer.compact()
+          storage.getFinalReport.fold(
+            ex => logger.error("Failed to generate report", ex),
+            report => println(report)
+          )
+          blockIndexer
+            .compact()
+            .fold(
+              ex => logger.error("Compaction failed", ex),
+              report => println(report)
+            )
           ChainSyncResult(
             lastBlock,
             storage,
