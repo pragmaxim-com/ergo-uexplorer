@@ -9,6 +9,7 @@ import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.{Address, BoxId, Height, Value}
+import scala.language.unsafeNulls
 
 import java.nio.ByteBuffer
 import java.util
@@ -45,8 +46,10 @@ object ValueByBoxCodec extends MultiMapCodec[java.util.Map, BoxId, Value] {
     existingOpt: Option[java.util.Map[BoxId, Value]]
   ): (Appended, java.util.Map[BoxId, Value]) =
     existingOpt.fold(true -> javaMapOf(newValueByBoxId)) { existingMap =>
-      val appended = newValueByBoxId.iterator.forall(e => Option(existingMap.put(e._1, e._2)).isEmpty)
-      appended -> existingMap
+      newValueByBoxId.iterator.forall { e =>
+        val replaced: Value | Null = existingMap.put(e._1, e._2)
+        replaced == null
+      } -> existingMap
     }
 
 }
