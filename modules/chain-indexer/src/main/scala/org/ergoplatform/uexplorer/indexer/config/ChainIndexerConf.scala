@@ -28,7 +28,8 @@ import scala.concurrent.duration.FiniteDuration
 
 case class MvStore(
   cacheSize: CacheSize,
-  maxCompactTime: MaxCompactTime,
+  maxIndexingCompactTime: MaxCompactTime,
+  maxIdleCompactTime: MaxCompactTime,
   heightCompactRate: HeightCompactRate
 )
 

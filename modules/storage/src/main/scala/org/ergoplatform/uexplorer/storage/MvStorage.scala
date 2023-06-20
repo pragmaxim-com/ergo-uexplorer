@@ -38,12 +38,15 @@ import scala.util.{Failure, Random, Success, Try}
 
 case class MvStorage(
   store: MVStore,
-  utxosByAddress: MultiMapLike[Address, java.util.Map, BoxId, Value],
+  utxosByAddress: MultiMvMap[Address, java.util.Map, BoxId, Value],
   addressByUtxo: MapLike[BoxId, Address],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, BlockInfo]
 ) extends Storage
   with LazyLogging {
+
+  def clear(): Try[Unit] =
+    utxosByAddress.clear()
 
   def close(): Try[Unit] = Try(store.close())
 
@@ -75,7 +78,9 @@ case class MvStorage(
       lightBlock.inputBoxes
         .groupBy(_.address)
         .view
-        .mapValues(_.map(_.boxId))
+        .mapValues(_.collect {
+          case Record(_, boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId
+        })
         .map { case (address, inputIds) =>
           removeInputBoxesByAddress(address, inputIds)
         }
@@ -98,17 +103,17 @@ case class MvStorage(
       }
   }
 
-  def getFinalReport: Try[String] = utxosByAddress.getFinalReport
+  def writeReport: Try[_] = utxosByAddress.writeReport
 
   def getCompactReport: String = {
     val height                                                      = getLastHeight.getOrElse(0)
     val MultiMapSize(superNodeSize, superNodeTotalSize, commonSize) = utxosByAddress.size
     val nonEmptyAddressCount                                        = superNodeSize + commonSize
     val progress =
-      s"storage height $height, " +
+      s"storage height: $height, " +
         s"utxo count: ${addressByUtxo.size}, " +
         s"supernode-utxo-count : $superNodeTotalSize, " +
-        s"non-empty-address count: $nonEmptyAddressCount\n"
+        s"non-empty-address count: $nonEmptyAddressCount, "
 
     val cs  = store.getCacheSize
     val csu = store.getCacheSizeUsed
@@ -121,8 +126,8 @@ case class MvStorage(
     val mps = store.getMaxPageSize
     val kpp = store.getKeysPerPage
     val debug =
-      s"cache size used $csu from $cs at ratio $chr, chunks $cc at fill rate $cfr, fill rate $fr\n" +
-        s"leaf ratio $lr, page count $pc, max page size $mps, keys per page $kpp"
+      s"cache size used: $csu from: $cs at ratio: $chr, chunks: $cc at fill rate: $cfr, fill rate: $fr, " +
+        s"leaf ratio: $lr, page count: $pc, max page size: $mps, keys per page: $kpp"
     progress + debug
   }
 

@@ -14,11 +14,14 @@ import scala.util.{Failure, Success, Try}
 //TODO make SuperNodePCol
 class MultiMvMap[PK, C[_, _], K, V](
   commonMap: MapLike[PK, C[K, V]],
-  superNodeMap: SuperNodeMapLike[PK, C, K, V]
+  superNodeMap: SuperNodeMvMap[PK, C, K, V]
 )(implicit c: MultiMapCodec[C, K, V])
   extends MultiMapLike[PK, C, K, V] {
 
-  def getFinalReport: Try[String] = superNodeMap.getFinalReport
+  def clear(): Try[Unit] =
+    superNodeMap.clear()
+
+  def writeReport: Try[_] = superNodeMap.writeReport
 
   def get(pk: PK, sk: K): Option[V] =
     superNodeMap

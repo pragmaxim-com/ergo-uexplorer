@@ -74,9 +74,11 @@ class BlockIndexer(
           }
       }
 
-  def compact(): Try[Unit] = Try {
+  def compact(indexing: Boolean): Try[Unit] = Try {
     logger.info(s"Compacting file at ${storage.getCompactReport}")
-    storage.store.compactFile(mvStoreConf.maxCompactTime.toMillis.toInt)
+    val compactTime = if (indexing) mvStoreConf.maxIndexingCompactTime else mvStoreConf.maxIdleCompactTime
+    val result      = if (!indexing) storage.clear() else Success(())
+    result.map(_ => storage.store.compactFile(compactTime.toMillis.toInt))
   }
 
   def addBestBlock(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
@@ -86,7 +88,7 @@ class BlockIndexer(
       lb        <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
       _         <- storage.persistNewBlock(lb)
       fbOpt     <- if (backendEnabled) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
-      _         <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact() else Success(())
+      _         <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
     } yield BestBlockInserted(lb, fbOpt)
 
   private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =

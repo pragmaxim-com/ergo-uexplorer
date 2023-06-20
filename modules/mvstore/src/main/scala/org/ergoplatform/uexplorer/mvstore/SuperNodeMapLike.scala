@@ -4,8 +4,6 @@ import scala.util.Try
 
 trait SuperNodeMapLike[HK, C[_, _], K, V] {
 
-  def getFinalReport: Try[String]
-
   def get(hotKey: HK, sk: K): Option[V]
 
   def getAll(hotKey: HK): Option[C[K, V]]

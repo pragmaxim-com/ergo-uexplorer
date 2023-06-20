@@ -9,7 +9,7 @@ import scala.util.Try
 
 trait Storage {
 
-  def getFinalReport: Try[String]
+  def writeReport: Try[_]
 
   def isEmpty: Boolean
 

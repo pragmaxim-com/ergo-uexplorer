@@ -6,8 +6,6 @@ import scala.util.Try
 
 trait MultiMapLike[PK, C[_, _], K, V] {
 
-  def getFinalReport: Try[String]
-
   def get(pk: PK, sk: K): Option[V]
 
   def getAll(pk: PK): Option[C[K, V]]

@@ -79,7 +79,7 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
               initializer   = new Initializer(storage, backendOpt, graphBackendOpt)
               scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
-              done <- scheduler.validateAndSchedule(0.seconds, conf.mvStore.maxCompactTime + 6.seconds)
+              done <- scheduler.validateAndSchedule(0.seconds, conf.mvStore.maxIdleCompactTime + 5.seconds)
             } yield done
 
           initializationF.andThen {

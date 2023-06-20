@@ -46,9 +46,28 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
       Some(Counter(writeOps + 1, readOps, added, removed + size))
     }
 
-  def getFinalReport: Try[String] =
+  def clear(): Try[Unit] = Try {
+    val emptyMaps =
+      existingMapsByHotKey
+        .foldLeft(Set.newBuilder[HK]) {
+          case (acc, (hotKey, map)) if map.isEmpty =>
+            acc.addOne(hotKey)
+          case (acc, _) =>
+            acc
+        }
+        .result()
+    logger.info(s"Going to remove ${emptyMaps.size} empty supernode maps")
+    emptyMaps
+      .foreach { hk =>
+        existingMapsByHotKey
+          .remove(hk)
+          .foreach(store.removeMap)
+      }
+  }
+
+  def writeReport: Try[_] =
     superNodeCollector
-      .report(counterByHotKey.iterator(None, None, false))
+      .writeReport(counterByHotKey.iterator(None, None, false))
 
   def get(hotKey: HK, sk: K): Option[V] =
     existingMapsByHotKey
@@ -164,6 +183,6 @@ object SuperNodeMvMap {
   def apply[HK: HotKeyCodec, C[_, _], K, V](store: MVStore, superNodeFile: File)(implicit
     sc: SuperNodeCodec[C, K, V],
     vc: ValueCodec[Counter]
-  ): SuperNodeMapLike[HK, C, K, V] =
+  ): SuperNodeMvMap[HK, C, K, V] =
     new SuperNodeMvMap[HK, C, K, V](store, new SuperNodeCollector[HK](superNodeFile))
 }
