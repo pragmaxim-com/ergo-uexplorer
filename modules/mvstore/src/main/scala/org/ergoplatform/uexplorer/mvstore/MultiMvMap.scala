@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.mvstore
 
+import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
@@ -37,7 +38,7 @@ class MultiMvMap[PK, C[_, _], K, V](
 
   def isEmpty: Boolean = superNodeMap.isEmpty && commonMap.isEmpty
 
-  def size: Int = superNodeMap.size + commonMap.size
+  def size: MultiMapSize = MultiMapSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
 
   def removeAllOrFail(k: PK, secondaryKeys: IterableOnce[K], size: Int)(f: C[K, V] => Option[C[K, V]]): Try[Unit] =
     superNodeMap.removeAllOrFail(k, secondaryKeys, size).fold(commonMap.removeOrUpdateOrFail(k)(f))(identity)

@@ -1,5 +1,7 @@
 package org.ergoplatform.uexplorer.mvstore
 
+import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
+
 import scala.util.Try
 
 trait MultiMapLike[PK, C[_, _], K, V] {
@@ -18,7 +20,11 @@ trait MultiMapLike[PK, C[_, _], K, V] {
 
   def isEmpty: Boolean
 
-  def size: Int
+  def size: MultiMapSize
 
   def adjustAndForget(key: PK, entries: IterableOnce[(K, V)], size: Int): Try[_]
+}
+
+object MultiMapLike {
+  case class MultiMapSize(superNodeSize: Int, superNodeTotalSize: Int, commonSize: Int)
 }
