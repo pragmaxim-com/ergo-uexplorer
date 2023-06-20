@@ -21,27 +21,22 @@ object LightBlockBuilder {
         .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))))
         .toMap
 
-    def getInputAddress(inputBoxId: BoxId) =
-      outputLookup
-        .get(inputBoxId)
-        .map(_._1)
-        .orElse(addressByUtxo(inputBoxId))
-        .getOrElse(
-          throw new IllegalStateException(
-            s"BoxId $inputBoxId of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+    def getInputAddressAndValue(inputBoxId: BoxId): (Address, Value) =
+      outputLookup.getOrElse(
+        inputBoxId, {
+          val inputAddress = addressByUtxo(inputBoxId).getOrElse(
+            throw new IllegalStateException(
+              s"Input boxId $inputBoxId of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+            )
           )
-        )
-
-    def getInputValue(inputAddress: Address, inputBoxId: BoxId) =
-      outputLookup
-        .get(inputBoxId)
-        .map(_._2)
-        .orElse(utxoValueByAddress(inputAddress, inputBoxId))
-        .getOrElse(
-          throw new IllegalStateException(
-            s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+          val value = utxoValueByAddress(inputAddress, inputBoxId).getOrElse(
+            throw new IllegalStateException(
+              s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+            )
           )
-        )
+          inputAddress -> value
+        }
+      )
 
     def validateInputSumEqualsOutputSum(
       inputs: IterableOnce[Record],
@@ -69,8 +64,8 @@ object LightBlockBuilder {
               Iterator(Record(tx.id, Foundation.box, Foundation.address, Foundation.initialNanoErgs))
             case tx =>
               tx.inputs.iterator.map { i =>
-                val inputAddress = getInputAddress(i.boxId)
-                Record(tx.id, i.boxId, inputAddress, getInputValue(inputAddress, i.boxId))
+                val (inputAddress, inputValue) = getInputAddressAndValue(i.boxId)
+                Record(tx.id, i.boxId, inputAddress, inputValue)
               }
           }
         }
