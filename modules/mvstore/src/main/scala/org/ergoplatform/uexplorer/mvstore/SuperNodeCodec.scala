@@ -6,13 +6,13 @@ import java.util
 import java.util.Map.Entry
 import java.util.stream.Collectors
 
-trait SuperNodeCodec[SV[_, _], K, V] {
+trait SuperNodeCodec[C[_, _], K, V] {
 
-  def read(key: K, m: MVMap[K, V]): Option[V]
+  def read(sk: K, m: MVMap[K, V]): Option[V]
 
-  def readAll(m: MVMap[K, V]): SV[K, V]
+  def write(to: MVMap[K, V], sk: K, value: V): Appended
 
-  def write(to: MVMap[K, V], key: K, value: V): Appended
+  def readAll(m: MVMap[K, V]): C[K, V]
 
   def writeAll(to: MVMap[K, V], from: IterableOnce[(K, V)]): Option[(K, V)]
 
@@ -30,8 +30,8 @@ object SuperNodeCodec {
       override def writeAll(to: MVMap[SK, SV], from: IterableOnce[(SK, SV)]): Option[(SK, SV)] =
         from.iterator.find(v => !write(to, v._1, v._2))
 
-      override def read(key: SK, m: MVMap[SK, SV]): Option[SV] = Option(m.get(key))
+      override def read(sk: SK, m: MVMap[SK, SV]): Option[SV] = Option(m.get(sk))
 
-      override def write(to: MVMap[SK, SV], key: SK, value: SV): Appended = to.put(key, value) == null
+      override def write(to: MVMap[SK, SV], sk: SK, value: SV): Appended = to.put(sk, value) == null
     }
 }

@@ -181,10 +181,10 @@ object MvStorage extends LazyLogging {
   private val tempDir                 = System.getProperty("java.io.tmpdir")
   private val VersionsToKeep          = 10
   private val dbFileName              = "mv-store.db"
-  private val superNodeFileName       = "supernode-keys.csv"
-  private val superNodeBackupFileName = "supernode-keys.csv.backup"
+  private val superNodeFileName       = "hot-keys.csv"
+  private val superNodeBackupFileName = "hot-keys.csv.backup"
   private val tempDbFile              = Paths.get(tempDir, s"mv-store-$randomNumberPerRun.db").toFile
-  private val tempSuperNodeFile       = Paths.get(tempDir, s"supernode-keys-$randomNumberPerRun.csv").toFile
+  private val tempSuperNodeFile       = Paths.get(tempDir, s"hot-keys-$randomNumberPerRun.csv").toFile
   private val dbFile                  = Paths.get(userHomeDir, ".ergo-uexplorer", dbFileName).toFile
   private val superNodeFile           = Paths.get(userHomeDir, ".ergo-uexplorer", superNodeFileName).toFile
   private val superNodeFileBackup     = Paths.get(userHomeDir, ".ergo-uexplorer", superNodeBackupFileName).toFile

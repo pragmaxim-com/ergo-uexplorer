@@ -13,7 +13,7 @@ object Implicits {
   implicit val counterCodec: ValueCodec[Counter]                           = CounterCodec
   implicit val addressCodec: ValueCodec[Address]                           = AddressCodec
 
-  implicit val superNodeAddressCodec: KeyCodec[Address] = new KeyCodec[Address] {
+  implicit val superNodeAddressCodec: HotKeyCodec[Address] = new HotKeyCodec[Address] {
     import Address.unwrapped
     def serialize(key: Address): String = key.unwrapped
 

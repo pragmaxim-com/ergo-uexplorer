@@ -1,8 +1,8 @@
 package org.ergoplatform.uexplorer.mvstore
 
-trait ValueCodec[T] {
+trait ValueCodec[V] {
 
-  def readAll(bytes: Array[Byte]): T
-  def writeAll(obj: T): Array[Byte]
+  def readAll(bytes: Array[Byte]): V
+  def writeAll(obj: V): Array[Byte]
 
 }

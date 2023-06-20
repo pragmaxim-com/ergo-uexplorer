@@ -13,106 +13,106 @@ import java.util.stream.Collectors
 import scala.collection.concurrent
 import scala.util.{Failure, Success, Try}
 
-class SuperNodeMvMap[SK, SV[_, _], K, V](
+class SuperNodeMvMap[HK, C[_, _], K, V](
   store: MVStore,
-  superNodeCollector: SuperNodeCollector[SK]
-)(implicit codec: SuperNodeCodec[SV, K, V], vc: ValueCodec[Counter])
-  extends SuperNodeMapLike[SK, SV, K, V]
+  superNodeCollector: SuperNodeCollector[HK]
+)(implicit codec: SuperNodeCodec[C, K, V], vc: ValueCodec[Counter])
+  extends SuperNodeMapLike[HK, C, K, V]
   with LazyLogging {
 
-  private lazy val existingSupernodeMapsByKey: concurrent.Map[SK, MVMap[K, V]] =
-    new ConcurrentHashMap[SK, MVMap[K, V]]().asScala.addAll(
+  private lazy val existingMapsByHotKey: concurrent.Map[HK, MVMap[K, V]] =
+    new ConcurrentHashMap[HK, MVMap[K, V]]().asScala.addAll(
       superNodeCollector
-        .getExistingSuperNodeKeysWithName(store.getMapNames.asScala.toSet)
+        .getExistingStringifiedHotKeys(store.getMapNames.asScala.toSet)
         .view
         .mapValues(store.openMap[K, V])
         .toMap
     )
 
-  private lazy val counterBySuperNode = new MvMap[SK, Counter]("counterBySuperNode", store)
+  private lazy val counterByHotKey = new MvMap[HK, Counter]("counterBySuperNode", store)
 
-  private def getSuperNodeKey(k: SK): Counter =
-    counterBySuperNode.adjust(k)(_.fold(Counter(1, 1, 0, 0)) { case Counter(writeOps, readOps, added, removed) =>
+  private def collectReadHotKey(k: HK): Counter =
+    counterByHotKey.adjust(k)(_.fold(Counter(1, 1, 0, 0)) { case Counter(writeOps, readOps, added, removed) =>
       Counter(writeOps + 1, readOps + 1, added, removed)
     })
 
-  private def insertSuperNodeKey(k: SK, size: Int): Counter =
-    counterBySuperNode.adjust(k)(_.fold(Counter(1, 0, size, 0)) { case Counter(writeOps, readOps, added, removed) =>
+  private def collectInsertedHotKey(k: HK, size: Int): Counter =
+    counterByHotKey.adjust(k)(_.fold(Counter(1, 0, size, 0)) { case Counter(writeOps, readOps, added, removed) =>
       Counter(writeOps + 1, readOps, added + size, removed)
     })
 
-  private def removeSuperNodeKey(k: SK, size: Int): Option[Counter] =
-    counterBySuperNode.removeOrUpdate(k) { case Counter(writeOps, readOps, added, removed) =>
+  private def collectRemovedHotKey(k: HK, size: Int): Option[Counter] =
+    counterByHotKey.removeOrUpdate(k) { case Counter(writeOps, readOps, added, removed) =>
       Some(Counter(writeOps + 1, readOps, added, removed + size))
     }
 
   def getFinalReport: Try[String] =
     superNodeCollector
-      .report(counterBySuperNode.iterator(None, None, false))
+      .report(counterByHotKey.iterator(None, None, false))
 
-  def get(sk: SK, secondaryKey: K): Option[V] =
-    existingSupernodeMapsByKey
-      .get(sk)
-      .flatMap(m => Option(m.get(secondaryKey)))
+  def get(hotKey: HK, sk: K): Option[V] =
+    existingMapsByHotKey
+      .get(hotKey)
+      .flatMap(m => Option(m.get(sk)))
       .orElse {
-        getSuperNodeKey(sk)
+        collectReadHotKey(hotKey)
         None
       }
 
-  def getAll(sk: SK): Option[SV[K, V]] =
-    existingSupernodeMapsByKey
-      .get(sk)
+  def getAll(hotKey: HK): Option[C[K, V]] =
+    existingMapsByHotKey
+      .get(hotKey)
       .map(codec.readAll)
       .orElse {
-        getSuperNodeKey(sk)
+        collectReadHotKey(hotKey)
         None
       }
 
-  def putOnlyNew(sk: SK, k: K, v: V): Option[Appended] =
+  def putOnlyNew(hotKey: HK, sk: K, v: V): Option[Appended] =
     superNodeCollector
-      .getSuperNodeNameByKey(sk)
+      .getHotKeyString(hotKey)
       .map { superNodeName =>
-        existingSupernodeMapsByKey.get(sk) match {
+        existingMapsByHotKey.get(hotKey) match {
           case None =>
             logger.info(s"Creating new supernode map for $superNodeName")
-            codec.write(store.openMap[K, V](superNodeName), k, v)
+            codec.write(store.openMap[K, V](superNodeName), sk, v)
           case Some(m) =>
-            codec.write(m, k, v)
+            codec.write(m, sk, v)
         }
       }
       .orElse {
-        insertSuperNodeKey(sk, 1)
+        collectInsertedHotKey(hotKey, 1)
         None
       }
 
-  def putAllNewOrFail(sk: SK, entries: IterableOnce[(K, V)], size: Int): Option[Try[Unit]] =
+  def putAllNewOrFail(hotKey: HK, entries: IterableOnce[(K, V)], size: Int): Option[Try[Unit]] =
     superNodeCollector
-      .getSuperNodeNameByKey(sk)
+      .getHotKeyString(hotKey)
       .map { superNodeName =>
         val replacedValueOpt =
-          existingSupernodeMapsByKey.get(sk) match {
+          existingMapsByHotKey.get(hotKey) match {
             case None =>
               logger.info(s"Creating new supernode map for $superNodeName")
               val newSuperNodeMap = store.openMap[K, V](superNodeName)
-              existingSupernodeMapsByKey.putIfAbsent(sk, newSuperNodeMap)
+              existingMapsByHotKey.putIfAbsent(hotKey, newSuperNodeMap)
               codec.writeAll(newSuperNodeMap, entries)
             case Some(m) =>
               codec.writeAll(m, entries)
           }
         replacedValueOpt
-          .map(e => Failure(new AssertionError(s"Key ${e._1} was already present in supernode $sk!")))
+          .map(e => Failure(new AssertionError(s"Key ${e._1} was already present in supernode $hotKey!")))
           .getOrElse(Success(()))
       }
       .orElse {
-        insertSuperNodeKey(sk, size)
+        collectInsertedHotKey(hotKey, size)
         None
       }
 
-  def remove(sk: SK): Option[SV[K, V]] =
+  def remove(hotKey: HK): Option[C[K, V]] =
     superNodeCollector
-      .getSuperNodeNameByKey(sk)
+      .getHotKeyString(hotKey)
       .flatMap { superNodeName =>
-        existingSupernodeMapsByKey.remove(sk).map { mvMapToRemove =>
+        existingMapsByHotKey.remove(hotKey).map { mvMapToRemove =>
           logger.info(s"Removing supernode map for $superNodeName")
           val result = codec.readAll(mvMapToRemove)
           store.removeMap(superNodeName)
@@ -120,19 +120,19 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
         }
       }
       .orElse {
-        removeSuperNodeKey(sk, 1)
+        collectRemovedHotKey(hotKey, 1)
         None
       }
 
-  def removeAllOrFail(sk: SK, keys: IterableOnce[K], size: Int): Option[Try[Unit]] =
+  def removeAllOrFail(hotKey: HK, secondaryKeys: IterableOnce[K], size: Int): Option[Try[Unit]] =
     superNodeCollector
-      .getSuperNodeNameByKey(sk)
+      .getHotKeyString(hotKey)
       .flatMap { superNodeName =>
-        existingSupernodeMapsByKey.get(sk).map { mvMap =>
-          keys.iterator
+        existingMapsByHotKey.get(hotKey).map { mvMap =>
+          secondaryKeys.iterator
             .find(k => mvMap.remove(k) == null)
-            .fold(Success(())) { key =>
-              Failure(new AssertionError(s"Removing non-existing key $key from superNode $sk"))
+            .fold(Success(())) { sk =>
+              Failure(new AssertionError(s"Removing non-existing secondary key $sk from superNode $superNodeName"))
             } // we don't remove supernode map when it gets empty as common map as  on/off/on/off is expensive
         /*
             .flatMap { _ =>
@@ -148,22 +148,22 @@ class SuperNodeMvMap[SK, SV[_, _], K, V](
         }
       }
       .orElse {
-        removeSuperNodeKey(sk, size)
+        collectRemovedHotKey(hotKey, size)
         None
       }
 
-  def isEmpty: Boolean = existingSupernodeMapsByKey.forall(_._2.isEmpty)
+  def isEmpty: Boolean = existingMapsByHotKey.forall(_._2.isEmpty)
 
-  def size: Int = existingSupernodeMapsByKey.size
+  def size: Int = existingMapsByHotKey.size
 
-  def totalSize: Int = existingSupernodeMapsByKey.iterator.map(_._2.size()).sum
+  def totalSize: Int = existingMapsByHotKey.iterator.map(_._2.size()).sum
 
 }
 
 object SuperNodeMvMap {
-  def apply[SK: KeyCodec, SV[_, _], K, V](store: MVStore, superNodeFile: File)(implicit
-    sc: SuperNodeCodec[SV, K, V],
+  def apply[HK: HotKeyCodec, C[_, _], K, V](store: MVStore, superNodeFile: File)(implicit
+    sc: SuperNodeCodec[C, K, V],
     vc: ValueCodec[Counter]
-  ): SuperNodeMapLike[SK, SV, K, V] =
-    new SuperNodeMvMap[SK, SV, K, V](store, new SuperNodeCollector[SK](superNodeFile))
+  ): SuperNodeMapLike[HK, C, K, V] =
+    new SuperNodeMvMap[HK, C, K, V](store, new SuperNodeCollector[HK](superNodeFile))
 }

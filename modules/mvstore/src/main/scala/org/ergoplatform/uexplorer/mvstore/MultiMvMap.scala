@@ -20,36 +20,36 @@ class MultiMvMap[PK, C[_, _], K, V](
 
   def getFinalReport: Try[String] = superNodeMap.getFinalReport
 
-  def get(key: PK, secondaryKey: K): Option[V] =
+  def get(pk: PK, sk: K): Option[V] =
     superNodeMap
-      .get(key, secondaryKey)
-      .orElse(commonMap.get(key).flatMap(v => c.readOne(secondaryKey, v)))
+      .get(pk, sk)
+      .orElse(commonMap.get(pk).flatMap(v => c.readOne(sk, v)))
 
-  def getAll(key: PK): Option[C[K, V]] =
-    superNodeMap.getAll(key).orElse(commonMap.get(key))
+  def getAll(pk: PK): Option[C[K, V]] =
+    superNodeMap.getAll(pk).orElse(commonMap.get(pk))
 
-  def remove(key: PK): Removed =
-    superNodeMap.remove(key).isDefined || commonMap.removeAndForget(key)
+  def remove(pk: PK): Removed =
+    superNodeMap.remove(pk).isDefined || commonMap.removeAndForget(pk)
 
-  def removeOrFail(key: PK): Try[C[K, V]] =
+  def removeOrFail(pk: PK): Try[C[K, V]] =
     superNodeMap
-      .remove(key)
-      .fold(commonMap.removeOrFail(key))(Success(_))
+      .remove(pk)
+      .fold(commonMap.removeOrFail(pk))(Success(_))
 
   def isEmpty: Boolean = superNodeMap.isEmpty && commonMap.isEmpty
 
   def size: MultiMapSize = MultiMapSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
 
-  def removeAllOrFail(k: PK, secondaryKeys: IterableOnce[K], size: Int)(f: C[K, V] => Option[C[K, V]]): Try[Unit] =
-    superNodeMap.removeAllOrFail(k, secondaryKeys, size).fold(commonMap.removeOrUpdateOrFail(k)(f))(identity)
+  def removeAllOrFail(pk: PK, secondaryKeys: IterableOnce[K], size: Int)(f: C[K, V] => Option[C[K, V]]): Try[Unit] =
+    superNodeMap.removeAllOrFail(pk, secondaryKeys, size).fold(commonMap.removeOrUpdateOrFail(pk)(f))(identity)
 
-  def adjustAndForget(key: PK, entries: IterableOnce[(K, V)], size: Int): Try[_] =
-    superNodeMap.putAllNewOrFail(key, entries, size).getOrElse {
-      val (appended, _) = commonMap.adjustCollection(key)(c.append(entries))
+  def adjustAndForget(pk: PK, entries: IterableOnce[(K, V)], size: Int): Try[_] =
+    superNodeMap.putAllNewOrFail(pk, entries, size).getOrElse {
+      val (appended, _) = commonMap.adjustCollection(pk)(c.append(entries))
       if (appended)
         Success(())
       else
-        Failure(new AssertionError(s"All inserted values under key $key should be appended"))
+        Failure(new AssertionError(s"All inserted values under key $pk should be appended"))
     }
 
 }

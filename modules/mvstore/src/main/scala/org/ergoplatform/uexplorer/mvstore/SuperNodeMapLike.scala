@@ -2,26 +2,26 @@ package org.ergoplatform.uexplorer.mvstore
 
 import scala.util.Try
 
-trait SuperNodeMapLike[SK, SV[_, _], K, V] {
+trait SuperNodeMapLike[HK, C[_, _], K, V] {
 
   def getFinalReport: Try[String]
-  
-  def get(key: SK, secondaryKey: K): Option[V]
 
-  def getAll(key: SK): Option[SV[K, V]]
+  def get(hotKey: HK, sk: K): Option[V]
 
-  def putOnlyNew(key: SK, secondaryKey: K, value: V): Option[Boolean]
+  def getAll(hotKey: HK): Option[C[K, V]]
 
-  def putAllNewOrFail(sk: SK, entries: IterableOnce[(K, V)], size: Int): Option[Try[Unit]]
+  def putOnlyNew(hotKey: HK, sk: K, value: V): Option[Boolean]
 
-  def remove(sk: SK): Option[SV[K, V]]
+  def putAllNewOrFail(hotKey: HK, entries: IterableOnce[(K, V)], size: Int): Option[Try[Unit]]
 
-  def removeAllOrFail(sk: SK, values: IterableOnce[K], size: Int): Option[Try[Unit]]
+  def remove(hotKey: HK): Option[C[K, V]]
+
+  def removeAllOrFail(hotKey: HK, values: IterableOnce[K], size: Int): Option[Try[Unit]]
 
   def isEmpty: Boolean
 
   def size: Int
-  
+
   def totalSize: Int
 
 }

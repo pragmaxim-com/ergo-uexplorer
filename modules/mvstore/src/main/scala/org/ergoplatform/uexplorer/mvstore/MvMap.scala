@@ -98,42 +98,42 @@ class MvMap[K, V: ValueCodec](name: String, store: MVStore) extends MapLike[K, V
   def replace(key: K, oldValue: V, newValue: V): Replaced =
     underlying.replace(key, codec.writeAll(oldValue), codec.writeAll(newValue))
 
-  def removeOrUpdate(k: K)(f: V => Option[V]): Option[V] =
-    Option(underlying.get(k)).map(codec.readAll) match {
+  def removeOrUpdate(key: K)(f: V => Option[V]): Option[V] =
+    Option(underlying.get(key)).map(codec.readAll) match {
       case None =>
         None
       case Some(v) =>
         f(v) match {
           case None =>
-            Option(underlying.remove(k)).map(codec.readAll)
+            Option(underlying.remove(key)).map(codec.readAll)
           case Some(v) =>
-            Option(underlying.put(k, codec.writeAll(v))).map(codec.readAll)
+            Option(underlying.put(key, codec.writeAll(v))).map(codec.readAll)
         }
     }
 
-  def removeOrUpdateOrFail(k: K)(f: V => Option[V]): Try[Unit] =
-    Option(underlying.get(k)).map(codec.readAll) match {
+  def removeOrUpdateOrFail(key: K)(f: V => Option[V]): Try[Unit] =
+    Option(underlying.get(key)).map(codec.readAll) match {
       case None =>
-        Failure(new AssertionError(s"Removing or updating non-existing key $k"))
+        Failure(new AssertionError(s"Removing or updating non-existing key $key"))
       case Some(v) =>
         f(v) match {
           case None =>
-            Try(assert(underlying.remove(k) != null, s"Removing non-existing key $k"))
+            Try(assert(underlying.remove(key) != null, s"Removing non-existing key $key"))
           case Some(v) =>
-            underlying.put(k, codec.writeAll(v))
+            underlying.put(key, codec.writeAll(v))
             Success(())
         }
     }
 
-  def adjust(k: K)(f: Option[V] => V): V = {
-    val newVal = f(Option(underlying.get(k)).map(codec.readAll))
-    underlying.put(k, codec.writeAll(newVal))
+  def adjust(key: K)(f: Option[V] => V): V = {
+    val newVal = f(Option(underlying.get(key)).map(codec.readAll))
+    underlying.put(key, codec.writeAll(newVal))
     newVal
   }
 
-  def adjustCollection(k: K)(f: Option[V] => (Appended, V)): (Appended, V) = {
-    val (appended, newVal) = f(Option(underlying.get(k)).map(codec.readAll))
-    underlying.put(k, codec.writeAll(newVal))
+  def adjustCollection(key: K)(f: Option[V] => (Appended, V)): (Appended, V) = {
+    val (appended, newVal) = f(Option(underlying.get(key)).map(codec.readAll))
+    underlying.put(key, codec.writeAll(newVal))
     appended -> newVal
   }
 
