@@ -20,6 +20,7 @@ import scala.concurrent.duration.FiniteDuration
 
 class Scheduler(
   pluginManager: PluginManager,
+  blockIndexer: BlockIndexer,
   chainIndexer: ChainIndexer,
   mempoolSyncer: MempoolSyncer,
   initializer: Initializer
@@ -32,7 +33,8 @@ class Scheduler(
 
   def periodicSync: Future[MempoolStateChanges] =
     for {
-      ChainSyncResult(lastBlockOpt, storage, graphTraversalSource) <- chainIndexer.indexChain
+      chainTip                                                     <- Future.fromTry(blockIndexer.getChainTip)
+      ChainSyncResult(lastBlockOpt, storage, graphTraversalSource) <- chainIndexer.indexChain(chainTip)
       stateChanges                                                 <- mempoolSyncer.syncMempool(storage)
       _ <- pluginManager.executePlugins(storage, stateChanges, graphTraversalSource, lastBlockOpt)
     } yield stateChanges
@@ -50,8 +52,13 @@ class Scheduler(
       case ChainEmpty | ChainValid =>
         schedule(initialDelay, pollingInterval)(periodicSync).via(killSwitch.flow).run()
       case MissingBlocks(_, missingHeights) =>
-        chainIndexer
-          .fixChain(missingHeights)
-          .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
+        Future
+          .fromTry(blockIndexer.getChainTip)
+          .flatMap(chainTip =>
+            chainIndexer
+              .fixChain(missingHeights, chainTip)
+              .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
+          )
+
     }
 }

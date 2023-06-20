@@ -20,6 +20,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
+import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainTip
 import org.ergoplatform.uexplorer.indexer.config.MvStore
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.storage.MvStorage
@@ -32,7 +33,7 @@ import java.nio.file.Paths
 import java.util
 import java.util.concurrent.ConcurrentSkipListMap
 import scala.collection.compat.immutable.ArraySeq
-import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable.{ListMap, TreeMap, TreeSet}
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -79,6 +80,20 @@ class BlockIndexer(
     val compactTime = if (indexing) mvStoreConf.maxIndexingCompactTime else mvStoreConf.maxIdleCompactTime
     val result      = if (!indexing) storage.clear() else Success(())
     result.map(_ => storage.store.compactFile(compactTime.toMillis.toInt))
+  }
+
+  def getChainTip: Try[ChainTip] = Try {
+    val chainTip =
+      ChainTip(
+        ListMap.from(
+          storage.blockIdsByHeight
+            .iterator(None, None, reverse = true)
+            .take(100)
+            .flatMap { case (height, blockIds) => blockIds.asScala.map(_ -> height) }
+        )
+      )
+    assert(chainTip.lastHeight == storage.getLastHeight, "MvStore's Iterator works unexpectedly!")
+    chainTip
   }
 
   def addBestBlock(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =

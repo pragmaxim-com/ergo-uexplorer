@@ -21,9 +21,12 @@ Explorer weak spot?
 ## Solution
 
 Supplementary, lightweight (μ = micro) Ergo explorer/analyzer with multiple modes of operation :
-  - `embedded` - running as single jvm process, only some blockchain data in embedded [MvStore](https://www.h2database.com/html/mvstore.html) 
-  - `cassandra` - additional cassandra backend with all blockchain data (very fast, it does not slow indexing down)
-  - `janusgraph` - all transactions are fed into a graph for analysis (**takes all day to index!**)
+  - `embedded` : running as single jvm process, only some blockchain data in embedded [MvStore](https://www.h2database.com/html/mvstore.html) 
+    - blocks are stored to `MvStore` using only a single thread to avoid DB corruption, it takes ~ 3-4 hours 
+  - `cassandra` : additional cassandra backend with all blockchain data (very fast, it does not slow indexing down)
+    - blocks are persisted concurrently so indexing is very fast 
+  - `janusgraph` : all transactions are fed into a graph for analysis (**takes all day to index!**)
+    - not tested and used, TBD 
 
 Properties : 
   - rapid indexing speed (30mins on `16vCPU`/`20GB RAM` server to 90mins on `4vCPU+`/`16GB RAM`

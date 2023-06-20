@@ -79,7 +79,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val chainIndexer  = new ChainIndexer(backend, graphBackend, blockClient, blockIndexer)
   val mempoolSyncer = new MempoolSyncer(blockClient)
   val initializer   = new Initializer(storage, backend, graphBackend)
-  val scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
+  val scheduler     = new Scheduler(pluginManager, blockIndexer, chainIndexer, mempoolSyncer, initializer)
 
   "Scheduler should sync from 1 to 4150 and then from 4150 to 4200" in {
     initializer.init shouldBe ChainEmpty

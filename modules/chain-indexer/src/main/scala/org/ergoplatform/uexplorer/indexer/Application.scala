@@ -78,7 +78,7 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
               chainIndexer  = new ChainIndexer(backendOpt, graphBackendOpt, blockHttpClient, blockIndexer)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
               initializer   = new Initializer(storage, backendOpt, graphBackendOpt)
-              scheduler     = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
+              scheduler     = new Scheduler(pluginManager, blockIndexer, chainIndexer, mempoolSyncer, initializer)
               done <- scheduler.validateAndSchedule(0.seconds, conf.mvStore.maxIdleCompactTime + 5.seconds)
             } yield done
 

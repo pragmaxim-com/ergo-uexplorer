@@ -13,7 +13,6 @@ lazy val commonSettings = Seq(
   ThisBuild / evictionErrorLevel := Level.Info,
   excludeDependencies ++= allExclusions.map( x => ExclusionRule(x.organization, x.name)),
   scalacOptions ++= Seq(
-    "-Xmax-inlines", "512",
     "-deprecation",
     "-encoding",
     "UTF-8",
