@@ -16,7 +16,6 @@ import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.storage.MvStorage
 
-import scala.concurrent.blocking
 import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -69,7 +68,7 @@ class ChainIndexer(
           blockIndexer.addBestBlock(bestBlock).get
         case winningFork =>
           blockIndexer.addWinningFork(winningFork).get
-      }(Implicits.trampoline)
+      }(global)
 
   private def onComplete(lastBlock: Option[BestBlockInserted]): ChainSyncResult = {
     val storage = blockIndexer.readableStorage
