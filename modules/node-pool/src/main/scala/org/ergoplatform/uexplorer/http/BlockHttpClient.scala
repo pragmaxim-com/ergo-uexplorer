@@ -102,7 +102,7 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
       .mapAsync(1)(getBlockIdForHeight)
       .buffer(512, OverflowStrategy.backpressure)
       .mapAsync(1)(getBlockForId) // parallelism could be parameterized - low or big pressure on Node
-      .buffer(512, OverflowStrategy.backpressure)
+      .buffer(1024, OverflowStrategy.backpressure)
 
   def close(): Future[Unit] = {
     logger.info(s"Stopping Block http client")

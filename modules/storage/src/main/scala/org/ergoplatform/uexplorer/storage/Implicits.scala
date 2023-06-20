@@ -17,7 +17,8 @@ object Implicits {
     import Address.unwrapped
     def serialize(key: Address): String = key.unwrapped
 
-    def deserialize(key: String): Address = Address.fromStringUnsafe(key)
+    // do not call Address.fromStringUnsafe as it has been already validated in BlockBuilder
+    def deserialize(key: String): Address = key.asInstanceOf[Address]
   }
 
 }

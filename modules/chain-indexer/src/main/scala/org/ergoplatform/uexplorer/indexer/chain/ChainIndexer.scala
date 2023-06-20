@@ -28,6 +28,22 @@ class ChainIndexer(
 )(implicit s: ActorSystem[Nothing], ps: ProtocolSettings, killSwitch: SharedKillSwitch)
   extends LazyLogging {
 
+  private def graphWriteFlow =
+    Flow[BestBlockInserted]
+      .buffer(100, OverflowStrategy.backpressure)
+      .async
+      .via(
+        graphBackendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(
+          _.graphWriteFlow
+        )
+      )
+
+  private def blockWriteFlow =
+    Flow[BestBlockInserted]
+      .buffer(100, OverflowStrategy.backpressure)
+      .async
+      .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
+
   private def forkDeleteFlow(parallelism: Int): Flow[Insertable, BestBlockInserted, NotUsed] =
     Flow[Insertable]
       .mapAsync(parallelism) {
@@ -36,6 +52,9 @@ class ChainIndexer(
             .fold(Future.successful(newBlocksInserted))(_.removeBlocksFromMainChain(supersededFork.keys))
             .map(_ => newBlocksInserted)
         case bb: BestBlockInserted =>
+          if (bb.lightBlock.info.height % 100 == 0) {
+            logger.info(s"Height ${bb.lightBlock.info.height}")
+          }
           Future.successful(List(bb))
       }
       .mapConcat(identity)
@@ -54,21 +73,8 @@ class ChainIndexer(
           }(Implicits.trampoline)
       }
       .via(forkDeleteFlow(1))
-      .async
-      .buffer(100, OverflowStrategy.backpressure)
-      .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
-      .wireTap { bb =>
-        if (bb.lightBlock.info.height % 100 == 0) {
-          logger.info(s"Height ${bb.lightBlock.info.height}")
-        }
-      }
-      .async
-      .buffer(100, OverflowStrategy.backpressure)
-      .via(
-        graphBackendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(
-          _.graphWriteFlow
-        )
-      )
+      .via(blockWriteFlow)
+      .via(graphWriteFlow)
       .via(killSwitch.flow)
       .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
       .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
