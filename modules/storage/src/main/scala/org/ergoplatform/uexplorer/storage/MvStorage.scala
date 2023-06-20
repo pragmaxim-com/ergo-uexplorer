@@ -12,6 +12,7 @@ import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock, Record}
 import org.ergoplatform.uexplorer.mvstore.*
 import MvStorage.*
+import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
 import org.ergoplatform.uexplorer.storage.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.h2.mvstore.{MVMap, MVStore}
@@ -74,9 +75,7 @@ case class MvStorage(
       lightBlock.inputBoxes
         .groupBy(_.address)
         .view
-        .mapValues(_.collect {
-          case Record(_, boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId
-        })
+        .mapValues(_.map(_.boxId))
         .map { case (address, inputIds) =>
           removeInputBoxesByAddress(address, inputIds)
         }
@@ -102,9 +101,14 @@ case class MvStorage(
   def getFinalReport: Option[String] = utxosByAddress.getFinalReport
 
   def getCompactReport: String = {
-    val height = getLastHeight.getOrElse(0)
+    val height                                                      = getLastHeight.getOrElse(0)
+    val MultiMapSize(superNodeSize, superNodeTotalSize, commonSize) = utxosByAddress.size
+    val nonEmptyAddressCount                                        = superNodeSize + commonSize
     val progress =
-      s"storage height $height, utxo count: ${addressByUtxo.size}, non-empty-address count: ${utxosByAddress.size}\n"
+      s"storage height $height, " +
+        s"utxo count: ${addressByUtxo.size}, " +
+        s"supernode-utxo-count : $superNodeTotalSize, " +
+        s"non-empty-address count: $nonEmptyAddressCount\n"
 
     val cs  = store.getCacheSize
     val csu = store.getCacheSizeUsed
