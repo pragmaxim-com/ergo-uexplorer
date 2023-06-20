@@ -13,12 +13,14 @@ import org.ergoplatform.uexplorer.db.{BestBlockInserted, ForkInserted, FullBlock
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.storage.MvStorage
 
 import scala.concurrent.blocking
 import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Try
 
 class ChainIndexer(
   backendOpt: Option[Backend],
@@ -59,41 +61,44 @@ class ChainIndexer(
       }
       .mapConcat(identity)
 
+  private def insertBlock(block: ApiFullBlock): Future[Insertable] =
+    blockHttpClient
+      .getBestBlockOrBranch(block, blockIndexer.readableStorage.containsBlock, List.empty)(Implicits.trampoline)
+      .map {
+        case bestBlock :: Nil =>
+          blockIndexer.addBestBlock(bestBlock).get
+        case winningFork =>
+          blockIndexer.addWinningFork(winningFork).get
+      }(Implicits.trampoline)
+
+  private def onComplete(lastBlock: Option[BestBlockInserted]): ChainSyncResult = {
+    val storage = blockIndexer.readableStorage
+    storage.writeReport.recover { case ex =>
+      logger.error("Failed to generate report", ex)
+    }
+    blockIndexer
+      .compact(indexing = false)
+      .recover { case ex =>
+        logger.error("Compaction failed", ex)
+      }
+    ChainSyncResult(
+      lastBlock,
+      blockIndexer.readableStorage,
+      graphBackendOpt.map(_.graphTraversalSource)
+    )
+  }
+
   private val indexingSink: Sink[Height, Future[ChainSyncResult]] =
     Flow[Height]
       .via(blockHttpClient.blockFlow)
-      .mapAsync(1) { block =>
-        blockHttpClient
-          .getBestBlockOrBranch(block, blockIndexer.readableStorage.containsBlock, List.empty)(Implicits.trampoline)
-          .map {
-            case bestBlock :: Nil =>
-              blockIndexer.addBestBlock(bestBlock).get
-            case winningFork =>
-              blockIndexer.addWinningFork(winningFork).get
-          }(Implicits.trampoline)
-      }
+      .mapAsync(1)(insertBlock)
       .via(forkDeleteFlow(1))
       .via(blockWriteFlow)
       .via(graphWriteFlow)
       .via(killSwitch.flow)
       .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
       .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
-        lastBlockF.map { lastBlock =>
-          val storage = blockIndexer.readableStorage
-          storage.writeReport.recover { case ex =>
-            logger.error("Failed to generate report", ex)
-          }
-          blockIndexer
-            .compact(indexing = false)
-            .recover { case ex =>
-              logger.error("Compaction failed", ex)
-            }
-          ChainSyncResult(
-            lastBlock,
-            storage,
-            graphBackendOpt.map(_.graphTraversalSource)
-          )
-        }
+        lastBlockF.map(onComplete)
       }
 
   def indexChain: Future[ChainSyncResult] =
