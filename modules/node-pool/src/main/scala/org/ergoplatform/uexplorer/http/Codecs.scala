@@ -77,7 +77,11 @@ trait Codecs {
       creationHeight <- c.downField("creationHeight").as[Height]
       ergoTree       <- c.downField("ergoTree").as[HexString]
       address <-
-        ErgoTreeParser.ergoTreeToAddress(ergoTree).toEither.left.map(ex => DecodingFailure.fromThrowable(ex, List.empty))
+        ErgoTreeParser
+          .ergoTreeHexToAddressString(ergoTree)
+          .toEither
+          .left
+          .map(ex => DecodingFailure.fromThrowable(ex, List.empty))
       scriptTemplateHash  <- ErgoTreeParser.deriveErgoTreeTemplateHash(ergoTree)
       assets              <- c.downField("assets").as[List[ApiAsset]]
       additionalRegisters <- c.downField("additionalRegisters").as[Map[RegisterId, HexString]]

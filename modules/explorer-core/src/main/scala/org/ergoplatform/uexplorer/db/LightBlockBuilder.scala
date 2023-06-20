@@ -11,13 +11,12 @@ import scala.util.Try
 object LightBlockBuilder {
 
   def apply(
-    b: ApiFullBlock,
-    bInfo: BlockInfo,
+    b: Block,
     addressByUtxo: BoxId => Option[Address],
     utxoValueByAddress: (Address, BoxId) => Option[Value]
   ): Try[LightBlock] = Try {
     val outputLookup =
-      b.transactions.transactions.iterator
+      b.txs.iterator
         .flatMap(tx => tx.outputs.map(o => (o.boxId, (o.address, o.value))))
         .toMap
 
@@ -26,12 +25,12 @@ object LightBlockBuilder {
         inputBoxId, {
           val inputAddress = addressByUtxo(inputBoxId).getOrElse(
             throw new IllegalStateException(
-              s"Input boxId $inputBoxId of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+              s"Input boxId $inputBoxId of block ${b.headerId} at height ${b.info.height} not found in utxo state"
             )
           )
           val value = utxoValueByAddress(inputAddress, inputBoxId).getOrElse(
             throw new IllegalStateException(
-              s"Address $inputAddress of block ${b.header.id} at height ${b.header.height} not found in utxo state"
+              s"Address $inputAddress of block ${b.headerId} at height ${b.info.height} not found in utxo state"
             )
           )
           inputAddress -> value
@@ -46,16 +45,16 @@ object LightBlockBuilder {
       val outputSum = outputs.iterator.map(_.value).sum
       assert(
         inputSum == outputSum,
-        s"Block ${b.header.id} invalid as sum of inputs $inputSum != $outputSum"
+        s"Block ${b.headerId} invalid as sum of inputs $inputSum != $outputSum"
       )
     }
 
     val outputs =
-      b.transactions.transactions
+      b.txs
         .flatMap(tx => tx.outputs.map(o => Record(tx.id, o.boxId, o.address, o.value)))
 
     val inputs =
-      b.transactions.transactions
+      b.txs
         .flatMap { tx =>
           tx match {
             case tx if tx.id == Emission.tx =>
@@ -70,7 +69,7 @@ object LightBlockBuilder {
           }
         }
     validateInputSumEqualsOutputSum(inputs, outputs)
-    LightBlock(b.header.id, inputs, outputs, bInfo)
+    LightBlock(b.headerId, inputs, outputs, b.info)
   }
 
 }

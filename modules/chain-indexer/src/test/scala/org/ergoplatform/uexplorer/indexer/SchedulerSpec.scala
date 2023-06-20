@@ -75,7 +75,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val backend       = Some(new InMemoryBackend)
   val graphBackend  = Some(new InMemoryGraphBackend)
   val pluginManager = new PluginManager(List.empty)
-  val blockIndexer  = BlockIndexer(storage, graphBackend.isDefined, mvStoreConf)
+  val blockIndexer  = BlockIndexer(storage, mvStoreConf)
   val chainIndexer  = new ChainIndexer(backend, graphBackend, blockClient, blockIndexer)
   val mempoolSyncer = new MempoolSyncer(blockClient)
   val initializer   = new Initializer(storage, backend, graphBackend)

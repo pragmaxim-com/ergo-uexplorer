@@ -57,7 +57,7 @@ object BlockInfoBuilder {
     }
   }
 
-  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockInfo], parentVersion: Revision)(implicit
+  def apply(apiBlock: ApiFullBlock, prevBlock: Option[BlockInfo])(implicit
     protocolSettings: ProtocolSettings
   ): Try[BlockInfo] =
     minerRewardAddress(apiBlock)(protocolSettings).map { minerAddress =>
@@ -79,7 +79,7 @@ object BlockInfoBuilder {
       }
 
       BlockInfo(
-        revision   = parentVersion,
+        revision        = 0L, // needs to be updated
         parentId        = apiBlock.header.parentId,
         timestamp       = apiBlock.header.timestamp,
         height          = apiBlock.header.height,

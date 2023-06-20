@@ -83,24 +83,6 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
         .map(_.body)
     }(retry.Success.always, global)
 
-  def getBestBlockOrBranch(
-    block: ApiFullBlock,
-    chainCache: concurrent.Map[BlockId, Height], // does not have to be concurrent unless akka-stream parallelism > 1
-    acc: List[ApiFullBlock]
-  ): Future[List[ApiFullBlock]] =
-    chainCache.get(block.header.parentId).contains(block.header.height - 1) match {
-      case blockCached if blockCached =>
-        chainCache.put(block.header.id, block.header.height)
-        Future.successful(block :: acc)
-      case _ if block.header.height == 1 =>
-        chainCache.put(block.header.id, block.header.height)
-        Future.successful(block :: acc)
-      case _ =>
-        logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
-        getBlockForId(block.header.parentId)
-          .flatMap(b => getBestBlockOrBranch(b, chainCache, block :: acc))
-    }
-
   def close(): Future[Unit] = {
     logger.info(s"Stopping Block http client")
     sttpB.close()

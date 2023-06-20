@@ -9,19 +9,29 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, Resiliency, Storage}
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, ForkInserted, FullBlock, Insertable}
+import org.ergoplatform.uexplorer.db.{
+  BestBlockInserted,
+  Block,
+  BlockInfo,
+  BlockInfoBuilder,
+  ForkInserted,
+  FullBlock,
+  FullBlockBuilder,
+  Insertable
+}
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.{ChainSyncResult, ChainTip}
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.storage.MvStorage
+
 import scala.jdk.CollectionConverters.*
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.immutable.{ListMap, TreeSet}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.collection.concurrent
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 class ChainIndexer(
   backendOpt: Option[Backend],
@@ -62,14 +72,6 @@ class ChainIndexer(
       }
       .mapConcat(identity)
 
-  private def insertBlocks(blocks: List[ApiFullBlock]): Insertable =
-    blocks match {
-      case bestBlock :: Nil =>
-        blockIndexer.addBestBlock(bestBlock).get
-      case winningFork =>
-        blockIndexer.addWinningFork(winningFork).get
-    }
-
   private def onComplete(lastBlock: Option[BestBlockInserted]): ChainSyncResult = {
     val storage = blockIndexer.readableStorage
     storage.writeReport.recover { case ex =>
@@ -87,13 +89,73 @@ class ChainIndexer(
     )
   }
 
-  private def blockFlow(chainCache: concurrent.Map[BlockId, Height]): Flow[Height, List[ApiFullBlock], NotUsed] =
+  /** Genesis block has no parent so we assert that any block either has its parent cached or its a first block */
+  private def getParentOrFail(
+    apiBlock: ApiFullBlock,
+    chainCache: concurrent.Map[BlockId, BlockInfo]
+  ): Try[Option[BlockInfo]] = {
+    def fail =
+      Failure(
+        new IllegalStateException(
+          s"Block ${apiBlock.header.id} at height ${apiBlock.header.height} has missing parent ${apiBlock.header.parentId}"
+        )
+      )
+
+    if (apiBlock.header.height == 1)
+      Try(Option.empty)
+    else
+      chainCache.get(apiBlock.header.parentId).fold(fail)(parent => Try(Option(parent)))
+  }
+
+  private def buildBlock(apiBlock: ApiFullBlock, chainCache: concurrent.Map[BlockId, BlockInfo]): Try[Block] =
+    for {
+      parentOpt <- getParentOrFail(apiBlock, chainCache)
+      blockInfo <- BlockInfoBuilder(apiBlock, parentOpt)
+      fbOpt     <- if (backendOpt.isDefined) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
+    } yield Block(apiBlock.header.id, blockInfo, fbOpt, apiBlock.transactions.transactions)
+
+  def getBestBlockOrBranch(
+    block: ApiFullBlock,
+    chainCache: concurrent.Map[BlockId, BlockInfo], // does not have to be concurrent unless akka-stream parallelism > 1
+    acc: List[Block]
+  ): Future[List[Block]] =
+    chainCache.get(block.header.parentId).exists(_.height == block.header.height - 1) match {
+      case blockCached if blockCached =>
+        Future.fromTry(buildBlock(block, chainCache)).map { case b @ Block(_, newBlockInfo, _, _) =>
+          chainCache.put(block.header.id, newBlockInfo)
+          b :: acc
+        }
+      case _ if block.header.height == 1 =>
+        Future.fromTry(buildBlock(block, chainCache)).map { case b @ Block(_, newBlockInfo, _, _) =>
+          chainCache.put(block.header.id, newBlockInfo)
+          b :: acc
+        }
+      case _ =>
+        logger.info(s"Encountered fork at height ${block.header.height} and block ${block.header.id}")
+        for {
+          newBlock <- Future.fromTry(buildBlock(block, chainCache))
+          b        <- blockHttpClient.getBlockForId(block.header.parentId)
+          bbOrB    <- getBestBlockOrBranch(b, chainCache, newBlock :: acc)
+        } yield bbOrB
+    }
+
+  private def insertBlocks(blocks: List[Block]): Insertable =
+    blocks match {
+      case bestBlock :: Nil =>
+        blockIndexer.addBestBlock(bestBlock).get
+      case winningFork =>
+        blockIndexer.addWinningFork(winningFork).get
+    }
+
+  private def blockFlow(
+    chainCache: concurrent.Map[BlockId, BlockInfo]
+  ): Flow[Height, List[Block], NotUsed] =
     Flow[Height]
       .mapAsync(1)(blockHttpClient.getBlockIdForHeight)
       .buffer(512, OverflowStrategy.backpressure)
       .mapAsync(1)(blockHttpClient.getBlockForId) // parallelism could be parameterized - low or big pressure on Node
       .buffer(1024, OverflowStrategy.backpressure)
-      .mapAsync(1)(block => blockHttpClient.getBestBlockOrBranch(block, chainCache, List.empty))
+      .mapAsync(1)(block => getBestBlockOrBranch(block, chainCache, List.empty))
 
   private def indexingSink(chainTip: ChainTip): Sink[Height, Future[ChainSyncResult]] =
     Flow[Height]
@@ -125,10 +187,10 @@ class ChainIndexer(
 }
 
 object ChainIndexer {
-  case class ChainTip(fromHighestToLowest: ListMap[BlockId, Height]) {
-    def lastHeight: Option[Height] = fromHighestToLowest.headOption.map(_._2)
-    def toConcurrent: concurrent.Map[BlockId, Height] =
-      new ConcurrentHashMap[BlockId, Height]().asScala.addAll(fromHighestToLowest)
+  case class ChainTip(fromHighestToLowest: ListMap[BlockId, BlockInfo]) {
+    def lastHeight: Option[Height] = fromHighestToLowest.headOption.map(_._2.height)
+    def toConcurrent: concurrent.Map[BlockId, BlockInfo] =
+      new ConcurrentHashMap[BlockId, BlockInfo]().asScala.addAll(fromHighestToLowest)
   }
   case class ChainSyncResult(
     lastBlock: Option[BestBlockInserted],
