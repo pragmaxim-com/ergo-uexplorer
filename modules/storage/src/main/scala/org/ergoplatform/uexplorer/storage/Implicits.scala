@@ -11,14 +11,14 @@ object Implicits {
   implicit val valueByBoxCodec: MultiMapCodec[java.util.Map, BoxId, Value] = ValueByBoxCodec
   implicit val blockInfoCodec: ValueCodec[BlockInfo]                       = BlockInfoCodec
   implicit val counterCodec: ValueCodec[Counter]                           = CounterCodec
-  implicit val addressCodec: ValueCodec[Address]                           = AddressCodec
+  implicit val addressCodec: ValueCodec[ErgoTreeHex]                       = ErgoTreeHexCodec
 
-  implicit val superNodeAddressCodec: HotKeyCodec[Address] = new HotKeyCodec[Address] {
-    import Address.unwrapped
-    def serialize(key: Address): String = key.unwrapped
+  implicit val superNodeErgoTreeCodec: HotKeyCodec[ErgoTreeHex] = new HotKeyCodec[ErgoTreeHex] {
+    import ErgoTreeHex.unwrapped
+    def serialize(key: ErgoTreeHex): String = key.unwrapped
 
     // do not call Address.fromStringUnsafe as it has been already validated in BlockBuilder
-    def deserialize(key: String): Address = key.asInstanceOf[Address]
+    def deserialize(key: String): ErgoTreeHex = key.asInstanceOf[ErgoTreeHex]
   }
 
 }

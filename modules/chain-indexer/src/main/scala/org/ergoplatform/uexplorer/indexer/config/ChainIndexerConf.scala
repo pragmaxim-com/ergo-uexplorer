@@ -9,7 +9,6 @@ import eu.timepit.refined.refineV
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.mining.emission.EmissionRules
 import org.ergoplatform.settings.MonetarySettings
-import org.ergoplatform.uexplorer.{Address, NetworkPrefix}
 import pureconfig.ConfigReader.Result
 import pureconfig.error.CannotConvert
 import pureconfig.{ConfigReader, ConfigSource}

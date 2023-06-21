@@ -10,7 +10,6 @@ import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.ergoplatform.uexplorer.mvstore.{MultiMapCodec, ValueCodec}
 import org.ergoplatform.uexplorer.storage.kryo.*
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
 
 import java.nio.ByteBuffer
 import java.util
@@ -29,7 +28,6 @@ object KryoSerialization {
       kryo.register(classOf[util.HashSet[_]], setSerializer)
       kryo.register(classOf[Counter])
       kryo.register(classOf[BlockInfo])
-      kryo.register(classOf[Address.Stats])
       setSerializer.setAcceptsNull(false)
       mapSerializer.setKeyClass(classOf[String], kryo.getSerializer(classOf[String]))
       mapSerializer.setKeysCanBeNull(false)

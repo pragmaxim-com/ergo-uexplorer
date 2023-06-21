@@ -21,29 +21,29 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
     storage: Storage,
     graphTraversalSource: Option[GraphTraversalSource]
   ): List[TxMatch] = {
-    def sumAddressValues(addresses: Set[Address]): Map[Address, Address.State] =
-      addresses
-        .flatMap(a => storage.getUtxosByAddress(a).map(a -> _))
-        .foldLeft(Map.empty[Address, Address.State]) { case (acc, (address, valueByBox)) =>
-          acc.updated(address, Address.State(valueByBox.values.asScala.sum))
+    def sumErgoTreeValues(ergoTrees: Set[ErgoTreeHex]): Map[ErgoTreeHex, ErgoTreeHex.State] =
+      ergoTrees
+        .flatMap(a => storage.getUtxosByErgoTreeHex(a).map(a -> _))
+        .foldLeft(Map.empty[ErgoTreeHex, ErgoTreeHex.State]) { case (acc, (ergoTree, valueByBox)) =>
+          acc.updated(ergoTree, ErgoTreeHex.State(valueByBox.values.asScala.sum))
         }
 
     val outputsWithoutPaybacksAndFees =
       tx.outputs.filterNot(o =>
         tx.inputs.exists(i =>
-          storage.getAddressByUtxo(i.boxId).contains(o.address)
-        ) || o.address == Const.FeeContract.address
+          storage.getErgoTreeHexByUtxo(i.boxId).contains(o.ergoTree)
+        ) || o.ergoTree == Const.FeeContract.address
       )
     Option(outputsWithoutPaybacksAndFees.iterator.map(_.value).sum)
       .filter(_ >= txErgValueThreshold * Const.NanoOrder)
       .map { value =>
-        val inputAddresses       = tx.inputs.iterator.map(_.boxId).flatMap(storage.getAddressByUtxo).toSet
-        val inputValueByAddress  = sumAddressValues(inputAddresses)
-        val outputAddresses      = outputsWithoutPaybacksAndFees.iterator.map(_.address).toSet
-        val outputValueByAddress = sumAddressValues(outputAddresses)
-        val txMatch              = TxMatch(tx, value, inputValueByAddress, outputValueByAddress)
+        val inputErgoTrees        = tx.inputs.iterator.map(_.boxId).flatMap(storage.getErgoTreeHexByUtxo).toSet
+        val inputValueByErgoTree  = sumErgoTreeValues(inputErgoTrees)
+        val outputErgoTrees       = outputsWithoutPaybacksAndFees.iterator.map(_.ergoTree).toSet
+        val outputValueByErgoTree = sumErgoTreeValues(outputErgoTrees)
+        val txMatch               = TxMatch(tx, value, inputValueByErgoTree, outputValueByErgoTree)
         Either.cond(
-          inputValueByAddress.valuesIterator.map(_._1).sum >= value,
+          inputValueByErgoTree.valuesIterator.map(_._1).sum >= value,
           txMatch,
           txMatch
         )
@@ -72,15 +72,15 @@ object HighValueDetector {
   case class BlockMatch(
     block: FullBlock,
     blockValue: Value,
-    inputs: Map[Address, Address.State],
-    outputs: Map[Address, Address.State]
+    inputs: Map[ErgoTreeHex, ErgoTreeHex.State],
+    outputs: Map[ErgoTreeHex, ErgoTreeHex.State]
   )
 
   case class TxMatch(
     tx: ApiTransaction,
     txValue: Value,
-    inputs: Map[Address, Address.State],
-    outputs: Map[Address, Address.State]
+    inputs: Map[ErgoTreeHex, ErgoTreeHex.State],
+    outputs: Map[ErgoTreeHex, ErgoTreeHex.State]
   ) {
 
     override def toString: AlertMessage = {
@@ -88,10 +88,10 @@ object HighValueDetector {
       val fmtInputAddrSum  = valueFormat.format(inputs.valuesIterator.map(_._1).sum / Const.NanoOrder)
       val fmtOutputAddrSum = valueFormat.format(outputs.valuesIterator.map(_._1).sum / Const.NanoOrder)
 
-      def stringify(tuple: (Address, Address.State)) = tuple match {
-        case (address, Address.State(value)) =>
+      def stringify(tuple: (ErgoTreeHex, ErgoTreeHex.State)) = tuple match {
+        case (ergoTree, ErgoTreeHex.State(value)) =>
           val fmtVal = valueFormat.format(value / Const.NanoOrder)
-          s"${address.asInstanceOf[String].take(5)} $fmtVal"
+          s"${ergoTree.asInstanceOf[String].take(5)} $fmtVal"
       }
 
       val addressDetails =

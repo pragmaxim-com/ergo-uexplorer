@@ -9,7 +9,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolStateChanges
 import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.{SortedTopAddressMap, Storage}
+import org.ergoplatform.uexplorer.Storage
 
 import java.util.ServiceLoader
 import scala.concurrent.ExecutionContext.Implicits.global

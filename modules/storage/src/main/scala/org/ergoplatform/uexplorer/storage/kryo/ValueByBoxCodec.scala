@@ -8,7 +8,7 @@ import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, M
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.*
-import org.ergoplatform.uexplorer.{Address, BoxId, Height, Value}
+import org.ergoplatform.uexplorer.{ErgoTreeHex, BoxId, Height, Value}
 import scala.language.unsafeNulls
 
 import java.nio.ByteBuffer

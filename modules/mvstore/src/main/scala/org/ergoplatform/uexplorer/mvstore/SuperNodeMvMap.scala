@@ -29,7 +29,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
         .toMap
     )
 
-  private lazy val counterByHotKey = new MvMap[HK, Counter]("counterBySuperNode", store)
+  private lazy val counterByHotKey = new MvMap[HK, Counter]("counterByHotKey", store)
 
   private def collectReadHotKey(k: HK): Counter =
     counterByHotKey.adjust(k)(_.fold(Counter(1, 1, 0, 0)) { case Counter(writeOps, readOps, added, removed) =>

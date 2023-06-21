@@ -18,7 +18,7 @@ object TxGraphWriter extends LazyLogging {
   private val blackListBoxes = Set(Protocol.Emission.inputBox, Protocol.NoPremine.box, Protocol.Foundation.box)
 
   private val blackListAddresses =
-    Set(FeeContract.address, Protocol.Emission.address, Protocol.NoPremine.address, Protocol.Foundation.address)
+    Set(FeeContract.ergoTree, Protocol.Emission.ergoTree, Protocol.NoPremine.ergoTree, Protocol.Foundation.ergoTree)
 
   def writeGraph(
     txId: TxId,
@@ -31,37 +31,37 @@ object TxGraphWriter extends LazyLogging {
     newTxVertex.property("txId", txId)
     newTxVertex.property("height", height)
     newTxVertex.property("timestamp", timestamp)
-    val inputsByAddress =
+    val inputsByErgoTrees =
       inputs
         .filterNot(t =>
-          blackListBoxes.contains(t.boxId) || blackListAddresses.contains(t.address) || t.value < CoinsInOneErgo
+          blackListBoxes.contains(t.boxId) || blackListAddresses.contains(t.ergoTree) || t.value < CoinsInOneErgo
         )
-        .groupBy(_.address)
+        .groupBy(_.ergoTree)
 
-    inputsByAddress
-      .foreach { case (address, inputs) =>
-        val inputAddressVertexIt = g.vertices(Utils.vertexHash(address, g))
+    inputsByErgoTrees
+      .foreach { case (ergoTree, inputs) =>
+        val inputAddressVertexIt = g.vertices(Utils.vertexHash(ergoTree, g))
         if (!inputAddressVertexIt.hasNext) {
-          logger.error(s"inputAddress $address from height $height lacks corresponding vertex")
+          logger.error(s"inputAddress $ergoTree from height $height lacks corresponding vertex")
         }
-        newTxVertex.addEdge("from", inputAddressVertexIt.next(), "value", 0L) // TODO inputs.iterator.map(_.value).sum
+        newTxVertex.addEdge("from", inputAddressVertexIt.next(), "value", inputs.iterator.map(_.value).sum)
       }
 
     outputs
       .filterNot(t =>
-        inputsByAddress.contains(t.address) || blackListBoxes.contains(t.boxId) || blackListAddresses.contains(
-          t.address
+        inputsByErgoTrees.contains(t.ergoTree) || blackListBoxes.contains(t.boxId) || blackListAddresses.contains(
+          t.ergoTree
         ) || t.value < CoinsInOneErgo
       )
-      .groupBy(_.address)
-      .foreach { case (address, outputs) =>
-        val outputAddressVertexIt = g.vertices(Utils.vertexHash(address, g))
+      .groupBy(_.ergoTree)
+      .foreach { case (ergoTree, outputs) =>
+        val outputAddressVertexIt = g.vertices(Utils.vertexHash(ergoTree, g))
         val newOutputAddressVertex =
           if (outputAddressVertexIt.hasNext) {
             outputAddressVertexIt.next()
           } else {
-            val newOutputAddressVertex = g.addVertex(T.id, Utils.vertexHash(address, g), T.label, "address")
-            newOutputAddressVertex.property("address", address)
+            val newOutputAddressVertex = g.addVertex(T.id, Utils.vertexHash(ergoTree, g), T.label, "address")
+            newOutputAddressVertex.property("address", ergoTree)
             newOutputAddressVertex
           }
         newTxVertex.addEdge("to", newOutputAddressVertex, "value", outputs.iterator.map(_.value).sum)

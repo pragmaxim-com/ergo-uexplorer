@@ -38,51 +38,51 @@ import scala.util.{Failure, Random, Success, Try}
 
 case class MvStorage(
   store: MVStore,
-  utxosByAddress: MultiMvMap[Address, java.util.Map, BoxId, Value],
-  addressByUtxo: MapLike[BoxId, Address],
+  utxosByErgoTreeHex: MultiMvMap[ErgoTreeHex, java.util.Map, BoxId, Value],
+  ergoTreeHexByUtxo: MapLike[BoxId, ErgoTreeHex],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, BlockInfo]
 ) extends Storage
   with LazyLogging {
 
   def clear(): Try[Unit] =
-    utxosByAddress.clear()
+    utxosByErgoTreeHex.clear()
 
   def close(): Try[Unit] = Try(store.close())
 
   def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
 
-  private def removeInputBoxesByAddress(address: Address, inputBoxes: ArraySeq[BoxId]): Try[_] =
-    addressByUtxo.removeAllOrFail(inputBoxes).flatMap { _ =>
-      utxosByAddress.removeAllOrFail(address, inputBoxes, inputBoxes.size) { existingBoxIds =>
+  private def removeInputBoxesByErgoTree(ergoTree: ErgoTreeHex, inputBoxes: ArraySeq[BoxId]): Try[_] =
+    ergoTreeHexByUtxo.removeAllOrFail(inputBoxes).flatMap { _ =>
+      utxosByErgoTreeHex.removeAllOrFail(ergoTree, inputBoxes, inputBoxes.size) { existingBoxIds =>
         inputBoxes.foreach(existingBoxIds.remove)
         Option(existingBoxIds).collect { case m if !m.isEmpty => m }
       }
     }
 
-  private def persistUtxos(address: Address, boxes: Iterable[OutputRecord]): Try[_] =
-    addressByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.address)).flatMap { _ =>
-      utxosByAddress.adjustAndForget(address, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
+  private def persistUtxos(ergoTreeHex: ErgoTreeHex, boxes: Iterable[OutputRecord]): Try[_] =
+    ergoTreeHexByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.ergoTree)).flatMap { _ =>
+      utxosByErgoTreeHex.adjustAndForget(ergoTreeHex, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
     }
 
   def persistNewBlock(b: BlockWithInputs): Try[BlockWithInputs] = {
     val outputExceptionOpt =
       b.outputRecords
-        .groupBy(_.address)
-        .map { case (address, boxes) =>
-          persistUtxos(address, boxes)
+        .groupBy(_.ergoTree)
+        .map { case (ergoTree, boxes) =>
+          persistUtxos(ergoTree, boxes)
         }
         .collectFirst { case f @ Failure(_) => f }
 
     val inputExceptionOpt =
       b.inputRecords
-        .groupBy(_.address)
+        .groupBy(_.ergoTree)
         .view
         .mapValues(_.collect {
           case InputRecord(_, boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId
         })
-        .map { case (address, inputIds) =>
-          removeInputBoxesByAddress(address, inputIds)
+        .map { case (ergoTree, inputIds) =>
+          removeInputBoxesByErgoTree(ergoTree, inputIds)
         }
         .collectFirst { case f @ Failure(_) => f }
 
@@ -103,15 +103,15 @@ case class MvStorage(
       }
   }
 
-  def writeReport: Try[_] = utxosByAddress.writeReport
+  def writeReport: Try[_] = utxosByErgoTreeHex.writeReport
 
   def getCompactReport: String = {
     val height                                                      = getLastHeight.getOrElse(0)
-    val MultiMapSize(superNodeSize, superNodeTotalSize, commonSize) = utxosByAddress.size
+    val MultiMapSize(superNodeSize, superNodeTotalSize, commonSize) = utxosByErgoTreeHex.size
     val nonEmptyAddressCount                                        = superNodeSize + commonSize
     val progress =
       s"storage height: $height, " +
-        s"utxo count: ${addressByUtxo.size}, " +
+        s"utxo count: ${ergoTreeHexByUtxo.size}, " +
         s"supernode-utxo-count : $superNodeTotalSize, " +
         s"non-empty-address count: $nonEmptyAddressCount, "
 
@@ -137,14 +137,14 @@ case class MvStorage(
       .map(_.asScala.flatMap(blockId => blockById.get(blockId).map(blockId -> _)).toMap)
       .getOrElse(Map.empty)
 
-  def getUtxosByAddress(address: Address): Option[java.util.Map[BoxId, Value]] =
-    utxosByAddress.getAll(address)
+  def getUtxosByErgoTreeHex(ergoTreeHex: ErgoTreeHex): Option[java.util.Map[BoxId, Value]] =
+    utxosByErgoTreeHex.getAll(ergoTreeHex)
 
-  def getUtxoValueByAddress(address: Address, utxo: BoxId): Option[Value] =
-    utxosByAddress.get(address, utxo: BoxId)
+  def getUtxoValueByErgoTreeHex(ergoTreeHex: ErgoTreeHex, utxo: BoxId): Option[Value] =
+    utxosByErgoTreeHex.get(ergoTreeHex, utxo: BoxId)
 
   def isEmpty: Boolean =
-    utxosByAddress.isEmpty && addressByUtxo.isEmpty && blockIdsByHeight.isEmpty && blockById.isEmpty
+    utxosByErgoTreeHex.isEmpty && ergoTreeHexByUtxo.isEmpty && blockIdsByHeight.isEmpty && blockById.isEmpty
 
   def getLastHeight: Option[Height] = blockIdsByHeight.lastKey
 
@@ -160,7 +160,7 @@ case class MvStorage(
 
   def getBlockById(blockId: BlockId): Option[BlockInfo] = blockById.get(blockId)
 
-  def getAddressByUtxo(boxId: BoxId): Option[Address] = addressByUtxo.get(boxId)
+  def getErgoTreeHexByUtxo(boxId: BoxId): Option[ErgoTreeHex] = ergoTreeHexByUtxo.get(boxId)
 
   def findMissingHeights: TreeSet[Height] = {
     val lastHeight = getLastHeight
@@ -219,11 +219,11 @@ object MvStorage extends LazyLogging {
     store.setRetentionTime(3600 * 1000 * 24 * 7)
     MvStorage(
       store,
-      new MultiMvMap[Address, java.util.Map, BoxId, Value](
-        new MvMap[Address, java.util.Map[BoxId, Value]]("utxosByAddress", store),
-        SuperNodeMvMap[Address, java.util.Map, BoxId, Value](store, superNodeFile)
+      new MultiMvMap[ErgoTreeHex, java.util.Map, BoxId, Value](
+        new MvMap[ErgoTreeHex, java.util.Map[BoxId, Value]]("utxosByErgoTreeHex", store),
+        SuperNodeMvMap[ErgoTreeHex, java.util.Map, BoxId, Value](store, superNodeFile)
       ),
-      new MvMap[BoxId, Address]("addressByUtxo", store),
+      new MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo", store),
       new MvMap[Height, java.util.Set[BlockId]]("blockIdsByHeight", store),
       new MvMap[BlockId, BlockInfo]("blockById", store)
     )

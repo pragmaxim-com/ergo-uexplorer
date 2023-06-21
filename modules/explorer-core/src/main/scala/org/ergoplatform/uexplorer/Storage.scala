@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer
 
 import org.ergoplatform.uexplorer.db.BlockInfo
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, Height, Value}
+import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex, Height, Value}
 
 import scala.collection.immutable.TreeSet
 import scala.collection.concurrent
@@ -27,9 +27,9 @@ trait Storage {
 
   def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockInfo]
 
-  def getAddressByUtxo(boxId: BoxId): Option[Address]
+  def getErgoTreeHexByUtxo(boxId: BoxId): Option[ErgoTreeHex]
 
-  def getUtxosByAddress(address: Address): Option[java.util.Map[BoxId, Value]]
+  def getUtxosByErgoTreeHex(ergoTreeHex: ErgoTreeHex): Option[java.util.Map[BoxId, Value]]
 
-  def getUtxoValueByAddress(address: Address, utxo: BoxId): Option[Value]
+  def getUtxoValueByErgoTreeHex(ergoTreeHex: ErgoTreeHex, utxo: BoxId): Option[Value]
 }

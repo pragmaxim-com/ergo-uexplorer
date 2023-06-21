@@ -6,24 +6,6 @@ import org.ergoplatform.uexplorer.node.*
 import scala.collection.immutable.ArraySeq
 import org.ergoplatform.uexplorer.*
 
-case class OutputRecord(
-  txId: TxId,
-  boxId: BoxId,
-  ergoTree: HexString,
-  templateHashHex: TemplateHashHex,
-  address: Address,
-  value: Value,
-  additionalRegisters: Map[RegisterId, ExpandedRegister]
-)
-
-case class InputRecord(
-  txId: TxId,
-  boxId: BoxId,
-  address: Address,
-  value: Value
-)
-case class MinerRewardInfo(reward: MinerReward, fee: MinerFee, address: Address)
-
 case class BlockWithReward(
   b: ApiFullBlock,
   minerRewardInfo: MinerRewardInfo

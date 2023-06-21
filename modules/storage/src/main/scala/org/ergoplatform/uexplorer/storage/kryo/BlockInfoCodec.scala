@@ -8,7 +8,6 @@ import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, M
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.ValueCodec
-import org.ergoplatform.uexplorer.{Address, Height}
 
 import java.nio.ByteBuffer
 import java.util

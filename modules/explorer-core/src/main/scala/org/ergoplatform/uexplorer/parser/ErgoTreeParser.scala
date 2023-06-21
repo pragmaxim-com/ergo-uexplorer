@@ -2,11 +2,11 @@ package org.ergoplatform.uexplorer.parser
 
 import com.google.bitcoin.core.Base58
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Address, HexString, TemplateHashHex}
-import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, Pay2SAddress}
+import org.ergoplatform.uexplorer.{Address, ErgoTreeHex, HexString, TemplateHashHex}
+import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, P2PKAddress, Pay2SAddress, Pay2SHAddress}
 import scorex.crypto.hash.{Blake2b256, Digest32, Sha256}
 import scorex.util.encode.Base16
-import sigmastate.Values.{ErgoTree, FalseLeaf}
+import sigmastate.Values.{ErgoTree, FalseLeaf, SigmaPropConstant, Value}
 import sigmastate.*
 import sigmastate.serialization.ErgoTreeSerializer
 
@@ -14,6 +14,7 @@ import scala.util.{Failure, Success, Try}
 import eu.timepit.refined.auto.*
 import io.circe.{Decoder, DecodingFailure}
 import eu.timepit.refined.auto.*
+import sigmastate.basics.DLogProtocol.ProveDlogProp
 
 object ErgoTreeParser extends LazyLogging {
 
@@ -22,16 +23,23 @@ object ErgoTreeParser extends LazyLogging {
   @inline def ergoTreeHex2ErgoTree(ergoTree: HexString): Try[Values.ErgoTree] =
     Base16.decode(ergoTree).map(treeSerializer.deserializeErgoTree)
 
-  @inline def ergoTreeHex2ErgoTreeTemplateSha256Hex(ergoTree: HexString): Try[TemplateHashHex] =
+  @inline def ergoTreeHex2ErgoTreeTemplateSha256Hex(
+    ergoTree: HexString
+  )(implicit enc: ErgoAddressEncoder): Try[Option[TemplateHashHex]] =
     ergoTreeHex2ErgoTree(ergoTree)
       .map { tree =>
-        TemplateHashHex.fromStringUnsafe(Base16.encode(Sha256.hash(tree.template)))
-      }
-
-  @inline def ergoTreeHex2ErgoTreeTemplateBlake2b256Hex(ergoTree: HexString): Try[TemplateHashHex] =
-    ergoTreeHex2ErgoTree(ergoTree)
-      .map { tree =>
-        TemplateHashHex.fromStringUnsafe(Base16.encode(Blake2b256.hash(tree.template)))
+        val templateOpt =
+          tree.root match {
+            case Right(SigmaPropConstant(ProveDlogProp(_))) =>
+              None
+            case Right(enc.IsPay2SHAddress(_)) =>
+              Option(tree.template)
+            case Right(b: Value[SSigmaProp.type] @unchecked) if b.tpe == SSigmaProp =>
+              Option(tree.template)
+            case _ =>
+              None
+          }
+        templateOpt.map(t => TemplateHashHex.fromStringUnsafe(Base16.encode(Sha256.hash(t))))
       }
 
   // http://213.239.193.208:9053/blocks/at/545684

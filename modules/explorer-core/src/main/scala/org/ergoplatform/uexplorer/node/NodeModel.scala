@@ -63,7 +63,7 @@ final case class ApiOutput(
   boxId: BoxId,
   value: Long,
   creationHeight: Int,
-  ergoTree: HexString,
+  ergoTree: ErgoTreeHex,
   assets: List[ApiAsset],
   additionalRegisters: Map[RegisterId, HexString]
 )

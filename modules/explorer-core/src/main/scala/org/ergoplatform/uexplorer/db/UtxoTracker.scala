@@ -7,32 +7,39 @@ import org.ergoplatform.uexplorer.*
 import scala.collection.compat.immutable.ArraySeq
 import scala.util.Try
 
+case class InputRecord(
+  txId: TxId,
+  boxId: BoxId,
+  ergoTree: ErgoTreeHex,
+  value: Value
+)
+
 object UtxoTracker {
 
   def apply(
     b: LinkedBlock,
-    addressByUtxo: BoxId => Option[Address],
-    utxoValueByAddress: (Address, BoxId) => Option[Value]
+    ergoTreeHexByUtxo: BoxId => Option[ErgoTreeHex],
+    utxoValueByErgoTreeHex: (ErgoTreeHex, BoxId) => Option[Value]
   ): Try[BlockWithInputs] = Try {
     val outputLookup =
       b.outputRecords.iterator
-        .map(o => (o.boxId, (o.address, o.value)))
+        .map(o => (o.boxId, (o.ergoTree, o.value)))
         .toMap
 
-    def getInputAddressAndValue(inputBoxId: BoxId): (Address, Value) =
+    def getInputErgoTreeAndValue(inputBoxId: BoxId): (ErgoTreeHex, Value) =
       outputLookup.getOrElse(
         inputBoxId, {
-          val inputAddress = addressByUtxo(inputBoxId).getOrElse(
+          val inputErgoTree = ergoTreeHexByUtxo(inputBoxId).getOrElse(
             throw new IllegalStateException(
               s"Input boxId $inputBoxId of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
             )
           )
-          val value = utxoValueByAddress(inputAddress, inputBoxId).getOrElse(
+          val value = utxoValueByErgoTreeHex(inputErgoTree, inputBoxId).getOrElse(
             throw new IllegalStateException(
-              s"Address $inputAddress of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
+              s"Address $inputErgoTree of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
             )
           )
-          inputAddress -> value
+          inputErgoTree -> value
         }
       )
 
@@ -53,13 +60,13 @@ object UtxoTracker {
         .flatMap { tx =>
           tx match {
             case tx if tx.id == Emission.tx =>
-              Iterator(InputRecord(tx.id, Emission.inputBox, Emission.address, Emission.initialNanoErgs))
+              Iterator(InputRecord(tx.id, Emission.inputBox, Emission.ergoTree, Emission.initialNanoErgs))
             case tx if tx.id == Foundation.tx =>
-              Iterator(InputRecord(tx.id, Foundation.box, Foundation.address, Foundation.initialNanoErgs))
+              Iterator(InputRecord(tx.id, Foundation.box, Foundation.ergoTree, Foundation.initialNanoErgs))
             case tx =>
               tx.inputs.iterator.map { i =>
-                val (inputAddress, inputValue) = getInputAddressAndValue(i.boxId)
-                InputRecord(tx.id, i.boxId, inputAddress, inputValue)
+                val (inputErgoTree, inputValue) = getInputErgoTreeAndValue(i.boxId)
+                InputRecord(tx.id, i.boxId, inputErgoTree, inputValue)
               }
           }
         }
