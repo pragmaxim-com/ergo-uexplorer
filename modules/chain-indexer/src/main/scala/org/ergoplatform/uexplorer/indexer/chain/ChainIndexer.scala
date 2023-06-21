@@ -10,6 +10,7 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, Resiliency, Storage}
 import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.chain.{ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
@@ -78,7 +79,7 @@ class ChainIndexer(
       .map(RewardCalculator(_).get)
       .async
       .buffer(8192, OverflowStrategy.backpressure)
-      .map(OutputParser(_).get)
+      .map(OutputBuilder(_).get)
       .async
       .addAttributes(Attributes.inputBuffer(1, 8)) // contract processing (sigma, base58)
       .buffer(8192, OverflowStrategy.backpressure)

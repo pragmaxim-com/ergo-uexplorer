@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
-import org.ergoplatform.uexplorer.{Address, BlockId, Revision}
+import org.ergoplatform.uexplorer.{Address, BlockId, ProtocolSettings, Revision}
 
 final case class BlockInfo(
   revision: Revision,
@@ -28,9 +28,7 @@ final case class BlockInfo(
   maxTxGix: Long, // Global index of the last transaction in the block
   maxBoxGix: Long // Global index of the last output in the last transaction in the block
 ) {
-  
-  def persistable(revision: Revision): BlockInfo = copy(revision = revision)
-  
+
   def this() = this(
     0,
     Protocol.blockId,
@@ -55,4 +53,64 @@ final case class BlockInfo(
     0,
     0
   ) // kryo needs a no-arg constructor
+
+  def persistable(revision: Revision): BlockInfo = copy(revision = revision)
+
+}
+
+object BlockInfo {
+  def apply(ppBlock: BlockWithOutputs, prevBlock: Option[BlockInfo])(implicit
+    protocolSettings: ProtocolSettings
+  ): BlockInfo = {
+    val MinerRewardInfo(reward, fee, minerAddress) = ppBlock.minerRewardInfo
+    val coinBaseValue                              = reward + fee
+    val blockCoins = ppBlock.block.transactions.transactions
+      .flatMap(_.outputs)
+      .map(_.value)
+      .sum - coinBaseValue
+    val miningTime = ppBlock.block.header.timestamp - prevBlock
+      .map(_.timestamp)
+      .getOrElse(0L)
+
+    val lastGlobalTxIndex  = prevBlock.map(_.maxTxGix).getOrElse(-1L)
+    val lastGlobalBoxIndex = prevBlock.map(_.maxBoxGix).getOrElse(-1L)
+    val maxGlobalTxIndex   = lastGlobalTxIndex + ppBlock.block.transactions.transactions.size
+    val maxGlobalBoxIndex = lastGlobalBoxIndex + ppBlock.block.transactions.transactions.foldLeft(0) { case (sum, tx) =>
+      sum + tx.outputs.size
+    }
+
+    BlockInfo(
+      revision        = 0L, // needs to be updated
+      parentId        = ppBlock.block.header.parentId,
+      timestamp       = ppBlock.block.header.timestamp,
+      height          = ppBlock.block.header.height,
+      blockSize       = ppBlock.block.size,
+      blockCoins      = blockCoins,
+      blockMiningTime = prevBlock.map(parent => ppBlock.block.header.timestamp - parent.timestamp).getOrElse(0),
+      txsCount        = ppBlock.block.transactions.transactions.length,
+      txsSize         = ppBlock.block.transactions.transactions.map(_.size).sum,
+      minerAddress    = minerAddress,
+      minerReward     = reward,
+      minerRevenue    = reward + fee,
+      blockFee        = fee,
+      blockChainTotalSize = prevBlock
+        .map(_.blockChainTotalSize)
+        .getOrElse(0L) + ppBlock.block.size,
+      totalTxsCount = ppBlock.block.transactions.transactions.length.toLong + prevBlock
+        .map(_.totalTxsCount)
+        .getOrElse(0L),
+      totalCoinsIssued = protocolSettings.emission.issuedCoinsAfterHeight(ppBlock.block.header.height.toLong),
+      totalMiningTime = prevBlock
+        .map(_.totalMiningTime)
+        .getOrElse(0L) + miningTime,
+      totalFees = prevBlock.map(_.totalFees).getOrElse(0L) + fee,
+      totalMinersReward = prevBlock
+        .map(_.totalMinersReward)
+        .getOrElse(0L) + reward,
+      totalCoinsInTxs = prevBlock.map(_.totalCoinsInTxs).getOrElse(0L) + blockCoins,
+      maxTxGix        = maxGlobalTxIndex,
+      maxBoxGix       = maxGlobalBoxIndex
+    )
+  }
+
 }

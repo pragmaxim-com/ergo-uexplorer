@@ -11,9 +11,9 @@ import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
 
-object OutputParser {
+object OutputBuilder {
 
-  def getOutputRecords(block: BlockWithReward)(implicit enc: ErgoAddressEncoder): Try[ArraySeq[OutputRecord]] = Try {
+  private def getOutputRecords(block: BlockWithReward)(implicit enc: ErgoAddressEncoder): Try[ArraySeq[OutputRecord]] = Try {
     block.block.transactions.transactions.flatMap { tx =>
       tx.outputs.map { o =>
         (

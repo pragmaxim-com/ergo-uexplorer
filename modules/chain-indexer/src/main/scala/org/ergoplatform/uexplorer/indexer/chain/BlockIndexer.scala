@@ -20,6 +20,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
+import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.indexer.config.MvStore
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.storage.MvStorage
