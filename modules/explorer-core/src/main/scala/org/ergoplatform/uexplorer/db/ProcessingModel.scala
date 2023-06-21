@@ -10,7 +10,7 @@ case class OutputRecord(
   txId: TxId,
   boxId: BoxId,
   ergoTree: HexString,
-  scriptTemplateHash: ErgoTreeTemplateHash,
+  templateHashHex: TemplateHashHex,
   address: Address,
   value: Value,
   additionalRegisters: Map[RegisterId, ExpandedRegister]

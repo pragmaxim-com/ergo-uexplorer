@@ -6,10 +6,11 @@ import eu.timepit.refined.string.{HexStringSpec, MatchesRegex, ValidByte}
 import eu.timepit.refined.refineV
 import io.circe.*
 import org.ergoplatform.uexplorer.{BoxCount, LastHeight, TxCount}
+import scorex.crypto.hash.Digest32
+
 import scala.collection.mutable
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap}
-
 import scala.collection.immutable.ListMap
 import scala.util.Try
 
@@ -66,10 +67,9 @@ package object uexplorer {
     def fromStringUnsafe(s: String): TokenId = unsafeWrap(HexString.fromStringUnsafe(s))
   }
 
-  type ErgoTreeTemplateHash = String Refined HexStringSpec
-
-  object ErgoTreeTemplateHash {
-    def fromStringUnsafe(s: String): ErgoTreeTemplateHash = unsafeWrap(HexString.fromStringUnsafe(s))
+  type TemplateHashHex = String Refined HexStringSpec
+  object TemplateHashHex {
+    def fromStringUnsafe(s: String): TemplateHashHex = unsafeWrap(HexString.fromStringUnsafe(s))
   }
 
   type ErgoTree = String Refined HexStringSpec

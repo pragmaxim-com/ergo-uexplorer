@@ -98,7 +98,7 @@ final case class Output(
   index: Short, // index of the output in the transaction
   globalIndex: Long,
   ergoTree: HexString, // serialized and hex-encoded ErgoTree
-  ergoTreeTemplateHash: ErgoTreeTemplateHash, // hash of serialized and hex-encoded ErgoTree template
+  templateHashHex: TemplateHashHex, // hash of hashed ErgoTree template
   address: Address, // an address derived from ergoTree
   timestamp: Long, // time output appeared in the blockchain
   mainChain: Boolean // chain status, `true` if this output resides in main chain

@@ -93,7 +93,6 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
       .map { superNodeName =>
         existingMapsByHotKey.get(hotKey) match {
           case None =>
-            logger.info(s"Creating new supernode map for $superNodeName")
             codec.write(store.openMap[K, V](superNodeName), sk, v)
           case Some(m) =>
             codec.write(m, sk, v)
@@ -111,7 +110,6 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
         val replacedValueOpt =
           existingMapsByHotKey.get(hotKey) match {
             case None =>
-              logger.info(s"Creating new supernode map for $superNodeName")
               val newSuperNodeMap = store.openMap[K, V](superNodeName)
               existingMapsByHotKey.putIfAbsent(hotKey, newSuperNodeMap)
               codec.writeAll(newSuperNodeMap, entries)

@@ -18,8 +18,8 @@ object OutputBuilder {
       tx.outputs.map { o =>
         (
           for {
-            address            <- ErgoTreeParser.ergoTreeHexToAddressString(o.ergoTree)
-            scriptTemplateHash <- ErgoTreeParser.deriveErgoTreeTemplateHash(o.ergoTree)
+            address            <- ErgoTreeParser.ergoTreeHex2Base58Address(o.ergoTree)
+            scriptTemplateHash <- ErgoTreeParser.ergoTreeHex2ErgoTreeTemplateSha256Hex(o.ergoTree)
             additionalRegisters = o.additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex)).toMap
           } yield OutputRecord(tx.id, o.boxId, o.ergoTree, scriptTemplateHash, address, o.value, additionalRegisters)
         ).get
