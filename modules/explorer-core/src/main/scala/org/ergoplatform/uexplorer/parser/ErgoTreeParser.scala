@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.parser
 
 import com.google.bitcoin.core.Base58
+import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.{Address, ErgoTreeTemplateHash, HexString}
 import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, Pay2SAddress}
 import scorex.crypto.hash.Sha256
@@ -12,8 +13,14 @@ import sigmastate.serialization.ErgoTreeSerializer
 import scala.util.{Failure, Success, Try}
 import eu.timepit.refined.auto.*
 import io.circe.{Decoder, DecodingFailure}
+import eu.timepit.refined.auto.*
 
-object ErgoTreeParser {
+object ErgoTreeParser extends LazyLogging {
+
+  // http://213.239.193.208:9053/blocks/at/545684
+  // http://213.239.193.208:9053/blocks/2ad5af788bfd1b92790eadb42a300ad4fc38aaaba599a43574b1ea45d5d9dee4
+  // http://213.239.193.208:9053/utils/ergoTreeToAddress/cd07021a8e6f59fd4a
+  private val invalidErgoTree = HexString.fromStringUnsafe("cd07021a8e6f59fd4a")
 
   private val treeSerializer: ErgoTreeSerializer = ErgoTreeSerializer.DefaultSerializer
 
@@ -27,7 +34,13 @@ object ErgoTreeParser {
       }
 
   @inline def deserializeErgoTreeHexToAddress(ergoTreeHex: HexString)(implicit enc: ErgoAddressEncoder): Try[ErgoAddress] =
-    deserializeErgoTree(ergoTreeHex).flatMap(enc.fromProposition)
+    deserializeErgoTree(ergoTreeHex).flatMap { ergoTree =>
+      if (ergoTreeHex == invalidErgoTree) {
+        Try(Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress)
+      } else {
+        enc.fromProposition(ergoTree)
+      }
+    }
 
   @inline def encodeErgoAddressToString(address: ErgoAddress)(implicit enc: ErgoAddressEncoder): Try[Address] = Try {
     val withNetworkByte = (enc.networkPrefix + address.addressTypePrefix).toByte +: address.contentBytes
