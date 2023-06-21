@@ -19,6 +19,9 @@ package object uexplorer {
   type Height    = Int
   type Timestamp = Long
 
+  type MinerReward = Long
+  type MinerFee    = Long
+
   type BoxCount            = Int
   type TxCount             = Int
   type LastHeight          = Int

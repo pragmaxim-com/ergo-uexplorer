@@ -81,7 +81,7 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `node-pool`, mvstore, storage, cassandra, janusgraph, `alert-plugin`, indexer)
+  ).aggregate(core, `node-pool`, mvstore, storage, cassandra, janusgraph, indexer)// TODO return `alert-plugin` and org.ergoplatform.uexplorer.plugin.alert.AlertPlugin to META-INF.services
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
@@ -131,6 +131,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ scalatest("3"))
+    .settings(libraryDependencies ++= Seq(logback) ++ lightBend("3") ++ scalatest("3"))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `node-pool` % "compile->compile;test->test", storage, cassandra, janusgraph, `alert-plugin`)
+    .dependsOn(core, `node-pool` % "compile->compile;test->test", storage, cassandra, janusgraph)

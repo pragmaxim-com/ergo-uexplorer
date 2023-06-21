@@ -49,7 +49,7 @@ class BlockIndexer(
 
   def readableStorage: Storage = storage
 
-  def addBestBlocks(winningFork: List[Block]): Try[ListBuffer[BestBlockInserted]] =
+  def addBestBlocks(winningFork: List[LinkedBlock]): Try[ListBuffer[BestBlockInserted]] =
     winningFork
       .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
         case (f @ Failure(_), _) =>
@@ -83,34 +83,35 @@ class BlockIndexer(
     chainTip
   }
 
-  def addBestBlock(block: Block): Try[BestBlockInserted] =
+  def addBestBlock(block: LinkedBlock): Try[BestBlockInserted] =
     for {
-      lb <- LightBlockBuilder(block, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
+      lb <- UtxoTracker(block, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
       _  <- storage.persistNewBlock(lb)
-      _  <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
-    } yield BestBlockInserted(lb, block.fullBlockOpt)
+      _  <- if (lb.blockInfo.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
+    } yield BestBlockInserted(lb, None) // TODO we forgot about FullBlock !
 
-  private def hasParentAndIsChained(fork: List[Block]): Boolean =
-    fork.size > 1 && storage.containsBlock(fork.head.info.parentId, fork.head.info.height - 1) &&
+  private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
+    fork.size > 1 && storage.containsBlock(fork.head.blockInfo.parentId, fork.head.blockInfo.height - 1) &&
       fork.sliding(2).forall {
         case first :: second :: Nil =>
-          first.headerId == second.info.parentId
+          first.block.header.id == second.blockInfo.parentId
         case _ =>
           false
       }
 
-  def addWinningFork(winningFork: List[Block]): Try[ForkInserted] =
+  def addWinningFork(winningFork: List[LinkedBlock]): Try[ForkInserted] =
     if (!hasParentAndIsChained(winningFork)) {
       Failure(
         new UnexpectedStateError(
-          s"Inserting fork ${winningFork.map(_.headerId).mkString(",")} at height ${winningFork.map(_.info.height).mkString(",")} illegal"
+          s"Inserting fork ${winningFork.map(_.block.header.id).mkString(",")} at height ${winningFork.map(_.blockInfo.height).mkString(",")} illegal"
         )
       )
     } else {
-      logger.info(s"Adding fork from height ${winningFork.head.info.height} until ${winningFork.last.info.height}")
+      logger.info(s"Adding fork from height ${winningFork.head.blockInfo.height} until ${winningFork.last.blockInfo.height}")
       for {
-        preForkVersion <- Try(storage.getBlockById(winningFork.head.headerId).map(_.revision).get)
-        toRemove = winningFork.flatMap(b => storage.getBlocksByHeight(b.info.height).filter(_._1 != b.headerId)).toMap
+        preForkVersion <- Try(storage.getBlockById(winningFork.head.block.header.id).map(_.revision).get)
+        toRemove =
+          winningFork.flatMap(b => storage.getBlocksByHeight(b.blockInfo.height).filter(_._1 != b.block.header.id)).toMap
         _         <- storage.rollbackTo(preForkVersion)
         newBlocks <- addBestBlocks(winningFork)
       } yield ForkInserted(

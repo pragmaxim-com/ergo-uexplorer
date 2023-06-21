@@ -22,9 +22,6 @@ final case class Asset(
   amount: Long
 )
 
-case class Record(txId: TxId, boxId: BoxId, address: Address, value: Value)
-final case class LightBlock(headerId: BlockId, inputBoxes: ArraySeq[Record], outputBoxes: ArraySeq[Record], info: BlockInfo)
-
 final case class FullBlock(
   header: Header,
   extension: BlockExtension,

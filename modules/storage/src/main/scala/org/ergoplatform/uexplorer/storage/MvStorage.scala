@@ -9,14 +9,14 @@ import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.FeeContract
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
-import org.ergoplatform.uexplorer.db.{BlockInfo, LightBlock, Record}
 import org.ergoplatform.uexplorer.mvstore.*
 import MvStorage.*
+import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
 import org.ergoplatform.uexplorer.storage.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.h2.mvstore.{MVMap, MVStore}
-
+import org.ergoplatform.uexplorer.db.OutputRecord
 import java.io.{BufferedInputStream, File}
 import java.nio.ByteBuffer
 import java.nio.file.{CopyOption, Files, Paths}
@@ -60,14 +60,14 @@ case class MvStorage(
       }
     }
 
-  private def persistUtxos(address: Address, boxes: Iterable[Record]): Try[_] =
+  private def persistUtxos(address: Address, boxes: Iterable[OutputRecord]): Try[_] =
     addressByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.address)).flatMap { _ =>
       utxosByAddress.adjustAndForget(address, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
     }
 
-  def persistNewBlock(lightBlock: LightBlock): Try[LightBlock] = {
+  def persistNewBlock(b: BlockWithInputs): Try[BlockWithInputs] = {
     val outputExceptionOpt =
-      lightBlock.outputBoxes
+      b.outputRecords
         .groupBy(_.address)
         .map { case (address, boxes) =>
           persistUtxos(address, boxes)
@@ -75,11 +75,11 @@ case class MvStorage(
         .collectFirst { case f @ Failure(_) => f }
 
     val inputExceptionOpt =
-      lightBlock.inputBoxes
+      b.inputRecords
         .groupBy(_.address)
         .view
         .mapValues(_.collect {
-          case Record(_, boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId
+          case InputRecord(_, boxId, _, _) if boxId != Emission.inputBox && boxId != Foundation.box => boxId
         })
         .map { case (address, inputIds) =>
           removeInputBoxesByAddress(address, inputIds)
@@ -87,11 +87,11 @@ case class MvStorage(
         .collectFirst { case f @ Failure(_) => f }
 
     blockById
-      .putIfAbsentOrFail(lightBlock.headerId, lightBlock.info)
+      .putIfAbsentOrFail(b.block.header.id, b.blockInfo)
       .flatMap { _ =>
-        blockIdsByHeight.adjust(lightBlock.info.height)(
-          _.fold(javaSetOf(lightBlock.headerId)) { existingBlockIds =>
-            existingBlockIds.add(lightBlock.headerId)
+        blockIdsByHeight.adjust(b.blockInfo.height)(
+          _.fold(javaSetOf(b.block.header.id)) { existingBlockIds =>
+            existingBlockIds.add(b.block.header.id)
             existingBlockIds
           }
         )
@@ -99,7 +99,7 @@ case class MvStorage(
       }
       .map { _ =>
         store.commit()
-        lightBlock
+        b
       }
   }
 

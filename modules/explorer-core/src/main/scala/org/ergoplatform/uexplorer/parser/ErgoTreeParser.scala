@@ -20,14 +20,11 @@ object ErgoTreeParser {
   @inline def deserializeErgoTree(ergoTree: HexString): Try[Values.ErgoTree] =
     Base16.decode(ergoTree).map(treeSerializer.deserializeErgoTree)
 
-  @inline def deriveErgoTreeTemplateHash(ergoTree: HexString): Decoder.Result[ErgoTreeTemplateHash] =
+  @inline def deriveErgoTreeTemplateHash(ergoTree: HexString): Try[ErgoTreeTemplateHash] =
     deserializeErgoTree(ergoTree)
       .map { tree =>
         ErgoTreeTemplateHash.fromStringUnsafe(Base16.encode(Sha256.hash(tree.template)))
-      } match {
-      case Success(t)  => Right(t)
-      case Failure(ex) => Left(DecodingFailure.fromThrowable(ex, List.empty))
-    }
+      }
 
   @inline def deserializeErgoTreeHexToAddress(ergoTreeHex: HexString)(implicit enc: ErgoAddressEncoder): Try[ErgoAddress] =
     deserializeErgoTree(ergoTreeHex).flatMap(enc.fromProposition)

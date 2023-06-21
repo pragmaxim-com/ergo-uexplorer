@@ -64,10 +64,8 @@ final case class ApiOutput(
   value: Long,
   creationHeight: Int,
   ergoTree: HexString,
-  address: Address,
-  scriptTemplateHash: ErgoTreeTemplateHash,
   assets: List[ApiAsset],
-  additionalRegisters: Map[RegisterId, ExpandedRegister]
+  additionalRegisters: Map[RegisterId, HexString]
 )
 
 final case class ApiPowSolutions(pk: HexString, w: HexString, n: HexString, d: String)

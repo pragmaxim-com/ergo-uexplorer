@@ -70,19 +70,12 @@ trait Codecs {
     )
   }
 
-  implicit def apiOutputDecoder(implicit enc: ErgoAddressEncoder): Decoder[ApiOutput] = { (c: HCursor) =>
+  implicit def apiOutputDecoder: Decoder[ApiOutput] = { (c: HCursor) =>
     for {
-      boxId          <- c.downField("boxId").as[BoxId]
-      value          <- c.downField("value").as[Value]
-      creationHeight <- c.downField("creationHeight").as[Height]
-      ergoTree       <- c.downField("ergoTree").as[HexString]
-      address <-
-        ErgoTreeParser
-          .ergoTreeHexToAddressString(ergoTree)
-          .toEither
-          .left
-          .map(ex => DecodingFailure.fromThrowable(ex, List.empty))
-      scriptTemplateHash  <- ErgoTreeParser.deriveErgoTreeTemplateHash(ergoTree)
+      boxId               <- c.downField("boxId").as[BoxId]
+      value               <- c.downField("value").as[Value]
+      creationHeight      <- c.downField("creationHeight").as[Height]
+      ergoTree            <- c.downField("ergoTree").as[HexString]
       assets              <- c.downField("assets").as[List[ApiAsset]]
       additionalRegisters <- c.downField("additionalRegisters").as[Map[RegisterId, HexString]]
     } yield ApiOutput(
@@ -90,10 +83,8 @@ trait Codecs {
       value,
       creationHeight,
       ergoTree,
-      address,
-      scriptTemplateHash,
       assets,
-      additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex)).toMap
+      additionalRegisters
     )
   }
 
@@ -118,7 +109,7 @@ trait Codecs {
     } yield ApiSpendingProof(proofBytes, extension)
   }
 
-  implicit def apiTransactionDecoder(implicit enc: ErgoAddressEncoder): Decoder[ApiTransaction] = { (c: HCursor) =>
+  implicit def apiTransactionDecoder: Decoder[ApiTransaction] = { (c: HCursor) =>
     for {
       id         <- c.downField("id").as[TxId]
       inputs     <- c.downField("inputs").as[ArraySeq[ApiInput]]
@@ -129,7 +120,7 @@ trait Codecs {
   }
 
   // extremely CPU greedy (6% of all runtime)
-  implicit def apiFullBlockDecoder(implicit enc: ErgoAddressEncoder): Decoder[ApiFullBlock] = { (c: HCursor) =>
+  implicit def apiFullBlockDecoder: Decoder[ApiFullBlock] = { (c: HCursor) =>
     for {
       header       <- c.downField("header").as[ApiHeader]
       transactions <- c.downField("blockTransactions").as[ApiBlockTransactions]
