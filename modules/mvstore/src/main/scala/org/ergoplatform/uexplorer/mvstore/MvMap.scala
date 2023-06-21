@@ -75,6 +75,9 @@ class MvMap[K, V: ValueCodec](name: String, store: MVStore) extends MapLike[K, V
 
   def put(key: K, value: V): Option[V] = Option(underlying.put(key, codec.writeAll(value))).map(codec.readAll)
 
+  def getWithOp(key: K)(f: Option[V] => Option[V]): Option[V] =
+    f(Option(underlying.get(key)).map(codec.readAll))
+
   def putAndForget(key: K, value: V): Appended = underlying.put(key, codec.writeAll(value)) == null
 
   def putAllNewOrFail(entries: IterableOnce[(K, V)]): Try[Unit] =

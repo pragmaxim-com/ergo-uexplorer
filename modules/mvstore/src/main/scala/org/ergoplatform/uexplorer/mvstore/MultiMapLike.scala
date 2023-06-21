@@ -8,6 +8,8 @@ trait MultiMapLike[PK, C[_, _], K, V] {
 
   def get(pk: PK, sk: K): Option[V]
 
+  def getPartially(pk: PK, sk: IterableOnce[K]): Option[C[K, V]]
+
   def getAll(pk: PK): Option[C[K, V]]
 
   def remove(pk: PK): Boolean

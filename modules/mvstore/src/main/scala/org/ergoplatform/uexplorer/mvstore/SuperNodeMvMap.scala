@@ -78,6 +78,11 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
         None
       }
 
+  def getPartially(hotKey: HK, sk: IterableOnce[K]): Option[C[K, V]] =
+    existingMapsByHotKey
+      .get(hotKey)
+      .map(m => codec.readPartially(m, sk))
+
   def getAll(hotKey: HK): Option[C[K, V]] =
     existingMapsByHotKey
       .get(hotKey)

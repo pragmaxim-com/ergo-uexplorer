@@ -6,6 +6,7 @@ import org.ergoplatform.uexplorer.*
 
 import scala.collection.compat.immutable.ArraySeq
 import scala.util.Try
+import scala.jdk.CollectionConverters.*
 
 case class InputRecord(
   txId: TxId,
@@ -19,29 +20,12 @@ object UtxoTracker {
   def apply(
     b: LinkedBlock,
     ergoTreeHexByUtxo: BoxId => Option[ErgoTreeHex],
-    utxoValueByErgoTreeHex: (ErgoTreeHex, BoxId) => Option[Value]
+    utxoValuesByErgoTreeHex: (ErgoTreeHex, IterableOnce[BoxId]) => Option[java.util.Map[BoxId, Value]]
   ): Try[BlockWithInputs] = Try {
     val outputLookup =
       b.outputRecords.iterator
         .map(o => (o.boxId, (o.ergoTree, o.value)))
         .toMap
-
-    def getInputErgoTreeAndValue(inputBoxId: BoxId): (ErgoTreeHex, Value) =
-      outputLookup.getOrElse(
-        inputBoxId, {
-          val inputErgoTree = ergoTreeHexByUtxo(inputBoxId).getOrElse(
-            throw new IllegalStateException(
-              s"Input boxId $inputBoxId of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
-            )
-          )
-          val value = utxoValueByErgoTreeHex(inputErgoTree, inputBoxId).getOrElse(
-            throw new IllegalStateException(
-              s"Address $inputErgoTree of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
-            )
-          )
-          inputErgoTree -> value
-        }
-      )
 
     def validateInputSumEqualsOutputSum(
       inputs: IterableOnce[InputRecord],
@@ -64,10 +48,38 @@ object UtxoTracker {
             case tx if tx.id == Foundation.tx =>
               Iterator(InputRecord(tx.id, Foundation.box, Foundation.ergoTree, Foundation.initialNanoErgs))
             case tx =>
-              tx.inputs.iterator.map { i =>
-                val (inputErgoTree, inputValue) = getInputErgoTreeAndValue(i.boxId)
-                InputRecord(tx.id, i.boxId, inputErgoTree, inputValue)
-              }
+              val (cached, notCached) = tx.inputs.iterator.map(_.boxId).partition(outputLookup.contains)
+              val cachedInputRecords =
+                cached.map { boxId =>
+                  val (et, inputValue) = outputLookup(boxId)
+                  InputRecord(tx.id, boxId, et, inputValue)
+                }
+
+              val notCachedInputRecords =
+                notCached
+                  .map { inputBoxId =>
+                    ergoTreeHexByUtxo(inputBoxId).getOrElse(
+                      throw new IllegalStateException(
+                        s"Input boxId $inputBoxId of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
+                      )
+                    ) -> inputBoxId
+                  }
+                  .toSeq
+                  .groupBy(_._1)
+                  .flatMap { case (et, values) =>
+                    // converting java map to scala map :-/
+                    utxoValuesByErgoTreeHex(et, values.iterator.map(_._2))
+                      .getOrElse(
+                        throw new IllegalStateException(
+                          s"Address $et of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
+                        )
+                      )
+                      .asScala
+                      .map { case (boxId, value) =>
+                        InputRecord(tx.id, boxId, et, value)
+                      }
+                  }
+              notCachedInputRecords ++ cachedInputRecords
           }
         }
     validateInputSumEqualsOutputSum(inputRecords, b.outputRecords)

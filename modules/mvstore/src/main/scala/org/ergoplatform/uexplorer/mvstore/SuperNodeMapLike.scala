@@ -6,6 +6,8 @@ trait SuperNodeMapLike[HK, C[_, _], K, V] {
 
   def get(hotKey: HK, sk: K): Option[V]
 
+  def getPartially(hotKey: HK, sk: IterableOnce[K]): Option[C[K, V]]
+
   def getAll(hotKey: HK): Option[C[K, V]]
 
   def putOnlyNew(hotKey: HK, sk: K, value: V): Option[Boolean]
