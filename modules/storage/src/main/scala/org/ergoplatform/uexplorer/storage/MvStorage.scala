@@ -87,7 +87,7 @@ case class MvStorage(
         .collectFirst { case f @ Failure(_) => f }
 
     blockById
-      .putIfAbsentOrFail(b.block.header.id, b.blockInfo)
+      .putIfAbsentOrFail(b.block.header.id, b.blockInfo.persistable(store.getCurrentVersion))
       .flatMap { _ =>
         blockIdsByHeight.adjust(b.blockInfo.height)(
           _.fold(javaSetOf(b.block.header.id)) { existingBlockIds =>
