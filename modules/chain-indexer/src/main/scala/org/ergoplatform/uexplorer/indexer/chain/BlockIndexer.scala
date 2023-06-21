@@ -20,7 +20,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
-import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainTip
 import org.ergoplatform.uexplorer.indexer.config.MvStore
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.storage.MvStorage
@@ -70,16 +69,18 @@ class BlockIndexer(
   def getChainTip: Try[ChainTip] = Try {
     val chainTip =
       ChainTip(
-        ListMap.from(
-          storage.blockIdsByHeight
-            .iterator(None, None, reverse = true)
-            .take(100)
-            .flatMap { case (_, blockIds) =>
-              blockIds.asScala.flatMap(b => storage.blockById.get(b).map(b -> _))
-            }
-        )
+        storage.blockIdsByHeight
+          .iterator(None, None, reverse = true)
+          .take(100)
+          .flatMap { case (_, blockIds) =>
+            blockIds.asScala.flatMap(b => storage.blockById.get(b).map(b -> _))
+          }
       )
-    assert(chainTip.lastHeight == storage.getLastHeight, "MvStore's Iterator works unexpectedly!")
+    val sortedKeys = chainTip.toMap.values.map(_.height).toSeq.sorted
+    assert(
+      sortedKeys.lastOption == storage.getLastHeight,
+      s"MvStore's Iterator works unexpectedly, ${sortedKeys.mkString(", ")} but last key is ${storage.getLastHeight}!"
+    )
     chainTip
   }
 

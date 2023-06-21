@@ -2,44 +2,70 @@ package org.ergoplatform.uexplorer.db
 
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiHeader}
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.db.ChainTip.FifoLinkedHashMap
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
 import scorex.util.encode.Base16
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
+
+import java.util
 import concurrent.ExecutionContext.Implicits.global
-import scala.collection.concurrent
+import scala.collection.mutable
+import scala.collection.immutable.TreeSet
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
+import scala.jdk.CollectionConverters.*
 
-class ChainLinker(getBlock: BlockId => Future[ApiFullBlock], linkedChainTip: concurrent.Map[BlockId, BlockInfo])
-  extends LazyLogging {
+class ChainTip(byBlockId: FifoLinkedHashMap[BlockId, BlockInfo]) {
+  def toMap: Map[BlockId, BlockInfo] = byBlockId.asScala.toMap
+  def getParent(block: ApiFullBlock): Option[BlockInfo] =
+    Option(byBlockId.get(block.header.parentId)).filter(_.height == block.header.height - 1)
+  def putOnlyNew(blockId: BlockId, info: BlockInfo): Try[BlockInfo] =
+    Option(byBlockId.put(blockId, info)).fold(Success(info)) { oldVal =>
+      Failure(
+        new AssertionError(
+          s"Trying to cache blockId $blockId at height ${info.height} but there already was $oldVal"
+        )
+      )
+    }
+}
+object ChainTip {
+  def apply(chainTip: IterableOnce[(BlockId, BlockInfo)], maxSize: Int = 100): ChainTip = {
+    val newFifoMap = new FifoLinkedHashMap[BlockId, BlockInfo](maxSize)
+    newFifoMap.putAll(chainTip.iterator.toMap.asJava)
+    new ChainTip(newFifoMap)
+  }
 
-  def linkChildToAncestors(
-    block: BlockWithOutputs,
-    acc: List[LinkedBlock]
-  )(implicit protocolSettings: ProtocolSettings, enc: ErgoAddressEncoder): Future[List[LinkedBlock]] =
-    linkedChainTip.get(block.block.header.parentId).filter(_.height == block.block.header.height - 1) match {
-      case someParentInfo @ Some(parentInfo) =>
-        val blockInfo = newInfo(block, someParentInfo)
-        linkedChainTip.put(block.block.header.id, blockInfo)
-        Future.successful(block.toLinkedBlock(blockInfo, someParentInfo) :: acc)
-      case _ if block.block.header.height == 1 =>
-        val blockInfo = newInfo(block, None)
-        linkedChainTip.put(block.block.header.id, blockInfo)
-        Future.successful(block.toLinkedBlock(blockInfo, None) :: acc)
+  class FifoLinkedHashMap[K, V](maxSize: Int = 100) extends util.LinkedHashMap[K, V] {
+    override def removeEldestEntry(eldest: java.util.Map.Entry[K, V]): Boolean = this.size > maxSize
+  }
+}
+
+class ChainLinker(getBlock: BlockId => Future[ApiFullBlock], chainTip: ChainTip) extends LazyLogging {
+
+  def linkChildToAncestors(acc: List[LinkedBlock] = List.empty)(
+    block: BlockWithOutputs
+  )(implicit ps: ProtocolSettings): Future[List[LinkedBlock]] =
+    chainTip.getParent(block.block) match {
+      case parentInfoOpt if parentInfoOpt.isDefined || block.block.header.height == 1 =>
+        Future.fromTry(
+          chainTip.putOnlyNew(block.block.header.id, newInfo(block, parentInfoOpt)).map { newBlockInfo =>
+            block.toLinkedBlock(newBlockInfo, parentInfoOpt) :: acc
+          }
+        )
       case _ =>
         logger.info(s"Encountered fork at height ${block.block.header.height} and block ${block.block.header.id}")
         for {
           apiBlock     <- getBlock(block.block.header.parentId)
           rewardBlock  <- Future.fromTry(RewardCalculator(apiBlock))
-          outputBlock  <- Future.fromTry(OutputParser(rewardBlock))
-          linkedBlocks <- linkChildToAncestors(outputBlock, acc)
+          outputBlock  <- Future.fromTry(OutputParser(rewardBlock)(ps.addressEncoder))
+          linkedBlocks <- linkChildToAncestors(acc)(outputBlock)
         } yield linkedBlocks
     }
 
-  def newInfo(ppBlock: BlockWithOutputs, prevBlock: Option[BlockInfo])(implicit
+  private def newInfo(ppBlock: BlockWithOutputs, prevBlock: Option[BlockInfo])(implicit
     protocolSettings: ProtocolSettings
   ): BlockInfo = {
     val MinerRewardInfo(reward, fee, minerAddress) = ppBlock.minerRewardInfo
