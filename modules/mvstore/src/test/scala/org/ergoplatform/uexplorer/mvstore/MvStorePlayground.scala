@@ -3,7 +3,6 @@ package org.ergoplatform.uexplorer.mvstore
 import org.h2.mvstore.MVStore
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
-case class Shit(field: String)
 
 class MvStorePlayground extends AsyncFreeSpec with Matchers {
 
