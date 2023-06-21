@@ -87,7 +87,7 @@ class BlockIndexer(
 
   def addBestBlock(block: LinkedBlock): Try[BestBlockInserted] =
     for {
-      lb <- UtxoTracker(block, storage.getErgoTreeHexByUtxo, storage.getUtxoValueByErgoTreeHex)
+      lb <- UtxoTracker(block, storage.getErgoTreeHexByUtxo, storage.getUtxoValuesByErgoTreeHex)
       _  <- storage.persistNewBlock(lb)
       _  <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
     } yield BestBlockInserted(lb, None) // TODO we forgot about FullBlock !

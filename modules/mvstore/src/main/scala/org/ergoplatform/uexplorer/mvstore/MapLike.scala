@@ -6,6 +6,8 @@ trait MapLike[K, V] {
 
   def get(key: K): Option[V]
 
+  def getWithOp(key: K)(f: Option[V] => Option[V]): Option[V]
+
   def isEmpty: Boolean
 
   def size: Int
@@ -67,6 +69,6 @@ trait MapLike[K, V] {
   def removeOrUpdateOrFail(k: K)(f: V => Option[V]): Try[Unit]
 
   def adjust(k: K)(f: Option[V] => V): V
-  
+
   def adjustCollection(k: K)(f: Option[V] => (Appended, V)): (Appended, V)
 }

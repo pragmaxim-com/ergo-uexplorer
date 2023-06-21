@@ -141,7 +141,10 @@ case class MvStorage(
     utxosByErgoTreeHex.getAll(ergoTreeHex)
 
   def getUtxoValueByErgoTreeHex(ergoTreeHex: ErgoTreeHex, utxo: BoxId): Option[Value] =
-    utxosByErgoTreeHex.get(ergoTreeHex, utxo: BoxId)
+    utxosByErgoTreeHex.get(ergoTreeHex, utxo)
+
+  def getUtxoValuesByErgoTreeHex(ergoTreeHex: ErgoTreeHex, utxos: IterableOnce[BoxId]): Option[java.util.Map[BoxId, Value]] =
+    utxosByErgoTreeHex.getPartially(ergoTreeHex, utxos)
 
   def isEmpty: Boolean =
     utxosByErgoTreeHex.isEmpty && ergoTreeHexByUtxo.isEmpty && blockIdsByHeight.isEmpty && blockById.isEmpty
@@ -186,10 +189,10 @@ object MvStorage extends LazyLogging {
   private val tempDir                 = System.getProperty("java.io.tmpdir")
   private val VersionsToKeep          = 10
   private val dbFileName              = "mv-store.db"
-  private val superNodeFileName       = "hot-keys.csv"
-  private val superNodeBackupFileName = "hot-keys.csv.backup"
+  private val superNodeFileName       = "hot-ergo-trees.csv"
+  private val superNodeBackupFileName = "hot-ergo-trees.csv.backup"
   private val tempDbFile              = Paths.get(tempDir, s"mv-store-$randomNumberPerRun.db").toFile
-  private val tempSuperNodeFile       = Paths.get(tempDir, s"hot-keys-$randomNumberPerRun.csv").toFile
+  private val tempSuperNodeFile       = Paths.get(tempDir, s"hot-ergo-trees-$randomNumberPerRun.csv").toFile
   private val dbFile                  = Paths.get(userHomeDir, ".ergo-uexplorer", dbFileName).toFile
   private val superNodeFile           = Paths.get(userHomeDir, ".ergo-uexplorer", superNodeFileName).toFile
   private val superNodeFileBackup     = Paths.get(userHomeDir, ".ergo-uexplorer", superNodeBackupFileName).toFile

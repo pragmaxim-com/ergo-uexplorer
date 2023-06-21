@@ -28,6 +28,11 @@ class MultiMvMap[PK, C[_, _], K, V](
       .get(pk, sk)
       .orElse(commonMap.get(pk).flatMap(v => c.readOne(sk, v)))
 
+  def getPartially(pk: PK, sk: IterableOnce[K]): Option[C[K, V]] =
+    superNodeMap
+      .getPartially(pk, sk)
+      .orElse(commonMap.getWithOp(pk)(c.readPartially(sk)))
+
   def getAll(pk: PK): Option[C[K, V]] =
     superNodeMap.getAll(pk).orElse(commonMap.get(pk))
 

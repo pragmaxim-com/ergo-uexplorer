@@ -12,6 +12,8 @@ trait MultiMapCodec[C[_, _], K, V] extends ValueCodec[C[K, V]] {
 
   def readAll(bytes: Array[Byte]): C[K, V]
 
+  def readPartially(only: IterableOnce[K])(existingOpt: Option[C[K, V]]): Option[C[K, V]]
+
   def writeAll(map: C[K, V]): Array[Byte]
 
   def append(newValueByBoxId: IterableOnce[(K, V)])(

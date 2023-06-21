@@ -15,7 +15,7 @@ import scala.util.{Random, Success, Try}
 
 class SuperNodeCollector[HK: HotKeyCodec](superNodeFile: File) extends LazyLogging {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
-  private val hotKeyFileNameGz             = "hot-keys.csv.gz"
+  private val hotKeyFileNameGz             = "hot-ergo-trees.csv.gz"
 
   private lazy val stringifiedHotKeys: Map[HK, String] =
     Source
@@ -61,7 +61,7 @@ class SuperNodeCollector[HK: HotKeyCodec](superNodeFile: File) extends LazyLoggi
           .sortBy(_._2.writeOps)(Ordering[Long].reverse)
           .map { case (hotKeyString, Counter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
             val stats  = s"$writeOps $readOps $boxesAdded $boxesRemoved ${boxesAdded - boxesRemoved}"
-            val indent = 30
+            val indent = 45
             s"$stats ${List.fill(Math.max(4, indent - stats.length))(" ").mkString("")} $hotKeyString"
           }
       Try {
