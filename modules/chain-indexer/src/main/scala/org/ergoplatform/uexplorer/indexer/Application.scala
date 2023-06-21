@@ -14,7 +14,6 @@ import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.{Address, BoxId, Const}
 import org.slf4j.LoggerFactory
 
 import java.io.{PrintWriter, StringWriter}

@@ -11,6 +11,15 @@ import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
 
+case class OutputRecord(
+  txId: TxId,
+  boxId: BoxId,
+  ergoTree: ErgoTreeHex,
+  templateHashHex: Option[TemplateHashHex],
+  value: Value,
+  additionalRegisters: Map[RegisterId, ExpandedRegister]
+)
+
 object OutputBuilder {
 
   private def getOutputRecords(block: BlockWithReward)(implicit enc: ErgoAddressEncoder): Try[ArraySeq[OutputRecord]] = Try {
@@ -18,10 +27,9 @@ object OutputBuilder {
       tx.outputs.map { o =>
         (
           for {
-            address            <- ErgoTreeParser.ergoTreeHex2Base58Address(o.ergoTree)
             scriptTemplateHash <- ErgoTreeParser.ergoTreeHex2ErgoTreeTemplateSha256Hex(o.ergoTree)
             additionalRegisters = o.additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex)).toMap
-          } yield OutputRecord(tx.id, o.boxId, o.ergoTree, scriptTemplateHash, address, o.value, additionalRegisters)
+          } yield OutputRecord(tx.id, o.boxId, o.ergoTree, scriptTemplateHash, o.value, additionalRegisters)
         ).get
       }
     }

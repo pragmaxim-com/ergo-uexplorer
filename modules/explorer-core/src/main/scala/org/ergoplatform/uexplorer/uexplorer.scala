@@ -23,26 +23,29 @@ package object uexplorer {
   type MinerReward = Long
   type MinerFee    = Long
 
-  type BoxCount            = Int
-  type TxCount             = Int
-  type LastHeight          = Int
-  type TopAddressMap       = Map[Address, Address.Stats]
-  type SortedTopAddressMap = ListMap[Address, Address.Stats]
+  type BoxCount   = Int
+  type TxCount    = Int
+  type LastHeight = Int
 
   type Revision = Long
 
   type Base58Spec    = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
   type Address       = String Refined Base58Spec
+  type ErgoTreeHex   = String Refined HexStringSpec
   type NetworkPrefix = String Refined ValidByte
 
   object Address {
     import eu.timepit.refined.auto.autoUnwrap
-    case class Stats(lastTxHeight: LastHeight, txCount: TxCount, boxCount: BoxCount) {
-      def this() = this(0, 0, 0) // kryo needs a no-arg constructor
-    }
     case class State(value: Value)
     extension (x: Address) def unwrapped: String = x
     def fromStringUnsafe(s: String): Address     = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
+  }
+
+  object ErgoTreeHex {
+    import eu.timepit.refined.auto.autoUnwrap
+    case class State(value: Value)
+    extension (x: ErgoTreeHex) def unwrapped: String = x
+    def fromStringUnsafe(s: String): ErgoTreeHex     = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
   object NetworkPrefix {
@@ -70,12 +73,6 @@ package object uexplorer {
   type TemplateHashHex = String Refined HexStringSpec
   object TemplateHashHex {
     def fromStringUnsafe(s: String): TemplateHashHex = unsafeWrap(HexString.fromStringUnsafe(s))
-  }
-
-  type ErgoTree = String Refined HexStringSpec
-
-  object ErgoTree {
-    def fromStringUnsafe(s: String): ErgoTree = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
   opaque type TxId = String

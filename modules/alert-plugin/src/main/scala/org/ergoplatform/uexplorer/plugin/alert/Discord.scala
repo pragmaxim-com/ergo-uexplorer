@@ -7,7 +7,7 @@ import discord4j.core.{DiscordClient, GatewayDiscordClient}
 import discord4j.core.`object`.entity.Message
 import discord4j.core.`object`.entity.channel.MessageChannel
 import org.ergoplatform.uexplorer.db.FullBlock
-import org.ergoplatform.uexplorer.{Address, BoxId, TxId}
+import org.ergoplatform.uexplorer.{ErgoTreeHex, BoxId, TxId}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.slf4j.{Logger, LoggerFactory}

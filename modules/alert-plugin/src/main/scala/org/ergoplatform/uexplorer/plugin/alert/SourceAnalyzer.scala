@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.plugin.alert
 
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.io.graphml.GraphMLWriter
-import org.ergoplatform.uexplorer.{SortedTopAddressMap, Storage}
+import org.ergoplatform.uexplorer.Storage
 import org.ergoplatform.uexplorer.plugin.alert.HighValueDetector.{BlockMatch, TxMatch}
 
 import java.io.FileOutputStream

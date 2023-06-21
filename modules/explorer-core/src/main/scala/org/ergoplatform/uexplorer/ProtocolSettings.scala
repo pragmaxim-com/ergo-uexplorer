@@ -4,13 +4,13 @@ import org.ergoplatform.settings.MonetarySettings
 import org.ergoplatform.mining.emission.EmissionRules
 import org.ergoplatform.ErgoAddressEncoder
 import pureconfig.ConfigReader
-import pureconfig._
-import pureconfig.generic.derivation.default._
+import pureconfig.*
+import pureconfig.generic.derivation.default.*
 
 final case class ProtocolSettings(
-                                   networkPrefix: NetworkPrefix,
-                                   genesisAddress: Address,
-                                 )  derives ConfigReader {
+  networkPrefix: NetworkPrefix,
+  genesisAddress: Address
+) derives ConfigReader {
 
   val monetary = MonetarySettings()
   val emission = new EmissionRules(monetary)

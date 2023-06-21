@@ -8,15 +8,15 @@ import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, M
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.ValueCodec
-import org.ergoplatform.uexplorer.{Address, Height}
+import org.ergoplatform.uexplorer.{ErgoTreeHex, Height}
 
 import java.nio.ByteBuffer
 import java.util
 import scala.util.Try
 
-object AddressCodec extends ValueCodec[Address] {
-  override def readAll(bytes: Array[Byte]): Address =
-    new String(bytes).asInstanceOf[Address] // do not call Address.fromStringUnsafe as it has been already validated
+object ErgoTreeHexCodec extends ValueCodec[ErgoTreeHex] {
+  override def readAll(bytes: Array[Byte]): ErgoTreeHex =
+    new String(bytes).asInstanceOf[ErgoTreeHex] // do not call Address.fromStringUnsafe as it has been already validated
 
-  override def writeAll(obj: Address): Array[Byte] = obj.asInstanceOf[String].getBytes("UTF-8")
+  override def writeAll(obj: ErgoTreeHex): Array[Byte] = obj.asInstanceOf[String].getBytes("UTF-8")
 }

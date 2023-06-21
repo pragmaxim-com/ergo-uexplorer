@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.{MapPimp, MutableMapPimp}
 import org.ergoplatform.uexplorer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
+import org.ergoplatform.uexplorer.{ErgoTreeHex, BlockId, BoxId}
 import org.ergoplatform.uexplorer.cassandra
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}

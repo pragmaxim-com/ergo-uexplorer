@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
-import org.ergoplatform.uexplorer.{Address, BlockId, ProtocolSettings, Revision}
+import org.ergoplatform.uexplorer.{Address, BlockId, ErgoTreeHex, ProtocolSettings, Revision}
 
 final case class BlockInfo(
   revision: Revision,

@@ -12,6 +12,8 @@ import eu.timepit.refined.auto.*
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
 
+case class MinerRewardInfo(reward: MinerReward, fee: MinerFee, address: Address)
+
 object RewardCalculator {
 
   // CPU greedy (2% of all runtime)

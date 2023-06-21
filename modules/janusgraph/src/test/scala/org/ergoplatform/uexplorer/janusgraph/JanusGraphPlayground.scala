@@ -7,7 +7,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.{AnonymousTraversalSource,
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.__ as _g
 import org.apache.tinkerpop.gremlin.structure.util.GraphFactory
 import org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph
-import org.ergoplatform.uexplorer.Address
+import org.ergoplatform.uexplorer.ErgoTreeHex
 import org.janusgraph.core.Multiplicity
 import org.janusgraph.graphdb.database.StandardJanusGraph
 import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
