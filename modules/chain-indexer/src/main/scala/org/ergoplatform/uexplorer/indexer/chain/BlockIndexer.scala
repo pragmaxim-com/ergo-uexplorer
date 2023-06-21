@@ -44,27 +44,12 @@ import scala.util.{Failure, Random, Success, Try}
 
 class BlockIndexer(
   storage: MvStorage,
-  backendEnabled: Boolean,
   mvStoreConf: MvStore
 ) extends LazyLogging {
 
   def readableStorage: Storage = storage
 
-  /** Genesis block has no parent so we assert that any block either has its parent cached or its a first block */
-  private def getParentOrFail(apiBlock: ApiFullBlock): Try[Option[BlockInfo]] = {
-    def fail =
-      Failure(
-        new IllegalStateException(
-          s"Block ${apiBlock.header.id} at height ${apiBlock.header.height} has missing parent ${apiBlock.header.parentId}"
-        )
-      )
-    if (apiBlock.header.height == 1)
-      Try(Option.empty)
-    else
-      storage.getBlockById(apiBlock.header.parentId).fold(fail)(parent => Try(Option(parent)))
-  }
-
-  def addBestBlocks(winningFork: List[ApiFullBlock])(implicit ps: ProtocolSettings): Try[ListBuffer[BestBlockInserted]] =
+  def addBestBlocks(winningFork: List[LinkedBlock]): Try[ListBuffer[BestBlockInserted]] =
     winningFork
       .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
         case (f @ Failure(_), _) =>
@@ -89,44 +74,44 @@ class BlockIndexer(
           storage.blockIdsByHeight
             .iterator(None, None, reverse = true)
             .take(100)
-            .flatMap { case (height, blockIds) => blockIds.asScala.map(_ -> height) }
+            .flatMap { case (_, blockIds) =>
+              blockIds.asScala.flatMap(b => storage.blockById.get(b).map(b -> _))
+            }
         )
       )
     assert(chainTip.lastHeight == storage.getLastHeight, "MvStore's Iterator works unexpectedly!")
     chainTip
   }
 
-  def addBestBlock(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BestBlockInserted] =
+  def addBestBlock(block: LinkedBlock): Try[BestBlockInserted] =
     for {
-      parentOpt <- getParentOrFail(apiBlock)
-      blockInfo <- BlockInfoBuilder(apiBlock, parentOpt, storage.getCurrentRevision)
-      lb        <- LightBlockBuilder(apiBlock, blockInfo, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
-      _         <- storage.persistNewBlock(lb)
-      fbOpt     <- if (backendEnabled) FullBlockBuilder(apiBlock, parentOpt).map(Some(_)) else Try(None)
-      _         <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
-    } yield BestBlockInserted(lb, fbOpt)
+      lb <- UtxoTracker(block, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
+      _  <- storage.persistNewBlock(lb)
+      _  <- if (lb.blockInfo.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
+    } yield BestBlockInserted(lb, None) // TODO we forgot about FullBlock !
 
-  private def hasParentAndIsChained(fork: List[ApiFullBlock]): Boolean =
-    fork.size > 1 && storage.containsBlock(fork.head.header.parentId, fork.head.header.height - 1) &&
+  private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
+    fork.size > 1 && storage.containsBlock(fork.head.blockInfo.parentId, fork.head.blockInfo.height - 1) &&
       fork.sliding(2).forall {
         case first :: second :: Nil =>
-          first.header.id == second.header.parentId
+          first.block.header.id == second.blockInfo.parentId
         case _ =>
           false
       }
 
-  def addWinningFork(winningFork: List[ApiFullBlock])(implicit protocol: ProtocolSettings): Try[ForkInserted] =
+  def addWinningFork(winningFork: List[LinkedBlock]): Try[ForkInserted] =
     if (!hasParentAndIsChained(winningFork)) {
       Failure(
         new UnexpectedStateError(
-          s"Inserting fork ${winningFork.map(_.header.id).mkString(",")} at height ${winningFork.map(_.header.height).mkString(",")} illegal"
+          s"Inserting fork ${winningFork.map(_.block.header.id).mkString(",")} at height ${winningFork.map(_.blockInfo.height).mkString(",")} illegal"
         )
       )
     } else {
-      logger.info(s"Adding fork from height ${winningFork.head.header.height} until ${winningFork.last.header.height}")
+      logger.info(s"Adding fork from height ${winningFork.head.blockInfo.height} until ${winningFork.last.blockInfo.height}")
       for {
-        preForkVersion <- Try(storage.getBlockById(winningFork.head.header.id).map(_.revision).get)
-        toRemove = winningFork.flatMap(b => storage.getBlocksByHeight(b.header.height).filter(_._1 != b.header.id)).toMap
+        preForkVersion <- Try(storage.getBlockById(winningFork.head.block.header.id).map(_.revision).get)
+        toRemove =
+          winningFork.flatMap(b => storage.getBlocksByHeight(b.blockInfo.height).filter(_._1 != b.block.header.id)).toMap
         _         <- storage.rollbackTo(preForkVersion)
         newBlocks <- addBestBlocks(winningFork)
       } yield ForkInserted(
@@ -139,7 +124,6 @@ class BlockIndexer(
 object BlockIndexer {
   def apply(
     storage: MvStorage,
-    backendEnabled: Boolean,
     mvStoreConf: MvStore
   )(implicit
     system: ActorSystem[Nothing]
@@ -150,6 +134,6 @@ object BlockIndexer {
     ) { () =>
       Future(storage.close()).map(_ => Done)
     }
-    new BlockIndexer(storage, backendEnabled, mvStoreConf)
+    new BlockIndexer(storage, mvStoreConf)
   }
 }

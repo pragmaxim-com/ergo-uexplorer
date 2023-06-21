@@ -4,6 +4,7 @@ import io.circe.Json
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
+import org.ergoplatform.uexplorer.node.ApiTransaction
 
 import scala.collection.immutable.ArraySeq
 
@@ -20,9 +21,6 @@ final case class Asset(
   index: Int,
   amount: Long
 )
-
-case class Record(txId: TxId, boxId: BoxId, address: Address, value: Value)
-final case class LightBlock(headerId: BlockId, inputBoxes: ArraySeq[Record], outputBoxes: ArraySeq[Record], info: BlockInfo)
 
 final case class FullBlock(
   header: Header,
@@ -42,6 +40,8 @@ final case class BlockExtension(
   digest: HexString,
   fields: Json // dict
 )
+
+case class Block(headerId: BlockId, info: BlockInfo, fullBlockOpt: Option[FullBlock], txs: ArraySeq[ApiTransaction])
 
 final case class BlockInfo(
   revision: Revision,

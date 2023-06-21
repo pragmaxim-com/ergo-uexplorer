@@ -17,37 +17,28 @@ object ErgoTreeParser {
 
   private val treeSerializer: ErgoTreeSerializer = ErgoTreeSerializer.DefaultSerializer
 
-  @inline def deserializeErgoTree(raw: HexString): Try[Values.ErgoTree] =
-    Base16.decode(raw).map(treeSerializer.deserializeErgoTree)
+  @inline def deserializeErgoTree(ergoTree: HexString): Try[Values.ErgoTree] =
+    Base16.decode(ergoTree).map(treeSerializer.deserializeErgoTree)
 
-  @inline def deriveErgoTreeTemplateHash(ergoTree: HexString): Decoder.Result[ErgoTreeTemplateHash] =
+  @inline def deriveErgoTreeTemplateHash(ergoTree: HexString): Try[ErgoTreeTemplateHash] =
     deserializeErgoTree(ergoTree)
       .map { tree =>
         ErgoTreeTemplateHash.fromStringUnsafe(Base16.encode(Sha256.hash(tree.template)))
-      } match {
-      case Success(t)  => Right(t)
-      case Failure(ex) => Left(DecodingFailure.fromThrowable(ex, List.empty))
-    }
+      }
 
-  private def addressToString(address: ErgoAddress)(implicit enc: ErgoAddressEncoder): String = {
+  @inline def deserializeErgoTreeHexToAddress(ergoTreeHex: HexString)(implicit enc: ErgoAddressEncoder): Try[ErgoAddress] =
+    deserializeErgoTree(ergoTreeHex).flatMap(enc.fromProposition)
+
+  @inline def encodeErgoAddressToString(address: ErgoAddress)(implicit enc: ErgoAddressEncoder): Try[Address] = Try {
     val withNetworkByte = (enc.networkPrefix + address.addressTypePrefix).toByte +: address.contentBytes
-
-    val checksum = ErgoAddressEncoder.hash256(withNetworkByte).take(ErgoAddressEncoder.ChecksumLength)
-    Base58.encode(withNetworkByte ++ checksum)
+    val checksum        = ErgoAddressEncoder.hash256(withNetworkByte).take(ErgoAddressEncoder.ChecksumLength)
+    // avoiding Address.fromStringUnsafe, as Base58 produced valid result for all Ergo addresses so far
+    Base58.encode(withNetworkByte ++ checksum).asInstanceOf[Address]
   }
 
-  @inline def ergoTreeToAddress(
-    ergoTree: HexString
-  )(implicit enc: ErgoAddressEncoder): Try[Address] = Try {
-    Address.fromStringUnsafe(
-      addressToString(
-        Base16
-          .decode(ergoTree)
-          .flatMap { bytes =>
-            enc.fromProposition(treeSerializer.deserializeErgoTree(bytes))
-          }
-          .getOrElse(Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress)
-      )
-    )
-  }
+  @inline def ergoTreeHexToAddressString(ergoTreeHex: HexString)(implicit enc: ErgoAddressEncoder): Try[Address] =
+    deserializeErgoTreeHexToAddress(ergoTreeHex).flatMap(encodeErgoAddressToString)
+
+  def ergoAddressFromString(address: Address)(implicit enc: ErgoAddressEncoder): Try[ErgoAddress] =
+    enc.fromString(address)
 }

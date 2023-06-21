@@ -7,7 +7,7 @@ import eu.timepit.refined.auto.autoUnwrap
 import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.*
-import org.ergoplatform.uexplorer.db.Record
+import org.ergoplatform.uexplorer.db.{InputRecord, OutputRecord}
 
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.collection.mutable
@@ -24,8 +24,8 @@ object TxGraphWriter extends LazyLogging {
     txId: TxId,
     height: Height,
     timestamp: Timestamp,
-    inputs: Iterable[Record],
-    outputs: Iterable[Record]
+    inputs: Iterable[InputRecord],
+    outputs: Iterable[OutputRecord]
   )(g: Graph): Unit = {
     val newTxVertex = g.addVertex(T.id, Utils.vertexHash(txId.unwrapped, g), T.label, "txId")
     newTxVertex.property("txId", txId)
@@ -44,7 +44,7 @@ object TxGraphWriter extends LazyLogging {
         if (!inputAddressVertexIt.hasNext) {
           logger.error(s"inputAddress $address from height $height lacks corresponding vertex")
         }
-        newTxVertex.addEdge("from", inputAddressVertexIt.next(), "value", inputs.iterator.map(_.value).sum)
+        newTxVertex.addEdge("from", inputAddressVertexIt.next(), "value", 0L) // TODO inputs.iterator.map(_.value).sum
       }
 
     outputs
