@@ -89,14 +89,14 @@ class BlockIndexer(
     for {
       lb <- UtxoTracker(block, storage.getAddressByUtxo, storage.getUtxoValueByAddress)
       _  <- storage.persistNewBlock(lb)
-      _  <- if (lb.blockInfo.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
+      _  <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
     } yield BestBlockInserted(lb, None) // TODO we forgot about FullBlock !
 
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
-    fork.size > 1 && storage.containsBlock(fork.head.blockInfo.parentId, fork.head.blockInfo.height - 1) &&
+    fork.size > 1 && storage.containsBlock(fork.head.info.parentId, fork.head.info.height - 1) &&
       fork.sliding(2).forall {
         case first :: second :: Nil =>
-          first.block.header.id == second.blockInfo.parentId
+          first.b.header.id == second.info.parentId
         case _ =>
           false
       }
@@ -105,15 +105,15 @@ class BlockIndexer(
     if (!hasParentAndIsChained(winningFork)) {
       Failure(
         new UnexpectedStateError(
-          s"Inserting fork ${winningFork.map(_.block.header.id).mkString(",")} at height ${winningFork.map(_.blockInfo.height).mkString(",")} illegal"
+          s"Inserting fork ${winningFork.map(_.b.header.id).mkString(",")} at height ${winningFork.map(_.info.height).mkString(",")} illegal"
         )
       )
     } else {
-      logger.info(s"Adding fork from height ${winningFork.head.blockInfo.height} until ${winningFork.last.blockInfo.height}")
+      logger.info(s"Adding fork from height ${winningFork.head.info.height} until ${winningFork.last.info.height}")
       for {
-        preForkVersion <- Try(storage.getBlockById(winningFork.head.block.header.id).map(_.revision).get)
+        preForkVersion <- Try(storage.getBlockById(winningFork.head.b.header.id).map(_.revision).get)
         toRemove =
-          winningFork.flatMap(b => storage.getBlocksByHeight(b.blockInfo.height).filter(_._1 != b.block.header.id)).toMap
+          winningFork.flatMap(b => storage.getBlocksByHeight(b.info.height).filter(_._1 != b.b.header.id)).toMap
         _         <- storage.rollbackTo(preForkVersion)
         newBlocks <- addBestBlocks(winningFork)
       } yield ForkInserted(

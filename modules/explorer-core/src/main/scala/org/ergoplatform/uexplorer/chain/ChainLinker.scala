@@ -49,17 +49,17 @@ class ChainLinker(getBlock: BlockId => Future[ApiFullBlock], chainTip: ChainTip)
   def linkChildToAncestors(acc: List[LinkedBlock] = List.empty)(
     block: BlockWithOutputs
   )(implicit ps: ProtocolSettings): Future[List[LinkedBlock]] =
-    chainTip.getParent(block.block) match {
-      case parentInfoOpt if parentInfoOpt.isDefined || block.block.header.height == 1 =>
+    chainTip.getParent(block.b) match {
+      case parentInfoOpt if parentInfoOpt.isDefined || block.b.header.height == 1 =>
         Future.fromTry(
-          chainTip.putOnlyNew(block.block.header.id, BlockInfo(block, parentInfoOpt)).map { newBlockInfo =>
+          chainTip.putOnlyNew(block.b.header.id, BlockInfo(block, parentInfoOpt)).map { newBlockInfo =>
             block.toLinkedBlock(newBlockInfo, parentInfoOpt) :: acc
           }
         )
       case _ =>
-        logger.info(s"Encountered fork at height ${block.block.header.height} and block ${block.block.header.id}")
+        logger.info(s"Encountered fork at height ${block.b.header.height} and block ${block.b.header.id}")
         for {
-          apiBlock     <- getBlock(block.block.header.parentId)
+          apiBlock     <- getBlock(block.b.header.parentId)
           rewardBlock  <- Future.fromTry(RewardCalculator(apiBlock))
           outputBlock  <- Future.fromTry(OutputBuilder(rewardBlock)(ps.addressEncoder))
           linkedBlocks <- linkChildToAncestors(acc)(outputBlock)

@@ -66,8 +66,8 @@ class InMemoryBackend extends Backend {
 
   override def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted].map { blockInserted =>
-      blocksByHeight.put(blockInserted.lightBlock.blockInfo.height, blockInserted.lightBlock.blockInfo)
-      blocksById.put(blockInserted.lightBlock.block.header.id, blockInserted.lightBlock.blockInfo)
+      blocksByHeight.put(blockInserted.lightBlock.info.height, blockInserted.lightBlock.info)
+      blocksById.put(blockInserted.lightBlock.b.header.id, blockInserted.lightBlock.info)
       blockInserted
     }
 

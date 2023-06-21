@@ -14,7 +14,7 @@ import scala.util.Try
 object OutputBuilder {
 
   private def getOutputRecords(block: BlockWithReward)(implicit enc: ErgoAddressEncoder): Try[ArraySeq[OutputRecord]] = Try {
-    block.block.transactions.transactions.flatMap { tx =>
+    block.b.transactions.transactions.flatMap { tx =>
       tx.outputs.map { o =>
         (
           for {

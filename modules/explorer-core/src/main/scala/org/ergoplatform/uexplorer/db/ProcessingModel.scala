@@ -16,48 +16,47 @@ case class OutputRecord(
   additionalRegisters: Map[RegisterId, ExpandedRegister]
 )
 
-case class BlockWithOutputs(
-  block: ApiFullBlock,
-  minerRewardInfo: MinerRewardInfo,
-  outputRecords: ArraySeq[OutputRecord]
-) {
-  def toLinkedBlock(blockInfo: BlockInfo, parentInfoOpt: Option[BlockInfo]) =
-    LinkedBlock(block, minerRewardInfo, outputRecords, blockInfo, parentInfoOpt)
-}
-
 case class InputRecord(
   txId: TxId,
   boxId: BoxId,
   address: Address,
   value: Value
 )
-
-case class BlockWithInputs(
-  block: ApiFullBlock,
-  minerRewardInfo: MinerRewardInfo,
-  inputRecords: ArraySeq[InputRecord],
-  outputRecords: ArraySeq[OutputRecord],
-  blockInfo: BlockInfo,
-  parentInfoOpt: Option[BlockInfo]
-)
-
-case class LinkedBlock(
-  block: ApiFullBlock,
-  minerRewardInfo: MinerRewardInfo,
-  outputRecords: ArraySeq[OutputRecord],
-  blockInfo: BlockInfo,
-  parentInfoOpt: Option[BlockInfo]
-) {
-  def toBlockWithInputs(inputRecords: ArraySeq[InputRecord]) =
-    BlockWithInputs(block, minerRewardInfo, inputRecords, outputRecords, blockInfo, parentInfoOpt)
-}
-
 case class MinerRewardInfo(reward: MinerReward, fee: MinerFee, address: Address)
 
 case class BlockWithReward(
-  block: ApiFullBlock,
+  b: ApiFullBlock,
   minerRewardInfo: MinerRewardInfo
 ) {
   def toBlockWithOutput(outputRecords: ArraySeq[OutputRecord]) =
-    BlockWithOutputs(block, minerRewardInfo, outputRecords)
+    BlockWithOutputs(b, minerRewardInfo, outputRecords)
 }
+
+case class BlockWithOutputs(
+  b: ApiFullBlock,
+  minerRewardInfo: MinerRewardInfo,
+  outputRecords: ArraySeq[OutputRecord]
+) {
+  def toLinkedBlock(blockInfo: BlockInfo, parentInfoOpt: Option[BlockInfo]) =
+    LinkedBlock(b, minerRewardInfo, outputRecords, blockInfo, parentInfoOpt)
+}
+
+case class LinkedBlock(
+  b: ApiFullBlock,
+  minerRewardInfo: MinerRewardInfo,
+  outputRecords: ArraySeq[OutputRecord],
+  info: BlockInfo,
+  parentInfoOpt: Option[BlockInfo]
+) {
+  def toBlockWithInputs(inputRecords: ArraySeq[InputRecord]) =
+    BlockWithInputs(b, minerRewardInfo, inputRecords, outputRecords, info, parentInfoOpt)
+}
+
+case class BlockWithInputs(
+  b: ApiFullBlock,
+  minerRewardInfo: MinerRewardInfo,
+  inputRecords: ArraySeq[InputRecord],
+  outputRecords: ArraySeq[OutputRecord],
+  info: BlockInfo,
+  parentInfoOpt: Option[BlockInfo]
+)

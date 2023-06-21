@@ -24,12 +24,12 @@ object UtxoTracker {
         inputBoxId, {
           val inputAddress = addressByUtxo(inputBoxId).getOrElse(
             throw new IllegalStateException(
-              s"Input boxId $inputBoxId of block ${b.block.header.id} at height ${b.blockInfo.height} not found in utxo state"
+              s"Input boxId $inputBoxId of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
             )
           )
           val value = utxoValueByAddress(inputAddress, inputBoxId).getOrElse(
             throw new IllegalStateException(
-              s"Address $inputAddress of block ${b.block.header.id} at height ${b.blockInfo.height} not found in utxo state"
+              s"Address $inputAddress of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
             )
           )
           inputAddress -> value
@@ -44,12 +44,12 @@ object UtxoTracker {
       val outputSum = outputs.iterator.map(_.value).sum
       assert(
         inputSum == outputSum,
-        s"Block ${b.block.header.id} invalid as sum of inputs $inputSum != $outputSum"
+        s"Block ${b.b.header.id} invalid as sum of inputs $inputSum != $outputSum"
       )
     }
 
     val inputRecords =
-      b.block.transactions.transactions
+      b.b.transactions.transactions
         .flatMap { tx =>
           tx match {
             case tx if tx.id == Emission.tx =>

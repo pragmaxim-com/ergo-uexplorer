@@ -60,8 +60,8 @@ class ChainIndexer(
             .fold(Future.successful(newBlocksInserted))(_.removeBlocksFromMainChain(supersededFork.keys))
             .map(_ => newBlocksInserted)
         case bb: BestBlockInserted =>
-          if (bb.lightBlock.blockInfo.height % 100 == 0) {
-            logger.info(s"Height ${bb.lightBlock.blockInfo.height}")
+          if (bb.lightBlock.info.height % 100 == 0) {
+            logger.info(s"Height ${bb.lightBlock.info.height}")
           }
           Future.successful(List(bb))
       }

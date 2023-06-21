@@ -48,7 +48,7 @@ trait JanusGraphWriter extends LazyLogging {
       .foreach { case BestBlockInserted(b, _) =>
         b.inputRecords.groupBy(_.txId).foreach { case (txId, inputRecords) =>
           val outputRecords = b.outputRecords.filter(_.txId == txId)
-          TxGraphWriter.writeGraph(txId, b.blockInfo.height, b.blockInfo.timestamp, inputRecords, outputRecords)(janusGraph)
+          TxGraphWriter.writeGraph(txId, b.info.height, b.info.timestamp, inputRecords, outputRecords)(janusGraph)
 
         }
       }
