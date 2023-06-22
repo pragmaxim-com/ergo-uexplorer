@@ -8,8 +8,8 @@ import scala.util.{Failure, Success, Try}
 
 final case class ApiAdProof(
   headerId: BlockId,
-  proofBytes: HexString,
-  digest: HexString
+  proofBytes: AvlTreePathProofHex,
+  digest: TreeRootHashHex
 )
 
 final case class ApiAsset(
@@ -19,7 +19,7 @@ final case class ApiAsset(
 
 final case class ApiBlockExtension(
   headerId: BlockId,
-  digest: HexString,
+  digest: ExtensionDigestHex,
   fields: Json
 )
 
@@ -48,14 +48,14 @@ final case class ApiHeader(
   nBits: Long,
   difficulty: ApiDifficulty,
   timestamp: Long,
-  stateRoot: HexString,
-  adProofsRoot: HexString,
-  transactionsRoot: HexString,
-  extensionHash: HexString,
-  minerPk: HexString,
-  w: HexString,
-  n: HexString,
-  d: String,
+  stateRoot: StateRootHex,
+  adProofsRoot: AdProofsRootHex,
+  transactionsRoot: TransactionsRootHex,
+  extensionHash: ExtensionDigestHex,
+  minerPk: ErgoTreeHex,
+  w: PowHex,
+  n: PowNonceHex,
+  d: BigInt,
   votes: String
 )
 
@@ -65,12 +65,12 @@ final case class ApiOutput(
   creationHeight: Int,
   ergoTree: ErgoTreeHex,
   assets: List[ApiAsset],
-  additionalRegisters: Map[RegisterId, HexString]
+  additionalRegisters: Map[RegisterId, BoxRegisterValueHex]
 )
 
-final case class ApiPowSolutions(pk: HexString, w: HexString, n: HexString, d: String)
+final case class ApiPowSolutions(pk: ErgoTreeHex, w: PowHex, n: PowNonceHex, d: BigInt)
 
-final case class ApiSpendingProof(proofBytes: Option[HexString], extension: Json)
+final case class ApiSpendingProof(proofBytes: Option[AvlTreePathProofHex], extension: Json)
 
 final case class ApiInput(boxId: BoxId, spendingProof: ApiSpendingProof)
 
@@ -83,7 +83,7 @@ final case class ApiTransaction(
 )
 
 final case class ExpandedRegister(
-  serializedValue: HexString,
+  serializedValue: BoxRegisterValueHex,
   regValue: Option[RegisterValue]
 )
 

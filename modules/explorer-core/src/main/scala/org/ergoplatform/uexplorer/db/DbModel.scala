@@ -10,8 +10,8 @@ import scala.collection.immutable.ArraySeq
 
 final case class AdProof(
   headerId: BlockId,
-  proofBytes: HexString, // AVL+ tree path
-  digest: HexString // tree root hash
+  proofBytes: AvlTreePathProofHex, // AVL+ tree path
+  digest: TreeRootHashHex // tree root hash
 )
 
 final case class Asset(
@@ -37,7 +37,7 @@ final case class FullBlock(
 
 final case class BlockExtension(
   headerId: BlockId,
-  digest: HexString,
+  digest: ExtensionDigestHex,
   fields: Json // dict
 )
 
@@ -45,7 +45,7 @@ final case class BoxRegister(
   id: RegisterId,
   boxId: BoxId,
   sigmaType: SigmaType,
-  rawValue: HexString,
+  rawValue: BoxRegisterValueHex,
   renderedValue: String
 )
 
@@ -65,14 +65,14 @@ final case class Header(
   nBits: Long,
   difficulty: BigDecimal,
   timestamp: Long,
-  stateRoot: HexString,
-  adProofsRoot: HexString,
-  transactionsRoot: HexString,
-  extensionHash: HexString,
-  minerPk: HexString,
-  w: HexString, // PoW one time PK
-  n: HexString, // PoW nonce
-  d: String, // PoW distance
+  stateRoot: StateRootHex,
+  adProofsRoot: AdProofsRootHex,
+  transactionsRoot: TransactionsRootHex,
+  extensionHash: ExtensionDigestHex,
+  minerPk: ErgoTreeHex,
+  w: PowHex, // PoW
+  n: PowNonceHex, // PoW nonce
+  d: BigInt, // PoW distance
   votes: String, // hex-encoded votes for a soft-fork and parameters
   mainChain: Boolean // chain status, `true` if this header resides in main chain.
 )
@@ -81,7 +81,7 @@ final case class Input(
   boxId: BoxId,
   txId: TxId,
   headerId: BlockId,
-  proofBytes: Option[HexString], // serialized and hex-encoded cryptographic proof
+  proofBytes: Option[InputProofHex], // serialized and hex-encoded cryptographic proof
   extension: Json, // arbitrary key-value dictionary
   index: Short, // index  of the input in the transaction
   mainChain: Boolean // chain status, `true` if this input resides in main chain.
@@ -97,7 +97,7 @@ final case class Output(
   settlementHeight: Int, // the height this output got fixed in blockchain
   index: Short, // index of the output in the transaction
   globalIndex: Long,
-  ergoTree: HexString, // serialized and hex-encoded ErgoTree
+  ergoTree: ErgoTreeHex, // serialized and hex-encoded ErgoTree
   templateHashHex: TemplateHashHex, // hash of hashed ErgoTree template
   address: Address, // an address derived from ergoTree
   timestamp: Long, // time output appeared in the blockchain

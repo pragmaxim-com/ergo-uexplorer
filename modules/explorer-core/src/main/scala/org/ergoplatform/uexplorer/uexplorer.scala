@@ -29,10 +29,20 @@ package object uexplorer {
 
   type Revision = Long
 
-  type Base58Spec    = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
-  type Address       = String Refined Base58Spec
-  type ErgoTreeHex   = String Refined HexStringSpec
-  type NetworkPrefix = String Refined ValidByte
+  type Base58Spec          = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
+  type Address             = String Refined Base58Spec
+  type ErgoTreeHex         = String Refined HexStringSpec
+  type AdProofsRootHex     = String Refined HexStringSpec
+  type AvlTreePathProofHex = String Refined HexStringSpec
+  type TreeRootHashHex     = String Refined HexStringSpec
+  type ExtensionDigestHex  = String Refined HexStringSpec
+  type BoxRegisterValueHex = String Refined HexStringSpec
+  type StateRootHex        = String Refined HexStringSpec
+  type TransactionsRootHex = String Refined HexStringSpec
+  type PowHex              = String Refined HexStringSpec
+  type PowNonceHex         = String Refined HexStringSpec
+  type InputProofHex       = String Refined HexStringSpec
+  type NetworkPrefix       = String Refined ValidByte
 
   object Address {
     import eu.timepit.refined.auto.autoUnwrap
@@ -56,6 +66,10 @@ package object uexplorer {
 
   object HexString {
     def fromStringUnsafe(s: String): HexString = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
+  }
+
+  object AvlTreePathProofHex {
+    def fromStringUnsafe(s: String): AvlTreePathProofHex = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
   type BlockId = String Refined HexStringSpec

@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.http
 
 import io.circe.{Decoder, HCursor}
-import org.ergoplatform.uexplorer.BoxId
+import org.ergoplatform.uexplorer.{AvlTreePathProofHex, BoxId, *}
 import org.ergoplatform.uexplorer.node.*
 import io.circe.generic.auto.*
 import org.ergoplatform.ErgoAddressEncoder
@@ -15,7 +15,6 @@ import io.circe.refined.*
 import io.circe.syntax.*
 import io.circe.*
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.*
 
 import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
@@ -44,10 +43,10 @@ trait Codecs {
       nBits            <- c.downField("nBits").as[Long]
       difficulty       <- c.downField("difficulty").as[ApiDifficulty]
       timestamp        <- c.downField("timestamp").as[Long]
-      stateRoot        <- c.downField("stateRoot").as[HexString]
-      adProofsRoot     <- c.downField("adProofsRoot").as[HexString]
-      transactionsRoot <- c.downField("transactionsRoot").as[HexString]
-      extensionHash    <- c.downField("extensionHash").as[HexString]
+      stateRoot        <- c.downField("stateRoot").as[StateRootHex]
+      adProofsRoot     <- c.downField("adProofsRoot").as[AdProofsRootHex]
+      transactionsRoot <- c.downField("transactionsRoot").as[TransactionsRootHex]
+      extensionHash    <- c.downField("extensionHash").as[ExtensionDigestHex]
       powSolutions     <- c.downField("powSolutions").as[ApiPowSolutions]
       votes            <- c.downField("votes").as[String]
     } yield ApiHeader(
@@ -75,9 +74,9 @@ trait Codecs {
       boxId               <- c.downField("boxId").as[BoxId]
       value               <- c.downField("value").as[Value]
       creationHeight      <- c.downField("creationHeight").as[Height]
-      ergoTree            <- c.downField("ergoTree").as[HexString]
+      ergoTree            <- c.downField("ergoTree").as[ErgoTreeHex]
       assets              <- c.downField("assets").as[List[ApiAsset]]
-      additionalRegisters <- c.downField("additionalRegisters").as[Map[RegisterId, HexString]]
+      additionalRegisters <- c.downField("additionalRegisters").as[Map[RegisterId, BoxRegisterValueHex]]
     } yield ApiOutput(
       boxId,
       value,
@@ -90,19 +89,19 @@ trait Codecs {
 
   implicit val apiPowSolutionsDecoder: Decoder[ApiPowSolutions] = { (c: HCursor) =>
     for {
-      pk <- c.downField("pk").as[HexString]
-      w  <- c.downField("w").as[HexString]
-      n  <- c.downField("n").as[HexString]
+      pk <- c.downField("pk").as[ErgoTreeHex]
+      w  <- c.downField("w").as[PowHex]
+      n  <- c.downField("n").as[PowNonceHex]
       d  <- c.downField("d").as[BigInt]
-    } yield ApiPowSolutions(pk, w, n, d.toString())
+    } yield ApiPowSolutions(pk, w, n, d)
   }
 
   implicit val apiSpendingProofDecoder: Decoder[ApiSpendingProof] = { (c: HCursor) =>
     for {
       proofBytes <- c.downField("proofBytes").as[String].flatMap { s =>
-                      Try(HexString.fromStringUnsafe(s)) match {
-                        case Failure(_)     => Right[DecodingFailure, Option[HexString]](Option.empty)
-                        case Success(value) => Right[DecodingFailure, Option[HexString]](Option(value))
+                      Try(AvlTreePathProofHex.fromStringUnsafe(s)) match {
+                        case Failure(_)     => Right[DecodingFailure, Option[AvlTreePathProofHex]](Option.empty)
+                        case Success(value) => Right[DecodingFailure, Option[AvlTreePathProofHex]](Option(value))
                       }
                     }
       extension <- c.downField("extension").as[Json]

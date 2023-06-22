@@ -52,7 +52,7 @@ trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
           .setString(miner_pk,              block.header.minerPk)
           .setString(w,                     block.header.w)
           .setString(n,                     block.header.n)
-          .setString(d,                     block.header.d)
+          .setBigInteger(d,                 block.header.d.bigInteger)
           .setString(votes,                 block.header.votes)
           .setBoolean(main_chain,           block.header.mainChain)
         // format: on

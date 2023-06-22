@@ -1,18 +1,12 @@
 package org.ergoplatform.uexplorer.indexer
 
-import org.ergoplatform.uexplorer.Const.MinerRewardDelta
-import org.ergoplatform.uexplorer.{ErgoTreeHex, HexString}
+import org.ergoplatform.uexplorer.ErgoTreeHex
 import org.ergoplatform.ErgoScriptPredef
 import scorex.util.encode.{Base16, Base58}
 
 import scala.util.Try
 
 object Const {
-
-  val FeePropositionScriptHex: HexString = {
-    val script = ErgoScriptPredef.feeProposition(MinerRewardDelta)
-    HexString.fromStringUnsafe(Base16.encode(script.bytes))
-  }
 
   type NetworkPrefix = Byte
   type AddressPrefix = Byte

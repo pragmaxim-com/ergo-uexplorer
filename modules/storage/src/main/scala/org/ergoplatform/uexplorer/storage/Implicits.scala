@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.storage
 
-import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.{ErgoTreeHex, *}
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
@@ -17,8 +17,7 @@ object Implicits {
     import ErgoTreeHex.unwrapped
     def serialize(key: ErgoTreeHex): String = key.unwrapped
 
-    // do not call Address.fromStringUnsafe as it has been already validated in BlockBuilder
-    def deserialize(key: String): ErgoTreeHex = key.asInstanceOf[ErgoTreeHex]
+    def deserialize(key: String): ErgoTreeHex = ErgoTreeHex.fromStringUnsafe(key)
   }
 
 }
