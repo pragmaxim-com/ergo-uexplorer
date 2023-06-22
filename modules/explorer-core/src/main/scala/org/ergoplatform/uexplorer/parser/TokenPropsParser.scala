@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.parser
 
-import org.ergoplatform.uexplorer.{HexString, RegisterId}
+import org.ergoplatform.uexplorer.RegisterId
 import org.ergoplatform.uexplorer.node.{ExpandedRegister, RegisterValue, TokenProps}
 import scorex.util.encode.Base16
 import sigmastate.serialization.ValueSerializer

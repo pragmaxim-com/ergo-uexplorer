@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS uexplorer.node_headers
     miner_pk          VARCHAR,
     w                 VARCHAR,
     n                 VARCHAR,
-    d                 VARCHAR,
+    d                 BIGINT,
     votes             VARCHAR,
     main_chain        BOOLEAN,
     PRIMARY KEY (header_id)

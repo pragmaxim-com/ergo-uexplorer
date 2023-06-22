@@ -4,7 +4,7 @@ import cats.Eval
 import cats.data.OptionT
 import cats.implicits.toTraverseOps
 import org.ergoplatform.uexplorer.node.{ExpandedRegister, RegisterValue}
-import org.ergoplatform.uexplorer.{HexString, RegisterId, SigmaType}
+import org.ergoplatform.uexplorer.{BoxRegisterValueHex, RegisterId, SigmaType}
 import scorex.util.encode.Base16
 import sigmastate.Values.{Constant, ConstantNode, EvaluatedValue, SigmaPropConstant, Value}
 import sigmastate.*
@@ -27,7 +27,7 @@ object RegistersParser {
             case ConstantNode(groupElem, SGroupElement) =>
               OptionT.some(
                 SigmaType.SimpleKindSigmaType.SGroupElement ->
-                Base16.encode(groupElem.asInstanceOf[SGroupElement.WrappedType].getEncoded.toArray)
+                  Base16.encode(groupElem.asInstanceOf[SGroupElement.WrappedType].getEncoded.toArray)
               )
             case _ => OptionT.none
           }
@@ -52,7 +52,7 @@ object RegistersParser {
         case SCollectionType(SByte) =>
           OptionT.some(
             SigmaType.SCollection(SigmaType.SimpleKindSigmaType.SByte) ->
-            Base16.encode(ev0.value.asInstanceOf[SCollection[SByte.type]#WrappedType].toArray)
+              Base16.encode(ev0.value.asInstanceOf[SCollection[SByte.type]#WrappedType].toArray)
           )
         case coll: SCollection[_] =>
           val typeTerm = coll.toString.replaceAll("\\$", "")
@@ -77,7 +77,7 @@ object RegistersParser {
     goRender(ev).value.value
   }
 
-  def parseAny(raw: HexString): ExpandedRegister =
+  def parseAny(raw: BoxRegisterValueHex): ExpandedRegister =
     Try(ValueSerializer.deserialize(Base16.decode(raw).get)) match {
       case Success(v: EvaluatedValue[_]) =>
         renderEvaluatedValue(v)
