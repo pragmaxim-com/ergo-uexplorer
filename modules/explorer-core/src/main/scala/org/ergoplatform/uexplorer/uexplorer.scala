@@ -17,6 +17,7 @@ import scala.util.Try
 package object uexplorer {
 
   type Value     = Long
+  type Amount    = Long
   type Height    = Int
   type Timestamp = Long
 
