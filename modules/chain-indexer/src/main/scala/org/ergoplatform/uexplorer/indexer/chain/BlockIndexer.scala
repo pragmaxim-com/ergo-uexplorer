@@ -1,8 +1,9 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
+import akka.stream.scaladsl.{Flow, Source}
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
@@ -21,10 +22,10 @@ import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
+import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.chain.ChainTip
-import org.ergoplatform.uexplorer.indexer.config.MvStore
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.ergoplatform.uexplorer.storage.MvStorage
+import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 import org.ergoplatform.uexplorer.storage.MvStorage.*
 import org.h2.mvstore.{MVMap, MVStore}
 
@@ -46,28 +47,22 @@ import scala.util.{Failure, Random, Success, Try}
 class BlockIndexer(
   storage: MvStorage,
   utxoTracker: UtxoTracker,
-  mvStoreConf: MvStore
-) extends LazyLogging {
+  mvStoreConf: MvStoreConf
+)(implicit enc: ErgoAddressEncoder)
+  extends LazyLogging {
+
+  def finishIndexing: Try[Unit] = {
+    storage.writeReport.recover { case ex =>
+      logger.error("Failed to generate report", ex)
+    }
+    storage
+      .compact(indexing = false, mvStoreConf.maxIndexingCompactTime, mvStoreConf.maxIdleCompactTime)
+      .recover { case ex =>
+        logger.error("Compaction failed", ex)
+      }
+  }
 
   def readableStorage: Storage = storage
-
-  def addBestBlocks(winningFork: List[LinkedBlock])(implicit enc: ErgoAddressEncoder): Try[ListBuffer[BestBlockInserted]] =
-    winningFork
-      .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
-        case (f @ Failure(_), _) =>
-          f
-        case (Success(insertedBlocksAcc), apiBlock) =>
-          addBestBlock(apiBlock).map { insertedBlock =>
-            insertedBlocksAcc :+ insertedBlock
-          }
-      }
-
-  def compact(indexing: Boolean): Try[Unit] = Try {
-    logger.info(s"Compacting file at ${storage.getCompactReport}")
-    val compactTime = if (indexing) mvStoreConf.maxIndexingCompactTime else mvStoreConf.maxIdleCompactTime
-    val result      = if (!indexing) storage.clear() else Success(())
-    result.map(_ => storage.store.compactFile(compactTime.toMillis.toInt))
-  }
 
   def getChainTip: Try[ChainTip] = Try {
     val chainTip =
@@ -87,13 +82,6 @@ class BlockIndexer(
     chainTip
   }
 
-  def addBestBlock(block: LinkedBlock)(implicit enc: ErgoAddressEncoder): Try[BestBlockInserted] =
-    for {
-      lb <- utxoTracker.getBlockWithInputs(block)
-      _  <- storage.persistNewBlock(lb)
-      _  <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
-    } yield BestBlockInserted(lb, None) // TODO we forgot about FullBlock !
-
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
     fork.size > 1 && storage.containsBlock(fork.head.info.parentId, fork.head.info.height - 1) &&
       fork.sliding(2).forall {
@@ -103,7 +91,7 @@ class BlockIndexer(
           false
       }
 
-  def addWinningFork(winningFork: List[LinkedBlock])(implicit enc: ErgoAddressEncoder): Try[ForkInserted] =
+  def rollbackFork(winningFork: List[LinkedBlock], backendOpt: Option[Backend]): Try[List[LinkedBlock]] =
     if (!hasParentAndIsChained(winningFork)) {
       Failure(
         new UnexpectedStateError(
@@ -114,24 +102,36 @@ class BlockIndexer(
       logger.info(s"Adding fork from height ${winningFork.head.info.height} until ${winningFork.last.info.height}")
       for {
         preForkVersion <- Try(storage.getBlockById(winningFork.head.b.header.id).map(_.revision).get)
-        toRemove =
-          winningFork.flatMap(b => storage.getBlocksByHeight(b.info.height).filter(_._1 != b.b.header.id)).toMap
-        _         <- storage.rollbackTo(preForkVersion)
-        newBlocks <- addBestBlocks(winningFork)
-      } yield ForkInserted(
-        newBlocks.toList,
-        toRemove
-      )
+        toRemove = winningFork.flatMap(b => storage.getBlocksByHeight(b.info.height).filter(_._1 != b.b.header.id)).toMap
+        _ <- storage.rollbackTo(preForkVersion)
+        _ <- backendOpt.fold(Success(()))(_.removeBlocksFromMainChain(toRemove.keys))
+      } yield winningFork
     }
+
+  val insertBlockFlow: Flow[LinkedBlock, BestBlockInserted, NotUsed] =
+    Flow
+      .apply[LinkedBlock]
+      .map(utxoTracker.getBlockWithInputs(_).get)
+      .async
+      .wireTap(b => storage.persistErgoTreeUtxos(b.outputRecords).get)
+      .wireTap(b => storage.removeInputBoxesByErgoTree(b.inputRecords).get)
+      .async
+      .wireTap(b => storage.persistErgoTreeTemplateUtxos(b.outputRecords).get)
+      .wireTap(b => storage.removeInputBoxesByErgoTreeT8(b.inputRecords).get)
+      .wireTap(b => storage.commitNewBlock(b.b.header.id, b.info, mvStoreConf, storage.getCurrentRevision).get)
+      .async
+      .map(lb => BestBlockInserted(lb, None))
+
 }
 
 object BlockIndexer {
   def apply(
     storage: MvStorage,
     utxoTracker: UtxoTracker,
-    mvStoreConf: MvStore
+    mvStoreConf: MvStoreConf
   )(implicit
-    system: ActorSystem[Nothing]
+    system: ActorSystem[Nothing],
+    enc: ErgoAddressEncoder
   ): BlockIndexer = {
     CoordinatedShutdown(system).addTask(
       CoordinatedShutdown.PhaseServiceStop,

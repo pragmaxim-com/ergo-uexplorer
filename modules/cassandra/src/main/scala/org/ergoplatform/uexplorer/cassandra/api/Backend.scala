@@ -24,7 +24,7 @@ trait Backend {
 
   def isEmpty: Boolean
 
-  def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Future[Done]
+  def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Try[Done]
 
   def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
@@ -61,13 +61,13 @@ class InMemoryBackend extends Backend {
 
   override def close(): Future[Unit] = Future.successful(())
 
-  override def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Future[Done] =
-    Future(blockIds.foreach(blocksById.remove)).map(_ => Done)
+  override def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Try[Done] =
+    Try(blockIds.foreach(blocksById.remove)).map(_ => Done)
 
   override def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted].map { blockInserted =>
-      blocksByHeight.put(blockInserted.lightBlock.info.height, blockInserted.lightBlock.info)
-      blocksById.put(blockInserted.lightBlock.b.header.id, blockInserted.lightBlock.info)
+      blocksByHeight.put(blockInserted.blockWithInputs.info.height, blockInserted.blockWithInputs.info)
+      blocksById.put(blockInserted.blockWithInputs.b.header.id, blockInserted.blockWithInputs.info)
       blockInserted
     }
 

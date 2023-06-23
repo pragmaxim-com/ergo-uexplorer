@@ -52,21 +52,6 @@ class ChainIndexer(
       .async
       .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
 
-  private val forkDeleteFlow: Flow[Insertable, BestBlockInserted, NotUsed] =
-    Flow[Insertable]
-      .mapAsync(1) {
-        case ForkInserted(newBlocksInserted, supersededFork) =>
-          backendOpt
-            .fold(Future.successful(newBlocksInserted))(_.removeBlocksFromMainChain(supersededFork.keys))
-            .map(_ => newBlocksInserted)
-        case bb: BestBlockInserted =>
-          if (bb.lightBlock.info.height % 100 == 0) {
-            logger.info(s"Height ${bb.lightBlock.info.height}")
-          }
-          Future.successful(List(bb))
-      }
-      .mapConcat(identity)
-
   private val httpFlow: Flow[Height, ApiFullBlock, NotUsed] =
     Flow[Height]
       .mapAsync(1)(blockHttpClient.getBlockIdForHeight)
@@ -84,15 +69,23 @@ class ChainIndexer(
       .addAttributes(Attributes.inputBuffer(1, 8)) // contract processing (sigma, base58)
       .buffer(8192, OverflowStrategy.backpressure)
 
-  private val persistenceFlow: Flow[List[LinkedBlock], Insertable, NotUsed] =
+  private val insertBranchFlow: Flow[List[LinkedBlock], BestBlockInserted, NotUsed] =
     Flow
-      .fromFunction[List[LinkedBlock], Insertable] {
+      .apply[List[LinkedBlock]]
+      .flatMapConcat {
         case bestBlock :: Nil =>
-          blockIndexer.addBestBlock(bestBlock).get
+          if (bestBlock.info.height % 100 == 0) {
+            logger.info(s"Height ${bestBlock.info.height}")
+          }
+          Source.single(bestBlock).via(blockIndexer.insertBlockFlow)
         case winningFork =>
-          blockIndexer.addWinningFork(winningFork).get
+          blockIndexer
+            .rollbackFork(winningFork, backendOpt)
+            .fold(
+              Source.failed[BestBlockInserted],
+              branch => Source(branch).via(blockIndexer.insertBlockFlow)
+            )
       }
-      .async(ActorAttributes.IODispatcher.dispatcher, 8)
 
   private def indexingSink(chainLinker: ChainLinker): Sink[Height, Future[ChainSyncResult]] =
     Flow[Height]
@@ -100,8 +93,7 @@ class ChainIndexer(
       .via(processingFlow)
       .mapAsync(1)(chainLinker.linkChildToAncestors())
       .buffer(8192, OverflowStrategy.backpressure)
-      .via(persistenceFlow)
-      .via(forkDeleteFlow)
+      .via(insertBranchFlow)
       .via(backendPersistence)
       .via(graphPersistenceFlow)
       .via(killSwitch.flow)
@@ -111,15 +103,7 @@ class ChainIndexer(
       }
 
   private def onComplete(lastBlock: Option[BestBlockInserted]): ChainSyncResult = {
-    val storage = blockIndexer.readableStorage
-    storage.writeReport.recover { case ex =>
-      logger.error("Failed to generate report", ex)
-    }
-    blockIndexer
-      .compact(indexing = false)
-      .recover { case ex =>
-        logger.error("Compaction failed", ex)
-      }
+    blockIndexer.finishIndexing
     ChainSyncResult(
       lastBlock,
       blockIndexer.readableStorage,

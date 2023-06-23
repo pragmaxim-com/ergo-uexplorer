@@ -3,7 +3,8 @@ package org.ergoplatform.uexplorer.indexer
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
-import org.ergoplatform.uexplorer.indexer.config.{ChainIndexerConf, MvStore}
+import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolState
@@ -28,7 +29,7 @@ import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.http.MetadataHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
-import org.ergoplatform.uexplorer.storage.MvStorage
+import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 
 import java.nio.file.Paths
 import scala.concurrent.duration.*
@@ -38,6 +39,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   private val testKit                                           = ActorTestKit()
   implicit private val sys: ActorSystem[_]                      = testKit.internalSystem
   implicit private val protocol: ProtocolSettings               = ChainIndexerConf.loadDefaultOrThrow.protocol
+  implicit private val enc: ErgoAddressEncoder                  = protocol.addressEncoder
   implicit private val localNodeUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(uri"http://local")
   implicit private val remoteNodeUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(uri"http://remote")
   implicit val killSwitch: SharedKillSwitch                     = KillSwitches.shared("scheduler-kill-switch")
@@ -71,7 +73,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
         Response.ok(Rest.blocks.byId(blockId))
     }
 
-  val mvStoreConf   = MvStore(10, 500.millis, 500.millis, 10000)
+  val mvStoreConf   = MvStoreConf(10, 500.millis, 500.millis, 10000)
   val storage       = MvStorage(64).get
   val blockClient   = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
   val backend       = Some(new InMemoryBackend)

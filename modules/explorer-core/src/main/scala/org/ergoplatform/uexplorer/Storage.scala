@@ -9,8 +9,6 @@ import scala.util.Try
 
 trait Storage {
 
-  def writeReport: Try[_]
-
   def isEmpty: Boolean
 
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean
