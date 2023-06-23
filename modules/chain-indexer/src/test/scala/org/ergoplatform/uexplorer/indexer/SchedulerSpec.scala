@@ -2,6 +2,7 @@ package org.ergoplatform.uexplorer.indexer
 
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.stream.scaladsl.Source
 import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
@@ -38,7 +39,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
 
   private val testKit                                           = ActorTestKit()
   implicit private val sys: ActorSystem[_]                      = testKit.internalSystem
-  implicit private val protocol: ProtocolSettings               = ChainIndexerConf.loadDefaultOrThrow.protocol
+  implicit private val protocol: ProtocolSettings               = ChainIndexerConf.loadDefaultOrThrow._1.protocol
   implicit private val enc: ErgoAddressEncoder                  = protocol.addressEncoder
   implicit private val localNodeUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(uri"http://local")
   implicit private val remoteNodeUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(uri"http://remote")
@@ -57,8 +58,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
       r.uri.path.endsWith(List("info"))
     }
     .thenRespondCyclicResponses(
-      (1 to 3).map(_ => Response.ok(getPeerInfo(Rest.info.sync))) ++
-        (1 to 100).map(_ => Response.ok(getPeerInfo(Rest.info.poll))): _*
+      (1 to 3).map(_ => Response.ok(getPeerInfo(Rest.info.poll))): _*
     )
     .whenRequestMatchesPartial {
       case r if r.uri.path.endsWith(List("transactions", "unconfirmed")) =>
@@ -68,6 +68,10 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
       case r if r.uri.path.startsWith(List("blocks", "at")) =>
         val chainHeight = r.uri.path.last.toInt
         Response.ok(s"""["${Rest.blockIds.byHeight(chainHeight)}"]""")
+      case r if r.uri.path.startsWith(List("blocks")) && r.uri.params.get("offset").isDefined =>
+        val offset = r.uri.params.get("offset").get.toInt
+        val limit  = r.uri.params.get("limit").getOrElse("50").toInt
+        Response.ok(Rest.blocks.forOffset(offset, limit).map(blockId => s""""$blockId"""") mkString ("[", ",", "]"))
       case r if r.uri.path.startsWith(List("blocks")) =>
         val blockId = r.uri.path.last
         Response.ok(Rest.blocks.byId(blockId))
@@ -86,17 +90,12 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val initializer   = new Initializer(storage, backend, graphBackend)
   val scheduler     = new Scheduler(pluginManager, blockIndexer, chainIndexer, mempoolSyncer, initializer)
 
-  "Scheduler should sync from 1 to 4150 and then from 4150 to 4200" in {
+  "Scheduler should sync from 1 to 4200" in {
     initializer.init shouldBe ChainEmpty
-    scheduler.periodicSync.flatMap { mempoolState =>
-      storage.getLastHeight.get shouldBe 4150
+    scheduler.periodicSync.map { newMempoolState =>
+      storage.getLastHeight.get shouldBe 4200
       storage.findMissingHeights shouldBe empty
-      mempoolState.stateTransitionByTx.size shouldBe 9
-      scheduler.periodicSync.map { newMempoolState =>
-        storage.getLastHeight.get shouldBe 4200
-        storage.findMissingHeights shouldBe empty
-        newMempoolState.stateTransitionByTx.size shouldBe 0
-      }
+      newMempoolState.stateTransitionByTx.size shouldBe 9
     }
   }
 }
