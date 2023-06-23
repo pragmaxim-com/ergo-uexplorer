@@ -13,9 +13,8 @@ import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.{Random, Success, Try}
 
-class SuperNodeCollector[HK: HotKeyCodec](superNodeFile: File) extends LazyLogging {
+class SuperNodeCollector[HK: HotKeyCodec](inputHotKeysFileName: String, outputHotKeysFile: File) extends LazyLogging {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
-  private val hotKeyFileNameGz             = "hot-ergo-trees.csv.gz"
 
   private lazy val stringifiedHotKeys: Map[HK, String] =
     Source
@@ -25,7 +24,7 @@ class SuperNodeCollector[HK: HotKeyCodec](superNodeFile: File) extends LazyLoggi
             Thread
               .currentThread()
               .getContextClassLoader
-              .getResourceAsStream(hotKeyFileNameGz)
+              .getResourceAsStream(inputHotKeysFileName)
           )
         )
       )
@@ -47,8 +46,8 @@ class SuperNodeCollector[HK: HotKeyCodec](superNodeFile: File) extends LazyLoggi
   def getHotKeyString(hotKey: HK): Option[String] = stringifiedHotKeys.get(hotKey)
 
   def writeReport(hotKeysWithCounter: Iterator[(HK, Counter)]): Try[_] =
-    if (superNodeFile.exists()) {
-      logger.info(s"Skipping report as file ${superNodeFile.getAbsolutePath} already exists")
+    if (outputHotKeysFile.exists()) {
+      logger.info(s"Skipping report as file ${outputHotKeysFile.getAbsolutePath} already exists")
       Success(())
     } else {
       val keysByCount =
@@ -67,9 +66,9 @@ class SuperNodeCollector[HK: HotKeyCodec](superNodeFile: File) extends LazyLoggi
       Try {
         keysByCount.headOption
           .map { _ =>
-            logger.info(s"Writing ${keysByCount.size} hot keys to ${superNodeFile.getAbsolutePath}")
+            logger.info(s"Writing ${keysByCount.size} hot keys to ${outputHotKeysFile.getAbsolutePath}")
             val report     = keysByCount.mkString("", "\n", "\n")
-            val fileWriter = new FileWriter(superNodeFile)
+            val fileWriter = new FileWriter(outputHotKeysFile)
             try fileWriter.write(report)
             finally fileWriter.close()
             report

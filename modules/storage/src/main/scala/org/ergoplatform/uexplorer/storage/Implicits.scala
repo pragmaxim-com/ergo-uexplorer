@@ -13,11 +13,11 @@ object Implicits {
   implicit val counterCodec: ValueCodec[Counter]                           = CounterCodec
   implicit val addressCodec: ValueCodec[ErgoTreeHex]                       = ErgoTreeHexCodec
 
-  implicit val superNodeErgoTreeCodec: HotKeyCodec[ErgoTreeHex] = new HotKeyCodec[ErgoTreeHex] {
-    import ErgoTreeHex.unwrapped
-    def serialize(key: ErgoTreeHex): String = key.unwrapped
+  implicit val hexCodec: HotKeyCodec[HexString] = new HotKeyCodec[HexString] {
+    import org.ergoplatform.uexplorer.HexString.unwrapped
+    def serialize(key: HexString): String = key.unwrapped
 
-    def deserialize(key: String): ErgoTreeHex = ErgoTreeHex.fromStringUnsafe(key)
+    def deserialize(key: String): HexString = ErgoTreeHex.fromStringUnsafe(key)
   }
 
 }

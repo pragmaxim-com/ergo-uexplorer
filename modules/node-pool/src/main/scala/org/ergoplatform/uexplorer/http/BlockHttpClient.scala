@@ -19,21 +19,18 @@ import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
-import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.ResiliencySupport
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 
 import scala.collection.{concurrent, mutable}
 
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
-  protocol: ProtocolSettings,
   sttpB: SttpBackend[Future, _]
 ) extends ResiliencySupport
   with Codecs {
 
-  implicit private val addressEncoder: ErgoAddressEncoder = protocol.addressEncoder
-  private val proxyUri                                    = uri"http://proxy"
-  private val retryPolicy: Policy                         = retry.Backoff(3, 1.second)
+  private val proxyUri            = uri"http://proxy"
+  private val retryPolicy: Policy = retry.Backoff(3, 1.second)
 
   def getBestBlockHeight: Future[Height] =
     metadataHttpClient.getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
@@ -95,7 +92,6 @@ object BlockHttpClient {
   def withNodePoolBackend(implicit
     localNodeUriMagnet: LocalNodeUriMagnet,
     remoteNodeUriMagnet: RemoteNodeUriMagnet,
-    protocol: ProtocolSettings,
     ctx: ActorContext[_],
     killSwitch: SharedKillSwitch
   ): Future[BlockHttpClient] = {
@@ -104,7 +100,7 @@ object BlockHttpClient {
     val nodePoolRef       = ctx.spawn(NodePool.behavior, "NodePool")
     val backend           = SttpNodePoolBackend[WebSockets](nodePoolRef)(ctx.system, futureSttpBackend, killSwitch)
     backend.keepNodePoolUpdated(metadataClient).map { _ =>
-      val blockClient = new BlockHttpClient(metadataClient)(protocol, backend)
+      val blockClient = new BlockHttpClient(metadataClient)(backend)
       CoordinatedShutdown(ctx.system).addTask(
         CoordinatedShutdown.PhaseServiceStop,
         "stop-block-http-client"

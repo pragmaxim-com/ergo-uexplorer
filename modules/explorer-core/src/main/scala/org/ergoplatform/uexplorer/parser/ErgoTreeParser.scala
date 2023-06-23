@@ -2,13 +2,13 @@ package org.ergoplatform.uexplorer.parser
 
 import com.google.bitcoin.core.Base58
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Address, ErgoTreeHex, TemplateHashHex}
+import org.ergoplatform.uexplorer.{Address, ErgoTreeHex, ErgoTreeT8Hex}
 import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, P2PKAddress, Pay2SAddress, Pay2SHAddress}
 import scorex.crypto.hash.{Blake2b256, Digest32, Sha256}
 import scorex.util.encode.Base16
 import sigmastate.Values.{ErgoTree, FalseLeaf, SigmaPropConstant, Value}
 import sigmastate.*
-import sigmastate.serialization.ErgoTreeSerializer
+import sigmastate.serialization.{ErgoTreeSerializer, SigmaSerializer}
 
 import scala.util.{Failure, Success, Try}
 import eu.timepit.refined.auto.*
@@ -23,12 +23,16 @@ object ErgoTreeParser extends LazyLogging {
   @inline def ergoTreeHex2ErgoTree(ergoTree: ErgoTreeHex): Try[Values.ErgoTree] =
     Base16.decode(ergoTree).map(treeSerializer.deserializeErgoTree)
 
-  @inline def ergoTreeHex2ErgoTreeTemplateSha256Hex(
+  @inline def isErgoTreeT8(ergoTreeBytes: Array[Byte]): Boolean =
+    treeSerializer.deserializeHeaderWithTreeBytes(SigmaSerializer.startReader(ergoTreeBytes))._3.nonEmpty
+
+  @inline def ergoTreeHex2T8Hex(
     ergoTree: ErgoTreeHex
-  )(implicit enc: ErgoAddressEncoder): Try[Option[TemplateHashHex]] =
-    ergoTreeHex2ErgoTree(ergoTree)
-      .map { tree =>
-        val templateOpt =
+  )(implicit enc: ErgoAddressEncoder): Try[Option[ErgoTreeT8Hex]] =
+    Base16.decode(ergoTree).map {
+      case bytes if isErgoTreeT8(bytes) =>
+        val tree = treeSerializer.deserializeErgoTree(bytes)
+        val t8Opt =
           tree.root match {
             case Right(SigmaPropConstant(ProveDlogProp(_))) =>
               None
@@ -39,9 +43,10 @@ object ErgoTreeParser extends LazyLogging {
             case _ =>
               None
           }
-        templateOpt.map(t => TemplateHashHex.fromStringUnsafe(Base16.encode(Sha256.hash(t))))
-      }
-
+        t8Opt.map(t => ErgoTreeT8Hex.fromStringUnsafe(Base16.encode(t)))
+      case _ =>
+        Option.empty[ErgoTreeT8Hex]
+    }
   // http://213.239.193.208:9053/blocks/at/545684
   // http://213.239.193.208:9053/blocks/2ad5af788bfd1b92790eadb42a300ad4fc38aaaba599a43574b1ea45d5d9dee4
   // http://213.239.193.208:9053/utils/ergoTreeToAddress/cd07021a8e6f59fd4a
@@ -63,9 +68,11 @@ object ErgoTreeParser extends LazyLogging {
       ErgoTreeHex.fromStringUnsafe(Base16.encode(ergoTree.bytes))
     }
 
-  @inline def base58Address2ErgoTreeTemplateHex(address: Address)(implicit enc: ErgoAddressEncoder): Try[TemplateHashHex] =
+  @inline def base58Address2ErgoTreeT8Hex(
+    address: Address
+  )(implicit enc: ErgoAddressEncoder): Try[ErgoTreeT8Hex] =
     base58Address2ErgoTree(address).map { ergoTree =>
-      TemplateHashHex.fromStringUnsafe(Base16.encode(ergoTree.template))
+      ErgoTreeT8Hex.fromStringUnsafe(Base16.encode(ergoTree.template))
     }
 
   @inline def base58Address2ErgoTree(address: Address)(implicit enc: ErgoAddressEncoder): Try[ErgoTree] =

@@ -7,10 +7,7 @@ import pureconfig.ConfigReader
 import pureconfig.*
 import pureconfig.generic.derivation.default.*
 
-final case class ProtocolSettings(
-  networkPrefix: NetworkPrefix,
-  genesisAddress: Address
-) derives ConfigReader {
+final case class ProtocolSettings(networkPrefix: NetworkPrefix) derives ConfigReader {
 
   val monetary = MonetarySettings()
   val emission = new EmissionRules(monetary)

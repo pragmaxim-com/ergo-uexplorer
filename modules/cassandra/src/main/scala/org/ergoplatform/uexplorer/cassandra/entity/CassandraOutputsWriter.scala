@@ -37,8 +37,8 @@ trait CassandraOutputsWriter { this: CassandraBackend =>
           .setInt(settlement_height,              output.settlementHeight)
           .setShort(idx,                            output.index)
           .setLong(global_index,                  output.globalIndex)
-          .setString(ergo_tree,                   output.ergoTree)
-          .setString(ergo_tree_template_hash,     output.templateHashHex)
+          .setString(ergo_tree,                   output.ergoTreeHex)
+          .setString(ergo_tree_template_hash,     output.ergoTreeT8HashHex)
           .setLong(timestamp,                     output.timestamp)
           .setBoolean(main_chain,                 output.mainChain)
         // format: on

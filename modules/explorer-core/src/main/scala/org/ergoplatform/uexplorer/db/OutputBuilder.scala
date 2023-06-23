@@ -14,8 +14,9 @@ import scala.util.Try
 case class OutputRecord(
   txId: TxId,
   boxId: BoxId,
-  ergoTree: ErgoTreeHex,
-  templateHashHex: Option[TemplateHashHex],
+  creationHeight: CreationHeight,
+  ergoTreeHex: ErgoTreeHex,
+  ergoTreeT8Hex: Option[ErgoTreeT8Hex],
   value: Value,
   additionalRegisters: Map[RegisterId, ExpandedRegister]
 )
@@ -27,9 +28,17 @@ object OutputBuilder {
       tx.outputs.map { o =>
         (
           for {
-            scriptTemplateHash <- ErgoTreeParser.ergoTreeHex2ErgoTreeTemplateSha256Hex(o.ergoTree)
+            scriptT8Hash <- ErgoTreeParser.ergoTreeHex2T8Hex(o.ergoTree)
             additionalRegisters = o.additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex)).toMap
-          } yield OutputRecord(tx.id, o.boxId, o.ergoTree, scriptTemplateHash, o.value, additionalRegisters)
+          } yield OutputRecord(
+            tx.id,
+            o.boxId,
+            o.creationHeight,
+            o.ergoTree,
+            scriptT8Hash,
+            o.value,
+            additionalRegisters
+          )
         ).get
       }
     }

@@ -15,6 +15,7 @@ import scala.util.{Failure, Success, Try}
 
 class SuperNodeMvMap[HK, C[_, _], K, V](
   store: MVStore,
+  id: String,
   superNodeCollector: SuperNodeCollector[HK]
 )(implicit codec: SuperNodeCodec[C, K, V], vc: ValueCodec[Counter])
   extends SuperNodeMapLike[HK, C, K, V]
@@ -29,7 +30,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
         .toMap
     )
 
-  private lazy val counterByHotKey = new MvMap[HK, Counter]("counterByHotKey", store)
+  private lazy val counterByHotKey = new MvMap[HK, Counter](s"$id-counter", store)
 
   private def collectReadHotKey(k: HK): Counter =
     counterByHotKey.adjust(k)(_.fold(Counter(1, 1, 0, 0)) { case Counter(writeOps, readOps, added, removed) =>
@@ -56,7 +57,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
             acc
         }
         .result()
-    logger.info(s"Going to remove ${emptyMaps.size} empty supernode maps")
+    logger.info(s"Going to remove ${emptyMaps.size} empty $id supernode maps")
     emptyMaps
       .foreach { hk =>
         existingMapsByHotKey
@@ -126,7 +127,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
               codec.writeAll(m, entries)
           }
         replacedValueOpt
-          .map(e => Failure(new AssertionError(s"Key ${e._1} was already present in supernode $hotKey!")))
+          .map(e => Failure(new AssertionError(s"In $id, secondary-key ${e._1} was already present under hotkey $hotKey!")))
           .getOrElse(Success(()))
       }
       .orElse {
@@ -139,7 +140,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
       .getHotKeyString(hotKey)
       .flatMap { superNodeName =>
         existingMapsByHotKey.remove(hotKey).map { mvMapToRemove =>
-          logger.info(s"Removing supernode map for $superNodeName")
+          logger.info(s"In $id, removing supernode map for $superNodeName")
           val result = codec.readAll(mvMapToRemove)
           store.removeMap(superNodeName)
           result
@@ -158,7 +159,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
           secondaryKeys.iterator
             .find(k => mvMap.remove(k) == null)
             .fold(Success(())) { sk =>
-              Failure(new AssertionError(s"Removing non-existing secondary key $sk from superNode $superNodeName"))
+              Failure(new AssertionError(s"In $id, removing non-existing secondary key $sk from superNode $superNodeName"))
             } // we don't remove supernode map when it gets empty as common map as  on/off/on/off is expensive
         /*
             .flatMap { _ =>
@@ -187,9 +188,11 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
 }
 
 object SuperNodeMvMap {
-  def apply[HK: HotKeyCodec, C[_, _], K, V](store: MVStore, superNodeFile: File)(implicit
+  def apply[HK: HotKeyCodec, C[_, _], K, V](store: MVStore, inputHotKeysFileName: String, outputHotKeysFile: File)(implicit
     sc: SuperNodeCodec[C, K, V],
     vc: ValueCodec[Counter]
-  ): SuperNodeMvMap[HK, C, K, V] =
-    new SuperNodeMvMap[HK, C, K, V](store, new SuperNodeCollector[HK](superNodeFile))
+  ): SuperNodeMvMap[HK, C, K, V] = {
+    val id = inputHotKeysFileName.stripSuffix(".csv.gz")
+    new SuperNodeMvMap[HK, C, K, V](store, id, new SuperNodeCollector[HK](inputHotKeysFileName, outputHotKeysFile))
+  }
 }

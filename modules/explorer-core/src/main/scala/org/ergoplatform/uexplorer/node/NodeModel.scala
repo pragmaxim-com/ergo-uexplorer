@@ -14,7 +14,7 @@ final case class ApiAdProof(
 
 final case class ApiAsset(
   tokenId: TokenId,
-  amount: Long
+  amount: Amount
 )
 
 final case class ApiBlockExtension(
@@ -44,10 +44,10 @@ final case class ApiHeader(
   id: BlockId,
   parentId: BlockId,
   version: Byte,
-  height: Int,
+  height: Height,
   nBits: Long,
   difficulty: ApiDifficulty,
-  timestamp: Long,
+  timestamp: Timestamp,
   stateRoot: StateRootHex,
   adProofsRoot: AdProofsRootHex,
   transactionsRoot: TransactionsRootHex,
@@ -61,8 +61,8 @@ final case class ApiHeader(
 
 final case class ApiOutput(
   boxId: BoxId,
-  value: Long,
-  creationHeight: Int,
+  value: Value,
+  creationHeight: CreationHeight,
   ergoTree: ErgoTreeHex,
   assets: List[ApiAsset],
   additionalRegisters: Map[RegisterId, BoxRegisterValueHex]
