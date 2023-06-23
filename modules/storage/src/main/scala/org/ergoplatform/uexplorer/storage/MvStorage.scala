@@ -53,96 +53,72 @@ case class MvStorage(
 
   def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
 
-  private def removeInputBoxesByErgoTree(ergoTree: ErgoTreeHex, inputBoxes: mutable.Map[BoxId, Value]): Try[_] =
-    ergoTreeHexByUtxo.removeAllOrFail(inputBoxes.keys).flatMap { _ =>
-      utxosByErgoTreeHex.removeAllOrFail(ergoTree, inputBoxes.iterator.map(_._1), inputBoxes.size) { existingBoxIds =>
-        inputBoxes.iterator.map(_._1).foreach(existingBoxIds.remove)
-        Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+  def removeInputBoxesByErgoTree(inputRecords: InputRecords): Option[Try[_]] =
+    inputRecords.byErgoTree.iterator
+      .map { case (ergoTreeHex, inputIds) =>
+        val inputBoxes =
+          inputIds.filter { case (boxId, _) =>
+            boxId != Emission.inputBox && boxId != Foundation.inputBox
+          }
+        ergoTreeHexByUtxo.removeAllOrFail(inputBoxes.keys).flatMap { _ =>
+          utxosByErgoTreeHex.removeAllOrFail(ergoTreeHex, inputBoxes.iterator.map(_._1), inputBoxes.size) { existingBoxIds =>
+            inputBoxes.iterator.map(_._1).foreach(existingBoxIds.remove)
+            Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+          }
+        }
       }
-    }
+      .collectFirst { case f @ Failure(_) => f }
 
-  private def removeInputBoxesByErgoTreeT8(
-    ergoTreeT8: ErgoTreeT8Hex,
-    inputBoxes: mutable.Set[BoxId]
-  ): Try[_] =
-    utxosByErgoTreeT8Hex.removeAllOrFail(ergoTreeT8, inputBoxes, inputBoxes.size) { existingBoxIds =>
-      inputBoxes.foreach(existingBoxIds.remove)
-      Option(existingBoxIds).collect { case m if !m.isEmpty => m }
-    }
-
-  private def persistErgoTreeUtxos(ergoTreeHex: ErgoTreeHex, boxes: Iterable[OutputRecord]): Try[_] =
-    ergoTreeHexByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.ergoTreeHex)).flatMap { _ =>
-      utxosByErgoTreeHex.adjustAndForget(ergoTreeHex, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
-    }
-
-  private def persistErgoTreeTemplateUtxos(ergoTreeT8Hex: ErgoTreeT8Hex, boxes: ArraySeq[OutputRecord]): Try[_] =
-    utxosByErgoTreeT8Hex.adjustAndForget(
-      ergoTreeT8Hex,
-      boxes.iterator.map(b => b.boxId -> b.creationHeight),
-      boxes.size
-    )
-
-  def persistNewBlock(b: BlockWithInputs): Try[BlockWithInputs] = {
-    val outErgoTreeFailureOpt =
-      b.outputRecords
-        .groupBy(_.ergoTreeHex)
-        .map { case (ergoTree, boxes) =>
-          persistErgoTreeUtxos(ergoTree, boxes)
+  def removeInputBoxesByErgoTreeT8(inputRecords: InputRecords): Option[Try[_]] =
+    inputRecords.byErgoTreeT8.iterator
+      .map { case (ergoTreeT8, inputIds) =>
+        val inputBoxes = inputIds.filter(boxId => boxId != Emission.inputBox && boxId != Foundation.inputBox)
+        utxosByErgoTreeT8Hex.removeAllOrFail(ergoTreeT8, inputBoxes, inputBoxes.size) { existingBoxIds =>
+          inputBoxes.foreach(existingBoxIds.remove)
+          Option(existingBoxIds).collect { case m if !m.isEmpty => m }
         }
-        .collectFirst { case f @ Failure(_) => f }
+      }
+      .collectFirst { case f @ Failure(_) => f }
 
-    val outErgoTreeT8FailureOpt =
-      b.outputRecords
-        .filter(_.ergoTreeT8Hex.isDefined)
-        .groupBy(_.ergoTreeT8Hex)
-        .collect { case (Some(ergoTreeTemplate), boxes) =>
-          persistErgoTreeTemplateUtxos(ergoTreeTemplate, boxes)
+  def persistErgoTreeTemplateUtxos(outputRecords: ArraySeq[OutputRecord]): Option[Try[_]] =
+    outputRecords
+      .filter(_.ergoTreeT8Hex.isDefined)
+      .groupBy(_.ergoTreeT8Hex)
+      .collect { case (Some(ergoTreeT8Hex), boxes) =>
+        utxosByErgoTreeT8Hex.adjustAndForget(
+          ergoTreeT8Hex,
+          boxes.iterator.map(b => b.boxId -> b.creationHeight),
+          boxes.size
+        )
+      }
+      .collectFirst { case f @ Failure(_) => f }
+
+  def persistErgoTreeUtxos(outputRecords: ArraySeq[OutputRecord]): Option[Try[_]] =
+    outputRecords
+      .groupBy(_.ergoTreeHex)
+      .map { case (ergoTreeHex, boxes) =>
+        ergoTreeHexByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.ergoTreeHex)).flatMap { _ =>
+          utxosByErgoTreeHex.adjustAndForget(ergoTreeHex, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
         }
-        .collectFirst { case f @ Failure(_) => f }
+      }
+      .collectFirst { case f @ Failure(_) => f }
 
-    val inErgoTreeFailureOpt =
-      b.inputRecords.byErgoTree.iterator
-        .map { case (ergoTree, inputIds) =>
-          removeInputBoxesByErgoTree(
-            ergoTree,
-            inputIds.filter { case (boxId, _) =>
-              boxId != Emission.inputBox && boxId != Foundation.inputBox
+  def commitNewBlock(blockId: BlockId, blockInfo: BlockInfo, currentVersion: Revision): Try[Set[BlockId]] =
+    blockById
+      .putIfAbsentOrFail(blockId, blockInfo.persistable(currentVersion))
+      .map { _ =>
+        blockIdsByHeight
+          .adjust(blockInfo.height)(
+            _.fold(javaSetOf(blockId)) { existingBlockIds =>
+              existingBlockIds.add(blockId)
+              existingBlockIds
             }
           )
-        }
-        .collectFirst { case f @ Failure(_) => f }
-
-    val inErgoTreeT8FailureOpt =
-      b.inputRecords.byErgoTreeT8.iterator
-        .map { case (ergoTreeT8, inputIds) =>
-          removeInputBoxesByErgoTreeT8(
-            ergoTreeT8,
-            inputIds.filter(boxId => boxId != Emission.inputBox && boxId != Foundation.inputBox)
-          )
-        }
-        .collectFirst { case f @ Failure(_) => f }
-
-    blockById
-      .putIfAbsentOrFail(b.b.header.id, b.info.persistable(store.getCurrentVersion))
-      .flatMap { _ =>
-        blockIdsByHeight.adjust(b.info.height)(
-          _.fold(javaSetOf(b.b.header.id)) { existingBlockIds =>
-            existingBlockIds.add(b.b.header.id)
-            existingBlockIds
-          }
-        )
-        List(
-          outErgoTreeFailureOpt,
-          inErgoTreeFailureOpt,
-          outErgoTreeT8FailureOpt,
-          inErgoTreeT8FailureOpt
-        ).flatten.headOption.getOrElse(Success(()))
       }
-      .map { _ =>
+      .map { blockIds =>
         store.commit()
-        b
+        blockIds.asScala.toSet
       }
-  }
 
   def writeReport: Try[_] = utxosByErgoTreeHex.writeReport
 
@@ -230,7 +206,6 @@ object MvStorage extends LazyLogging {
   type CacheSize         = Int
   type HeightCompactRate = Int
   type MaxCompactTime    = FiniteDuration
-  type Index             = Long
 
   private val userHomeDir                = System.getProperty("user.home")
   private val tempDir                    = System.getProperty("java.io.tmpdir")

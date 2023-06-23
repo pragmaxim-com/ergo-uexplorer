@@ -90,8 +90,14 @@ class BlockIndexer(
   def addBestBlock(block: LinkedBlock)(implicit enc: ErgoAddressEncoder): Try[BestBlockInserted] =
     for {
       lb <- utxoTracker.getBlockWithInputs(block)
-      _  <- storage.persistNewBlock(lb)
-      _  <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
+      outErgoTreeErr   = storage.persistErgoTreeUtxos(lb.outputRecords)
+      outErgoTreeT8Err = storage.persistErgoTreeTemplateUtxos(lb.outputRecords)
+      inErgoTreeErr    = storage.removeInputBoxesByErgoTree(lb.inputRecords)
+      inErgoTreeT8Err  = storage.removeInputBoxesByErgoTreeT8(lb.inputRecords)
+      _ <- List(outErgoTreeErr, outErgoTreeT8Err, inErgoTreeErr, inErgoTreeT8Err).flatten.headOption.getOrElse(Success(()))
+      blockIds <- storage.commitNewBlock(lb.b.header.id, lb.info, storage.getCurrentRevision)
+      _ = if (blockIds.size > 1) logger.info(s"Fork at height ${lb.info.height} with ${blockIds.mkString(", ")}")
+      _ <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
     } yield BestBlockInserted(lb, None) // TODO we forgot about FullBlock !
 
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
