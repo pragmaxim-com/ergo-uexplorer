@@ -21,18 +21,18 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
     storage: Storage,
     graphTraversalSource: Option[GraphTraversalSource]
   ): List[TxMatch] = {
-    def sumErgoTreeValues(ergoTrees: Set[ErgoTreeHex]): Map[ErgoTreeHex, ErgoTreeHex.State] =
+    def sumErgoTreeValues(ergoTrees: Set[ErgoTreeHex]): Map[ErgoTreeHex, Value] =
       ergoTrees
         .flatMap(a => storage.getUtxosByErgoTreeHex(a).map(a -> _))
-        .foldLeft(Map.empty[ErgoTreeHex, ErgoTreeHex.State]) { case (acc, (ergoTree, valueByBox)) =>
-          acc.updated(ergoTree, ErgoTreeHex.State(valueByBox.values.asScala.sum))
+        .foldLeft(Map.empty[ErgoTreeHex, Value]) { case (acc, (ergoTree, valueByBox)) =>
+          acc.updated(ergoTree, valueByBox.values.asScala.sum)
         }
 
     val outputsWithoutPaybacksAndFees =
       tx.outputs.filterNot(o =>
         tx.inputs.exists(i =>
           storage.getErgoTreeHexByUtxo(i.boxId).contains(o.ergoTree)
-        ) || o.ergoTree == Const.FeeContract.address
+        ) || o.ergoTree == Const.Protocol.FeeContract.address
       )
     Option(outputsWithoutPaybacksAndFees.iterator.map(_.value).sum)
       .filter(_ >= txErgValueThreshold * Const.NanoOrder)
@@ -43,7 +43,7 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
         val outputValueByErgoTree = sumErgoTreeValues(outputErgoTrees)
         val txMatch               = TxMatch(tx, value, inputValueByErgoTree, outputValueByErgoTree)
         Either.cond(
-          inputValueByErgoTree.valuesIterator.map(_._1).sum >= value,
+          inputValueByErgoTree.valuesIterator.sum >= value,
           txMatch,
           txMatch
         )
@@ -72,24 +72,24 @@ object HighValueDetector {
   case class BlockMatch(
     block: FullBlock,
     blockValue: Value,
-    inputs: Map[ErgoTreeHex, ErgoTreeHex.State],
-    outputs: Map[ErgoTreeHex, ErgoTreeHex.State]
+    inputs: Map[ErgoTreeHex, Value],
+    outputs: Map[ErgoTreeHex, Value]
   )
 
   case class TxMatch(
     tx: ApiTransaction,
     txValue: Value,
-    inputs: Map[ErgoTreeHex, ErgoTreeHex.State],
-    outputs: Map[ErgoTreeHex, ErgoTreeHex.State]
+    inputs: Map[ErgoTreeHex, Value],
+    outputs: Map[ErgoTreeHex, Value]
   ) {
 
     override def toString: AlertMessage = {
       val fmtValue         = valueFormat.format(txValue / Const.NanoOrder)
-      val fmtInputAddrSum  = valueFormat.format(inputs.valuesIterator.map(_._1).sum / Const.NanoOrder)
-      val fmtOutputAddrSum = valueFormat.format(outputs.valuesIterator.map(_._1).sum / Const.NanoOrder)
+      val fmtInputAddrSum  = valueFormat.format(inputs.valuesIterator.sum / Const.NanoOrder)
+      val fmtOutputAddrSum = valueFormat.format(outputs.valuesIterator.sum / Const.NanoOrder)
 
-      def stringify(tuple: (ErgoTreeHex, ErgoTreeHex.State)) = tuple match {
-        case (ergoTree, ErgoTreeHex.State(value)) =>
+      def stringify(tuple: (ErgoTreeHex, Value)) = tuple match {
+        case (ergoTree, value) =>
           val fmtVal = valueFormat.format(value / Const.NanoOrder)
           s"${ergoTree.asInstanceOf[String].take(5)} $fmtVal"
       }

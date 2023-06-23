@@ -62,7 +62,7 @@ final case class ApiHeader(
 final case class ApiOutput(
   boxId: BoxId,
   value: Value,
-  creationHeight: Int,
+  creationHeight: CreationHeight,
   ergoTree: ErgoTreeHex,
   assets: List[ApiAsset],
   additionalRegisters: Map[RegisterId, BoxRegisterValueHex]

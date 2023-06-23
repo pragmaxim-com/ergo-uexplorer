@@ -4,7 +4,6 @@ import akka.NotUsed
 import akka.stream.ActorAttributes
 import akka.stream.scaladsl.{Flow, Source}
 import com.typesafe.scalalogging.LazyLogging
-import eu.timepit.refined.auto.autoUnwrap
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockWithInputs, FullBlock}
@@ -46,7 +45,7 @@ trait JanusGraphWriter extends LazyLogging {
   def writeTxsAndCommit(blocks: Seq[BestBlockInserted]): IterableOnce[BestBlockInserted] = {
     blocks.iterator
       .foreach { case BestBlockInserted(b, _) =>
-        b.inputRecords.groupBy(_.txId).foreach { case (txId, inputRecords) =>
+        b.inputRecords.byTxId.foreach { case (txId, inputRecords) =>
           val outputRecords = b.outputRecords.filter(_.txId == txId)
           TxGraphWriter.writeGraph(txId, b.info.height, b.info.timestamp, inputRecords, outputRecords)(janusGraph)
 

@@ -18,7 +18,6 @@ import org.ergoplatform.ErgoAddressEncoder
 
 import scala.collection.immutable.ArraySeq
 import scala.util.{Failure, Success, Try}
-import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.parser.RegistersParser
 
 trait Codecs {

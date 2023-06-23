@@ -18,6 +18,7 @@ import com.esotericsoftware.kryo.serializers.MapSerializer
 import com.esotericsoftware.kryo.util.Pool
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.chain.ChainTip
@@ -44,12 +45,13 @@ import scala.util.{Failure, Random, Success, Try}
 
 class BlockIndexer(
   storage: MvStorage,
+  utxoTracker: UtxoTracker,
   mvStoreConf: MvStore
 ) extends LazyLogging {
 
   def readableStorage: Storage = storage
 
-  def addBestBlocks(winningFork: List[LinkedBlock]): Try[ListBuffer[BestBlockInserted]] =
+  def addBestBlocks(winningFork: List[LinkedBlock])(implicit enc: ErgoAddressEncoder): Try[ListBuffer[BestBlockInserted]] =
     winningFork
       .foldLeft(Try(ListBuffer.empty[BestBlockInserted])) {
         case (f @ Failure(_), _) =>
@@ -85,9 +87,9 @@ class BlockIndexer(
     chainTip
   }
 
-  def addBestBlock(block: LinkedBlock): Try[BestBlockInserted] =
+  def addBestBlock(block: LinkedBlock)(implicit enc: ErgoAddressEncoder): Try[BestBlockInserted] =
     for {
-      lb <- UtxoTracker(block, storage.getErgoTreeHexByUtxo, storage.getUtxoValuesByErgoTreeHex)
+      lb <- utxoTracker.getBlockWithInputs(block)
       _  <- storage.persistNewBlock(lb)
       _  <- if (lb.info.height % mvStoreConf.heightCompactRate == 0) compact(true) else Success(())
     } yield BestBlockInserted(lb, None) // TODO we forgot about FullBlock !
@@ -101,7 +103,7 @@ class BlockIndexer(
           false
       }
 
-  def addWinningFork(winningFork: List[LinkedBlock]): Try[ForkInserted] =
+  def addWinningFork(winningFork: List[LinkedBlock])(implicit enc: ErgoAddressEncoder): Try[ForkInserted] =
     if (!hasParentAndIsChained(winningFork)) {
       Failure(
         new UnexpectedStateError(
@@ -126,6 +128,7 @@ class BlockIndexer(
 object BlockIndexer {
   def apply(
     storage: MvStorage,
+    utxoTracker: UtxoTracker,
     mvStoreConf: MvStore
   )(implicit
     system: ActorSystem[Nothing]
@@ -136,6 +139,6 @@ object BlockIndexer {
     ) { () =>
       Future(storage.close()).map(_ => Done)
     }
-    new BlockIndexer(storage, mvStoreConf)
+    new BlockIndexer(storage, utxoTracker, mvStoreConf)
   }
 }

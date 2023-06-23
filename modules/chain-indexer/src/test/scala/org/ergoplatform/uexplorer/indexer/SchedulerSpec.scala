@@ -21,11 +21,13 @@ import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.Future
 import org.ergoplatform.uexplorer.{ProtocolSettings, Storage}
 import org.ergoplatform.uexplorer.cassandra.api.InMemoryBackend
+import org.ergoplatform.uexplorer.db.UtxoTracker
 import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, Rest, TestSupport}
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.http.MetadataHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
+import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.storage.MvStorage
 
 import java.nio.file.Paths
@@ -75,7 +77,8 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val backend       = Some(new InMemoryBackend)
   val graphBackend  = Some(new InMemoryGraphBackend)
   val pluginManager = new PluginManager(List.empty)
-  val blockIndexer  = BlockIndexer(storage, mvStoreConf)
+  val utxoTracker   = new UtxoTracker(storage, graphBackend.isDefined)
+  val blockIndexer  = BlockIndexer(storage, utxoTracker, mvStoreConf)
   val chainIndexer  = new ChainIndexer(backend, graphBackend, blockClient, blockIndexer)
   val mempoolSyncer = new MempoolSyncer(blockClient)
   val initializer   = new Initializer(storage, backend, graphBackend)

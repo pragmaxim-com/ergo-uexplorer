@@ -7,7 +7,7 @@ import eu.timepit.refined.refineV
 import io.circe.*
 import org.ergoplatform.uexplorer.{BoxCount, LastHeight, TxCount}
 import scorex.crypto.hash.Digest32
-
+import eu.timepit.refined.auto.autoUnwrap
 import scala.collection.mutable
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap}
@@ -16,10 +16,11 @@ import scala.util.Try
 
 package object uexplorer {
 
-  type Value     = Long
-  type Amount    = Long
-  type Height    = Int
-  type Timestamp = Long
+  type Value          = Long
+  type Amount         = Long
+  type Height         = Int
+  type CreationHeight = Long
+  type Timestamp      = Long
 
   type MinerReward = Long
   type MinerFee    = Long
@@ -30,73 +31,71 @@ package object uexplorer {
 
   type Revision = Long
 
-  type Base58Spec          = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
-  type Address             = String Refined Base58Spec
-  type ErgoTreeHex         = String Refined HexStringSpec
-  type AdProofsRootHex     = String Refined HexStringSpec
-  type AvlTreePathProofHex = String Refined HexStringSpec
-  type TreeRootHashHex     = String Refined HexStringSpec
-  type ExtensionDigestHex  = String Refined HexStringSpec
-  type BoxRegisterValueHex = String Refined HexStringSpec
-  type StateRootHex        = String Refined HexStringSpec
-  type TransactionsRootHex = String Refined HexStringSpec
-  type PowHex              = String Refined HexStringSpec
-  type PowNonceHex         = String Refined HexStringSpec
-  type InputProofHex       = String Refined HexStringSpec
-  type NetworkPrefix       = String Refined ValidByte
+  type Base58Spec    = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
+  type Address       = String Refined Base58Spec
+  type NetworkPrefix = String Refined ValidByte
 
   object Address {
-    import eu.timepit.refined.auto.autoUnwrap
-    case class State(value: Value)
     extension (x: Address) def unwrapped: String = x
     def fromStringUnsafe(s: String): Address     = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
-  }
-
-  object ErgoTreeHex {
-    import eu.timepit.refined.auto.autoUnwrap
-    case class State(value: Value)
-    extension (x: ErgoTreeHex) def unwrapped: String = x
-    def fromStringUnsafe(s: String): ErgoTreeHex     = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
   object NetworkPrefix {
     def fromStringUnsafe(s: String): NetworkPrefix = unsafeWrap(refineV[ValidByte].unsafeFrom(s))
   }
 
-  type HexString = String Refined HexStringSpec
+  type HexString           = String Refined HexStringSpec
+  type AdProofsRootHex     = HexString
+  type AvlTreePathProofHex = HexString
+  type TreeRootHashHex     = HexString
+  type ExtensionDigestHex  = HexString
+  type BoxRegisterValueHex = HexString
+  type StateRootHex        = HexString
+  type TransactionsRootHex = HexString
+  type PowHex              = HexString
+  type PowNonceHex         = HexString
+  type InputProofHex       = HexString
 
   object HexString {
-    def fromStringUnsafe(s: String): HexString = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
+    extension (x: HexString) def unwrapped: String = x
+    def fromStringUnsafe(s: String): HexString     = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
   object AvlTreePathProofHex {
     def fromStringUnsafe(s: String): AvlTreePathProofHex = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
   }
 
-  type BlockId = String Refined HexStringSpec
+  type BlockId = HexString
 
   object BlockId {
-    def fromStringUnsafe(s: String): BlockId = unsafeWrap(HexString.fromStringUnsafe(s))
+    extension (x: BlockId) def unwrapped: String = x
+    def fromStringUnsafe(s: String): BlockId     = unsafeWrap(HexString.fromStringUnsafe(s))
   }
 
-  type TokenId = String Refined HexStringSpec
+  type TokenId = HexString
 
   object TokenId {
-    def fromStringUnsafe(s: String): TokenId = unsafeWrap(HexString.fromStringUnsafe(s))
+    extension (x: TokenId) def unwrapped: String = x
+    def fromStringUnsafe(s: String): TokenId     = unsafeWrap(HexString.fromStringUnsafe(s))
   }
 
-  type TemplateHashHex = String Refined HexStringSpec
-  object TemplateHashHex {
-    def fromStringUnsafe(s: String): TemplateHashHex = unsafeWrap(HexString.fromStringUnsafe(s))
+  type ErgoTreeHex = HexString
+  object ErgoTreeHex {
+    extension (x: ErgoTreeHex) def unwrapped: String = x
+    def fromStringUnsafe(s: String): ErgoTreeHex     = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
+  }
+
+  type ErgoTreeT8Hex = HexString
+  object ErgoTreeT8Hex {
+    extension (x: ErgoTreeT8Hex) def unwrapped: String = x
+    def fromStringUnsafe(s: String): ErgoTreeT8Hex     = unsafeWrap(HexString.fromStringUnsafe(s))
   }
 
   opaque type TxId = String
 
   object TxId {
-    def apply(s: String): TxId = s
-
-    given Encoder[TxId] = Encoder.encodeString
-
+    def apply(s: String): TxId                = s
+    given Encoder[TxId]                       = Encoder.encodeString
     given Decoder[TxId]                       = Decoder.decodeString
     extension (x: TxId) def unwrapped: String = x
   }

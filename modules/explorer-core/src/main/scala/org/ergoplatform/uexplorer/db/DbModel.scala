@@ -97,8 +97,8 @@ final case class Output(
   settlementHeight: Int, // the height this output got fixed in blockchain
   index: Short, // index of the output in the transaction
   globalIndex: Long,
-  ergoTree: ErgoTreeHex, // serialized and hex-encoded ErgoTree
-  templateHashHex: TemplateHashHex, // hash of hashed ErgoTree template
+  ergoTreeHex: ErgoTreeHex, // serialized and hex-encoded ErgoTree
+  ergoTreeT8HashHex: ErgoTreeT8Hex, // hash of hashed ErgoTree template
   address: Address, // an address derived from ergoTree
   timestamp: Long, // time output appeared in the blockchain
   mainChain: Boolean // chain status, `true` if this output resides in main chain

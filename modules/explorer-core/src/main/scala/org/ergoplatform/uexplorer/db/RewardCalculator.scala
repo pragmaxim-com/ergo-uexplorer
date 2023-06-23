@@ -19,7 +19,7 @@ object RewardCalculator {
   // CPU greedy (2% of all runtime)
   private def getMinerRewardAddress(
     apiBlock: ApiFullBlock
-  )(implicit protocolSettings: ProtocolSettings): Try[Address] =
+  )(implicit ps: ProtocolSettings): Try[Address] =
     Base16
       .decode(apiBlock.header.minerPk)
       .flatMap { bytes =>
@@ -29,18 +29,18 @@ object RewardCalculator {
         val minerPk = ProveDlog(x)
         val rewardScript =
           ErgoScriptPredef.rewardOutputScript(
-            protocolSettings.monetary.minerRewardDelay,
+            ps.monetary.minerRewardDelay,
             minerPk
           )
         val addressStr =
-          Pay2SAddress(rewardScript)(protocolSettings.addressEncoder).toString
+          Pay2SAddress(rewardScript)(ps.addressEncoder).toString
         Try(Address.fromStringUnsafe(addressStr))
       }
 
   private def getMinerRewardAndFee(
     apiBlock: ApiFullBlock
-  )(implicit protocolSettings: ProtocolSettings): (Long, Long) = {
-    val emission = protocolSettings.emission.emissionAtHeight(apiBlock.header.height.toLong)
+  )(implicit ps: ProtocolSettings): (Long, Long) = {
+    val emission = ps.emission.emissionAtHeight(apiBlock.header.height.toLong)
     val reward   = math.min(Const.TeamTreasuryThreshold, emission)
     val eip27Reward =
       if (reward >= Const.Eip27UpperPoint) reward - Const.Eip27DefaultReEmission
@@ -48,10 +48,10 @@ object RewardCalculator {
       else reward
     val fee = apiBlock.transactions.transactions
       .flatMap(_.outputs)
-      .filter(_.ergoTree == Const.FeeContract.ergoTree)
+      .filter(_.ergoTree == Const.Protocol.FeeContract.ergoTree)
       .map(_.value)
       .sum
-    protocolSettings.networkPrefix.value.toByte match {
+    ps.networkPrefix.value.toByte match {
       case ErgoAddressEncoder.MainnetNetworkPrefix if apiBlock.header.height >= Const.MainnetEip27ActivationHeight =>
         (eip27Reward, fee)
       case ErgoAddressEncoder.TestnetNetworkPrefix if apiBlock.header.height >= Const.TestnetEip27ActivationHeight =>
@@ -61,7 +61,7 @@ object RewardCalculator {
     }
   }
 
-  def apply(block: ApiFullBlock)(implicit protocolSettings: ProtocolSettings): Try[BlockWithReward] =
+  def apply(block: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BlockWithReward] =
     for {
       minerRewardAddress <- getMinerRewardAddress(block)
       (reward, fee) = getMinerRewardAndFee(block)

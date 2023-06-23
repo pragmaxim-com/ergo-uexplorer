@@ -30,14 +30,14 @@ case class LinkedBlock(
   info: BlockInfo,
   parentInfoOpt: Option[BlockInfo]
 ) {
-  def toBlockWithInputs(inputRecords: ArraySeq[InputRecord]) =
+  def toBlockWithInputs(inputRecords: InputRecords) =
     BlockWithInputs(b, minerRewardInfo, inputRecords, outputRecords, info, parentInfoOpt)
 }
 
 case class BlockWithInputs(
   b: ApiFullBlock,
   minerRewardInfo: MinerRewardInfo,
-  inputRecords: ArraySeq[InputRecord],
+  inputRecords: InputRecords,
   outputRecords: ArraySeq[OutputRecord],
   info: BlockInfo,
   parentInfoOpt: Option[BlockInfo]
