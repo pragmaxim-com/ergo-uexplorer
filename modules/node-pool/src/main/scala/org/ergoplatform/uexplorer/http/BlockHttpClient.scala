@@ -51,6 +51,22 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
         }
     }(retry.Success.always, global)
 
+  def getBlockIdsByOffset(fromHeightIncl: Int, limit: Int): Future[Vector[BlockId]] =
+    retryPolicy.apply { () =>
+      basicRequest
+        .get(proxyUri.addPath("blocks").addParam("offset", fromHeightIncl.toString).addParam("limit", limit.toString))
+        .response(asJson[Vector[BlockId]])
+        .readTimeout(1.seconds)
+        .send(sttpB)
+        .map(_.body)
+        .flatMap {
+          case Right(blockIds) =>
+            Future.successful(blockIds)
+          case Left(error) =>
+            Future.failed(new Exception(s"Getting block id at fromHeightIncl $fromHeightIncl failed", error))
+        }
+    }(retry.Success.always, global)
+
   def getBlockIdForHeight(height: Int): Future[BlockId] =
     retryPolicy.apply { () =>
       basicRequest
@@ -67,6 +83,17 @@ class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
           case Left(error) =>
             Future.failed(new Exception(s"Getting block id at height $height failed", error))
         }
+    }(retry.Success.always, global)
+
+  def getBlockForIdAsString(blockId: BlockId): Future[String] =
+    retryPolicy.apply { () =>
+      basicRequest
+        .get(proxyUri.addPath("blocks", blockId.toString))
+        .response(asString)
+        .responseGetRight
+        .readTimeout(5.seconds)
+        .send(sttpB)
+        .map(_.body)
     }(retry.Success.always, global)
 
   def getBlockForId(blockId: BlockId): Future[ApiFullBlock] =

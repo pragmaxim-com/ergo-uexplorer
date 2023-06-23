@@ -42,10 +42,11 @@ object Rest {
     lazy val byHeight: SortedMap[Height, String] = loadCacheFromFile("blocks/blocks.gz")
 
     lazy val byId: SortedMap[String, String] = byHeight.map { case (height, block) =>
-      if (height == 4201)
-        println(block)
       blockIds.byHeight(height) -> block
     }
+
+    def forOffset(offset: Int, limit: Int): Vector[String] =
+      blockIds.byHeight.iteratorFrom(offset).take(limit).map(_._2).toVector
 
     def getByHeight(height: Int)(implicit addressEncoder: ErgoAddressEncoder): ApiFullBlock =
       parse(byHeight(height)).flatMap(_.as[ApiFullBlock]).toOption.get

@@ -36,38 +36,33 @@ class ChainIndexer(
 
   implicit private val enc: ErgoAddressEncoder = ps.addressEncoder
 
-  private val graphPersistenceFlow =
-    Flow[BestBlockInserted]
-      .buffer(100, OverflowStrategy.backpressure)
-      .async
-      .via(
-        graphBackendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(
-          _.graphWriteFlow
-        )
-      )
+  private def blockIdSource(fromHeight: Int): Source[BlockId, NotUsed] =
+    Source
+      .unfoldAsync(fromHeight) { offset =>
+        blockHttpClient.getBlockIdsByOffset(offset, 50).map {
+          case blockIds if blockIds.nonEmpty =>
+            Some((offset + blockIds.size, blockIds))
+          case _ =>
+            None
+        }
+      }
+      .buffer(20, OverflowStrategy.backpressure)
+      .mapConcat(identity)
 
-  private val backendPersistence =
-    Flow[BestBlockInserted]
-      .buffer(100, OverflowStrategy.backpressure)
-      .async
-      .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
-
-  private val httpFlow: Flow[Height, ApiFullBlock, NotUsed] =
-    Flow[Height]
-      .mapAsync(1)(blockHttpClient.getBlockIdForHeight)
-      .buffer(512, OverflowStrategy.backpressure)
+  private val blockForIdFlow: Flow[BlockId, ApiFullBlock, NotUsed] =
+    Flow[BlockId]
       .mapAsync(1)(blockHttpClient.getBlockForId) // parallelism could be parameterized - low or big pressure on Node
-      .buffer(8192, OverflowStrategy.backpressure)
+      .buffer(4096, OverflowStrategy.backpressure)
 
   private val processingFlow: Flow[ApiFullBlock, BlockWithOutputs, NotUsed] =
     Flow[ApiFullBlock]
       .map(RewardCalculator(_).get)
       .async
-      .buffer(8192, OverflowStrategy.backpressure)
+      .buffer(4096, OverflowStrategy.backpressure)
       .map(OutputBuilder(_).get)
       .async
       .addAttributes(Attributes.inputBuffer(1, 8)) // contract processing (sigma, base58)
-      .buffer(8192, OverflowStrategy.backpressure)
+      .buffer(4096, OverflowStrategy.backpressure)
 
   private val insertBranchFlow: Flow[List[LinkedBlock], BestBlockInserted, NotUsed] =
     Flow
@@ -87,12 +82,12 @@ class ChainIndexer(
             )
       }
 
-  private def indexingSink(chainLinker: ChainLinker): Sink[Height, Future[ChainSyncResult]] =
-    Flow[Height]
-      .via(httpFlow)
+  private def indexingSink(chainLinker: ChainLinker): Sink[BlockId, Future[ChainSyncResult]] =
+    Flow[BlockId]
+      .via(blockForIdFlow)
       .via(processingFlow)
       .mapAsync(1)(chainLinker.linkChildToAncestors())
-      .buffer(8192, OverflowStrategy.backpressure)
+      .buffer(4096, OverflowStrategy.backpressure)
       .via(insertBranchFlow)
       .via(backendPersistence)
       .via(graphPersistenceFlow)
@@ -101,6 +96,22 @@ class ChainIndexer(
       .toMat(Sink.lastOption[BestBlockInserted]) { case (_, lastBlockF) =>
         lastBlockF.map(onComplete)
       }
+
+  private val backendPersistence =
+    Flow[BestBlockInserted]
+      .buffer(100, OverflowStrategy.backpressure)
+      .async
+      .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
+
+  private val graphPersistenceFlow =
+    Flow[BestBlockInserted]
+      .buffer(100, OverflowStrategy.backpressure)
+      .async
+      .via(
+        graphBackendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(
+          _.graphWriteFlow
+        )
+      )
 
   private def onComplete(lastBlock: Option[BestBlockInserted]): ChainSyncResult = {
     blockIndexer.finishIndexing
@@ -118,11 +129,12 @@ class ChainIndexer(
       _ = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
       _ = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
       chainLinker = new ChainLinker(blockHttpClient.getBlockForId, chainTip)
-      syncResult <- Source(fromHeight to bestBlockHeight).runWith(indexingSink(chainLinker))
+      syncResult <- blockIdSource(fromHeight).runWith(indexingSink(chainLinker))
     yield syncResult
 
   def fixChain(missingHeights: TreeSet[Height], chainTip: ChainTip): Future[ChainSyncResult] =
     Source(missingHeights)
+      .mapAsync(1)(blockHttpClient.getBlockIdForHeight)
       .runWith(indexingSink(new ChainLinker(blockHttpClient.getBlockForId, chainTip)))
 
 }
