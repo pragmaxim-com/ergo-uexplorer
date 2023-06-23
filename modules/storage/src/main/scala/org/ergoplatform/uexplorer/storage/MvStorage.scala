@@ -10,13 +10,13 @@ import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, FeeContract, Foundation}
 import org.ergoplatform.uexplorer.mvstore.*
 import MvStorage.*
-
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
 import org.ergoplatform.uexplorer.storage.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.h2.mvstore.{MVMap, MVStore}
 import org.ergoplatform.uexplorer.db.OutputRecord
+
 import java.io.{BufferedInputStream, File}
 import java.nio.ByteBuffer
 import java.nio.file.{CopyOption, Files, Paths}
@@ -32,6 +32,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Random, Success, Try}
@@ -53,98 +54,106 @@ case class MvStorage(
 
   def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
 
-  private def removeInputBoxesByErgoTree(ergoTree: ErgoTreeHex, inputBoxes: mutable.Map[BoxId, Value]): Try[_] =
-    ergoTreeHexByUtxo.removeAllOrFail(inputBoxes.keys).flatMap { _ =>
-      utxosByErgoTreeHex.removeAllOrFail(ergoTree, inputBoxes.iterator.map(_._1), inputBoxes.size) { existingBoxIds =>
-        inputBoxes.iterator.map(_._1).foreach(existingBoxIds.remove)
-        Option(existingBoxIds).collect { case m if !m.isEmpty => m }
-      }
-    }
-
-  private def removeInputBoxesByErgoTreeT8(
-    ergoTreeT8: ErgoTreeT8Hex,
-    inputBoxes: mutable.Set[BoxId]
-  ): Try[_] =
-    utxosByErgoTreeT8Hex.removeAllOrFail(ergoTreeT8, inputBoxes, inputBoxes.size) { existingBoxIds =>
-      inputBoxes.foreach(existingBoxIds.remove)
-      Option(existingBoxIds).collect { case m if !m.isEmpty => m }
-    }
-
-  private def persistErgoTreeUtxos(ergoTreeHex: ErgoTreeHex, boxes: Iterable[OutputRecord]): Try[_] =
-    ergoTreeHexByUtxo.putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.ergoTreeHex)).flatMap { _ =>
-      utxosByErgoTreeHex.adjustAndForget(ergoTreeHex, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
-    }
-
-  private def persistErgoTreeTemplateUtxos(ergoTreeT8Hex: ErgoTreeT8Hex, boxes: ArraySeq[OutputRecord]): Try[_] =
-    utxosByErgoTreeT8Hex.adjustAndForget(
-      ergoTreeT8Hex,
-      boxes.iterator.map(b => b.boxId -> b.creationHeight),
-      boxes.size
-    )
-
-  def persistNewBlock(b: BlockWithInputs): Try[BlockWithInputs] = {
-    val outErgoTreeFailureOpt =
-      b.outputRecords
-        .groupBy(_.ergoTreeHex)
-        .map { case (ergoTree, boxes) =>
-          persistErgoTreeUtxos(ergoTree, boxes)
-        }
-        .collectFirst { case f @ Failure(_) => f }
-
-    val outErgoTreeT8FailureOpt =
-      b.outputRecords
-        .filter(_.ergoTreeT8Hex.isDefined)
-        .groupBy(_.ergoTreeT8Hex)
-        .collect { case (Some(ergoTreeTemplate), boxes) =>
-          persistErgoTreeTemplateUtxos(ergoTreeTemplate, boxes)
-        }
-        .collectFirst { case f @ Failure(_) => f }
-
-    val inErgoTreeFailureOpt =
-      b.inputRecords.byErgoTree.iterator
-        .map { case (ergoTree, inputIds) =>
-          removeInputBoxesByErgoTree(
-            ergoTree,
-            inputIds.filter { case (boxId, _) =>
-              boxId != Emission.inputBox && boxId != Foundation.inputBox
-            }
-          )
-        }
-        .collectFirst { case f @ Failure(_) => f }
-
-    val inErgoTreeT8FailureOpt =
-      b.inputRecords.byErgoTreeT8.iterator
-        .map { case (ergoTreeT8, inputIds) =>
-          removeInputBoxesByErgoTreeT8(
-            ergoTreeT8,
-            inputIds.filter(boxId => boxId != Emission.inputBox && boxId != Foundation.inputBox)
-          )
-        }
-        .collectFirst { case f @ Failure(_) => f }
-
-    blockById
-      .putIfAbsentOrFail(b.b.header.id, b.info.persistable(store.getCurrentVersion))
-      .flatMap { _ =>
-        blockIdsByHeight.adjust(b.info.height)(
-          _.fold(javaSetOf(b.b.header.id)) { existingBlockIds =>
-            existingBlockIds.add(b.b.header.id)
-            existingBlockIds
+  def removeInputBoxesByErgoTree(inputRecords: InputRecords): Try[_] = Try {
+    inputRecords.byErgoTree.iterator
+      .map { case (ergoTreeHex, inputIds) =>
+        val inputBoxes =
+          inputIds.filter { case (boxId, _) =>
+            boxId != Emission.inputBox && boxId != Foundation.inputBox
           }
-        )
-        List(
-          outErgoTreeFailureOpt,
-          inErgoTreeFailureOpt,
-          outErgoTreeT8FailureOpt,
-          inErgoTreeT8FailureOpt
-        ).flatten.headOption.getOrElse(Success(()))
-      }
-      .map { _ =>
-        store.commit()
-        b
+        ergoTreeHexByUtxo
+          .removeAllOrFail(inputBoxes.keys)
+          .flatMap { _ =>
+            utxosByErgoTreeHex.removeAllOrFail(ergoTreeHex, inputBoxes.iterator.map(_._1), inputBoxes.size) {
+              existingBoxIds =>
+                inputBoxes.iterator.map(_._1).foreach(existingBoxIds.remove)
+                Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+            }
+          }
+          .get
       }
   }
 
+  def removeInputBoxesByErgoTreeT8(inputRecords: InputRecords): Try[_] = Try {
+    inputRecords.byErgoTreeT8.iterator
+      .map { case (ergoTreeT8, inputIds) =>
+        val inputBoxes = inputIds.filter(boxId => boxId != Emission.inputBox && boxId != Foundation.inputBox)
+        utxosByErgoTreeT8Hex
+          .removeAllOrFail(ergoTreeT8, inputBoxes, inputBoxes.size) { existingBoxIds =>
+            inputBoxes.foreach(existingBoxIds.remove)
+            Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+          }
+          .get
+      }
+  }
+
+  def persistErgoTreeTemplateUtxos(outputRecords: ArraySeq[OutputRecord]): Try[_] = Try {
+    outputRecords
+      .filter(_.ergoTreeT8Hex.isDefined)
+      .groupBy(_.ergoTreeT8Hex)
+      .collect { case (Some(ergoTreeT8Hex), boxes) =>
+        utxosByErgoTreeT8Hex
+          .adjustAndForget(
+            ergoTreeT8Hex,
+            boxes.iterator.map(b => b.boxId -> b.creationHeight),
+            boxes.size
+          )
+          .get
+      }
+  }
+
+  def persistErgoTreeUtxos(outputRecords: ArraySeq[OutputRecord]): Try[_] = Try {
+    outputRecords
+      .groupBy(_.ergoTreeHex)
+      .map { case (ergoTreeHex, boxes) =>
+        ergoTreeHexByUtxo
+          .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.ergoTreeHex))
+          .flatMap { _ =>
+            utxosByErgoTreeHex.adjustAndForget(ergoTreeHex, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
+          }
+          .get
+      }
+  }
+
+  def commitNewBlock(
+    blockId: BlockId,
+    blockInfo: BlockInfo,
+    mvStoreConf: MvStoreConf,
+    currentVersion: Revision
+  ): Try[Set[BlockId]] =
+    blockById
+      .putIfAbsentOrFail(blockId, blockInfo.persistable(currentVersion))
+      .map { _ =>
+        blockIdsByHeight
+          .adjust(blockInfo.height)(
+            _.fold(javaSetOf(blockId)) { existingBlockIds =>
+              existingBlockIds.add(blockId)
+              existingBlockIds
+            }
+          )
+      }
+      .map { blockIds =>
+        store.commit()
+        val r = blockIds.asScala.toSet
+        if (blockIds.size > 1) logger.info(s"Fork at height ${blockInfo.height} with ${r.mkString(", ")}")
+        if (blockInfo.height % mvStoreConf.heightCompactRate == 0)
+          compact(true, mvStoreConf.maxIndexingCompactTime, mvStoreConf.maxIdleCompactTime)
+        else Success(())
+        r
+      }
+
   def writeReport: Try[_] = utxosByErgoTreeHex.writeReport
+
+  def compact(
+    indexing: Boolean,
+    maxIndexingCompactTime: MaxCompactTime,
+    maxIdleCompactTime: MaxCompactTime
+  ): Try[Unit] = Try {
+    logger.info(s"Compacting file at $getCompactReport")
+    val compactTime = if (indexing) maxIndexingCompactTime else maxIdleCompactTime
+    val result      = if (!indexing) clear() else Success(())
+    result.map(_ => store.compactFile(compactTime.toMillis.toInt))
+  }
 
   def getCompactReport: String = {
     val height                                                      = getLastHeight.getOrElse(0)
@@ -230,7 +239,6 @@ object MvStorage extends LazyLogging {
   type CacheSize         = Int
   type HeightCompactRate = Int
   type MaxCompactTime    = FiniteDuration
-  type Index             = Long
 
   private val userHomeDir                = System.getProperty("user.home")
   private val tempDir                    = System.getProperty("java.io.tmpdir")

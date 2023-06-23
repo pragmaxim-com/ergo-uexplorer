@@ -9,6 +9,7 @@ import akka.stream.{KillSwitches, SharedKillSwitch}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.cassandra.{AkkaStreamSupport, CassandraBackend}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
@@ -47,6 +48,7 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
         Behaviors.setup[Nothing] { implicit ctx =>
           implicit val system: ActorSystem[Nothing] = ctx.system
           implicit val protocol: ProtocolSettings   = conf.protocol
+          implicit val enc: ErgoAddressEncoder      = protocol.addressEncoder
           implicit val mempoolStateHolderRef: ActorRef[MempoolStateHolderRequest] =
             ctx.spawn(MempoolStateHolder.behavior(MempoolState.empty), "MempoolStateHolder")
 
