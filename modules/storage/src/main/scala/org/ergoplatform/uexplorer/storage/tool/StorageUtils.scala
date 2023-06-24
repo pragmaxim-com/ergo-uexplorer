@@ -1,8 +1,8 @@
-package org.ergoplatform.uexplorer.storage
+package org.ergoplatform.uexplorer.storage.tool
 
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.{Address, ErgoTreeHex, ErgoTreeT8Hex}
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
+import org.ergoplatform.uexplorer.{Address, ErgoTreeHex, ErgoTreeT8Hex}
 
 import java.io.{BufferedInputStream, FileWriter}
 import java.util.zip.GZIPInputStream
@@ -12,13 +12,13 @@ import scala.util.Success
 object StorageUtils {
   implicit val enc: ErgoAddressEncoder = ErgoAddressEncoder(0.toByte)
 
-  private def writeLinesToFile(lines: IterableOnce[String], filePath: String) = {
+  def writeLinesToFile(lines: IterableOnce[String], filePath: String) = {
     val fileWriter = new FileWriter(filePath)
     try fileWriter.write(lines.iterator.mkString("", "\n", "\n"))
     finally fileWriter.close()
 
   }
-  
+
   def ergoTreesFromAddresses: Set[ErgoTreeHex] =
     Source
       .fromInputStream(
@@ -55,6 +55,5 @@ object StorageUtils {
       .map(k => ErgoTreeParser.ergoTreeHex2T8Hex(ErgoTreeHex.fromStringUnsafe(k)))
       .collect { case Success(Some(t8)) => t8 }
       .toSet
-    
 
 }
