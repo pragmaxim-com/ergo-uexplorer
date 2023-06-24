@@ -47,7 +47,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
       Some(Counter(writeOps + 1, readOps, added, removed + size))
     }
 
-  def clear(): Try[Unit] = Try {
+  def clearEmptySuperNodes(): Try[Unit] = Try {
     val emptyMaps =
       existingMapsByHotKey
         .foldLeft(Set.newBuilder[HK]) {
@@ -66,9 +66,9 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
       }
   }
 
-  def writeReport: Try[_] =
+  def getReport: Vector[(String, Counter)] =
     superNodeCollector
-      .writeReport(counterByHotKey.iterator(None, None, false))
+      .filterAndSortHotKeys(counterByHotKey.iterator(None, None, false))
 
   def get(hotKey: HK, sk: K): Option[V] =
     existingMapsByHotKey
@@ -188,11 +188,11 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
 }
 
 object SuperNodeMvMap {
-  def apply[HK: HotKeyCodec, C[_, _], K, V](store: MVStore, inputHotKeysFileName: String, outputHotKeysFile: File)(implicit
+  def apply[HK: HotKeyCodec, C[_, _], K, V](store: MVStore, inputHotKeysFileName: String)(implicit
     sc: SuperNodeCodec[C, K, V],
     vc: ValueCodec[Counter]
   ): SuperNodeMvMap[HK, C, K, V] = {
-    val id = inputHotKeysFileName.stripSuffix(".csv.gz")
-    new SuperNodeMvMap[HK, C, K, V](store, id, new SuperNodeCollector[HK](inputHotKeysFileName, outputHotKeysFile))
+    val id = inputHotKeysFileName.stripSuffix(".csv.gz") // TODO take the id from upper maps
+    new SuperNodeMvMap[HK, C, K, V](store, id, new SuperNodeCollector[HK](inputHotKeysFileName))
   }
 }

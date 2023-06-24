@@ -77,18 +77,19 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
         Response.ok(Rest.blocks.byId(blockId))
     }
 
-  val mvStoreConf   = MvStoreConf(10, 500.millis, 500.millis, 10000)
-  val storage       = MvStorage(64).get
-  val blockClient   = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
-  val backend       = Some(new InMemoryBackend)
-  val graphBackend  = Some(new InMemoryGraphBackend)
-  val pluginManager = new PluginManager(List.empty)
-  val utxoTracker   = new UtxoTracker(storage, graphBackend.isDefined)
-  val blockIndexer  = BlockIndexer(storage, utxoTracker, mvStoreConf)
-  val chainIndexer  = new ChainIndexer(false, backend, graphBackend, blockClient, blockIndexer)
-  val mempoolSyncer = new MempoolSyncer(blockClient)
-  val initializer   = new Initializer(storage, backend, graphBackend)
-  val scheduler     = new Scheduler(pluginManager, blockIndexer, chainIndexer, mempoolSyncer, initializer)
+  val mvStoreConf     = MvStoreConf(10, 500.millis, 500.millis, 10000)
+  val storage         = MvStorage(64).get
+  val pluginManager   = new PluginManager(List.empty)
+  val storageService  = StorageService(storage, mvStoreConf)
+  val blockHttpClient = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
+  val backend         = Some(new InMemoryBackend)
+  val graphBackend    = Some(new InMemoryGraphBackend)
+  val blockReader     = new BlockReader(blockHttpClient)
+  val blockWriter     = new BlockWriter(storage, storageService, mvStoreConf, backend, graphBackend)
+  val streamExecutor  = new StreamExecutor(false, blockHttpClient, blockReader, blockWriter, storage)
+  val mempoolSyncer   = new MempoolSyncer(blockHttpClient)
+  val initializer     = new Initializer(storage, backend, graphBackend)
+  val scheduler       = new Scheduler(pluginManager, streamExecutor, mempoolSyncer, initializer)
 
   "Scheduler should sync from 1 to 4200" in {
     initializer.init shouldBe ChainEmpty

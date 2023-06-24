@@ -51,6 +51,5 @@ object Initializer {
   case class GraphInconsistency(error: String) extends ChainIntegrity
   case object ChainEmpty extends ChainIntegrity
   case object ChainValid extends ChainIntegrity
-  case class MissingBlocks(latestHeight: Height, missingHeights: TreeSet[Height]) extends ChainIntegrity
 
 }

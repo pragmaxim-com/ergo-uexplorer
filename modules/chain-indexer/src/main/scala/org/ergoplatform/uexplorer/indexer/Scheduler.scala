@@ -7,9 +7,9 @@ import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.ergoplatform.uexplorer.Resiliency
 import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
+import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
-import org.ergoplatform.uexplorer.indexer.chain.{BlockIndexer, ChainIndexer, Initializer}
+import org.ergoplatform.uexplorer.indexer.chain.{Initializer, StreamExecutor}
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
@@ -20,8 +20,7 @@ import scala.concurrent.duration.FiniteDuration
 
 class Scheduler(
   pluginManager: PluginManager,
-  blockIndexer: BlockIndexer,
-  chainIndexer: ChainIndexer,
+  streamExecutor: StreamExecutor,
   mempoolSyncer: MempoolSyncer,
   initializer: Initializer
 )(implicit
@@ -33,16 +32,14 @@ class Scheduler(
 
   def periodicSync: Future[MempoolStateChanges] =
     for {
-      chainTip                                                     <- Future.fromTry(blockIndexer.getChainTip)
-      ChainSyncResult(lastBlockOpt, storage, graphTraversalSource) <- chainIndexer.indexChain(chainTip)
+      ChainSyncResult(lastBlockOpt, storage, graphTraversalSource) <- streamExecutor.indexNewBlocks
       stateChanges                                                 <- mempoolSyncer.syncMempool(storage)
       _ <- pluginManager.executePlugins(storage, stateChanges, graphTraversalSource, lastBlockOpt)
     } yield stateChanges
 
   def validateAndSchedule(
     initialDelay: FiniteDuration,
-    pollingInterval: FiniteDuration,
-    verify: Boolean = true
+    pollingInterval: FiniteDuration
   ): Future[Done] =
     initializer.init match {
       case HalfEmptyInconsistency(error) =>
@@ -51,14 +48,5 @@ class Scheduler(
         Future.failed(new IllegalStateException(error))
       case ChainEmpty | ChainValid =>
         schedule(initialDelay, pollingInterval)(periodicSync).via(killSwitch.flow).run()
-      case MissingBlocks(_, missingHeights) =>
-        Future
-          .fromTry(blockIndexer.getChainTip)
-          .flatMap(chainTip =>
-            chainIndexer
-              .fixChain(missingHeights, chainTip)
-              .flatMap(_ => validateAndSchedule(initialDelay, pollingInterval, verify = false))
-          )
-
     }
 }

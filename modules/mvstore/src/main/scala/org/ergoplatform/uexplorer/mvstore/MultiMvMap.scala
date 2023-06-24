@@ -1,9 +1,11 @@
 package org.ergoplatform.uexplorer.mvstore
 
 import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
+import java.nio.file.Path
 import scala.collection.concurrent
 import java.util.Map.Entry
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
@@ -11,17 +13,18 @@ import java.util.stream.Collectors
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-//TODO make SuperNodePCol
 class MultiMvMap[PK, C[_, _], K, V](
+  id: String,
   commonMap: MapLike[PK, C[K, V]],
   superNodeMap: SuperNodeMvMap[PK, C, K, V]
 )(implicit c: MultiMapCodec[C, K, V])
   extends MultiMapLike[PK, C, K, V] {
 
-  def clear(): Try[Unit] =
-    superNodeMap.clear()
+  def clearEmptySuperNodes(): Try[Unit] =
+    superNodeMap.clearEmptySuperNodes()
 
-  def writeReport: Try[_] = superNodeMap.writeReport
+  def getReport: (Path, Vector[(String, Counter)]) =
+    ergoHomeDir.resolve(s"$id-hot-keys-$randomNumberPerRun.csv") -> superNodeMap.getReport
 
   def get(pk: PK, sk: K): Option[V] =
     superNodeMap

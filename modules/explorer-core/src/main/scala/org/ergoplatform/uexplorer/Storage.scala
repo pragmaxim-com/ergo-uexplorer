@@ -1,8 +1,10 @@
 package org.ergoplatform.uexplorer
 
+import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex, Height, Value}
 
+import java.nio.file.Path
 import scala.collection.immutable.TreeSet
 import scala.collection.concurrent
 import scala.util.Try
@@ -10,6 +12,8 @@ import scala.util.Try
 trait Storage {
 
   def isEmpty: Boolean
+
+  def getChainTip: Try[ChainTip]
 
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean
 

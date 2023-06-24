@@ -10,16 +10,18 @@ import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, FeeContract, Foundation}
 import org.ergoplatform.uexplorer.mvstore.*
 import MvStorage.*
+import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
 import org.ergoplatform.uexplorer.storage.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.h2.mvstore.{MVMap, MVStore}
 import org.ergoplatform.uexplorer.db.OutputRecord
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 
 import java.io.{BufferedInputStream, File}
 import java.nio.ByteBuffer
-import java.nio.file.{CopyOption, Files, Paths}
+import java.nio.file.{CopyOption, Files, Path, Paths}
 import java.util
 import java.util.Map.Entry
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
@@ -47,12 +49,29 @@ case class MvStorage(
 ) extends Storage
   with LazyLogging {
 
-  def clear(): Try[Unit] =
-    utxosByErgoTreeHex.clear()
+  def getReportByPath: Map[Path, Vector[(String, Counter)]] =
+    Map(
+      utxosByErgoTreeHex.getReport,
+      utxosByErgoTreeT8Hex.getReport
+    )
 
-  def close(): Try[Unit] = Try(store.close())
-
-  def rollbackTo(version: Revision): Try[Unit] = Try(store.rollbackTo(version))
+  def getChainTip: Try[ChainTip] = Try {
+    val chainTip =
+      ChainTip(
+        blockIdsByHeight
+          .iterator(None, None, reverse = true)
+          .take(100)
+          .flatMap { case (_, blockIds) =>
+            blockIds.asScala.flatMap(b => blockById.get(b).map(b -> _))
+          }
+      )
+    val sortedKeys = chainTip.toMap.values.map(_.height).toSeq.sorted
+    assert(
+      sortedKeys.lastOption == getLastHeight,
+      s"MvStore's Iterator works unexpectedly, ${sortedKeys.mkString(", ")} but last key is $getLastHeight!"
+    )
+    chainTip
+  }
 
   def removeInputBoxesByErgoTree(inputRecords: InputRecords): Try[_] = Try {
     inputRecords.byErgoTree.iterator
@@ -118,7 +137,6 @@ case class MvStorage(
   def commitNewBlock(
     blockId: BlockId,
     blockInfo: BlockInfo,
-    mvStoreConf: MvStoreConf,
     currentVersion: Revision
   ): Try[Set[BlockId]] =
     blockById
@@ -136,50 +154,8 @@ case class MvStorage(
         store.commit()
         val r = blockIds.asScala.toSet
         if (blockIds.size > 1) logger.info(s"Fork at height ${blockInfo.height} with ${r.mkString(", ")}")
-        if (blockInfo.height % mvStoreConf.heightCompactRate == 0)
-          compact(true, mvStoreConf.maxIndexingCompactTime, mvStoreConf.maxIdleCompactTime)
-        else Success(())
         r
       }
-
-  def writeReport: Try[_] = utxosByErgoTreeHex.writeReport
-
-  def compact(
-    indexing: Boolean,
-    maxIndexingCompactTime: MaxCompactTime,
-    maxIdleCompactTime: MaxCompactTime
-  ): Try[Unit] = Try {
-    logger.info(s"Compacting file at $getCompactReport")
-    val compactTime = if (indexing) maxIndexingCompactTime else maxIdleCompactTime
-    val result      = if (!indexing) clear() else Success(())
-    result.map(_ => store.compactFile(compactTime.toMillis.toInt))
-  }
-
-  def getCompactReport: String = {
-    val height                                                      = getLastHeight.getOrElse(0)
-    val MultiMapSize(superNodeSize, superNodeTotalSize, commonSize) = utxosByErgoTreeHex.size
-    val nonEmptyAddressCount                                        = superNodeSize + commonSize
-    val progress =
-      s"storage height: $height, " +
-        s"utxo count: ${ergoTreeHexByUtxo.size}, " +
-        s"supernode-utxo-count : $superNodeTotalSize, " +
-        s"non-empty-address count: $nonEmptyAddressCount, "
-
-    val cs  = store.getCacheSize
-    val csu = store.getCacheSizeUsed
-    val chr = store.getCacheHitRatio
-    val cc  = store.getChunkCount
-    val cfr = store.getChunksFillRate
-    val fr  = store.getFillRate
-    val lr  = store.getLeafRatio
-    val pc  = store.getPageCount
-    val mps = store.getMaxPageSize
-    val kpp = store.getKeysPerPage
-    val debug =
-      s"cache size used: $csu from: $cs at ratio: $chr, chunks: $cc at fill rate: $cfr, fill rate: $fr, " +
-        s"leaf ratio: $lr, page count: $pc, max page size: $mps, keys per page: $kpp"
-    progress + debug
-  }
 
   def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockInfo] =
     blockIdsByHeight
@@ -234,36 +210,21 @@ case class MvStorage(
 
 object MvStorage extends LazyLogging {
   import scala.concurrent.duration.*
-  import SuperNodeCollector.randomNumberPerRun
 
   type CacheSize         = Int
   type HeightCompactRate = Int
   type MaxCompactTime    = FiniteDuration
 
-  private val userHomeDir                = System.getProperty("user.home")
-  private val tempDir                    = System.getProperty("java.io.tmpdir")
-  private val VersionsToKeep             = 10
-  private val dbFileName                 = "mv-store.db"
-  private val dbFile                     = Paths.get(userHomeDir, ".ergo-uexplorer", dbFileName).toFile
-  private val tempDbFile                 = Paths.get(tempDir, s"mv-store-$randomNumberPerRun.db").toFile
-  private val tempOutputHotErgoTreesFile = Paths.get(tempDir, s"hot-ergo-trees-$randomNumberPerRun.csv").toFile
-  private val prodOutputHotErgoTreesFile = Paths.get(userHomeDir, ".ergo-uexplorer", "hot-ergo-trees.csv").toFile
-  private val tempOutputHotTemplatesFile = Paths.get(tempDir, s"hot-templates-$randomNumberPerRun.csv").toFile
-  private val prodOutputHotTemplatesFile = Paths.get(userHomeDir, ".ergo-uexplorer", "hot-templates.csv").toFile
+  private val VersionsToKeep = 10
+  private val dbFileName     = "mv-store.db"
+  private val dbFile         = ergoHomeDir.resolve(dbFileName).toFile
+  private val tempDbFile     = tempDir.resolve(s"mv-store-$randomNumberPerRun.db").toFile
 
   def apply(
     cacheSize: CacheSize,
-    dbFile: File              = tempDbFile,
-    outHotErgoTreesFile: File = tempOutputHotErgoTreesFile,
-    outHotTemplatesFile: File = tempOutputHotTemplatesFile
+    dbFile: File = tempDbFile
   ): Try[MvStorage] = Try {
     dbFile.getParentFile.mkdirs()
-    outHotErgoTreesFile.getParentFile.mkdirs()
-    if (outHotErgoTreesFile.exists()) {
-      val backupOutputPath = outHotErgoTreesFile.toPath.resolve(".backup")
-      logger.warn(s"Moving file ${outHotErgoTreesFile.getAbsolutePath} to ${backupOutputPath.toFile.getAbsolutePath}")
-      Files.move(outHotErgoTreesFile.toPath, backupOutputPath)
-    }
     val store =
       new MVStore.Builder()
         .fileName(dbFile.getAbsolutePath)
@@ -279,12 +240,14 @@ object MvStorage extends LazyLogging {
     MvStorage(
       store,
       new MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value](
+        "utxosByErgoTreeHex",
         new MvMap[ErgoTreeHex, util.Map[BoxId, Value]]("utxosByErgoTreeHex", store),
-        SuperNodeMvMap[ErgoTreeHex, util.Map, BoxId, Value](store, "hot-ergo-trees.csv.gz", outHotErgoTreesFile)
+        SuperNodeMvMap[ErgoTreeHex, util.Map, BoxId, Value](store, "hot-ergo-trees.csv.gz")
       ),
       new MultiMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight](
+        "utxosByErgoTreeTemplateHex",
         new MvMap[ErgoTreeT8Hex, util.Map[BoxId, CreationHeight]]("utxosByErgoTreeTemplateHex", store),
-        SuperNodeMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight](store, "hot-templates.csv.gz", outHotTemplatesFile)
+        SuperNodeMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight](store, "hot-templates.csv.gz")
       ),
       new MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo", store),
       new MvMap[Height, util.Set[BlockId]]("blockIdsByHeight", store),
@@ -295,8 +258,6 @@ object MvStorage extends LazyLogging {
   def withDefaultDir(cacheSize: CacheSize): Try[MvStorage] =
     MvStorage(
       cacheSize,
-      dbFile,
-      outHotErgoTreesFile = prodOutputHotErgoTreesFile,
-      outHotTemplatesFile = prodOutputHotTemplatesFile
+      dbFile
     )
 }
