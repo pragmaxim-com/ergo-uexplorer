@@ -6,7 +6,7 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-class MvMap[K, V: ValueCodec](id: String)(implicit store: MVStore) extends MapLike[K, V] {
+case class MvMap[K, V: ValueCodec](id: String)(implicit store: MVStore) extends MapLike[K, V] {
 
   private val underlying: MVMap[K, Array[Byte]] = store.openMap[K, Array[Byte]](id)
 

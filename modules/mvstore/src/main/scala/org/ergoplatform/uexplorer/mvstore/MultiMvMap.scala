@@ -13,7 +13,7 @@ import java.util.stream.Collectors
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-class MultiMvMap[PK, C[_, _], K, V](
+case class MultiMvMap[PK, C[_, _], K, V](
   id: MultiMapId
 )(implicit
   store: MVStore,

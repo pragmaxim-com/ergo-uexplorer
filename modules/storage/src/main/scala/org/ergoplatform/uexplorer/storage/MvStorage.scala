@@ -232,11 +232,11 @@ object MvStorage extends LazyLogging {
     logger.info(s"Opening mvstore at version ${store.getCurrentVersion}")
 
     MvStorage(
-      new MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex"),
-      new MultiMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight]("utxosByErgoTreeT8Hex"),
-      new MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
-      new MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
-      new MvMap[BlockId, BlockInfo]("blockById")
+      MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex"),
+      MultiMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight]("utxosByErgoTreeT8Hex"),
+      MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
+      MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
+      MvMap[BlockId, BlockInfo]("blockById")
     )
   }
 
