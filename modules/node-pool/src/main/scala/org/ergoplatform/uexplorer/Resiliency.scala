@@ -25,7 +25,7 @@ trait Resiliency {
     interval: FiniteDuration
   )(run: => Future[T]): Source[T, NotUsed] =
     RestartSource
-      .withBackoff(Resiliency.restartSettings) { () =>
+      .withBackoff(Resiliency.restartSettings(interval)) { () =>
         Source
           .tick(initialDelay, interval, ())
           .mapAsync(1)(_ => run)
@@ -41,8 +41,8 @@ trait Resiliency {
 
 object Resiliency extends LazyLogging {
 
-  val restartSettings: RestartSettings = RestartSettings(
-    minBackoff   = 3.seconds,
+  def restartSettings(minBackoff: FiniteDuration): RestartSettings = RestartSettings(
+    minBackoff   = minBackoff,
     maxBackoff   = 30.seconds,
     randomFactor = 0.2 // adds 20% "noise" to vary the intervals slightly
   ).withMaxRestarts(20, 60.minutes) // limits the amount of restarts to 20 within 5 minutes

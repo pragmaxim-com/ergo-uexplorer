@@ -38,7 +38,10 @@ import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.storage.MvStorage
 
-object Application extends App with AkkaStreamSupport with LazyLogging {
+object ChainIndexer extends App with AkkaStreamSupport with LazyLogging {
+
+  Try(args.headOption).foreach(println)
+
   ChainIndexerConf.loadWithFallback match {
     case Left(failures) =>
       failures.toList.foreach(f => println(s"Config error ${f.description} at ${f.origin}"))
@@ -78,7 +81,7 @@ object Application extends App with AkkaStreamSupport with LazyLogging {
               storage         <- Future.fromTry(MvStorage.withDefaultDir(conf.mvStore.cacheSize))
               utxoTracker   = new UtxoTracker(storage, graphBackendOpt.isDefined)
               blockIndexer  = BlockIndexer(storage, utxoTracker, conf.mvStore)
-              chainIndexer  = new ChainIndexer(backendOpt, graphBackendOpt, blockHttpClient, blockIndexer)
+              chainIndexer  = new ChainIndexer(true, backendOpt, graphBackendOpt, blockHttpClient, blockIndexer)
               mempoolSyncer = new MempoolSyncer(blockHttpClient)
               initializer   = new Initializer(storage, backendOpt, graphBackendOpt)
               scheduler     = new Scheduler(pluginManager, blockIndexer, chainIndexer, mempoolSyncer, initializer)

@@ -1,9 +1,10 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import akka.NotUsed
+import akka.{Done, NotUsed}
 import akka.actor.typed.ActorSystem
-import akka.stream.{ActorAttributes, Attributes, OverflowStrategy, SharedKillSwitch}
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.{ActorAttributes, Attributes, IOResult, OverflowStrategy, SharedKillSwitch}
+import akka.stream.scaladsl.{Compression, FileIO, Flow, Framing, Sink, Source}
+import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.ErgoAddressEncoder
@@ -12,12 +13,14 @@ import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, Resiliency
 import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.chain.{ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.ChainSyncResult
+import org.ergoplatform.uexplorer.http.{BlockHttpClient, Codecs}
+import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer.*
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.storage.MvStorage
+import sttp.client3.circe.asJson
 
+import java.nio.file.{Path, Paths}
 import scala.jdk.CollectionConverters.*
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.immutable.{ListMap, TreeSet}
@@ -27,6 +30,7 @@ import scala.collection.concurrent
 import scala.util.{Failure, Try}
 
 class ChainIndexer(
+  bench: Boolean,
   backendOpt: Option[Backend],
   graphBackendOpt: Option[GraphBackend],
   blockHttpClient: BlockHttpClient,
@@ -35,19 +39,6 @@ class ChainIndexer(
   extends LazyLogging {
 
   implicit private val enc: ErgoAddressEncoder = ps.addressEncoder
-
-  private def blockIdSource(fromHeight: Int): Source[BlockId, NotUsed] =
-    Source
-      .unfoldAsync(fromHeight) { offset =>
-        blockHttpClient.getBlockIdsByOffset(offset, 50).map {
-          case blockIds if blockIds.nonEmpty =>
-            Some((offset + blockIds.size, blockIds))
-          case _ =>
-            None
-        }
-      }
-      .buffer(20, OverflowStrategy.backpressure)
-      .mapConcat(identity)
 
   private val blockForIdFlow: Flow[BlockId, ApiFullBlock, NotUsed] =
     Flow[BlockId]
@@ -69,9 +60,6 @@ class ChainIndexer(
       .apply[List[LinkedBlock]]
       .flatMapConcat {
         case bestBlock :: Nil =>
-          if (bestBlock.info.height % 100 == 0) {
-            logger.info(s"Height ${bestBlock.info.height}")
-          }
           Source.single(bestBlock).via(blockIndexer.insertBlockFlow)
         case winningFork =>
           blockIndexer
@@ -82,9 +70,8 @@ class ChainIndexer(
             )
       }
 
-  private def indexingSink(chainLinker: ChainLinker): Sink[BlockId, Future[ChainSyncResult]] =
-    Flow[BlockId]
-      .via(blockForIdFlow)
+  private def indexingSink(chainLinker: ChainLinker): Sink[ApiFullBlock, Future[ChainSyncResult]] =
+    Flow[ApiFullBlock]
       .via(processingFlow)
       .mapAsync(1)(chainLinker.linkChildToAncestors())
       .buffer(4096, OverflowStrategy.backpressure)
@@ -129,20 +116,50 @@ class ChainIndexer(
       _ = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
       _ = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
       chainLinker = new ChainLinker(blockHttpClient.getBlockForId, chainTip)
-      syncResult <- blockIdSource(fromHeight).runWith(indexingSink(chainLinker))
+      source = if (bench) blockSourceFromFS(benchPath) else blockIdSource(blockHttpClient, fromHeight).via(blockForIdFlow)
+      syncResult <- source.runWith(indexingSink(chainLinker))
     yield syncResult
 
   def fixChain(missingHeights: TreeSet[Height], chainTip: ChainTip): Future[ChainSyncResult] =
     Source(missingHeights)
       .mapAsync(1)(blockHttpClient.getBlockIdForHeight)
+      .via(blockForIdFlow)
       .runWith(indexingSink(new ChainLinker(blockHttpClient.getBlockForId, chainTip)))
 
 }
 
-object ChainIndexer {
+object ChainIndexer extends Codecs with LazyLogging {
+  private val benchPath = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "ergo-chain.lines.gz")
   case class ChainSyncResult(
     lastBlock: Option[BestBlockInserted],
     storage: Storage,
     graphTraversalSource: Option[GraphTraversalSource]
   )
+
+  protected[indexer] def blockSourceFromFS(path: Path): Source[ApiFullBlock, NotUsed] = {
+    import io.circe.parser.decode
+    logger.info(s"Running benchmark, reading all blocks from filesystem")
+    FileIO
+      .fromPath(path)
+      .via(Compression.gunzip())
+      .via(Framing.delimiter(ByteString("\n"), 512 * 1000))
+      .map(_.utf8String)
+      .map(s => decode[ApiFullBlock](s).toTry.get)
+      .mapMaterializedValue(_ => NotUsed)
+  }
+
+  protected[indexer] def blockIdSource(blockHttpClient: BlockHttpClient, fromHeight: Int): Source[BlockId, NotUsed] =
+    Source
+      .unfoldAsync(fromHeight) { offset =>
+        blockHttpClient.getBlockIdsByOffset(offset, 100).map {
+          case blockIds if blockIds.nonEmpty =>
+            logger.info(s"Height $offset")
+            Some((offset + blockIds.size, blockIds))
+          case _ =>
+            None
+        }
+      }
+      .buffer(10, OverflowStrategy.backpressure)
+      .mapConcat(identity)
+
 }
