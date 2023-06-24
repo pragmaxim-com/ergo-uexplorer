@@ -8,7 +8,7 @@ import akka.stream.*
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.http.{BlockHttpClient, LocalNodeUriMagnet, RemoteNodeUriMagnet}
-import org.ergoplatform.uexplorer.indexer.chain.ChainIndexer
+import org.ergoplatform.uexplorer.indexer.chain.{BlockReader, StreamExecutor}
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 
 import java.io.{PrintWriter, StringWriter}
@@ -34,10 +34,11 @@ object DownloadBlocksAsLinesFromNodeToFile extends App with LazyLogging {
 
       for
         blockHttpClient <- BlockHttpClient.withNodePoolBackend
+        blockReader = new BlockReader(blockHttpClient)
         bestBlockHeight <- blockHttpClient.getBestBlockHeight
         _ = println(s"Initiating download from 1 to $bestBlockHeight")
-      yield ChainIndexer
-        .blockIdSource(blockHttpClient, 1)
+      yield blockReader
+        .blockIdSource(1)
         .buffer(20000, OverflowStrategy.backpressure)
         .mapAsync(1)(blockHttpClient.getBlockForIdAsString)
         .buffer(20000, OverflowStrategy.backpressure)

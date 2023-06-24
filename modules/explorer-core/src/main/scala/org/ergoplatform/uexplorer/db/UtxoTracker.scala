@@ -22,10 +22,11 @@ case class InputRecords(
   byTxId: mutable.Map[TxId, mutable.Map[ErgoTreeHex, mutable.Map[BoxId, Value]]]
 )
 
-class UtxoTracker(storage: Storage, graphEnabled: Boolean) {
+object UtxoTracker {
 
   def getBlockWithInputs(
-    b: LinkedBlock
+    b: LinkedBlock,
+    storage: Storage
   )(implicit enc: ErgoAddressEncoder): Try[BlockWithInputs] = Try {
 
     val outputLookup =
@@ -36,7 +37,7 @@ class UtxoTracker(storage: Storage, graphEnabled: Boolean) {
     val byErgoTree   = mutable.Map.empty[ErgoTreeHex, mutable.Map[BoxId, Value]]
     val byErgoTreeT8 = mutable.Map.empty[ErgoTreeT8Hex, mutable.Set[BoxId]]
     val byTxId =
-      mutable.Map.empty[TxId, mutable.Map[ErgoTreeHex, mutable.Map[BoxId, Value]]] // TODO populate for janus if graphEnabled
+      mutable.Map.empty[TxId, mutable.Map[ErgoTreeHex, mutable.Map[BoxId, Value]]] // TODO populate, also for janus
 
     b.b.transactions.transactions
       .foreach {
@@ -105,10 +106,6 @@ class UtxoTracker(storage: Storage, graphEnabled: Boolean) {
       }
     b.toBlockWithInputs(InputRecords(byErgoTree, byErgoTreeT8, byTxId))
   }
-
-}
-
-object UtxoTracker {
 
   private def adjustMultiMap[ET, B, V](m: mutable.Map[ET, mutable.Map[B, V]], et: ET, boxId: B, value: V) =
     m.adjust(et)(
