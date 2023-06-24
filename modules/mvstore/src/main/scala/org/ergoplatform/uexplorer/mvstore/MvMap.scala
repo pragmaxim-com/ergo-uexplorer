@@ -6,9 +6,9 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-class MvMap[K, V: ValueCodec](name: String, store: MVStore) extends MapLike[K, V] {
+class MvMap[K, V: ValueCodec](id: String)(implicit store: MVStore) extends MapLike[K, V] {
 
-  private val underlying: MVMap[K, Array[Byte]] = store.openMap[K, Array[Byte]](name)
+  private val underlying: MVMap[K, Array[Byte]] = store.openMap[K, Array[Byte]](id)
 
   private val codec: ValueCodec[V] = implicitly[ValueCodec[V]]
 

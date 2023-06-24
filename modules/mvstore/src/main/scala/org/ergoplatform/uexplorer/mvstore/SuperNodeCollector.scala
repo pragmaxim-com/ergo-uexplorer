@@ -13,7 +13,7 @@ import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.{Random, Success, Try}
 
-class SuperNodeCollector[HK: HotKeyCodec](inputHotKeysFileName: String) extends LazyLogging {
+class SuperNodeCollector[HK: HotKeyCodec](id: String) extends LazyLogging {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
 
   private lazy val stringifiedHotKeys: Map[HK, String] =
@@ -24,7 +24,7 @@ class SuperNodeCollector[HK: HotKeyCodec](inputHotKeysFileName: String) extends 
             Thread
               .currentThread()
               .getContextClassLoader
-              .getResourceAsStream(inputHotKeysFileName)
+              .getResourceAsStream(s"hot-keys-$id.csv.gz")
           )
         )
       )

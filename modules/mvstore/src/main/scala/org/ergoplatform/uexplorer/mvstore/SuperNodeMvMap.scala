@@ -14,10 +14,9 @@ import scala.collection.concurrent
 import scala.util.{Failure, Success, Try}
 
 class SuperNodeMvMap[HK, C[_, _], K, V](
-  store: MVStore,
   id: String,
   superNodeCollector: SuperNodeCollector[HK]
-)(implicit codec: SuperNodeCodec[C, K, V], vc: ValueCodec[Counter])
+)(implicit store: MVStore, codec: SuperNodeCodec[C, K, V], vc: ValueCodec[Counter])
   extends SuperNodeMapLike[HK, C, K, V]
   with LazyLogging {
 
@@ -30,7 +29,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
         .toMap
     )
 
-  private lazy val counterByHotKey = new MvMap[HK, Counter](s"$id-counter", store)
+  private lazy val counterByHotKey = new MvMap[HK, Counter](s"$id-counter")
 
   private def collectReadHotKey(k: HK): Counter =
     counterByHotKey.adjust(k)(_.fold(Counter(1, 1, 0, 0)) { case Counter(writeOps, readOps, added, removed) =>
@@ -188,11 +187,10 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
 }
 
 object SuperNodeMvMap {
-  def apply[HK: HotKeyCodec, C[_, _], K, V](store: MVStore, inputHotKeysFileName: String)(implicit
+  def apply[HK: HotKeyCodec, C[_, _], K, V](id: String)(implicit
+    store: MVStore,
     sc: SuperNodeCodec[C, K, V],
     vc: ValueCodec[Counter]
-  ): SuperNodeMvMap[HK, C, K, V] = {
-    val id = inputHotKeysFileName.stripSuffix(".csv.gz") // TODO take the id from upper maps
-    new SuperNodeMvMap[HK, C, K, V](store, id, new SuperNodeCollector[HK](inputHotKeysFileName))
-  }
+  ): SuperNodeMvMap[HK, C, K, V] =
+    new SuperNodeMvMap[HK, C, K, V](id, new SuperNodeCollector[HK](id))
 }

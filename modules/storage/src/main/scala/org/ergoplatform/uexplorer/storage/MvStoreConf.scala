@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.storage
 
-import org.ergoplatform.uexplorer.storage.MvStorage.{CacheSize, HeightCompactRate, MaxCompactTime}
+import org.ergoplatform.uexplorer.mvstore.*
 
 case class MvStoreConf(
   cacheSize: CacheSize,

@@ -24,6 +24,7 @@ import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.chain.ChainTip
+import org.ergoplatform.uexplorer.mvstore.MaxCompactTime
 import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}

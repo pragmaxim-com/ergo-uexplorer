@@ -40,13 +40,13 @@ import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Random, Success, Try}
 
 case class MvStorage(
-  store: MVStore,
   utxosByErgoTreeHex: MultiMvMap[ErgoTreeHex, java.util.Map, BoxId, Value],
   utxosByErgoTreeT8Hex: MultiMvMap[ErgoTreeT8Hex, java.util.Map, BoxId, CreationHeight],
   ergoTreeHexByUtxo: MapLike[BoxId, ErgoTreeHex],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, BlockInfo]
-) extends Storage
+)(implicit store: MVStore)
+  extends Storage
   with LazyLogging {
 
   def getReportByPath: Map[Path, Vector[(String, Counter)]] =
@@ -202,7 +202,7 @@ case class MvStorage(
     if (lastHeight.isEmpty || lastHeight.contains(1))
       TreeSet.empty
     else
-      TreeSet((1 to lastHeight.get): _*).diff(blockIdsByHeight.keySet.asScala)
+      TreeSet(1 to lastHeight.get: _*).diff(blockIdsByHeight.keySet.asScala)
   }
 
   override def getCurrentRevision: Revision = store.getCurrentVersion
@@ -211,21 +211,14 @@ case class MvStorage(
 object MvStorage extends LazyLogging {
   import scala.concurrent.duration.*
 
-  type CacheSize         = Int
-  type HeightCompactRate = Int
-  type MaxCompactTime    = FiniteDuration
-
   private val VersionsToKeep = 10
-  private val dbFileName     = "mv-store.db"
-  private val dbFile         = ergoHomeDir.resolve(dbFileName).toFile
-  private val tempDbFile     = tempDir.resolve(s"mv-store-$randomNumberPerRun.db").toFile
 
   def apply(
     cacheSize: CacheSize,
-    dbFile: File = tempDbFile
+    dbFile: File = tempDir.resolve(s"mv-store-$randomNumberPerRun.db").toFile
   ): Try[MvStorage] = Try {
     dbFile.getParentFile.mkdirs()
-    val store =
+    implicit val store: MVStore =
       new MVStore.Builder()
         .fileName(dbFile.getAbsolutePath)
         .cacheSize(cacheSize)
@@ -233,31 +226,23 @@ object MvStorage extends LazyLogging {
         .autoCommitDisabled()
         .open()
 
-    logger.info(s"Opening mvstore at version ${store.getCurrentVersion}")
-
     store.setVersionsToKeep(VersionsToKeep)
     store.setRetentionTime(3600 * 1000 * 24 * 7)
+
+    logger.info(s"Opening mvstore at version ${store.getCurrentVersion}")
+
     MvStorage(
-      store,
-      new MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value](
-        "utxosByErgoTreeHex",
-        new MvMap[ErgoTreeHex, util.Map[BoxId, Value]]("utxosByErgoTreeHex", store),
-        SuperNodeMvMap[ErgoTreeHex, util.Map, BoxId, Value](store, "hot-ergo-trees.csv.gz")
-      ),
-      new MultiMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight](
-        "utxosByErgoTreeTemplateHex",
-        new MvMap[ErgoTreeT8Hex, util.Map[BoxId, CreationHeight]]("utxosByErgoTreeTemplateHex", store),
-        SuperNodeMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight](store, "hot-templates.csv.gz")
-      ),
-      new MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo", store),
-      new MvMap[Height, util.Set[BlockId]]("blockIdsByHeight", store),
-      new MvMap[BlockId, BlockInfo]("blockById", store)
+      new MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex"),
+      new MultiMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight]("utxosByErgoTreeT8Hex"),
+      new MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
+      new MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
+      new MvMap[BlockId, BlockInfo]("blockById")
     )
   }
 
   def withDefaultDir(cacheSize: CacheSize): Try[MvStorage] =
     MvStorage(
       cacheSize,
-      dbFile
+      ergoHomeDir.resolve("mv-store.db").toFile
     )
 }

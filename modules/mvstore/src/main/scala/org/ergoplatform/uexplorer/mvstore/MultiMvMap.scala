@@ -14,17 +14,23 @@ import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
 class MultiMvMap[PK, C[_, _], K, V](
-  id: String,
-  commonMap: MapLike[PK, C[K, V]],
-  superNodeMap: SuperNodeMvMap[PK, C, K, V]
-)(implicit c: MultiMapCodec[C, K, V])
-  extends MultiMapLike[PK, C, K, V] {
+  id: MultiMapId
+)(implicit
+  store: MVStore,
+  c: MultiMapCodec[C, K, V],
+  sc: SuperNodeCodec[C, K, V],
+  vc: ValueCodec[Counter],
+  kc: HotKeyCodec[PK]
+) extends MultiMapLike[PK, C, K, V] {
+
+  private val commonMap: MapLike[PK, C[K, V]]           = new MvMap[PK, C[K, V]](id)
+  private val superNodeMap: SuperNodeMvMap[PK, C, K, V] = SuperNodeMvMap[PK, C, K, V](id)
 
   def clearEmptySuperNodes(): Try[Unit] =
     superNodeMap.clearEmptySuperNodes()
 
   def getReport: (Path, Vector[(String, Counter)]) =
-    ergoHomeDir.resolve(s"$id-hot-keys-$randomNumberPerRun.csv") -> superNodeMap.getReport
+    ergoHomeDir.resolve(s"hot-keys-$id-$randomNumberPerRun.csv") -> superNodeMap.getReport
 
   def get(pk: PK, sk: K): Option[V] =
     superNodeMap
