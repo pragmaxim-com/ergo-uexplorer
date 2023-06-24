@@ -222,7 +222,7 @@ object MvStorage extends LazyLogging {
       new MVStore.Builder()
         .fileName(dbFile.getAbsolutePath)
         .cacheSize(cacheSize)
-        .cacheConcurrency(2)
+        .cacheConcurrency(4)
         .autoCommitDisabled()
         .open()
 
