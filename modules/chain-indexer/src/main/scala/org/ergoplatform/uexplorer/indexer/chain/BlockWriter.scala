@@ -5,9 +5,10 @@ import akka.stream.{ActorAttributes, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
 import org.ergoplatform.uexplorer.{Resiliency, UnexpectedStateError}
 import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, ForkInserted, LinkedBlock, UtxoTracker}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockWithInputs, ForkInserted, LinkedBlock, UtxoTracker}
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
@@ -23,7 +24,8 @@ class BlockWriter(
   backendOpt: Option[Backend],
   graphBackendOpt: Option[GraphBackend]
 )(implicit enc: ErgoAddressEncoder)
-  extends LazyLogging {
+  extends AkkaStreamSupport
+  with LazyLogging {
 
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
     fork.size > 1 && storage.containsBlock(fork.head.info.parentId, fork.head.info.height - 1) &&
@@ -107,18 +109,32 @@ class BlockWriter(
           Source(forkInserted.winningFork).via(insertBlockFlow).mapMaterializedValue(_ => forkInserted.loosingFork)
       )
 
+  private val concurrentFlows = List(
+    Flow.fromFunction[BlockWithInputs, BlockWithInputs] { b =>
+      storage.persistErgoTreeUtxos(b.outputRecords).get
+      storage.removeInputBoxesByErgoTree(b.inputRecords).get
+      b
+    },
+    Flow.fromFunction[BlockWithInputs, BlockWithInputs] { b =>
+      storage.persistErgoTreeT8Utxos(b.outputRecords).get
+      storage.removeInputBoxesByErgoTreeT8(b.inputRecords).get
+      b
+    },
+    Flow.fromFunction[BlockWithInputs, BlockWithInputs] { b =>
+      storage.insertNewBlock(b.b.header.id, b.info, storage.getCurrentRevision).get
+      b
+    }
+  )
+
   val insertBlockFlow: Flow[LinkedBlock, BestBlockInserted, NotUsed] =
     Flow
       .apply[LinkedBlock]
       .map(UtxoTracker.getBlockWithInputs(_, storage).get)
       .async
-      .wireTap(b => storage.persistErgoTreeUtxos(b.outputRecords).get)
-      .wireTap(b => storage.removeInputBoxesByErgoTree(b.inputRecords).get)
-      .async
-      .wireTap(b => storage.persistErgoTreeTemplateUtxos(b.outputRecords).get)
-      .wireTap(b => storage.removeInputBoxesByErgoTreeT8(b.inputRecords).get)
-      .wireTap(b => storage.commitNewBlock(b.b.header.id, b.info, storage.getCurrentRevision).get)
-      .async
-      .map(lb => BestBlockInserted(lb, None))
+      .via(cpuHeavyBroadcastFlow(concurrentFlows))
+      .map { lb =>
+        storage.commit()
+        BestBlockInserted(lb, None)
+      }
 
 }
