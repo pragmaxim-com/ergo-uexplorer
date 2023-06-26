@@ -20,11 +20,13 @@ object ErgoTreeParser extends LazyLogging {
 
   private val treeSerializer: ErgoTreeSerializer = ErgoTreeSerializer.DefaultSerializer
 
-  @inline def ergoTreeHex2ErgoTree(ergoTree: ErgoTreeHex): Try[Values.ErgoTree] =
+  def ergoTreeHex2ErgoTree(ergoTree: ErgoTreeHex): Try[Values.ErgoTree] =
     Base16.decode(ergoTree).map(treeSerializer.deserializeErgoTree)
 
-  @inline def isErgoTreeT8(ergoTreeBytes: Array[Byte]): Boolean =
-    treeSerializer.deserializeHeaderWithTreeBytes(SigmaSerializer.startReader(ergoTreeBytes))._3.nonEmpty
+  def isErgoTreeT8(ergoTreeBytes: Array[Byte]): Boolean = {
+    val (_, _, constants, _) = treeSerializer.deserializeHeaderWithTreeBytes(SigmaSerializer.startReader(ergoTreeBytes))
+    constants.nonEmpty
+  }
 
   @inline def ergoTreeHex2T8Hex(
     ergoTree: ErgoTreeHex
