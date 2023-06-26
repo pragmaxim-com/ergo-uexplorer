@@ -45,7 +45,7 @@ case class MvStorage(
   ergoTreeHexByUtxo: MapLike[BoxId, ErgoTreeHex],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, BlockInfo]
-)(implicit store: MVStore)
+)(implicit val store: MVStore)
   extends Storage
   with LazyLogging {
 
@@ -106,7 +106,7 @@ case class MvStorage(
       }
   }
 
-  def persistErgoTreeTemplateUtxos(outputRecords: ArraySeq[OutputRecord]): Try[_] = Try {
+  def persistErgoTreeT8Utxos(outputRecords: ArraySeq[OutputRecord]): Try[_] = Try {
     outputRecords
       .filter(_.ergoTreeT8Hex.isDefined)
       .groupBy(_.ergoTreeT8Hex)
@@ -134,7 +134,7 @@ case class MvStorage(
       }
   }
 
-  def commitNewBlock(
+  def insertNewBlock(
     blockId: BlockId,
     blockInfo: BlockInfo,
     currentVersion: Revision
@@ -151,7 +151,6 @@ case class MvStorage(
           )
       }
       .map { blockIds =>
-        store.commit()
         val r = blockIds.asScala.toSet
         if (blockIds.size > 1) logger.info(s"Fork at height ${blockInfo.height} with ${r.mkString(", ")}")
         r
@@ -206,6 +205,8 @@ case class MvStorage(
   }
 
   override def getCurrentRevision: Revision = store.getCurrentVersion
+
+  def commit(): Revision = store.commit()
 }
 
 object MvStorage extends LazyLogging {
