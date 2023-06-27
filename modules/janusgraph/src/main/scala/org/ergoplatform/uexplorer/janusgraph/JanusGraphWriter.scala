@@ -10,6 +10,7 @@ import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockWithInputs, FullBl
 import org.janusgraph.core.Multiplicity
 
 import scala.collection.immutable.{ArraySeq, TreeMap}
+import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -47,7 +48,8 @@ trait JanusGraphWriter extends LazyLogging {
       .foreach { case BestBlockInserted(b, _) =>
         b.inputRecords.byTxId.foreach { case (txId, inputRecords) =>
           val outputRecords = b.outputRecords.filter(_.txId == txId)
-          TxGraphWriter.writeGraph(txId, b.info.height, b.info.timestamp, inputRecords, outputRecords)(janusGraph)
+          val fixMe         = mutable.Map.empty[ErgoTreeHex, mutable.Map[BoxId, Value]] // TODO
+          TxGraphWriter.writeGraph(txId, b.info.height, b.info.timestamp, fixMe, outputRecords)(janusGraph)
 
         }
       }

@@ -8,16 +8,16 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, FeeContract, Foundation}
-import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.{multiset, *}
 import MvStorage.*
 import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
 import org.ergoplatform.uexplorer.storage.Implicits.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.h2.mvstore.{MVMap, MVStore}
 import org.ergoplatform.uexplorer.db.OutputRecord
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
+import org.ergoplatform.uexplorer.mvstore.multiset.MultiMvSet
 
 import java.io.{BufferedInputStream, File}
 import java.nio.ByteBuffer
@@ -40,8 +40,8 @@ import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Random, Success, Try}
 
 case class MvStorage(
-  utxosByErgoTreeHex: MultiMvMap[ErgoTreeHex, java.util.Map, BoxId, Value],
-  utxosByErgoTreeT8Hex: MultiMvMap[ErgoTreeT8Hex, java.util.Map, BoxId, CreationHeight],
+  utxosByErgoTreeHex: MultiMvSet[ErgoTreeHex, java.util.Set, BoxId],
+  utxosByErgoTreeT8Hex: MultiMvSet[ErgoTreeT8Hex, java.util.Set, BoxId],
   ergoTreeHexByUtxo: MapLike[BoxId, ErgoTreeHex],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, BlockInfo]
@@ -77,16 +77,15 @@ case class MvStorage(
     inputRecords.byErgoTree.iterator
       .map { case (ergoTreeHex, inputIds) =>
         val inputBoxes =
-          inputIds.filter { case (boxId, _) =>
+          inputIds.filter { boxId =>
             boxId != Emission.inputBox && boxId != Foundation.inputBox
           }
         ergoTreeHexByUtxo
-          .removeAllOrFail(inputBoxes.keys)
+          .removeAllOrFail(inputBoxes)
           .flatMap { _ =>
-            utxosByErgoTreeHex.removeAllOrFail(ergoTreeHex, inputBoxes.iterator.map(_._1), inputBoxes.size) {
-              existingBoxIds =>
-                inputBoxes.iterator.map(_._1).foreach(existingBoxIds.remove)
-                Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+            utxosByErgoTreeHex.removeSubsetOrFail(ergoTreeHex, inputBoxes.iterator, inputBoxes.size) { existingBoxIds =>
+              inputBoxes.iterator.foreach(existingBoxIds.remove)
+              Option(existingBoxIds).collect { case m if !m.isEmpty => m }
             }
           }
           .get
@@ -98,7 +97,7 @@ case class MvStorage(
       .map { case (ergoTreeT8, inputIds) =>
         val inputBoxes = inputIds.filter(boxId => boxId != Emission.inputBox && boxId != Foundation.inputBox)
         utxosByErgoTreeT8Hex
-          .removeAllOrFail(ergoTreeT8, inputBoxes, inputBoxes.size) { existingBoxIds =>
+          .removeSubsetOrFail(ergoTreeT8, inputBoxes, inputBoxes.size) { existingBoxIds =>
             inputBoxes.foreach(existingBoxIds.remove)
             Option(existingBoxIds).collect { case m if !m.isEmpty => m }
           }
@@ -114,7 +113,7 @@ case class MvStorage(
         utxosByErgoTreeT8Hex
           .adjustAndForget(
             ergoTreeT8Hex,
-            boxes.iterator.map(b => b.boxId -> b.creationHeight),
+            boxes.iterator.map(_.boxId),
             boxes.size
           )
           .get
@@ -128,7 +127,7 @@ case class MvStorage(
         ergoTreeHexByUtxo
           .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.ergoTreeHex))
           .flatMap { _ =>
-            utxosByErgoTreeHex.adjustAndForget(ergoTreeHex, boxes.iterator.map(b => b.boxId -> b.value), boxes.size)
+            utxosByErgoTreeHex.adjustAndForget(ergoTreeHex, boxes.iterator.map(_.boxId), boxes.size)
           }
           .get
       }
@@ -161,21 +160,6 @@ case class MvStorage(
       .get(atHeight)
       .map(_.asScala.flatMap(blockId => blockById.get(blockId).map(blockId -> _)).toMap)
       .getOrElse(Map.empty)
-
-  def getUtxosByErgoTreeHex(ergoTreeHex: ErgoTreeHex): Option[java.util.Map[BoxId, Value]] =
-    utxosByErgoTreeHex.getAll(ergoTreeHex)
-
-  def getUtxoValueByErgoTreeHex(ergoTreeHex: ErgoTreeHex, utxo: BoxId): Option[Value] =
-    utxosByErgoTreeHex.get(ergoTreeHex, utxo)
-
-  def getUtxoValuesByErgoTreeHex(ergoTreeHex: ErgoTreeHex, utxos: IterableOnce[BoxId]): Option[java.util.Map[BoxId, Value]] =
-    utxosByErgoTreeHex.getPartially(ergoTreeHex, utxos)
-
-  def getUtxoValuesByErgoTreeT8Hex(
-    ergoTreeHex: ErgoTreeT8Hex,
-    utxos: IterableOnce[BoxId]
-  ): Option[util.Map[BoxId, CreationHeight]] =
-    utxosByErgoTreeT8Hex.getPartially(ergoTreeHex, utxos)
 
   def isEmpty: Boolean =
     utxosByErgoTreeHex.isEmpty && ergoTreeHexByUtxo.isEmpty && blockIdsByHeight.isEmpty && blockById.isEmpty
@@ -233,8 +217,8 @@ object MvStorage extends LazyLogging {
     logger.info(s"Opening mvstore at version ${store.getCurrentVersion}")
 
     MvStorage(
-      MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex"),
-      MultiMvMap[ErgoTreeT8Hex, util.Map, BoxId, CreationHeight]("utxosByErgoTreeT8Hex"),
+      multiset.MultiMvSet[ErgoTreeHex, util.Set, BoxId]("utxosByErgoTreeHex"),
+      multiset.MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
       MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
       MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
       MvMap[BlockId, BlockInfo]("blockById")

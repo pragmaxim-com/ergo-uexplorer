@@ -36,8 +36,8 @@ case class MvMap[K, V: ValueCodec](id: String)(implicit store: MVStore) extends 
         Success(codec.readAll(v))
     }
 
-  def removeAllOrFail(keys: Iterable[K]): Try[Unit] =
-    keys.find(key => underlying.remove(key) == null).fold(Success(())) { key =>
+  def removeAllOrFail(keys: IterableOnce[K]): Try[Unit] =
+    keys.iterator.find(key => underlying.remove(key) == null).fold(Success(())) { key =>
       Failure(new AssertionError(s"Removing non-existing key $key"))
     }
 

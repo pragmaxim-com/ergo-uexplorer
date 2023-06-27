@@ -1,24 +1,24 @@
-package org.ergoplatform.uexplorer.mvstore
+package org.ergoplatform.uexplorer.mvstore.multimap
 
-import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
+import org.ergoplatform.uexplorer.mvstore.*
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
 import java.nio.file.Path
-import scala.collection.concurrent
 import java.util.Map.Entry
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 import java.util.stream.Collectors
+import scala.collection.concurrent
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
 case class MultiMvMap[PK, C[_, _], K, V](
-  id: MultiMapId
+  id: MultiColId
 )(implicit
   store: MVStore,
   c: MultiMapCodec[C, K, V],
-  sc: SuperNodeCodec[C, K, V],
+  sc: SuperNodeMapCodec[C, K, V],
   vc: ValueCodec[Counter],
   kc: HotKeyCodec[PK]
 ) extends MultiMapLike[PK, C, K, V] {
@@ -55,7 +55,7 @@ case class MultiMvMap[PK, C[_, _], K, V](
 
   def isEmpty: Boolean = superNodeMap.isEmpty && commonMap.isEmpty
 
-  def size: MultiMapSize = MultiMapSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
+  def size: MultiColSize = MultiColSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
 
   def removeAllOrFail(pk: PK, secondaryKeys: IterableOnce[K], size: Int)(f: C[K, V] => Option[C[K, V]]): Try[Unit] =
     superNodeMap.removeAllOrFail(pk, secondaryKeys, size).fold(commonMap.removeOrUpdateOrFail(pk)(f))(identity)

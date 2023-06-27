@@ -8,23 +8,24 @@ import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, M
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.*
-import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHex, Height, Value}
-import scala.language.unsafeNulls
+import org.ergoplatform.uexplorer.mvstore.multimap.MultiMapCodec
+import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHex, Height}
 
+import scala.language.unsafeNulls
 import java.nio.ByteBuffer
 import java.util
 import scala.util.Try
 import scala.jdk.CollectionConverters.*
 
-object ValueByBoxCodec extends MultiMapCodec[java.util.Map, BoxId, Value] {
+class ValueByBoxCodec[V] extends MultiMapCodec[java.util.Map, BoxId, V] {
 
-  override def readOne(key: BoxId, valueByBoxId: java.util.Map[BoxId, Value]): Option[Value] =
+  override def readOne(key: BoxId, valueByBoxId: java.util.Map[BoxId, V]): Option[V] =
     Option(valueByBoxId.get(key))
 
-  override def readAll(bytes: Array[Byte]): java.util.Map[BoxId, Value] = {
+  override def readAll(bytes: Array[Byte]): java.util.Map[BoxId, V] = {
     val input = new Input(bytes)
     val kryo  = KryoSerialization.pool.obtain()
-    try kryo.readObject(input, classOf[util.HashMap[BoxId, Value]])
+    try kryo.readObject(input, classOf[util.HashMap[BoxId, V]])
     finally {
       KryoSerialization.pool.free(kryo)
       input.close()
@@ -32,17 +33,17 @@ object ValueByBoxCodec extends MultiMapCodec[java.util.Map, BoxId, Value] {
   }
 
   override def readPartially(only: IterableOnce[BoxId])(
-    existingOpt: Option[java.util.Map[BoxId, Value]]
-  ): Option[java.util.Map[BoxId, Value]] =
+    existingOpt: Option[java.util.Map[BoxId, V]]
+  ): Option[java.util.Map[BoxId, V]] =
     existingOpt.map { existingMap =>
-      val partialResult = new util.HashMap[BoxId, Value]()
+      val partialResult = new util.HashMap[BoxId, V]()
       only.iterator.foreach { k =>
         partialResult.put(k, existingMap.get(k))
       }
       partialResult
     }
 
-  override def writeAll(valueByBoxId: java.util.Map[BoxId, Value]): Array[Byte] = {
+  override def writeAll(valueByBoxId: java.util.Map[BoxId, V]): Array[Byte] = {
     val buffer = ByteBuffer.allocate((valueByBoxId.size() * 72) + 512)
     val output = new ByteBufferOutput(buffer)
     val kryo   = KryoSerialization.pool.obtain()
@@ -54,12 +55,12 @@ object ValueByBoxCodec extends MultiMapCodec[java.util.Map, BoxId, Value] {
     buffer.array()
   }
 
-  override def append(newValueByBoxId: IterableOnce[(BoxId, Value)])(
-    existingOpt: Option[java.util.Map[BoxId, Value]]
-  ): (Appended, java.util.Map[BoxId, Value]) =
+  override def append(newValueByBoxId: IterableOnce[(BoxId, V)])(
+    existingOpt: Option[java.util.Map[BoxId, V]]
+  ): (Appended, java.util.Map[BoxId, V]) =
     existingOpt.fold(true -> javaMapOf(newValueByBoxId)) { existingMap =>
       newValueByBoxId.iterator.forall { e =>
-        val replaced: Value | Null = existingMap.put(e._1, e._2)
+        val replaced: V | Null = existingMap.put(e._1, e._2)
         replaced == null
       } -> existingMap
     }

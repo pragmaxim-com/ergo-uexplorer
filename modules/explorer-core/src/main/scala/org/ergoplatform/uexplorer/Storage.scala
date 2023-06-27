@@ -31,14 +31,4 @@ trait Storage {
 
   def getErgoTreeHexByUtxo(boxId: BoxId): Option[ErgoTreeHex]
 
-  def getUtxosByErgoTreeHex(ergoTreeHex: ErgoTreeHex): Option[java.util.Map[BoxId, Value]]
-
-  def getUtxoValueByErgoTreeHex(ergoTreeHex: ErgoTreeHex, utxo: BoxId): Option[Value]
-
-  def getUtxoValuesByErgoTreeHex(ergoTreeHex: ErgoTreeHex, utxos: IterableOnce[BoxId]): Option[java.util.Map[BoxId, Value]]
-
-  def getUtxoValuesByErgoTreeT8Hex(
-    ergoTreeHex: ErgoTreeT8Hex,
-    utxos: IterableOnce[BoxId]
-  ): Option[java.util.Map[BoxId, CreationHeight]]
 }

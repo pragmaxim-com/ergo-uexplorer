@@ -1,13 +1,14 @@
-package org.ergoplatform.uexplorer.mvstore
+package org.ergoplatform.uexplorer.mvstore.multimap
 
 import org.ergoplatform.uexplorer.mvstore
+import org.ergoplatform.uexplorer.mvstore.Appended
 import org.h2.mvstore.MVMap
 
 import java.util
 import java.util.Map.Entry
 import java.util.stream.Collectors
 
-trait SuperNodeCodec[C[_, _], K, V] {
+trait SuperNodeMapCodec[C[_, _], K, V] {
 
   def read(sk: K, m: MVMap[K, V]): Option[V]
 
@@ -21,9 +22,9 @@ trait SuperNodeCodec[C[_, _], K, V] {
 
 }
 
-object SuperNodeCodec {
-  implicit def javaHashMapSuperNodeCodec[K, V]: SuperNodeCodec[java.util.Map, K, V] =
-    new SuperNodeCodec[java.util.Map, K, V] {
+object SuperNodeMapCodec {
+  implicit def javaHashMapSuperNodeCodec[K, V]: SuperNodeMapCodec[java.util.Map, K, V] =
+    new SuperNodeMapCodec[java.util.Map, K, V] {
       override def readAll(from: MVMap[K, V]): util.Map[K, V] =
         from
           .entrySet()

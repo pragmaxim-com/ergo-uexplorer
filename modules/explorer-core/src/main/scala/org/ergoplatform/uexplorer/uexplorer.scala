@@ -19,7 +19,7 @@ package object uexplorer {
   type Value          = Long
   type Amount         = Long
   type Height         = Int
-  type CreationHeight = Long
+  type CreationHeight = Int
   type Timestamp      = Long
 
   type MinerReward = Long
@@ -83,12 +83,14 @@ package object uexplorer {
   object ErgoTreeHex {
     extension (x: ErgoTreeHex) def unwrapped: String = x
     def fromStringUnsafe(s: String): ErgoTreeHex     = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
+    def castUnsafe(s: String): ErgoTreeHex           = s.asInstanceOf[ErgoTreeHex]
   }
 
   type ErgoTreeT8Hex = HexString
   object ErgoTreeT8Hex {
     extension (x: ErgoTreeT8Hex) def unwrapped: String = x
     def fromStringUnsafe(s: String): ErgoTreeT8Hex     = unsafeWrap(HexString.fromStringUnsafe(s))
+    def castUnsafe(s: String): ErgoTreeHex             = s.asInstanceOf[ErgoTreeHex]
   }
 
   opaque type TxId = String

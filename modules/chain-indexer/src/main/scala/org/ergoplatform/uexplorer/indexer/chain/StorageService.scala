@@ -24,8 +24,7 @@ import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.chain.ChainTip
-import org.ergoplatform.uexplorer.mvstore.MaxCompactTime
-import org.ergoplatform.uexplorer.mvstore.MultiMapLike.MultiMapSize
+import org.ergoplatform.uexplorer.mvstore.{MaxCompactTime, MultiColSize}
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
@@ -70,7 +69,7 @@ class StorageService(
 
   private def getCompactReport: String = {
     val height                                                      = storage.getLastHeight.getOrElse(0)
-    val MultiMapSize(superNodeSize, superNodeTotalSize, commonSize) = storage.utxosByErgoTreeHex.size
+    val MultiColSize(superNodeSize, superNodeTotalSize, commonSize) = storage.utxosByErgoTreeHex.size
     val nonEmptyAddressCount                                        = superNodeSize + commonSize
     val progress =
       s"storage height: $height, " +
