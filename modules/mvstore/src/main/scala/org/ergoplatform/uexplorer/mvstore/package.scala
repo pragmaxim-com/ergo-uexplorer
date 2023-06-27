@@ -15,16 +15,24 @@ package object mvstore {
   type CacheSize         = Int
   type HeightCompactRate = Int
   type MaxCompactTime    = FiniteDuration
-  type MultiMapId        = String
+  type MultiColId        = String
 
   type Appended = Boolean // put & not replaced
   type Updated  = Boolean // put & replaced
   type Removed  = Boolean // removed existing
   type Replaced = Boolean // replaced given value
 
-  def javaSetOf[T](e: T): java.util.Set[T] = {
-    val set = new java.util.HashSet[T]()
+  def javaSetOf[V](e: V): java.util.Set[V] = {
+    val set = new java.util.HashSet[V]()
     set.add(e)
+    set
+  }
+
+  def javaSetOf[V](values: IterableOnce[V]): java.util.Set[V] = {
+    val set = new java.util.HashSet[V]()
+    values.iterator.foreach { value =>
+      set.add(value)
+    }
     set
   }
 

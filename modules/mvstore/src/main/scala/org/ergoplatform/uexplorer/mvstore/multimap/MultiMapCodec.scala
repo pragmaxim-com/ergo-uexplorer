@@ -1,5 +1,6 @@
-package org.ergoplatform.uexplorer.mvstore
+package org.ergoplatform.uexplorer.mvstore.multimap
 
+import org.ergoplatform.uexplorer.mvstore.{Appended, ValueCodec}
 import org.h2.mvstore.MVMap
 
 import java.util

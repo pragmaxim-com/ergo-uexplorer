@@ -20,7 +20,7 @@ trait MapLike[K, V] {
 
   def removeOrFail(key: K): Try[V]
 
-  def removeAllOrFail(keys: Iterable[K]): Try[Unit]
+  def removeAllOrFail(keys: IterableOnce[K]): Try[Unit]
 
   def ceilingKey(key: K): Option[K]
 

@@ -1,22 +1,23 @@
-package org.ergoplatform.uexplorer.mvstore
+package org.ergoplatform.uexplorer.mvstore.multimap
 
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.h2.mvstore.{MVMap, MVStore}
 
 import java.io.File
 import java.nio.file.Path
 import java.util.Map.Entry
-import scala.jdk.CollectionConverters.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 import scala.collection.concurrent
+import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
 class SuperNodeMvMap[HK, C[_, _], K, V](
   id: String,
   superNodeCollector: SuperNodeCollector[HK]
-)(implicit store: MVStore, codec: SuperNodeCodec[C, K, V], vc: ValueCodec[Counter])
+)(implicit store: MVStore, codec: SuperNodeMapCodec[C, K, V], vc: ValueCodec[Counter])
   extends SuperNodeMapLike[HK, C, K, V]
   with LazyLogging {
 
@@ -189,7 +190,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
 object SuperNodeMvMap {
   def apply[HK: HotKeyCodec, C[_, _], K, V](id: String)(implicit
     store: MVStore,
-    sc: SuperNodeCodec[C, K, V],
+    sc: SuperNodeMapCodec[C, K, V],
     vc: ValueCodec[Counter]
   ): SuperNodeMvMap[HK, C, K, V] =
     new SuperNodeMvMap[HK, C, K, V](id, new SuperNodeCollector[HK](id))

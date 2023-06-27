@@ -1,4 +1,4 @@
-package org.ergoplatform.uexplorer.mvstore
+package org.ergoplatform.uexplorer.mvstore.multimap
 
 import scala.util.Try
 
