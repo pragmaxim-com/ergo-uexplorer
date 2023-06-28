@@ -22,8 +22,8 @@ import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
-import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.chain.ChainTip
+import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.mvstore.{MaxCompactTime, MultiColSize}
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
@@ -75,7 +75,7 @@ class StorageService(
       s"storage height: $height, " +
         s"utxo count: ${storage.ergoTreeHexByUtxo.size}, " +
         s"supernode-utxo-count : $superNodeTotalSize, " +
-        s"non-empty-address count: $nonEmptyAddressCount, "
+        s"non-empty-address count: $nonEmptyAddressCount \n"
     val store = storage.store
     val cs    = store.getCacheSize
     val csu   = store.getCacheSizeUsed

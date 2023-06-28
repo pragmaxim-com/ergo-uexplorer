@@ -7,7 +7,7 @@ import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.*
 import org.ergoplatform.uexplorer.db.{InputRecords, OutputRecord}
-import org.ergoplatform.uexplorer.ErgoTreeHex.unwrapped
+import org.ergoplatform.uexplorer.HexString.unwrapped
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*

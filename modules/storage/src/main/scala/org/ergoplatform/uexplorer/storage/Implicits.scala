@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.storage
 
-import org.ergoplatform.uexplorer.{ErgoTreeHex, *}
+import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
@@ -21,7 +21,7 @@ object Implicits {
     import org.ergoplatform.uexplorer.HexString.unwrapped
     def serialize(key: HexString): String = key.unwrapped
 
-    def deserialize(key: String): HexString = ErgoTreeHex.fromStringUnsafe(key)
+    def deserialize(key: String): HexString = HexString.fromStringUnsafe(key)
   }
 
 }

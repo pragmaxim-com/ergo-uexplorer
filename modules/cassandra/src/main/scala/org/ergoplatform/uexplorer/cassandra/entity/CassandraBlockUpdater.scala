@@ -26,39 +26,36 @@ trait CassandraBlockUpdater extends LazyLogging {
       table -> (keyOpt, cqlSession.prepare(statement))
     }.toMap
 
-  def removeBlocksFromMainChain(blockIds: Iterable[BlockId]): Try[Done] = Try {
-    Await.result(
-      Source(blockIds.toList)
-        .mapConcat(blockId => updateMainChainPreparedStatements.map { case (table, (key, _)) => (table, key, blockId) })
-        .mapAsync(1) {
-          case (table, Some(key), blockId) =>
-            Source
-              .fromPublisher(
-                cqlSession.executeReactive(
-                  s"SELECT $key FROM ${cassandra.Const.CassandraKeyspace}.$table WHERE header_id = '$blockId';"
-                )
+  def removeBlocks(blockIds: Set[BlockId]): Future[Unit] =
+    Source(blockIds.toList)
+      .mapConcat(blockId => updateMainChainPreparedStatements.map { case (table, (key, _)) => (table, key, blockId) })
+      .mapAsync(1) {
+        case (table, Some(key), blockId) =>
+          Source
+            .fromPublisher(
+              cqlSession.executeReactive(
+                s"SELECT $key FROM ${cassandra.Const.CassandraKeyspace}.$table WHERE header_id = '$blockId';"
               )
-              .map(_.getString(key))
-              .runWith(Sink.seq)
-              .flatMap { keys =>
-                cqlSession
-                  .executeAsync(
-                    updateMainChainWithKeysBinder(blockId, keys, mainChain = false)(
-                      updateMainChainPreparedStatements(table)._2
-                    )
+            )
+            .map(_.getString(key))
+            .runWith(Sink.seq)
+            .flatMap { keys =>
+              cqlSession
+                .executeAsync(
+                  updateMainChainWithKeysBinder(blockId, keys, mainChain = false)(
+                    updateMainChainPreparedStatements(table)._2
                   )
-                  .asScala
-              }
+                )
+                .asScala
+            }
 
-          case (table, None, blockId) =>
-            cqlSession
-              .executeAsync(updateMainChainBinder(blockId, mainChain = false)(updateMainChainPreparedStatements(table)._2))
-              .asScala
-        }
-        .run(),
-      1.minute
-    )
-  }
+        case (table, None, blockId) =>
+          cqlSession
+            .executeAsync(updateMainChainBinder(blockId, mainChain = false)(updateMainChainPreparedStatements(table)._2))
+            .asScala
+      }
+      .run()
+      .map(_ => ())
 }
 
 object CassandraBlockUpdater {

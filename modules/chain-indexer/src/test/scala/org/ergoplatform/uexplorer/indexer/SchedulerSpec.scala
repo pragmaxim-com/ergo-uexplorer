@@ -22,7 +22,6 @@ import org.ergoplatform.uexplorer.janusgraph.api.InMemoryGraphBackend
 import scala.collection.immutable.{ListMap, TreeMap}
 import scala.concurrent.Future
 import org.ergoplatform.uexplorer.{ProtocolSettings, Storage}
-import org.ergoplatform.uexplorer.cassandra.api.InMemoryBackend
 import org.ergoplatform.uexplorer.db.UtxoTracker
 import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, Rest, TestSupport}
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
@@ -30,16 +29,18 @@ import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.http.MetadataHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
-import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
+import org.ergoplatform.uexplorer.storage.{H2Backend, MvStorage, MvStoreConf}
 
 import java.nio.file.Paths
 import scala.concurrent.duration.*
 
 class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {
 
-  private val testKit                                           = ActorTestKit()
+  private val (conf, config) = ChainIndexerConf.loadDefaultOrThrow
+  private val testKit        = ActorTestKit(config)
+
+  implicit private val protocol: ProtocolSettings               = conf.protocol
   implicit private val sys: ActorSystem[_]                      = testKit.internalSystem
-  implicit private val protocol: ProtocolSettings               = ChainIndexerConf.loadDefaultOrThrow._1.protocol
   implicit private val enc: ErgoAddressEncoder                  = protocol.addressEncoder
   implicit private val localNodeUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(uri"http://local")
   implicit private val remoteNodeUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(uri"http://remote")
@@ -82,7 +83,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val pluginManager   = new PluginManager(List.empty)
   val storageService  = StorageService(storage, mvStoreConf)
   val blockHttpClient = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
-  val backend         = Some(new InMemoryBackend)
+  val backend         = H2Backend().get
   val graphBackend    = Some(new InMemoryGraphBackend)
   val blockReader     = new BlockReader(blockHttpClient)
   val blockWriter     = new BlockWriter(storage, storageService, mvStoreConf, backend, graphBackend)
@@ -92,11 +93,13 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val scheduler       = new Scheduler(pluginManager, streamExecutor, mempoolSyncer, initializer)
 
   "Scheduler should sync from 1 to 4200" in {
-    initializer.init shouldBe ChainEmpty
-    scheduler.periodicSync.map { newMempoolState =>
-      storage.getLastHeight.get shouldBe 4200
-      storage.findMissingHeights shouldBe empty
-      newMempoolState.stateTransitionByTx.size shouldBe 9
+    initializer.init.flatMap { state =>
+      state shouldBe ChainEmpty
+      scheduler.periodicSync.map { newMempoolState =>
+        storage.getLastHeight.get shouldBe 4200
+        storage.findMissingHeights shouldBe empty
+        newMempoolState.stateTransitionByTx.size shouldBe 9
+      }
     }
   }
 }

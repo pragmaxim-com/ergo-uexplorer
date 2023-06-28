@@ -1,7 +1,8 @@
 import sbt.*
 
 object Version {
-  lazy val akka            = "2.7.0"
+  lazy val akka            = "2.8.2"
+  lazy val akkaHttp        = "10.5.2"
   lazy val sttp            = "3.8.2"
   lazy val circe           = "0.14.3"
   lazy val enumeratum      = "1.7.0"
@@ -9,6 +10,7 @@ object Version {
   lazy val caliban         = "2.0.1"
   lazy val cql4s           = "0.0.1"
   lazy val ergo            = "5.0.8"
+  lazy val janus           = "1.0.0-rc1"
 }
 
 object Dependencies {
@@ -23,12 +25,12 @@ object Dependencies {
   lazy val gremlin        = "org.apache.tinkerpop" % "gremlin-driver"  % "3.6.1"
 
   lazy val janusGraph = List(
-    "org.janusgraph" % "janusgraph-driver" % "1.0.0-rc1",
-    "org.janusgraph" % "janusgraph-core"   % "1.0.0-rc1",
-    "org.janusgraph" % "janusgraph-cql"    % "1.0.0-rc1"
+    "org.janusgraph" % "janusgraph-driver" % Version.janus,
+    "org.janusgraph" % "janusgraph-core"   % Version.janus,
+    "org.janusgraph" % "janusgraph-cql"    % Version.janus
   )
 
-  lazy val mvStore = "com.h2database" % "h2-mvstore" % "2.1.214"
+  lazy val h2 = "com.h2database" % "h2" % "2.1.214"
 
   lazy val kryo = "com.esotericsoftware" % "kryo" % "5.5.0"
 
@@ -43,9 +45,10 @@ object Dependencies {
   val logback                 = "ch.qos.logback"             % "logback-classic"   % "1.4.3"
   def scalaLogging(v: String) = "com.typesafe.scala-logging" % s"scala-logging_$v" % "3.9.5"
 
-  def lightBend(v: String) = Seq(
+  def akkaHttp(v: String) = "com.typesafe.akka" % s"akka-http_$v" % Version.akkaHttp
+
+  def akkaStream(v: String) = Seq(
     "com.typesafe.akka" % s"akka-actor_$v"               % Version.akka,
-    "com.typesafe.akka" % s"akka-http_$v"                % "10.5.0-M1",
     "com.typesafe.akka" % s"akka-actor-typed_$v"         % Version.akka,
     "com.typesafe.akka" % s"akka-stream-typed_$v"        % Version.akka,
     "com.typesafe.akka" % s"akka-actor-testkit-typed_$v" % Version.akka % Test,
@@ -91,7 +94,7 @@ object Dependencies {
       "dev.optics" % s"monocle-macro_$v" % "3.1.0"
     )
 
-  def allExclusions = cats("2.13") ++ circe("2.13") ++ lightBend("2.13") ++ Seq(
+  def allExclusions = cats("2.13") ++ circe("2.13") ++ akkaStream("2.13") ++ Seq(
     "com.typesafe.akka"      % "akka-actor_2.13"              % "any",
     "com.typesafe.akka"      % "akka-stream_2.13"             % "any",
     "com.typesafe.akka"      % "akka-protobuf-v3_2.13"        % "any",

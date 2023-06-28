@@ -19,7 +19,7 @@ import java.io.File
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
-import org.ergoplatform.uexplorer.cassandra.api.Backend.BackendType
+import org.ergoplatform.uexplorer.indexer.db.Backend.BackendType
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend.GraphBackendType
 import org.ergoplatform.uexplorer.storage.MvStorage.*
 import org.ergoplatform.uexplorer.storage.MvStoreConf
@@ -39,7 +39,6 @@ case class ChainIndexerConf(
 }
 
 object ChainIndexerConf extends LazyLogging {
-
   implicit def nelReader[A: ConfigReader]: ConfigReader[NonEmptyList[A]] =
     implicitly[ConfigReader[List[A]]].emap { list =>
       list.toNel.toRight(CannotConvert(list.toString, s"NonEmptyList", "List is empty"))

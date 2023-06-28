@@ -25,8 +25,10 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Try
-import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
+import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, FullBlock}
+
+import java.util.concurrent.Flow.Processor
+import org.reactivestreams.FlowAdapters.toFlowProcessor
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
@@ -49,7 +51,7 @@ class CassandraBackend(parallelism: Int)(implicit
     cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
   }
 
-  val blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+  val blockWriteFlow: Processor[BestBlockInserted, BestBlockInserted] = toFlowProcessor {
     Flow[BestBlockInserted]
       // format: off
       .via(headerWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
@@ -59,7 +61,9 @@ class CassandraBackend(parallelism: Int)(implicit
       .via(inputsWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
       .via(assetsWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
       .via(outputsWriteFlow(parallelism))
+      .toProcessor.run()
       // format: on
+  }
 }
 
 object CassandraBackend extends LazyLogging {

@@ -30,11 +30,11 @@ import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.http.Routes
 import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
-import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.db.{FullBlock, UtxoTracker}
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.storage.MvStorage
 
@@ -76,15 +76,15 @@ object ChainIndexer extends App with AkkaStreamSupport with LazyLogging {
             for {
               blockHttpClient <- BlockHttpClient.withNodePoolBackend
               pluginManager   <- PluginManager.initialize
-              backendOpt      <- Future.fromTry(Backend(conf.backendType))
               graphBackendOpt <- Future.fromTry(GraphBackend(conf.graphBackendType))
               storage         <- Future.fromTry(MvStorage.withDefaultDir(conf.mvStore.cacheSize))
+              backend         <- Future.fromTry(Backend(conf.backendType))
               storageService = StorageService(storage, conf.mvStore)
               blockReader    = new BlockReader(blockHttpClient)
-              blockWriter    = new BlockWriter(storage, storageService, conf.mvStore, backendOpt, graphBackendOpt)
+              blockWriter    = new BlockWriter(storage, storageService, conf.mvStore, backend, graphBackendOpt)
               chainIndexer   = new StreamExecutor(true, blockHttpClient, blockReader, blockWriter, storage)
               mempoolSyncer  = new MempoolSyncer(blockHttpClient)
-              initializer    = new Initializer(storage, backendOpt, graphBackendOpt)
+              initializer    = new Initializer(storage, backend, graphBackendOpt)
               scheduler      = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
               done <- scheduler.validateAndSchedule(0.seconds, conf.mvStore.maxIdleCompactTime + 5.seconds)
             } yield done

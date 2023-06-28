@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.mvstore
 import org.h2.mvstore.MVStore
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
+
 import scala.jdk.CollectionConverters.*
 
 class MvStorePlayground extends AsyncFreeSpec with Matchers {
@@ -32,6 +33,7 @@ class MvStorePlayground extends AsyncFreeSpec with Matchers {
     // store.compactFile(1000)
 
     store.close()
+
     0 shouldBe 0
   }
 }

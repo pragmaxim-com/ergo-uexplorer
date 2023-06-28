@@ -5,8 +5,9 @@ import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.structure.Graph
-import org.ergoplatform.uexplorer.cassandra.api.Backend
+import org.ergoplatform.uexplorer.db.Backend
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
+import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.storage.MvStorage
 import org.ergoplatform.uexplorer.{BlockId, Const, Height}
@@ -20,27 +21,29 @@ import scala.util.Try
 
 class Initializer(
   storage: MvStorage,
-  backendOpt: Option[Backend],
+  backend: Backend,
   graphBackendOpt: Option[GraphBackend]
 ) extends LazyLogging {
 
-  def init: ChainIntegrity =
-    if (storage.isEmpty && backendOpt.exists(b => !b.isEmpty)) {
-      HalfEmptyInconsistency("Backend must be empty when utxo state is.")
-    } else if (!storage.isEmpty && backendOpt.exists(_.isEmpty)) {
-      HalfEmptyInconsistency(s"utxoState must be empty when backend is.")
-    } else if (storage.isEmpty && (backendOpt.isEmpty || backendOpt.exists(_.isEmpty))) {
-      if (graphBackendOpt.exists(_.initGraph) || graphBackendOpt.isEmpty) {
-        logger.info(s"Chain is empty, loading from scratch ...")
-        ChainEmpty
+  def init: Future[ChainIntegrity] =
+    backend.isEmpty.map { backendEmpty =>
+      if (storage.isEmpty && !backendEmpty) {
+        HalfEmptyInconsistency("Backend must be empty when storage is.")
+      } else if (!storage.isEmpty && backendEmpty) {
+        HalfEmptyInconsistency(s"Storage must be empty when backend is.")
+      } else if (storage.isEmpty && backendEmpty) {
+        if (graphBackendOpt.exists(_.initGraph) || graphBackendOpt.isEmpty) {
+          logger.info(s"Chain is empty, loading from scratch ...")
+          ChainEmpty
+        } else {
+          GraphInconsistency("Janus graph must be empty when main db is empty, drop janusgraph keyspace!")
+        }
       } else {
-        GraphInconsistency("Janus graph must be empty when main db is empty, drop janusgraph keyspace!")
+        if (graphBackendOpt.isEmpty || graphBackendOpt.exists(g => !g.isEmpty))
+          ChainValid
+        else
+          GraphInconsistency("Janus graph cannot be empty when main db is not")
       }
-    } else {
-      if (graphBackendOpt.isEmpty || graphBackendOpt.exists(g => !g.isEmpty))
-        ChainValid
-      else
-        GraphInconsistency("Janus graph cannot be empty when main db is not")
     }
 }
 

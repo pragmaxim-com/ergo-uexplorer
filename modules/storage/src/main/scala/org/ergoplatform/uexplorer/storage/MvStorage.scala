@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, FeeContract, Foundation}
-import org.ergoplatform.uexplorer.mvstore.{multiset, *}
+import org.ergoplatform.uexplorer.mvstore.*
 import MvStorage.*
 import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
