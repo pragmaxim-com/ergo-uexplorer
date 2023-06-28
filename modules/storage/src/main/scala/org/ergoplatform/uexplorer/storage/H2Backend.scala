@@ -29,16 +29,24 @@ class H2Backend(cp: JdbcConnectionPool)(implicit as: ActorSystem[Nothing]) exten
 
   override def removeBlocks(blockIds: Set[BlockId]): Future[Unit] = Future {
     val conn = cp.getConnection
-    val ps   = conn.prepareStatement(deleteBlockPreparedStmnt)
+    conn.setAutoCommit(false)
+    val ps = conn.prepareStatement(deleteBlockPreparedStmnt)
     ps.setArray(1, conn.createArrayOf("VARCHAR", blockIds.toArray))
     try !ps.execute()
-    finally conn.close()
+    finally {
+      Try(conn.commit())
+      conn.close()
+    }
   }
 
   override def blockWriteFlow: concurrent.Flow.Processor[BestBlockInserted, BestBlockInserted] =
     FlowAdapters.toFlowProcessor(
       Flow[BestBlockInserted]
-        .statefulMap[Connection, BestBlockInserted](() => cp.getConnection)(
+        .statefulMap[Connection, BestBlockInserted] { () =>
+          val conn = cp.getConnection
+          conn.setAutoCommit(false)
+          conn
+        }(
           (conn, b) => {
             addOutputInsertBatch(conn.prepareStatement(outputInsertPreparedStmnt), b.blockWithInputs).executeBatch()
             conn.commit()
