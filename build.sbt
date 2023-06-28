@@ -91,30 +91,30 @@ lazy val core =
 lazy val `node-pool` =
   Utils.mkModule("node-pool", "node-pool")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ sttp("3") ++ scalatest("3"))
+    .settings(libraryDependencies ++= akkaStream("3") ++ sttp("3") ++ scalatest("3"))
     .dependsOn(core)
 
 lazy val mvstore =
   Utils.mkModule("mvstore", "mvstore")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= Seq(mvStore, loggingApi, scalaLogging("3")) ++ scalatest("3"))
+    .settings(libraryDependencies ++= Seq(h2, loggingApi, scalaLogging("3")) ++ scalatest("3"))
 
 lazy val storage =
   Utils.mkModule("storage", "storage")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= Seq(kryo) ++ scalatest("3"))
+    .settings(libraryDependencies ++= akkaStream("3") ++ Seq(kryo) ++ scalatest("3"))
     .dependsOn(mvstore, core)
 
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ cassandraDb ++ Seq(commonsCodec))
+    .settings(libraryDependencies ++= akkaStream("3") ++ cassandraDb ++ Seq(commonsCodec))
     .dependsOn(core)
 
 lazy val janusgraph =
   Utils.mkModule("janusgraph", "janusgraph")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= lightBend("3") ++ janusGraph ++ cassandraDb ++ scalatest("3"))
+    .settings(libraryDependencies ++= akkaStream("3") ++ janusGraph ++ cassandraDb ++ scalatest("3"))
     .dependsOn(core)
 
 lazy val `alert-plugin` =
@@ -131,6 +131,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= Seq(logback) ++ lightBend("3") ++ scalatest("3"))
+    .settings(libraryDependencies ++= Seq(logback, akkaHttp("3")) ++ akkaStream("3") ++ scalatest("3"))
     .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
     .dependsOn(core, `node-pool` % "compile->compile;test->test", storage, cassandra, janusgraph)

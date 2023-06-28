@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.{MapPimp, MutableMapPimp}
 import org.ergoplatform.uexplorer.cassandra.{CassandraBackend, CassandraPersistenceSupport}
-import org.ergoplatform.uexplorer.{ErgoTreeHex, BlockId, BoxId}
+import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex}
 import org.ergoplatform.uexplorer.cassandra
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
@@ -28,7 +28,8 @@ trait CassandraHeadersReader extends LazyLogging {
 
   private lazy val headerSelectWhereHeader = cqlSession.prepare(headerIdSelectStatement)
 
-  def isEmpty: Boolean = !cqlSession.execute(headerSelectWhereHeader.bind()).iterator().hasNext
+  def isEmpty: Future[Boolean] =
+    cqlSession.executeAsync(headerSelectWhereHeader.bind()).asScala.map(r => !r.currentPage().iterator().hasNext)
 }
 
 object CassandraHeadersReader extends CassandraPersistenceSupport {

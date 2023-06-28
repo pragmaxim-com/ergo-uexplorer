@@ -7,11 +7,13 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
 import org.ergoplatform.uexplorer.{Resiliency, UnexpectedStateError}
-import org.ergoplatform.uexplorer.cassandra.api.Backend
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockWithInputs, ForkInserted, LinkedBlock, UtxoTracker}
+import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, BlockWithInputs, ForkInserted, LinkedBlock, UtxoTracker}
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
+import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
+import java.util.concurrent.Flow.Processor
+import org.reactivestreams.FlowAdapters.toProcessor
 
 import concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -21,7 +23,7 @@ class BlockWriter(
   storage: MvStorage,
   storageService: StorageService,
   mvStoreConf: MvStoreConf,
-  backendOpt: Option[Backend],
+  backend: Backend,
   graphBackendOpt: Option[GraphBackend]
 )(implicit enc: ErgoAddressEncoder)
   extends AkkaStreamSupport
@@ -56,7 +58,9 @@ class BlockWriter(
     Flow[BestBlockInserted]
       .buffer(100, OverflowStrategy.backpressure)
       .async
-      .via(backendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(_.blockWriteFlow))
+      .via(
+        Flow.fromProcessor(() => toProcessor(backend.blockWriteFlow))
+      )
 
   private val graphPersistenceFlow =
     Flow[BestBlockInserted]
@@ -76,7 +80,7 @@ class BlockWriter(
           Source.single(bestBlock).via(insertBlockFlow)
         case winningFork =>
           insertForkFlow(winningFork).mapMaterializedValue { loosingFork =>
-            backendOpt.fold(Success(NotUsed))(_.removeBlocksFromMainChain(loosingFork.keys).map(_ => NotUsed))
+            backend.removeBlocks(loosingFork.keySet).map(_ => NotUsed)
           }
       }
       .wireTap { b =>

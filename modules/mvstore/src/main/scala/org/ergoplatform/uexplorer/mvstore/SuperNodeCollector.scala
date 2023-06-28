@@ -16,7 +16,7 @@ import scala.util.{Random, Success, Try}
 class SuperNodeCollector[HK: HotKeyCodec](id: String) extends LazyLogging {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
 
-  private lazy val stringifiedHotKeys: Map[HK, String] =
+  private val stringifiedHotKeys: Map[HK, String] =
     Source
       .fromInputStream(
         new GZIPInputStream(
@@ -38,7 +38,7 @@ class SuperNodeCollector[HK: HotKeyCodec](id: String) extends LazyLogging {
   def getExistingStringifiedHotKeys(mvStoreMapNames: Set[String]): Map[HK, String] = {
     val existingStringifiedHotKeys = stringifiedHotKeys.filter(e => mvStoreMapNames.contains(e._2))
     logger.info(
-      s"MvStore contains ${existingStringifiedHotKeys.size} SuperNodes from ${stringifiedHotKeys.size} registered"
+      s"MvStore contains ${existingStringifiedHotKeys.size} $id superNodes from ${stringifiedHotKeys.size} registered"
     )
     existingStringifiedHotKeys
   }

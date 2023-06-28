@@ -10,11 +10,11 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, Resiliency, Storage}
-import org.ergoplatform.uexplorer.cassandra.api.Backend
 import org.ergoplatform.uexplorer.chain.{ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.http.{BlockHttpClient, Codecs}
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.*
+import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.storage.MvStorage

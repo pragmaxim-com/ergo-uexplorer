@@ -59,6 +59,7 @@ package object uexplorer {
   object HexString {
     extension (x: HexString) def unwrapped: String = x
     def fromStringUnsafe(s: String): HexString     = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
+    def castUnsafe(s: String): HexString           = s.asInstanceOf[HexString]
   }
 
   object AvlTreePathProofHex {
@@ -70,6 +71,7 @@ package object uexplorer {
   object BlockId {
     extension (x: BlockId) def unwrapped: String = x
     def fromStringUnsafe(s: String): BlockId     = unsafeWrap(HexString.fromStringUnsafe(s))
+    def castUnsafe(s: String): BlockId           = s.asInstanceOf[BlockId]
   }
 
   type TokenId = HexString
@@ -81,16 +83,14 @@ package object uexplorer {
 
   type ErgoTreeHex = HexString
   object ErgoTreeHex {
-    extension (x: ErgoTreeHex) def unwrapped: String = x
-    def fromStringUnsafe(s: String): ErgoTreeHex     = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
-    def castUnsafe(s: String): ErgoTreeHex           = s.asInstanceOf[ErgoTreeHex]
+    def fromStringUnsafe(s: String): ErgoTreeHex = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
+    def castUnsafe(s: String): ErgoTreeHex       = s.asInstanceOf[ErgoTreeHex]
   }
 
   type ErgoTreeT8Hex = HexString
   object ErgoTreeT8Hex {
-    extension (x: ErgoTreeT8Hex) def unwrapped: String = x
-    def fromStringUnsafe(s: String): ErgoTreeT8Hex     = unsafeWrap(HexString.fromStringUnsafe(s))
-    def castUnsafe(s: String): ErgoTreeHex             = s.asInstanceOf[ErgoTreeHex]
+    def fromStringUnsafe(s: String): ErgoTreeT8Hex = unsafeWrap(HexString.fromStringUnsafe(s))
+    def castUnsafe(s: String): ErgoTreeHex         = s.asInstanceOf[ErgoTreeHex]
   }
 
   opaque type TxId = String
@@ -100,6 +100,7 @@ package object uexplorer {
     given Encoder[TxId]                       = Encoder.encodeString
     given Decoder[TxId]                       = Decoder.decodeString
     extension (x: TxId) def unwrapped: String = x
+    def castUnsafe(s: String): TxId           = s.asInstanceOf[TxId]
   }
 
   opaque type BoxId = String
@@ -111,6 +112,7 @@ package object uexplorer {
 
     given Decoder[BoxId]                       = Decoder.decodeString
     extension (x: BoxId) def unwrapped: String = x
+    def castUnsafe(s: String): BoxId           = s.asInstanceOf[BoxId]
   }
 
   opaque type TokenName = String

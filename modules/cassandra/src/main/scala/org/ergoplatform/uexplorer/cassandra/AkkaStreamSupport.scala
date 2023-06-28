@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.cassandra
 
 import akka.NotUsed
-import akka.stream.scaladsl.{Balance, Broadcast, Flow, GraphDSL, Merge, RestartSource, Source}
+import akka.stream.scaladsl.{Balance, Broadcast, Flow, GraphDSL, Merge, RestartSource, Sink, Source}
 import akka.stream.*
 import akka.stream.ActorAttributes.Dispatcher
 
@@ -36,10 +36,15 @@ trait AkkaStreamSupport {
 
     Flow.fromGraph(GraphDSL.create() { implicit b =>
       val broadcast = b.add(Broadcast[In](workers.size, eagerCancel = true))
-      val merge     = b.add(Merge[Out](workers.size))
+      val merge     = b.add(Merge[Out](1))
 
-      workers.foreach { worker =>
-        broadcast ~> worker.withAttributes(workerAttributes) ~> merge
+      workers.foldLeft(0) {
+        case (acc, worker) if acc == 0 =>
+          broadcast ~> worker.withAttributes(workerAttributes) ~> merge
+          acc + 1
+        case (acc, worker) =>
+          broadcast ~> worker.withAttributes(workerAttributes) ~> Sink.ignore
+          acc + 1
       }
 
       FlowShape(broadcast.in, merge.out)
