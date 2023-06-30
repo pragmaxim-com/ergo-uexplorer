@@ -17,8 +17,7 @@ case class OutputRecord(
   creationHeight: CreationHeight,
   ergoTreeHex: ErgoTreeHex,
   ergoTreeT8Hex: Option[ErgoTreeT8Hex],
-  value: Value,
-  additionalRegisters: Map[RegisterId, ExpandedRegister]
+  value: Value
 )
 
 object OutputBuilder {
@@ -36,8 +35,7 @@ object OutputBuilder {
             o.creationHeight,
             o.ergoTree,
             scriptT8Hash,
-            o.value,
-            additionalRegisters
+            o.value
           )
         ).get
       }
