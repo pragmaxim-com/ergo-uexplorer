@@ -80,7 +80,7 @@ object H2Backend extends LazyLogging {
   import org.ergoplatform.uexplorer.HexString.unwrapped
 
   private def addOutputInsertBatch(ps: PreparedStatement, b: BlockWithInputs) = {
-    b.outputRecords.foreach { case OutputRecord(txId, boxId, creationHeight, ergoTreeHex, ergoTreeT8Hex, value, _) =>
+    b.outputRecords.foreach { case OutputRecord(txId, boxId, creationHeight, ergoTreeHex, ergoTreeT8Hex, value) =>
       ps.setString(1, boxId.unwrapped)
       ps.setString(2, b.b.header.id.unwrapped)
       ps.setInt(3, creationHeight)
