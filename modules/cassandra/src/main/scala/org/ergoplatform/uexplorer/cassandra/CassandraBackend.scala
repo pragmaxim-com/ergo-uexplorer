@@ -25,7 +25,7 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Try
-import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, FullBlock}
+import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, BlockWithInputs, FullBlock}
 
 import java.util.concurrent.Flow.Processor
 import org.reactivestreams.FlowAdapters.toFlowProcessor
@@ -50,6 +50,8 @@ class CassandraBackend(parallelism: Int)(implicit
     logger.info(s"Stopping Cassandra session")
     cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
   }
+
+  override def writeBlock(b: BlockWithInputs): BlockWithInputs = ???
 
   val blockWriteFlow: Processor[BestBlockInserted, BestBlockInserted] = toFlowProcessor {
     Flow[BestBlockInserted]

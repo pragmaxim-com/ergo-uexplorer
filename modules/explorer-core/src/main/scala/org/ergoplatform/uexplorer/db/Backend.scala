@@ -14,5 +14,7 @@ trait Backend {
 
   def blockWriteFlow: Processor[BestBlockInserted, BestBlockInserted]
 
+  def writeBlock(b: BlockWithInputs): BlockWithInputs
+
   def close(): Future[Unit]
 }

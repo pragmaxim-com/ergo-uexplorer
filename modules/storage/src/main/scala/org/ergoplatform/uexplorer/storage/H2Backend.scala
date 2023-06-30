@@ -39,6 +39,18 @@ class H2Backend(cp: JdbcConnectionPool)(implicit as: ActorSystem[Nothing]) exten
     }
   }
 
+  override def writeBlock(b: BlockWithInputs): BlockWithInputs = {
+    val conn = cp.getConnection
+    conn.setAutoCommit(false)
+    try {
+      addOutputInsertBatch(conn.prepareStatement(outputInsertPreparedStmnt), b).executeBatch()
+      b
+    } finally {
+      Try(conn.commit())
+      conn.close()
+    }
+  }
+
   override def blockWriteFlow: concurrent.Flow.Processor[BestBlockInserted, BestBlockInserted] =
     FlowAdapters.toFlowProcessor(
       Flow[BestBlockInserted]
@@ -87,15 +99,6 @@ object H2Backend extends LazyLogging {
   private val outputInsertPreparedStmnt =
     """INSERT INTO OUTPUTS (boxId, blockId, creationHeight, txId, ergoTreeHex, ergoTreeT8Hex, val) VALUES(?,?,?,?,?,?,?)""".stripMargin
 
-  private val createOutputsTableStmnt =
-    Source
-      .fromInputStream(
-        new BufferedInputStream(Thread.currentThread().getContextClassLoader.getResourceAsStream("db-schema.sql"))
-      )
-      .getLines()
-      .mkString("", "\n", "\n")
-      .stripMargin
-
   def apply()(implicit system: ActorSystem[Nothing]): Try[H2Backend] = Try {
     val h2Conf = system.settings.config.getConfig("h2")
     val cp =
@@ -104,10 +107,6 @@ object H2Backend extends LazyLogging {
         h2Conf.getString("user"),
         h2Conf.getString("password")
       )
-
-    cp.getConnection
-      .createStatement()
-      .execute(createOutputsTableStmnt)
 
     CoordinatedShutdown(system).addTask(
       CoordinatedShutdown.PhaseServiceStop,
