@@ -113,7 +113,7 @@ class BlockWriter(
           Source(forkInserted.winningFork).via(insertBlockFlow).mapMaterializedValue(_ => forkInserted.loosingFork)
       )
 
-  private val concurrentFlows = List(
+  private val storagePersistence = broadcastTo3Workers(
     Flow.fromFunction[BlockWithInputs, BlockWithInputs] { b =>
       storage.persistErgoTreeUtxos(b.outputRecords).get
       storage.removeInputBoxesByErgoTree(b.inputRecords).get
@@ -135,7 +135,7 @@ class BlockWriter(
       .apply[LinkedBlock]
       .map(UtxoTracker.getBlockWithInputs(_, storage).get)
       .async
-      .via(cpuHeavyBroadcastFlow(concurrentFlows))
+      .via(storagePersistence)
       .map { lb =>
         storage.commit()
         BestBlockInserted(lb, None)

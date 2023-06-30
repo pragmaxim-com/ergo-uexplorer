@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.cassandra
 
 import akka.NotUsed
-import akka.stream.scaladsl.{Balance, Broadcast, Flow, GraphDSL, Merge, RestartSource, Sink, Source}
+import akka.stream.scaladsl.*
 import akka.stream.*
 import akka.stream.ActorAttributes.Dispatcher
 
@@ -28,27 +28,60 @@ trait AkkaStreamSupport {
     })
   }
 
-  def heavyBroadcastFlow[In, Out](
-    workers: Seq[Flow[In, Out, Any]],
-    workerAttributes: Attributes
-  ): Flow[In, Out, NotUsed] = {
+  def broadcastTo3Workers[In, Out](
+    w1: Flow[In, Out, _],
+    w2: Flow[In, Out, _],
+    w3: Flow[In, Out, _]
+  ): Flow[In, Out, _] = {
     import akka.stream.scaladsl.GraphDSL.Implicits.*
 
-    Flow.fromGraph(GraphDSL.create() { implicit b =>
-      val broadcast = b.add(Broadcast[In](workers.size, eagerCancel = true))
-      val merge     = b.add(Merge[Out](1))
+    Flow.fromGraph(
+      GraphDSL
+        .create() { implicit b =>
+          val zipWith =
+            ZipWith[Out, Out, Out, Out] { (in1, in2, in3) =>
+              assert(Set(in1, in2, in3).size == 1)
+              in1
+            }
+          val broadcast = b.add(Broadcast[In](3, eagerCancel = true))
+          val zip       = b.add(zipWith)
+          broadcast.out(0) ~> w1 ~> zip.in0
+          broadcast.out(1) ~> w2 ~> zip.in1
+          broadcast.out(2) ~> w3 ~> zip.in2
 
-      workers.foldLeft(0) {
-        case (acc, worker) if acc == 0 =>
-          broadcast ~> worker.withAttributes(workerAttributes) ~> merge
-          acc + 1
-        case (acc, worker) =>
-          broadcast ~> worker.withAttributes(workerAttributes) ~> Sink.ignore
-          acc + 1
-      }
+          FlowShape[In, Out](broadcast.in, zip.out)
+        }
+        .withAttributes(Attributes.inputBuffer(initial = 1, max = 1))
+    )
+  }
 
-      FlowShape(broadcast.in, merge.out)
-    })
+  def broadcastTo4Workers[In, Out](
+    w1: Flow[In, Out, _],
+    w2: Flow[In, Out, _],
+    w3: Flow[In, Out, _],
+    w4: Flow[In, Out, _]
+  ): Flow[In, Out, _] = {
+    import akka.stream.scaladsl.GraphDSL.Implicits.*
+
+    Flow.fromGraph(
+      GraphDSL
+        .create() { implicit b =>
+          val zipWith =
+            ZipWith[Out, Out, Out, Out, Out] { (in1, in2, in3, in4) =>
+              assert(Set(in1, in2, in3, in4).size == 1)
+              in1
+            }
+          val broadcast = b.add(Broadcast[In](4, eagerCancel = true))
+          val zip       = b.add(zipWith)
+          broadcast.out(0) ~> w1 ~> zip.in0
+          broadcast.out(1) ~> w2 ~> zip.in1
+          broadcast.out(2) ~> w3 ~> zip.in2
+          broadcast.out(3) ~> w4 ~> zip.in3
+
+          FlowShape[In, Out](broadcast.in, zip.out)
+        }
+        .withAttributes(Attributes.inputBuffer(initial = 1, max = 1))
+    )
   }
 
   // maxParallelism corresponds to 'parallelism-factor = 0.5' from configuration
@@ -60,18 +93,6 @@ trait AkkaStreamSupport {
     heavyBalanceFlow(
       worker,
       parallelism = Math.max(maxParallelism, Runtime.getRuntime.availableProcessors()),
-      Attributes.asyncBoundary
-        .and(Attributes.inputBuffer(1, 32))
-        .and(dispatcher)
-    )
-
-  // maxParallelism corresponds to 'parallelism-factor = 0.5' from configuration
-  def cpuHeavyBroadcastFlow[In, Out](
-    workers: Seq[Flow[In, Out, Any]],
-    dispatcher: Dispatcher = ActorAttributes.IODispatcher
-  ): Flow[In, Out, NotUsed] =
-    heavyBroadcastFlow(
-      workers,
       Attributes.asyncBoundary
         .and(Attributes.inputBuffer(1, 32))
         .and(dispatcher)
