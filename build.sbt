@@ -56,6 +56,8 @@ def chainIndexerAssemblySettings = Seq(
     case "logback.xml" => MergeStrategy.first
     case other if other.contains("module-info.class") => MergeStrategy.discard
     case other if other.contains("ExtensionModule") => MergeStrategy.first
+    case other if other.contains("getquill") => MergeStrategy.last
+    case PathList("deriving.conf") => MergeStrategy.concat
     case other if other.contains(".proto") => MergeStrategy.first
     case other if other.contains("io.netty.versions") => MergeStrategy.first
     case other => (assembly / assemblyMergeStrategy).value(other)
@@ -81,12 +83,12 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `node-pool`, mvstore, storage, cassandra, janusgraph, indexer)// TODO return `alert-plugin` and org.ergoplatform.uexplorer.plugin.alert.AlertPlugin to META-INF.services
+  ).aggregate(core, `node-pool`, backend, mvstore, storage, cassandra, janusgraph, indexer)// TODO return `alert-plugin` and org.ergoplatform.uexplorer.plugin.alert.AlertPlugin to META-INF.services
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= circe("3") ++ monocle("3") ++ refined("3") ++ Seq(retry("3"), pureConfig, ergoWallet, gremlin, loggingApi, scalaLogging("3")))
+    .settings(libraryDependencies ++= akkaStream("3") ++ circe("3") ++ monocle("3") ++ refined("3") ++ Seq(retry("3"), pureConfig, ergoWallet, gremlin, loggingApi, scalaLogging("3")))
 
 lazy val `node-pool` =
   Utils.mkModule("node-pool", "node-pool")
@@ -126,11 +128,19 @@ lazy val `alert-plugin` =
     .settings(excludeDependencies += ExclusionRule(commonsLogging.organization, commonsLogging.name))
     .dependsOn(core)
 
+lazy val backend =
+  Utils.mkModule("backend", "backend")
+    .settings(commonSettings)
+    .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
+    .settings(libraryDependencies ++= akkaStream("3") ++ zio("3") ++ Seq(h2, logback, loggingApi) ++ scalatest("3")) //TODO remove logging
+    .settings(excludeDependencies ++= Seq(ExclusionRule("com.lihaoyi", "sourcecode_2.13"), ExclusionRule("com.lihaoyi", "fansi_2.13"), ExclusionRule("com.lihaoyi", "pprint_2.13"), ExclusionRule("io.suzaku", "boopickle_2.13")))
+    .dependsOn(core)
+
 lazy val indexer =
   Utils.mkModule("chain-indexer", "chain-indexer")
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
     .settings(libraryDependencies ++= Seq(logback, akkaHttp("3")) ++ akkaStream("3") ++ scalatest("3"))
-    .settings(excludeDependencies ++= cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
-    .dependsOn(core, `node-pool` % "compile->compile;test->test", storage, cassandra, janusgraph)
+    .settings(excludeDependencies ++= Seq(ExclusionRule("com.lihaoyi", "sourcecode_2.13"), ExclusionRule("com.lihaoyi", "fansi_2.13"), ExclusionRule("com.lihaoyi", "pprint_2.13"), ExclusionRule("io.suzaku", "boopickle_2.13")) ++ cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
+    .dependsOn(core, `node-pool` % "compile->compile;test->test", backend, storage, cassandra, janusgraph)

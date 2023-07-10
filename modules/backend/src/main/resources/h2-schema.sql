@@ -1,0 +1,62 @@
+
+create table if not exists Block (
+    blockId              VARCHAR(64) NOT NULL PRIMARY KEY,
+    parentId             VARCHAR(64) NOT NULL,
+    height               INT NOT NULL,
+    timestamp            BIGINT NOT NULL,
+    blockSize            INT NOT NULL,
+    blockCoins           BIGINT NOT NULL,
+    blockMiningTime      BIGINT NOT NULL,
+    txsCount             INT NOT NULL,
+    txsSize              INT NOT NULL,
+    minerAddress         VARCHAR NOT NULL,
+    minerReward          BIGINT NOT NULL,
+    minerRevenue         BIGINT NOT NULL,
+    blockFee             BIGINT NOT NULL,
+    blockChainTotalSize  BIGINT NOT NULL,
+    totalTxsCount        BIGINT NOT NULL,
+    totalCoinsIssued     BIGINT NOT NULL,
+    totalMiningTime      BIGINT NOT NULL,
+    totalFees            BIGINT NOT NULL,
+    totalMinersReward    BIGINT NOT NULL,
+    totalCoinsInTxs      BIGINT NOT NULL,
+    maxTxGix             BIGINT NOT NULL,
+    maxBoxGix            BIGINT NOT NULL
+);
+
+create table if not exists ErgoTree (
+    hash            VARCHAR(64) NOT NULL PRIMARY KEY,
+    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    hex             VARCHAR NOT NULL
+);
+
+create table if not exists ErgoTreeT8 (
+    hash            VARCHAR(64) NOT NULL PRIMARY KEY,
+    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    hex             VARCHAR NOT NULL
+);
+
+create table if not exists Box (
+    boxId           VARCHAR(64) NOT NULL PRIMARY KEY,
+    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    txId            VARCHAR(64) NOT NULL,
+    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash),
+    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash),
+    ergValue        BIGINT NOT NULL
+);
+
+create table if not exists Asset (
+    tokenId         VARCHAR(64) NOT NULL PRIMARY KEY,
+    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    boxId           VARCHAR(64) NOT NULL REFERENCES Box (boxId),
+    amount          BIGINT NOT NULL
+);
+
+create table if not exists Utxo (
+    boxId           VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES Box (boxId),
+    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    txId            VARCHAR(64) NOT NULL,
+    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash),
+    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash),
+    ergValue        BIGINT NOT NULL
+);

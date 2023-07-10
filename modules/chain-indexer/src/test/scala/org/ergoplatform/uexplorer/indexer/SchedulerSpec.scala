@@ -5,6 +5,7 @@ import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.scaladsl.Source
 import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.backend.H2Backend
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
@@ -29,7 +30,7 @@ import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.http.MetadataHttpClient
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
-import org.ergoplatform.uexplorer.storage.{H2Backend, MvStorage, MvStoreConf}
+import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 
 import java.nio.file.Paths
 import scala.concurrent.duration.*
@@ -83,7 +84,7 @@ class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with Be
   val pluginManager   = new PluginManager(List.empty)
   val storageService  = StorageService(storage, mvStoreConf)
   val blockHttpClient = new BlockHttpClient(new MetadataHttpClient[WebSockets](minNodeHeight = Rest.info.minNodeHeight))
-  val backend         = H2Backend().get
+  val backend         = H2Backend(sys).get
   val graphBackend    = Some(new InMemoryGraphBackend)
   val blockReader     = new BlockReader(blockHttpClient)
   val blockWriter     = new BlockWriter(storage, storageService, mvStoreConf, backend, graphBackend)

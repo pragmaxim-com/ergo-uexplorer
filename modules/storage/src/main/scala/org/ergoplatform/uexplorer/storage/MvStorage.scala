@@ -8,16 +8,15 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, FeeContract, Foundation}
-import org.ergoplatform.uexplorer.mvstore.*
-import MvStorage.*
 import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.storage.Implicits.*
-import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.h2.mvstore.{MVMap, MVStore}
-import org.ergoplatform.uexplorer.db.OutputRecord
+import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.ergoplatform.uexplorer.mvstore.multiset.MultiMvSet
+import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
+import org.ergoplatform.uexplorer.storage.Implicits.*
+import org.ergoplatform.uexplorer.storage.MvStorage.*
+import org.h2.mvstore.{MVMap, MVStore}
 
 import java.io.{BufferedInputStream, File}
 import java.nio.ByteBuffer
@@ -25,12 +24,11 @@ import java.nio.file.{CopyOption, Files, Path, Paths}
 import java.util
 import java.util.Map.Entry
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
-import scala.collection.concurrent
 import java.util.stream.Collectors
 import java.util.zip.GZIPInputStream
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{TreeMap, TreeSet}
-import scala.collection.mutable
+import scala.collection.{concurrent, mutable}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -44,7 +42,7 @@ case class MvStorage(
   utxosByErgoTreeT8Hex: MultiMvSet[ErgoTreeT8Hex, java.util.Set, BoxId],
   ergoTreeHexByUtxo: MapLike[BoxId, ErgoTreeHex],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
-  blockById: MapLike[BlockId, BlockInfo]
+  blockById: MapLike[BlockId, Block]
 )(implicit val store: MVStore)
   extends Storage
   with LazyLogging {
@@ -105,14 +103,12 @@ case class MvStorage(
       }
   }
 
-  def persistErgoTreeT8Utxos(outputRecords: ArraySeq[OutputRecord]): Try[_] = Try {
-    outputRecords
-      .filter(_.ergoTreeT8Hex.isDefined)
-      .groupBy(_.ergoTreeT8Hex)
-      .collect { case (Some(ergoTreeT8Hex), boxes) =>
+  def persistErgoTreeT8Utxos(outputRecords: OutputRecords): Try[_] = Try {
+    outputRecords.byErgoTreeT8
+      .collect { case (ergoTreeT8, boxes) =>
         utxosByErgoTreeT8Hex
           .adjustAndForget(
-            ergoTreeT8Hex,
+            ergoTreeT8.hex,
             boxes.iterator.map(_.boxId),
             boxes.size
           )
@@ -120,14 +116,13 @@ case class MvStorage(
       }
   }
 
-  def persistErgoTreeUtxos(outputRecords: ArraySeq[OutputRecord]): Try[_] = Try {
-    outputRecords
-      .groupBy(_.ergoTreeHex)
+  def persistErgoTreeUtxos(outputRecords: OutputRecords): Try[_] = Try {
+    outputRecords.byErgoTree
       .map { case (ergoTreeHex, boxes) =>
         ergoTreeHexByUtxo
-          .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> b.ergoTreeHex))
+          .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> ergoTreeHex.hex))
           .flatMap { _ =>
-            utxosByErgoTreeHex.adjustAndForget(ergoTreeHex, boxes.iterator.map(_.boxId), boxes.size)
+            utxosByErgoTreeHex.adjustAndForget(ergoTreeHex.hex, boxes.iterator.map(_.boxId), boxes.size)
           }
           .get
       }
@@ -135,14 +130,14 @@ case class MvStorage(
 
   def insertNewBlock(
     blockId: BlockId,
-    blockInfo: BlockInfo,
+    block: Block,
     currentVersion: Revision
   ): Try[Set[BlockId]] =
     blockById
-      .putIfAbsentOrFail(blockId, blockInfo.persistable(currentVersion))
+      .putIfAbsentOrFail(blockId, block.persistable(currentVersion))
       .map { _ =>
         blockIdsByHeight
-          .adjust(blockInfo.height)(
+          .adjust(block.height)(
             _.fold(javaSetOf(blockId)) { existingBlockIds =>
               existingBlockIds.add(blockId)
               existingBlockIds
@@ -151,11 +146,11 @@ case class MvStorage(
       }
       .map { blockIds =>
         val r = blockIds.asScala.toSet
-        if (blockIds.size > 1) logger.info(s"Fork at height ${blockInfo.height} with ${r.mkString(", ")}")
+        if (blockIds.size > 1) logger.info(s"Fork at height ${block.height} with ${r.mkString(", ")}")
         r
       }
 
-  def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockInfo] =
+  def getBlocksByHeight(atHeight: Height): Map[BlockId, Block] =
     blockIdsByHeight
       .get(atHeight)
       .map(_.asScala.flatMap(blockId => blockById.get(blockId).map(blockId -> _)).toMap)
@@ -166,7 +161,7 @@ case class MvStorage(
 
   def getLastHeight: Option[Height] = blockIdsByHeight.lastKey
 
-  def getLastBlocks: Map[BlockId, BlockInfo] =
+  def getLastBlocks: Map[BlockId, Block] =
     blockIdsByHeight.lastKey
       .map { lastHeight =>
         getBlocksByHeight(lastHeight)
@@ -176,7 +171,7 @@ case class MvStorage(
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean =
     blockById.containsKey(blockId) && blockIdsByHeight.containsKey(atHeight)
 
-  def getBlockById(blockId: BlockId): Option[BlockInfo] = blockById.get(blockId)
+  def getBlockById(blockId: BlockId): Option[Block] = blockById.get(blockId)
 
   def getErgoTreeHexByUtxo(boxId: BoxId): Option[ErgoTreeHex] = ergoTreeHexByUtxo.get(boxId)
 
@@ -221,7 +216,7 @@ object MvStorage extends LazyLogging {
       multiset.MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
       MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
       MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
-      MvMap[BlockId, BlockInfo]("blockById")
+      MvMap[BlockId, Block]("blockById")
     )
   }
 

@@ -16,7 +16,7 @@ import scala.util.Try
 
 object FullBlockBuilder {
 
-  def apply(block: BlockWithInputs, prevBlock: Option[BlockInfo]): Try[FullBlock] = ???
+  def apply(block: NormalizedBlock, prevBlock: Option[Block]): Try[FullBlock] = ???
   /*
     Try {
       val apiHeader       = apiBlock.header

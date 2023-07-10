@@ -11,6 +11,7 @@ object Version {
   lazy val cql4s           = "0.0.1"
   lazy val ergo            = "5.0.8"
   lazy val janus           = "1.0.0-rc1"
+  lazy val zio             = "2.0.15"
 }
 
 object Dependencies {
@@ -34,6 +35,16 @@ object Dependencies {
 
   lazy val kryo = "com.esotericsoftware" % "kryo" % "5.5.0"
 
+  def zio(v: String) = Seq(
+    "dev.zio"     % s"zio_$v"                         % Version.zio,
+    "dev.zio"     % s"zio-http_$v"                    % "3.0.0-RC2",
+    "dev.zio"     % s"zio-streams_$v"                 % "2.0.15",
+    "dev.zio"     % s"zio-interop-reactivestreams_$v" % "2.0.2",
+    "dev.zio"     % s"zio-json_$v"                    % "0.5.0",
+    "io.getquill" % s"quill-jdbc_$v"                  % "4.6.0.1",
+    "io.getquill" % s"quill-jdbc-zio_$v"              % "4.6.0.1"
+  )
+
   lazy val cassandraDb = List(
     "com.datastax.oss" % "java-driver-core"             % Version.cassandraDriver,
     "com.datastax.oss" % "java-driver-query-builder"    % Version.cassandraDriver,
@@ -54,6 +65,12 @@ object Dependencies {
     "com.typesafe.akka" % s"akka-actor-testkit-typed_$v" % Version.akka % Test,
     "com.typesafe.akka" % s"akka-slf4j_$v"               % Version.akka,
     scalaLogging(v)
+  )
+
+  def zioTest(v: String) = Seq(
+    "dev.zio" % s"zio-test_$v"          % Version.zio % Test,
+    "dev.zio" % s"zio-test-sbt_$v"      % Version.zio % Test,
+    "dev.zio" % s"zio-test-magnolia_$v" % Version.zio % Test
   )
 
   def scalatest(v: String) = Seq(

@@ -1,0 +1,7 @@
+
+DROP TABLE Asset;
+DROP TABLE Box;
+DROP TABLE Utxo;
+DROP TABLE ErgoTree;
+DROP TABLE ErgoTreeT8;
+DROP TABLE Block;

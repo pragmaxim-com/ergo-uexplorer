@@ -4,7 +4,6 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.MutableMapPimp
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.Storage
 import scala.collection.mutable
@@ -27,11 +26,15 @@ object UtxoTracker {
   def getBlockWithInputs(
     b: LinkedBlock,
     storage: Storage
-  )(implicit enc: ErgoAddressEncoder): Try[BlockWithInputs] = Try {
+  )(implicit enc: ErgoAddressEncoder): Try[NormalizedBlock] = Try {
 
-    val outputLookup =
-      b.outputRecords.iterator
-        .map(o => (o.boxId, (o.ergoTreeHex, o.ergoTreeT8Hex)))
+    val outputErgoTreeLookup =
+      b.outputRecords.byErgoTree
+        .flatMap(o => o._2.map(_.boxId -> o._1))
+        .toMap
+    val outputErgoTreeT8Lookup =
+      b.outputRecords.byErgoTreeT8
+        .flatMap(o => o._2.map(_.boxId -> o._1))
         .toMap
 
     val byErgoTree   = mutable.Map.empty[ErgoTreeHex, mutable.Set[BoxId]]
@@ -41,20 +44,19 @@ object UtxoTracker {
     b.b.transactions.transactions
       .foreach {
         case tx if tx.id == Emission.tx =>
-          adjustMultiSet(byErgoTree, Emission.ergoTree, Emission.inputBox)
+          adjustMultiSet(byErgoTree, Emission.ergoTreeHex, Emission.inputBox)
           adjustMultiSet(byErgoTreeT8, Emission.ergoTreeT8Hex, Emission.inputBox)
         case tx if tx.id == Foundation.tx =>
-          adjustMultiSet(byErgoTree, Foundation.ergoTree, Foundation.inputBox)
+          adjustMultiSet(byErgoTree, Foundation.ergoTreeHex, Foundation.inputBox)
           adjustMultiSet(byErgoTreeT8, Foundation.ergoTreeT8Hex, Foundation.inputBox)
         case tx =>
-          val (cached, notCached) = tx.inputs.iterator.map(_.boxId).partition(outputLookup.contains)
+          val (cached, notCached) = tx.inputs.iterator.map(_.boxId).partition(outputErgoTreeLookup.contains)
 
           cached.foreach { boxId =>
-            val (et, etT8Opt) = outputLookup(boxId)
-            adjustMultiSet(byErgoTree, et, boxId)
-            etT8Opt.foreach { t8 =>
-              adjustMultiSet(byErgoTreeT8, t8, boxId)
-
+            val ergoTree = outputErgoTreeLookup(boxId)
+            adjustMultiSet(byErgoTree, ergoTree.hex, boxId)
+            outputErgoTreeT8Lookup.get(boxId).foreach { ergoTreeT8 =>
+              adjustMultiSet(byErgoTreeT8, ergoTreeT8.hex, boxId)
             }
           }
 
@@ -64,7 +66,7 @@ object UtxoTracker {
                 .getErgoTreeHexByUtxo(inputBoxId)
                 .getOrElse(
                   throw new IllegalStateException(
-                    s"Input boxId $inputBoxId of block ${b.b.header.id} at height ${b.info.height} not found in utxo state"
+                    s"Input boxId $inputBoxId of block ${b.b.header.id} at height ${b.block.height} not found in utxo state"
                   )
                 ) -> inputBoxId
             }
@@ -78,7 +80,7 @@ object UtxoTracker {
                 .ergoTreeHex2T8Hex(et)
                 .getOrElse(
                   throw new IllegalStateException(
-                    s"Template of ergoTree $et of block ${b.b.header.id} at height ${b.info.height} cannot be extracted"
+                    s"Template of ergoTree $et of block ${b.b.header.id} at height ${b.block.height} cannot be extracted"
                   )
                 )
                 .foreach { t8 =>
@@ -87,7 +89,7 @@ object UtxoTracker {
 
             }
       }
-    b.toBlockWithInputs(InputRecords(byErgoTree, byErgoTreeT8, byTxId))
+    b.toNormalizedBlock(InputRecords(byErgoTree, byErgoTreeT8, byTxId))
   }
 
   private def adjustMultiSet[ET, B](m: mutable.Map[ET, mutable.Set[B]], et: ET, boxId: B) =

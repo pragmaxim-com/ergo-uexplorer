@@ -5,11 +5,11 @@ import org.ergoplatform.uexplorer.db.ForkInserted.{LoosingFork, WinningFork}
 
 sealed trait Insertable
 
-case class BestBlockInserted(blockWithInputs: BlockWithInputs, fullBlockOpt: Option[FullBlock]) extends Insertable
+case class BestBlockInserted(blockWithInputs: NormalizedBlock, fullBlockOpt: Option[FullBlock]) extends Insertable
 
 case class ForkInserted(winningFork: WinningFork, loosingFork: LoosingFork) extends Insertable
 
 object ForkInserted {
   type WinningFork = List[LinkedBlock]
-  type LoosingFork = Map[BlockId, BlockInfo]
+  type LoosingFork = Map[BlockId, Block]
 }

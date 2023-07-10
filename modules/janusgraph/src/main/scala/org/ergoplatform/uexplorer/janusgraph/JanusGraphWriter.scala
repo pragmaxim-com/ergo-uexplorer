@@ -6,7 +6,7 @@ import akka.stream.scaladsl.{Flow, Source}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockWithInputs, FullBlock}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock, NormalizedBlock}
 import org.janusgraph.core.Multiplicity
 
 import scala.collection.immutable.{ArraySeq, TreeMap}
@@ -47,9 +47,9 @@ trait JanusGraphWriter extends LazyLogging {
     blocks.iterator
       .foreach { case BestBlockInserted(b, _) =>
         b.inputRecords.byTxId.foreach { case (txId, inputRecords) =>
-          val outputRecords = b.outputRecords.filter(_.txId == txId)
+          val outputRecords = b.outputRecords.byErgoTree.values.flatten.filter(_.txId == txId)
           val fixMe         = mutable.Map.empty[ErgoTreeHex, mutable.Map[BoxId, Value]] // TODO
-          TxGraphWriter.writeGraph(txId, b.info.height, b.info.timestamp, fixMe, outputRecords)(janusGraph)
+          TxGraphWriter.writeGraph(txId, b.block.height, b.block.timestamp, fixMe, outputRecords)(janusGraph)
 
         }
       }

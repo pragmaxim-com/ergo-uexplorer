@@ -6,25 +6,24 @@ import com.esotericsoftware.kryo.serializers.DefaultSerializers.CollectionsSingl
 import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.JdkImmutableSetSerializer
 import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
-import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.mvstore.ValueCodec
-
+import org.ergoplatform.uexplorer.db.Block
 import java.nio.ByteBuffer
 import java.util
 import scala.util.Try
 
-object BlockInfoCodec extends ValueCodec[BlockInfo] {
-  override def readAll(bytes: Array[Byte]): BlockInfo = {
+object BlockCodec extends ValueCodec[Block] {
+  override def readAll(bytes: Array[Byte]): Block = {
     val input = new Input(bytes)
     val kryo  = KryoSerialization.pool.obtain()
-    try kryo.readObject(input, classOf[BlockInfo])
+    try kryo.readObject(input, classOf[Block])
     finally {
       KryoSerialization.pool.free(kryo)
       input.close()
     }
   }
 
-  override def writeAll(obj: BlockInfo): Array[Byte] = {
+  override def writeAll(obj: Block): Array[Byte] = {
     val buffer = ByteBuffer.allocate(2048)
     val output = new ByteBufferOutput(buffer)
     val kryo   = KryoSerialization.pool.obtain()
