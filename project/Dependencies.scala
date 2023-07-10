@@ -119,7 +119,6 @@ object Dependencies {
       ExclusionRule("org.scala-lang.modules", "scala-java8-compat_2.13"),
       ExclusionRule("com.typesafe", "ssl-config-core_2.13"),
       ExclusionRule("com.lihaoyi", "sourcecode_2.13"),
-      ExclusionRule("com.lihaoyi", "sourcecode_2.13"),
       ExclusionRule("com.lihaoyi", "fansi_2.13"),
       ExclusionRule("com.lihaoyi", "pprint_2.13"),
       ExclusionRule("io.suzaku", "boopickle_2.13")
