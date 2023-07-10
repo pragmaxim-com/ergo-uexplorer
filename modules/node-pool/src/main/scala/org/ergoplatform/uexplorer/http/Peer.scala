@@ -1,12 +1,11 @@
 package org.ergoplatform.uexplorer.http
 
 import io.circe.{Decoder, HCursor}
-import org.ergoplatform.uexplorer.Height
+import org.ergoplatform.uexplorer.{Height, Utils}
 import sttp.model.Uri
 
 import java.net.{URI, URL}
 import scala.util.Try
-import org.ergoplatform.uexplorer.Utils
 
 case class ConnectedPeer(restApiUrl: Option[Uri])
 

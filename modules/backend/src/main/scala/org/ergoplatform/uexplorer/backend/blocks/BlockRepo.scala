@@ -1,8 +1,8 @@
 package org.ergoplatform.uexplorer.backend.blocks
 
 import org.ergoplatform.uexplorer.BlockId
-import zio.*
 import org.ergoplatform.uexplorer.db.Block
+import zio.*
 
 trait BlockRepo:
   def insert(block: Block): Task[BlockId]

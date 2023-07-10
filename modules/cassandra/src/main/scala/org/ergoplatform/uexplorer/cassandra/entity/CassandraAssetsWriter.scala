@@ -4,8 +4,8 @@ import akka.NotUsed
 import akka.stream.scaladsl.Flow
 import com.datastax.oss.driver.api.core.cql.{BoundStatement, DefaultBatchType, PreparedStatement}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
+import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 
 import scala.collection.immutable.ArraySeq
@@ -13,7 +13,7 @@ import scala.collection.immutable.ArraySeq
 trait CassandraAssetsWriter extends LazyLogging {
   this: CassandraBackend =>
 
-  import Assets._
+  import Assets.*
 
   def assetsWriteFlow(parallelism: Int): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     storeBatchFlow(

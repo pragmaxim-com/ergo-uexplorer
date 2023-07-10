@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.chain
 
-import org.ergoplatform.uexplorer.db.Block
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.*

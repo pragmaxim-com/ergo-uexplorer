@@ -3,14 +3,14 @@ package org.ergoplatform.uexplorer.parser
 import cats.Eval
 import cats.data.OptionT
 import cats.implicits.toTraverseOps
+import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.node.{ExpandedRegister, RegisterValue}
 import org.ergoplatform.uexplorer.{BoxRegisterValueHex, RegisterId, SigmaType}
 import scorex.util.encode.Base16
-import sigmastate.Values.{Constant, ConstantNode, EvaluatedValue, SigmaPropConstant, Value}
 import sigmastate.*
+import sigmastate.Values.{Constant, ConstantNode, EvaluatedValue, SigmaPropConstant, Value}
 import sigmastate.basics.DLogProtocol.ProveDlogProp
 import sigmastate.serialization.ValueSerializer
-import eu.timepit.refined.auto.*
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}

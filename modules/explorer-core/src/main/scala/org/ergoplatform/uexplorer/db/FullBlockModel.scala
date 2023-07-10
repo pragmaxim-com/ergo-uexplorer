@@ -1,8 +1,8 @@
 package org.ergoplatform.uexplorer.db
 
 import io.circe.Json
-import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
 import org.ergoplatform.uexplorer.node.ApiTransaction
 

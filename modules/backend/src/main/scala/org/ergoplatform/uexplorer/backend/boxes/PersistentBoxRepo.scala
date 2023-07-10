@@ -15,6 +15,8 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
   val ctx = new H2ZioJdbcContext(Literal)
   import ctx.*
 
+  private val dsLayer = ZLayer.succeed(ds)
+
   private def insertUtxosQuery(utxos: Iterable[Utxo]) =
     quote {
       liftQuery(utxos).foreach(utxo => query[Utxo].insertValue(utxo))
@@ -24,11 +26,11 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       liftQuery(boxes).foreach(box => query[Box].insertValue(box))
     }
   private def insertErgoTreesQuery(ergoTrees: Iterable[ErgoTree]) =
-    quote {
+    quote { // todo https://github.com/zio/zio-protoquill/issues/298
       liftQuery(ergoTrees).foreach(ergoTree => query[ErgoTree].insertValue(ergoTree).onConflictIgnore)
     }
   private def insertErgoTreeT8sQuery(ergoTreeT8s: Iterable[ErgoTreeT8]) =
-    quote {
+    quote { // todo https://github.com/zio/zio-protoquill/issues/298
       liftQuery(ergoTreeT8s).foreach(ergoTreeT8 => query[ErgoTreeT8].insertValue(ergoTreeT8).onConflictIgnore)
     }
   private def insertErgoTreeQuery(ergoTree: ErgoTree) =
@@ -46,11 +48,11 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     utxos: Iterable[Utxo]
   ): Task[Iterable[BoxId]] =
     (for {
-      _ <- ZIO.foreachDiscard(ergoTrees)(et => ctx.run(insertErgoTreeQuery(et)))
+      _ <- ZIO.foreachDiscard(ergoTrees)(et => ctx.run(insertErgoTreeQuery(et))) // todo 298
       _ <- ZIO.foreachDiscard(ergoTreeT8s)(et => ctx.run(insertErgoTreeT8Query(et)))
       _ <- ctx.run(insertBoxesQuery(utxos.map(_.toBox)))
       _ <- ctx.run(insertUtxosQuery(utxos))
-    } yield utxos.map(_.boxId)).provide(ZLayer.succeed(ds))
+    } yield utxos.map(_.boxId)).provide(dsLayer)
 
   override def deleteUtxo(boxId: BoxId): Task[Long] =
     ctx
@@ -59,7 +61,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
           query[Utxo].filter(p => p.boxId == lift(boxId)).delete
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
   override def deleteUtxos(boxIds: Iterable[BoxId]): Task[Long] =
     ctx
@@ -68,7 +70,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
           query[Utxo].filter(p => liftQuery(boxIds).contains(p.boxId)).delete
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
   override def lookupBox(boxId: BoxId): Task[Option[Box]] =
     ctx
@@ -78,7 +80,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .filter(p => p.boxId == lift(boxId))
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
       .map(_.headOption)
 
   override def lookupUtxo(boxId: BoxId): Task[Option[Utxo]] =
@@ -89,7 +91,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .filter(p => p.boxId == lift(boxId))
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
       .map(_.headOption)
 
   override def lookupBoxes(ids: Iterable[BoxId]): Task[List[Box]] =
@@ -100,7 +102,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .filter(p => liftQuery(ids).contains(p.boxId))
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
   override def lookupUtxos(ids: Iterable[BoxId]): Task[List[Utxo]] =
     ctx
@@ -110,7 +112,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .filter(p => liftQuery(ids).contains(p.boxId))
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
   override def isEmpty: Task[Boolean] =
     ctx
@@ -119,7 +121,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
           query[Utxo].take(1).isEmpty
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
 object PersistentBoxRepo:
   def layer: ZLayer[DataSource, Nothing, PersistentBoxRepo] =

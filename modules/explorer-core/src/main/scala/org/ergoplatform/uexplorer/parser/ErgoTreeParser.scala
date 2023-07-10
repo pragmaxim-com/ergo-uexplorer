@@ -2,19 +2,18 @@ package org.ergoplatform.uexplorer.parser
 
 import com.google.bitcoin.core.Base58
 import com.typesafe.scalalogging.LazyLogging
+import eu.timepit.refined.auto.*
+import io.circe.{Decoder, DecodingFailure}
 import org.ergoplatform.uexplorer.{Address, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hash, ErgoTreeT8Hex}
-import org.ergoplatform.{ErgoAddress, ErgoAddressEncoder, P2PKAddress, Pay2SAddress, Pay2SHAddress}
+import org.ergoplatform.*
 import scorex.crypto.hash.{Blake2b256, Digest32, Sha256}
 import scorex.util.encode.Base16
-import sigmastate.Values.{ErgoTree, FalseLeaf, SigmaPropConstant, Value}
 import sigmastate.*
+import sigmastate.Values.{ErgoTree, FalseLeaf, SigmaPropConstant, Value}
+import sigmastate.basics.DLogProtocol.ProveDlogProp
 import sigmastate.serialization.{ErgoTreeSerializer, SigmaSerializer}
 
 import scala.util.{Failure, Success, Try}
-import eu.timepit.refined.auto.*
-import io.circe.{Decoder, DecodingFailure}
-import eu.timepit.refined.auto.*
-import sigmastate.basics.DLogProtocol.ProveDlogProp
 
 object ErgoTreeParser extends LazyLogging {
 

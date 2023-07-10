@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
-import org.ergoplatform.uexplorer.{BlockId, BoxId}
 import org.ergoplatform.uexplorer.backend.Codecs
+import org.ergoplatform.uexplorer.{BlockId, BoxId}
 import zio.*
 import zio.http.*
 import zio.json.*

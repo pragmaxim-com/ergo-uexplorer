@@ -1,8 +1,8 @@
 package org.ergoplatform.uexplorer.janusgraph
 
-import org.janusgraph.graphdb.database.StandardJanusGraph
 import org.apache.commons.codec.digest.MurmurHash2
 import org.apache.tinkerpop.gremlin.structure.Graph
+import org.janusgraph.graphdb.database.StandardJanusGraph
 import org.janusgraph.graphdb.transaction.StandardJanusGraphTx
 
 object Utils {

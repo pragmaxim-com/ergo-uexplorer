@@ -5,17 +5,16 @@ import akka.{Done, NotUsed}
 import com.datastax.oss.driver.api.core.cql.*
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.{BlockId, cassandra}
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.cassandra.entity.CassandraBlockUpdater.*
-import org.ergoplatform.uexplorer.cassandra
 import org.ergoplatform.uexplorer.db.FullBlock
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
-import concurrent.duration.DurationInt
 import scala.util.Try
 
 trait CassandraBlockUpdater extends LazyLogging {

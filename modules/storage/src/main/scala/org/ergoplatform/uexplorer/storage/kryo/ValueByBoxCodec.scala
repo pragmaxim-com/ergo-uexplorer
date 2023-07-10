@@ -10,11 +10,11 @@ import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.multimap.MultiMapCodec
 import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHex, Height}
 
-import scala.language.unsafeNulls
 import java.nio.ByteBuffer
 import java.util
-import scala.util.Try
 import scala.jdk.CollectionConverters.*
+import scala.language.unsafeNulls
+import scala.util.Try
 
 class ValueByBoxCodec[V] extends MultiMapCodec[java.util.Map, BoxId, V] {
 

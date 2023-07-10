@@ -1,13 +1,12 @@
 package org.ergoplatform.uexplorer.backend
 
-import org.ergoplatform.uexplorer.HexString.unwrapped
-import org.ergoplatform.uexplorer.Address.unwrappedAddress
 import io.getquill.MappedEncoding
+import org.ergoplatform.uexplorer.Address.unwrappedAddress
+import org.ergoplatform.uexplorer.HexString.unwrapped
 import org.ergoplatform.uexplorer.backend.boxes.*
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, ErgoTreeHash, ErgoTreeT8Hash, HexString, TxId}
 import zio.json.*
-import org.ergoplatform.uexplorer.db.Block
 
 trait Codecs {
   given MappedEncoding[HexString, String] = MappedEncoding[HexString, String](_.unwrapped)

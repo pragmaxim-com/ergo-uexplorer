@@ -7,15 +7,15 @@ import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.Transaction
-import org.ergoplatform.uexplorer.db.FullBlock
 import org.ergoplatform.uexplorer.Height
+import org.ergoplatform.uexplorer.db.FullBlock
+import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.janusgraph.core.JanusGraphFactory
 import org.janusgraph.graphdb.database.StandardJanusGraph
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
-import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 
 class JanusGraphBackend(val janusGraph: StandardJanusGraph) extends GraphBackend with JanusGraphWriter {
 

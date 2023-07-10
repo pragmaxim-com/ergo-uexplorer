@@ -13,7 +13,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.{Direction, T}
-import org.ergoplatform.uexplorer.Const
+import org.ergoplatform.uexplorer.{BlockId, Const}
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend.BufferSize
 import org.ergoplatform.uexplorer.cassandra.entity.*
 
@@ -48,7 +48,7 @@ class CassandraBackend(parallelism: Int)(implicit
     cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
   }
 
-  override def writeBlock(b: NormalizedBlock): NormalizedBlock = ???
+  override def writeBlock(b: NormalizedBlock): BlockId = ???
 
   val blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     Flow[BestBlockInserted]

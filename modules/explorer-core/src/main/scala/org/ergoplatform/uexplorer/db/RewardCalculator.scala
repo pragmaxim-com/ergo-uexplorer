@@ -1,13 +1,13 @@
 package org.ergoplatform.uexplorer.db
 
-import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
+import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister}
 import org.ergoplatform.uexplorer.parser.{ErgoTreeParser, RegistersParser}
+import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
 import scorex.util.encode.Base16
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
-import eu.timepit.refined.auto.*
 
 import scala.collection.immutable.ArraySeq
 import scala.util.Try

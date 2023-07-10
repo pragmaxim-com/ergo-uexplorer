@@ -3,9 +3,9 @@ package org.ergoplatform.uexplorer.backend.blocks
 import io.getquill.*
 import io.getquill.context.ZioJdbc.DataSourceLayer
 import io.getquill.jdbczio.Quill
-import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.backend.Codecs
+import org.ergoplatform.uexplorer.db.Block
 import zio.*
 
 import java.util.UUID
@@ -13,8 +13,9 @@ import javax.sql.DataSource
 
 case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
   val ctx = new H2ZioJdbcContext(Literal)
-
   import ctx.*
+
+  private val dsLayer = ZLayer.succeed(ds)
 
   override def insert(block: Block): Task[BlockId] =
     ctx
@@ -26,7 +27,7 @@ case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
         }
       }
       .as(block.blockId)
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
   override def lookup(headerId: BlockId): Task[Option[Block]] =
     ctx
@@ -36,7 +37,7 @@ case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
             .filter(p => p.blockId == lift(headerId))
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
       .map(_.headOption)
 
   override def lookupBlocks(ids: Set[BlockId]): Task[List[Block]] =
@@ -47,7 +48,7 @@ case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
             .filter(p => liftQuery(ids).contains(p.blockId))
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
   override def isEmpty: Task[Boolean] =
     ctx
@@ -56,7 +57,7 @@ case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
           query[Block].take(1).isEmpty
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
   override def delete(blockId: BlockId): Task[Long] =
     ctx
@@ -65,7 +66,7 @@ case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
           query[Block].filter(p => p.blockId == lift(blockId)).delete
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
   override def delete(blockIds: Iterable[BlockId]): Task[Long] =
     ctx
@@ -74,7 +75,7 @@ case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
           query[Block].filter(p => liftQuery(blockIds).contains(p.blockId)).delete
         }
       }
-      .provide(ZLayer.succeed(ds))
+      .provide(dsLayer)
 
 object PersistentBlockRepo:
   def layer: ZLayer[DataSource, Nothing, PersistentBlockRepo] =

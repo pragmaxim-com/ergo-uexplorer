@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.node.ApiTransaction
-import org.ergoplatform.uexplorer.{ErgoTreeHex, BoxId, TxId}
+import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHex, TxId}
 
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.Future

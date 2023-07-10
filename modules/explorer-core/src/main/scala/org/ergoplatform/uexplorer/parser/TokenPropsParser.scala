@@ -1,11 +1,11 @@
 package org.ergoplatform.uexplorer.parser
 
+import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.RegisterId
 import org.ergoplatform.uexplorer.node.{ExpandedRegister, RegisterValue, TokenProps}
 import scorex.util.encode.Base16
 import sigmastate.serialization.ValueSerializer
 import sigmastate.{SByte, SCollection}
-import eu.timepit.refined.auto.*
 
 import java.util.regex.Pattern
 import scala.util.Try

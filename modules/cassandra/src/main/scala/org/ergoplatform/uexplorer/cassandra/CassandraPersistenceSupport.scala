@@ -5,16 +5,15 @@ import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Flow, Source}
 import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.cql.*
-
-import scala.jdk.CollectionConverters.*
-import scala.jdk.FutureConverters.*
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import com.datastax.oss.driver.api.querybuilder.QueryBuilder.{bindMarker, insertInto}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.cassandra
 
 import scala.collection.immutable.ArraySeq
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
+import scala.jdk.FutureConverters.*
 
 trait CassandraPersistenceSupport extends LazyLogging {
 

@@ -6,8 +6,8 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.*
-import org.ergoplatform.uexplorer.db.{InputRecords, Utxo}
 import org.ergoplatform.uexplorer.HexString.unwrapped
+import org.ergoplatform.uexplorer.db.{InputRecords, Utxo}
 
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.collection.mutable

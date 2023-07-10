@@ -2,18 +2,18 @@ package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
-import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.db.UtxoTracker.*
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
-import org.ergoplatform.uexplorer.Storage
-import scala.collection.mutable
-import scala.collection.compat.immutable.ArraySeq
-import scala.util.Try
+
 import java.util
+import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.VectorBuilder
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters.*
-import UtxoTracker.*
+import scala.util.Try
 
 case class InputRecords(
   byErgoTree: mutable.Map[ErgoTreeHex, mutable.Set[BoxId]],

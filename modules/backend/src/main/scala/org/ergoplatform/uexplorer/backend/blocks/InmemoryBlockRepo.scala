@@ -1,10 +1,10 @@
 package org.ergoplatform.uexplorer.backend.blocks
 
 import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.db.Block
 import zio.*
 
 import scala.collection.mutable
-import org.ergoplatform.uexplorer.db.Block
 
 case class InmemoryBlockRepo(map: Ref[Map[BlockId, Block]]) extends BlockRepo:
 

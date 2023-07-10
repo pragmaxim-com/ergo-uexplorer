@@ -1,9 +1,9 @@
 package org.ergoplatform.uexplorer.cassandra
 
 import akka.NotUsed
-import akka.stream.scaladsl.*
 import akka.stream.*
 import akka.stream.ActorAttributes.Dispatcher
+import akka.stream.scaladsl.*
 
 import scala.concurrent.Future
 import scala.concurrent.duration.*

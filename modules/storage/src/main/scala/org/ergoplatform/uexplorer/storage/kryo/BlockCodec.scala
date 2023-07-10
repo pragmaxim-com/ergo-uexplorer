@@ -6,8 +6,9 @@ import com.esotericsoftware.kryo.serializers.DefaultSerializers.CollectionsSingl
 import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.JdkImmutableSetSerializer
 import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
-import org.ergoplatform.uexplorer.mvstore.ValueCodec
 import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.mvstore.ValueCodec
+
 import java.nio.ByteBuffer
 import java.util
 import scala.util.Try

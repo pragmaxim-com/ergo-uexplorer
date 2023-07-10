@@ -1,18 +1,9 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import akka.{Done, NotUsed}
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Flow, Source}
-import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.node.ApiFullBlock
-
-import scala.collection.compat.immutable.ArraySeq
-import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
+import akka.{Done, NotUsed}
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ByteBufferInput, ByteBufferOutput, Input, Output}
 import com.esotericsoftware.kryo.serializers.MapSerializer
@@ -23,12 +14,13 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.chain.ChainTip
+import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.indexer.db.Backend
-import org.ergoplatform.uexplorer.mvstore.{MaxCompactTime, MultiColSize}
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
+import org.ergoplatform.uexplorer.mvstore.{MaxCompactTime, MultiColSize}
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 import org.ergoplatform.uexplorer.storage.MvStorage.*
+import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 import org.h2.mvstore.{MVMap, MVStore}
 
 import java.io.File

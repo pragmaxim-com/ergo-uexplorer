@@ -1,28 +1,26 @@
 package org.ergoplatform.uexplorer.http
 
-import akka.{Done, NotUsed}
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.ActorContext
 import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.stream.{OverflowStrategy, SharedKillSwitch}
 import akka.stream.scaladsl.Flow
-import org.ergoplatform.uexplorer.{BlockId, Const, Height, TxId}
+import akka.stream.{OverflowStrategy, SharedKillSwitch}
+import akka.{Done, NotUsed}
+import io.circe.refined.*
+import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
+import org.ergoplatform.uexplorer.{BlockId, Const, Height, ResiliencySupport, TxId}
 import retry.Policy
 import sttp.capabilities.WebSockets
 import sttp.client3.*
 import sttp.client3.circe.*
-import io.circe.refined.*
-import org.ergoplatform.ErgoAddressEncoder
 
 import scala.collection.immutable.{ArraySeq, ListMap}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.DurationInt
-import org.ergoplatform.uexplorer.ResiliencySupport
-import org.ergoplatform.uexplorer.ExeContext.Implicits
-
 import scala.collection.{concurrent, mutable}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, Future}
 
 class BlockHttpClient(metadataHttpClient: MetadataHttpClient[_])(implicit
   sttpB: SttpBackend[Future, _]

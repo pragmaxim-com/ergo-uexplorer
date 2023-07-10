@@ -1,11 +1,12 @@
 package org.ergoplatform.uexplorer
 
 import org.ergoplatform.uexplorer.chain.ChainTip
-import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex, Height, Value}
 import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex, Height, Value}
+
 import java.nio.file.Path
-import scala.collection.immutable.TreeSet
 import scala.collection.concurrent
+import scala.collection.immutable.TreeSet
 import scala.util.Try
 
 trait Storage {

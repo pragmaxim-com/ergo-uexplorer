@@ -2,17 +2,16 @@ package org.ergoplatform.uexplorer.indexer.chain
 
 import akka.NotUsed
 import akka.stream.OverflowStrategy
-import akka.stream.scaladsl.Flow
-import org.ergoplatform.uexplorer.{BlockId, Height}
-import org.ergoplatform.uexplorer.http.{BlockHttpClient, Codecs}
-import org.ergoplatform.uexplorer.node.ApiFullBlock
 import akka.stream.scaladsl.{Compression, FileIO, Flow, Framing, Sink, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.http.{BlockHttpClient, Codecs}
+import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.{BlockId, Height}
 
-import concurrent.ExecutionContext.Implicits.global
 import java.nio.file.{Path, Paths}
 import scala.collection.immutable.TreeSet
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class BlockReader(
   blockHttpClient: BlockHttpClient

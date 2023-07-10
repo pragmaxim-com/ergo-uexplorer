@@ -9,21 +9,19 @@ import eu.timepit.refined.refineV
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.mining.emission.EmissionRules
 import org.ergoplatform.settings.MonetarySettings
-import pureconfig.ConfigReader.Result
-import pureconfig.error.CannotConvert
-import pureconfig.{ConfigReader, ConfigSource}
-import sttp.model.Uri
-import pureconfig.generic.derivation.default.*
-
-import java.io.File
 import org.ergoplatform.uexplorer.ProtocolSettings
-import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
-import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
+import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, RemoteNodeUriMagnet}
 import org.ergoplatform.uexplorer.indexer.db.Backend.BackendType
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend.GraphBackendType
 import org.ergoplatform.uexplorer.storage.MvStorage.*
 import org.ergoplatform.uexplorer.storage.MvStoreConf
+import pureconfig.ConfigReader.Result
+import pureconfig.error.CannotConvert
+import pureconfig.generic.derivation.default.*
+import pureconfig.{ConfigReader, ConfigSource}
+import sttp.model.Uri
 
+import java.io.File
 import scala.concurrent.duration.FiniteDuration
 
 case class ChainIndexerConf(

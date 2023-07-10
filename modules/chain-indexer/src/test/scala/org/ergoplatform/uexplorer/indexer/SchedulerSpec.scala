@@ -6,11 +6,18 @@ import akka.stream.scaladsl.Source
 import akka.stream.{KillSwitches, SharedKillSwitch}
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.backend.H2Backend
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.db.UtxoTracker
+import org.ergoplatform.uexplorer.http.*
 import org.ergoplatform.uexplorer.indexer.chain.*
-import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
+import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolState
+import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
+import org.ergoplatform.uexplorer.janusgraph.api.InMemoryGraphBackend
+import org.ergoplatform.uexplorer.parser.ErgoTreeParser
+import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
+import org.ergoplatform.uexplorer.{ProtocolSettings, Storage}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -18,21 +25,10 @@ import org.scalatest.matchers.should.Matchers
 import sttp.capabilities.WebSockets
 import sttp.client3.*
 import sttp.client3.testing.SttpBackendStub
-import org.ergoplatform.uexplorer.janusgraph.api.InMemoryGraphBackend
-
-import scala.collection.immutable.{ListMap, TreeMap}
-import scala.concurrent.Future
-import org.ergoplatform.uexplorer.{ProtocolSettings, Storage}
-import org.ergoplatform.uexplorer.db.UtxoTracker
-import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, Rest, TestSupport}
-import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
-import org.ergoplatform.uexplorer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.http.MetadataHttpClient
-import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
-import org.ergoplatform.uexplorer.parser.ErgoTreeParser
-import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 
 import java.nio.file.Paths
+import scala.collection.immutable.{ListMap, TreeMap}
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 
 class SchedulerSpec extends AsyncFreeSpec with TestSupport with Matchers with BeforeAndAfterAll with ScalaFutures {

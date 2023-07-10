@@ -4,10 +4,11 @@ import akka.Done
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.{ActorRef, ActorSystem}
 import akka.stream.{KillSwitches, SharedKillSwitch}
+import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.Resiliency
 import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
-import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
+import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.{Initializer, StreamExecutor}
 import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
@@ -17,7 +18,6 @@ import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
-import org.ergoplatform.uexplorer.ExeContext.Implicits
 
 class Scheduler(
   pluginManager: PluginManager,

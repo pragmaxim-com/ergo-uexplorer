@@ -17,7 +17,7 @@ trait Backend {
 
   def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
-  def writeBlock(b: NormalizedBlock): NormalizedBlock
+  def writeBlock(b: NormalizedBlock): BlockId
 
   def close(): Future[Unit]
 }

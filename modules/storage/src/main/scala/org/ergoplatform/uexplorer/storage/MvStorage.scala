@@ -28,8 +28,8 @@ import java.util.stream.Collectors
 import java.util.zip.GZIPInputStream
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{TreeMap, TreeSet}
-import scala.collection.{concurrent, mutable}
 import scala.collection.mutable.ListBuffer
+import scala.collection.{concurrent, mutable}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration

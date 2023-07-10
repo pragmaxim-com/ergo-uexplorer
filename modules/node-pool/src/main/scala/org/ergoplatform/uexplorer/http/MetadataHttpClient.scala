@@ -5,7 +5,8 @@ import akka.actor.CoordinatedShutdown
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import io.circe.Decoder
-import org.ergoplatform.uexplorer.Const
+import org.ergoplatform.uexplorer.Const.EpochLength
+import org.ergoplatform.uexplorer.{Const, ResiliencySupport}
 import retry.Policy
 import sttp.client3.*
 import sttp.client3.circe.asJson
@@ -15,8 +16,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
-import org.ergoplatform.uexplorer.ResiliencySupport
-import org.ergoplatform.uexplorer.Const.EpochLength
 
 class MetadataHttpClient[P](minNodeHeight: Int = EpochLength * 800)(implicit
   remoteUri: RemoteNodeUriMagnet,

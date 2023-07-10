@@ -1,9 +1,8 @@
 package org.ergoplatform.uexplorer
 
-import org.ergoplatform.settings.MonetarySettings
-import org.ergoplatform.mining.emission.EmissionRules
 import org.ergoplatform.ErgoAddressEncoder
-import pureconfig.ConfigReader
+import org.ergoplatform.mining.emission.EmissionRules
+import org.ergoplatform.settings.MonetarySettings
 import pureconfig.*
 import pureconfig.generic.derivation.default.*
 

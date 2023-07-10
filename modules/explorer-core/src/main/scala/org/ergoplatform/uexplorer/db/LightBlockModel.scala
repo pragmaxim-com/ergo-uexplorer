@@ -1,13 +1,11 @@
 package org.ergoplatform.uexplorer.db
 
 import eu.timepit.refined.auto.*
-import org.ergoplatform.uexplorer.Const.Protocol
-import org.ergoplatform.uexplorer.Const.Protocol.Emission
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.HexString.unwrapped
 import org.ergoplatform.uexplorer.Address.unwrappedAddress
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
+import org.ergoplatform.uexplorer.HexString.unwrapped
 
 import scala.collection.mutable
 

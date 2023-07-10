@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.mvstore.multiset
 
-import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 

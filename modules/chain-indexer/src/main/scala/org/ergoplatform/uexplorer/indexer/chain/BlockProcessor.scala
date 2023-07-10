@@ -1,8 +1,8 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
 import akka.NotUsed
-import akka.stream.{Attributes, OverflowStrategy}
 import akka.stream.scaladsl.Flow
+import akka.stream.{Attributes, OverflowStrategy}
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.chain.ChainLinker

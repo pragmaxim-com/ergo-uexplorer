@@ -3,8 +3,8 @@ package org.ergoplatform.uexplorer.indexer.tool
 import akka.actor.CoordinatedShutdown
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
 import akka.actor.typed.{ActorSystem, Behavior}
-import akka.stream.scaladsl.{Compression, FileIO, Source}
 import akka.stream.*
+import akka.stream.scaladsl.{Compression, FileIO, Source}
 import akka.util.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.http.{BlockHttpClient, LocalNodeUriMagnet, RemoteNodeUriMagnet}

@@ -4,7 +4,6 @@ import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.node.*
 
 import scala.collection.immutable.ArraySeq
-import org.ergoplatform.uexplorer.*
 
 case class BlockWithReward(
   b: ApiFullBlock,

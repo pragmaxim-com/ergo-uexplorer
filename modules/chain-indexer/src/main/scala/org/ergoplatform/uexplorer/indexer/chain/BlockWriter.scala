@@ -1,20 +1,20 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
 import akka.NotUsed
-import akka.stream.{ActorAttributes, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.{ActorAttributes, OverflowStrategy}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
-import org.ergoplatform.uexplorer.{Resiliency, UnexpectedStateError}
-import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, ForkInserted, LinkedBlock, NormalizedBlock, UtxoTracker}
+import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
-import java.util.concurrent.Flow.Processor
+import org.ergoplatform.uexplorer.{Resiliency, UnexpectedStateError}
 
-import concurrent.ExecutionContext.Implicits.global
+import java.util.concurrent.Flow.Processor
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
@@ -82,7 +82,7 @@ class BlockWriter(
           }
       }
       .wireTap { b =>
-        if (b.blockWithInputs.block.height % mvStoreConf.heightCompactRate == 0)
+        if (b.normalizedBlock.block.height % mvStoreConf.heightCompactRate == 0)
           storageService.compact(indexing = true, mvStoreConf.maxIndexingCompactTime, mvStoreConf.maxIdleCompactTime)
         else Success(())
       }

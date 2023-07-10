@@ -1,15 +1,14 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import akka.{Done, NotUsed}
 import akka.actor.typed.ActorSystem
-import akka.stream.{ActorAttributes, Attributes, IOResult, OverflowStrategy, SharedKillSwitch}
 import akka.stream.scaladsl.{Compression, FileIO, Flow, Framing, Keep, Sink, Source}
+import akka.stream.*
 import akka.util.ByteString
+import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ExeContext.Implicits
-import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, Resiliency, Storage}
 import org.ergoplatform.uexplorer.chain.{ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.http.{BlockHttpClient, Codecs}
@@ -18,14 +17,15 @@ import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.storage.MvStorage
+import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, Resiliency, Storage}
 
 import java.nio.file.{Path, Paths}
-import scala.jdk.CollectionConverters.*
 import java.util.concurrent.ConcurrentHashMap
+import scala.collection.concurrent
 import scala.collection.immutable.{ListMap, TreeSet}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.collection.concurrent
+import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
 class StreamExecutor(

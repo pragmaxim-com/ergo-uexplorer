@@ -7,13 +7,13 @@ import com.datastax.oss.driver.api.core.cql.{BoundStatement, PreparedStatement}
 import com.datastax.oss.driver.api.core.data.UdtValue
 import com.datastax.oss.driver.internal.core.`type`.UserDefinedTypeBuilder
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.cassandra
+import org.ergoplatform.uexplorer.cassandra.CassandraBackend
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 
 trait CassandraHeaderWriter extends LazyLogging { this: CassandraBackend =>
-  import Headers._
+  import Headers.*
 
   def headerWriteFlow(parallelism: Int): Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
     storeFlow(

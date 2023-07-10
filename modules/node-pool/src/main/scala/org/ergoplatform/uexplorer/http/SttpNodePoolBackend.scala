@@ -1,25 +1,24 @@
 package org.ergoplatform.uexplorer.http
 
-import akka.{Done, NotUsed}
 import akka.actor.typed.*
-import akka.stream.{ActorAttributes, KillSwitches, SharedKillSwitch}
+import akka.actor.typed.scaladsl.AskPattern.*
 import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.{ActorAttributes, KillSwitches, SharedKillSwitch}
 import akka.util.Timeout
+import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
+import org.ergoplatform.uexplorer.{Resiliency, Utils}
 import org.ergoplatform.uexplorer.http.NodePool.*
 import org.ergoplatform.uexplorer.http.SttpNodePoolBackend.swapUri
 import sttp.capabilities.Effect
 import sttp.client3.*
 import sttp.model.Uri
-import akka.actor.typed.scaladsl.AskPattern.*
 
 import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.*
-import org.ergoplatform.uexplorer.Utils
-import org.ergoplatform.uexplorer.Resiliency
 
 class SttpNodePoolBackend[P]()(implicit
   sys: ActorSystem[Nothing],
