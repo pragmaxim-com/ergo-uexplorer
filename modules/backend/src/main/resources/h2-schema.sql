@@ -2,8 +2,9 @@
 create table if not exists Block (
     blockId              VARCHAR(64) NOT NULL PRIMARY KEY,
     parentId             VARCHAR(64) NOT NULL,
-    height               INT NOT NULL,
+    revision             BIGINT NOT NULL,
     timestamp            BIGINT NOT NULL,
+    height               INT NOT NULL,
     blockSize            INT NOT NULL,
     blockCoins           BIGINT NOT NULL,
     blockMiningTime      BIGINT NOT NULL,
