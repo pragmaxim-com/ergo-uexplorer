@@ -132,7 +132,7 @@ lazy val backend =
   Utils.mkModule("backend", "backend")
     .settings(commonSettings)
     .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
-    .settings(libraryDependencies ++= akkaStream("3") ++ zio("3") ++ Seq(h2, logback, loggingApi) ++ scalatest("3")) //TODO remove logging
+    .settings(libraryDependencies ++= akkaStream("3") ++ zio("3") ++ Seq(h2) ++ scalatest("3"))
     .settings(excludeDependencies ++= Seq(ExclusionRule("com.lihaoyi", "sourcecode_2.13"), ExclusionRule("com.lihaoyi", "fansi_2.13"), ExclusionRule("com.lihaoyi", "pprint_2.13"), ExclusionRule("io.suzaku", "boopickle_2.13")))
     .dependsOn(core)
 
