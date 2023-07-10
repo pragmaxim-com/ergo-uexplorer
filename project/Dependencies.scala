@@ -110,12 +110,20 @@ object Dependencies {
       "dev.optics" % s"monocle-macro_$v" % "3.1.0"
     )
 
-  def allExclusions = cats("2.13") ++ circe("2.13") ++ akkaStream("2.13") ++ Seq(
-    "com.typesafe.akka"      % "akka-actor_2.13"              % "any",
-    "com.typesafe.akka"      % "akka-stream_2.13"             % "any",
-    "com.typesafe.akka"      % "akka-protobuf-v3_2.13"        % "any",
-    "org.scala-lang.modules" % "scala-collection-compat_2.13" % "any",
-    "org.scala-lang.modules" % "scala-java8-compat_2.13"      % "any",
-    "com.typesafe"           % "ssl-config-core_2.13"         % "any"
-  )
+  lazy val allExclusions =
+    Seq(
+      ExclusionRule("com.typesafe.akka", "akka-actor_2.13"),
+      ExclusionRule("com.typesafe.akka", "akka-stream_2.13"),
+      ExclusionRule("com.typesafe.akka", "akka-protobuf-v3_2.13"),
+      ExclusionRule("org.scala-lang.modules", "scala-collection-compat_2.13"),
+      ExclusionRule("org.scala-lang.modules", "scala-java8-compat_2.13"),
+      ExclusionRule("com.typesafe", "ssl-config-core_2.13"),
+      ExclusionRule("com.lihaoyi", "sourcecode_2.13"),
+      ExclusionRule("com.lihaoyi", "sourcecode_2.13"),
+      ExclusionRule("com.lihaoyi", "fansi_2.13"),
+      ExclusionRule("com.lihaoyi", "pprint_2.13"),
+      ExclusionRule("io.suzaku", "boopickle_2.13")
+    ) ++ (cats("2.13") ++ circe("2.13") ++ akkaStream("2.13") :+ commonsLogging).map { x =>
+      ExclusionRule(x.organization, x.name)
+    }
 }

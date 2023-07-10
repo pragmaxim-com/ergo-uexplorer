@@ -11,7 +11,7 @@ lazy val commonSettings = Seq(
   version := "0.0.1",
   resolvers ++= Resolver.sonatypeOssRepos("public") ++ Resolver.sonatypeOssRepos("snapshots"),
   ThisBuild / evictionErrorLevel := Level.Info,
-  excludeDependencies ++= allExclusions.map( x => ExclusionRule(x.organization, x.name)),
+  excludeDependencies ++= allExclusions,
   scalacOptions ++= Seq(
     "-deprecation",
     "-encoding",
@@ -125,7 +125,6 @@ lazy val `alert-plugin` =
     .settings(commonSettings)
     .settings(pluginAssemblySettings("alert-plugin"))
     .settings(libraryDependencies ++= scalatest("3") ++ Seq(discord4j, logback))
-    .settings(excludeDependencies += ExclusionRule(commonsLogging.organization, commonsLogging.name))
     .dependsOn(core)
 
 lazy val backend =
@@ -133,7 +132,6 @@ lazy val backend =
     .settings(commonSettings)
     .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
     .settings(libraryDependencies ++= akkaStream("3") ++ zio("3") ++ Seq(h2) ++ scalatest("3"))
-    .settings(excludeDependencies ++= Seq(ExclusionRule("com.lihaoyi", "sourcecode_2.13"), ExclusionRule("com.lihaoyi", "fansi_2.13"), ExclusionRule("com.lihaoyi", "pprint_2.13"), ExclusionRule("io.suzaku", "boopickle_2.13")))
     .dependsOn(core)
 
 lazy val indexer =
@@ -142,5 +140,4 @@ lazy val indexer =
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
     .settings(libraryDependencies ++= Seq(logback, akkaHttp("3")) ++ akkaStream("3") ++ scalatest("3"))
-    .settings(excludeDependencies ++= Seq(ExclusionRule("com.lihaoyi", "sourcecode_2.13"), ExclusionRule("com.lihaoyi", "fansi_2.13"), ExclusionRule("com.lihaoyi", "pprint_2.13"), ExclusionRule("io.suzaku", "boopickle_2.13")) ++ cats("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ circe("2.13").map( x => ExclusionRule(x.organization, x.name)) ++ Seq(ExclusionRule(commonsLogging.organization, commonsLogging.name)))
     .dependsOn(core, `node-pool` % "compile->compile;test->test", backend, storage, cassandra, janusgraph)
