@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.chain
 
+import org.ergoplatform.uexplorer.db.Block
 import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.*
@@ -19,22 +20,22 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-class ChainTip(byBlockId: FifoLinkedHashMap[BlockId, BlockInfo]) {
-  def toMap: Map[BlockId, BlockInfo] = byBlockId.asScala.toMap
-  def getParent(block: ApiFullBlock): Option[BlockInfo] =
+class ChainTip(byBlockId: FifoLinkedHashMap[BlockId, Block]) {
+  def toMap: Map[BlockId, Block] = byBlockId.asScala.toMap
+  def getParent(block: ApiFullBlock): Option[Block] =
     Option(byBlockId.get(block.header.parentId)).filter(_.height == block.header.height - 1)
-  def putOnlyNew(blockId: BlockId, info: BlockInfo): Try[BlockInfo] =
-    Option(byBlockId.put(blockId, info)).fold(Success(info)) { oldVal =>
+  def putOnlyNew(blockId: BlockId, block: Block): Try[Block] =
+    Option(byBlockId.put(blockId, block)).fold(Success(block)) { oldVal =>
       Failure(
         new AssertionError(
-          s"Trying to cache blockId $blockId at height ${info.height} but there already was $oldVal"
+          s"Trying to cache blockId $blockId at height ${block.height} but there already was $oldVal"
         )
       )
     }
 }
 object ChainTip {
-  def apply(chainTip: IterableOnce[(BlockId, BlockInfo)], maxSize: Int = 100): ChainTip = {
-    val newFifoMap = new FifoLinkedHashMap[BlockId, BlockInfo](maxSize)
+  def apply(chainTip: IterableOnce[(BlockId, Block)], maxSize: Int = 100): ChainTip = {
+    val newFifoMap = new FifoLinkedHashMap[BlockId, Block](maxSize)
     newFifoMap.putAll(chainTip.iterator.toMap.asJava)
     new ChainTip(newFifoMap)
   }
@@ -50,10 +51,10 @@ class ChainLinker(getBlock: BlockId => Future[ApiFullBlock], chainTip: ChainTip)
     block: BlockWithOutputs
   )(implicit ps: ProtocolSettings): Future[List[LinkedBlock]] =
     chainTip.getParent(block.b) match {
-      case parentInfoOpt if parentInfoOpt.isDefined || block.b.header.height == 1 =>
+      case parentBlockOpt if parentBlockOpt.isDefined || block.b.header.height == 1 =>
         Future.fromTry(
-          chainTip.putOnlyNew(block.b.header.id, BlockInfo(block, parentInfoOpt)).map { newBlockInfo =>
-            block.toLinkedBlock(newBlockInfo, parentInfoOpt) :: acc
+          chainTip.putOnlyNew(block.b.header.id, BlockBuilder(block, parentBlockOpt)).map { newBlock =>
+            block.toLinkedBlock(newBlock, parentBlockOpt) :: acc
           }
         )
       case _ =>

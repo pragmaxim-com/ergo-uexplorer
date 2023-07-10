@@ -4,12 +4,12 @@ import akka.NotUsed
 import akka.actor.typed.ActorSystem
 import akka.stream.scaladsl.{Flow, Source}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
+import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, BlockInfo, BlockWithInputs, FullBlock}
-import pureconfig.ConfigReader
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock, NormalizedBlock}
 import org.ergoplatform.uexplorer.janusgraph.JanusGraphBackend
+import pureconfig.ConfigReader
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.compat.immutable.ArraySeq

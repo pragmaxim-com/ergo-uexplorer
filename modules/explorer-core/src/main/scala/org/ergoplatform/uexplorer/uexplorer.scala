@@ -32,12 +32,13 @@ package object uexplorer {
   type Revision = Long
 
   type Base58Spec    = MatchesRegex["[1-9A-HJ-NP-Za-km-z]+"]
-  type Address       = String Refined Base58Spec
   type NetworkPrefix = String Refined ValidByte
 
+  type Address = String Refined Base58Spec
   object Address {
-    extension (x: Address) def unwrapped: String = x
-    def fromStringUnsafe(s: String): Address     = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
+    extension (x: Address) def unwrappedAddress: String = x
+    def fromStringUnsafe(s: String): Address            = unsafeWrap(refineV[Base58Spec].unsafeFrom(s))
+    def castUnsafe(s: String): Address                  = s.asInstanceOf[Address]
   }
 
   object NetworkPrefix {
@@ -67,11 +68,9 @@ package object uexplorer {
   }
 
   type BlockId = HexString
-
   object BlockId {
-    extension (x: BlockId) def unwrapped: String = x
-    def fromStringUnsafe(s: String): BlockId     = unsafeWrap(HexString.fromStringUnsafe(s))
-    def castUnsafe(s: String): BlockId           = s.asInstanceOf[BlockId]
+    def fromStringUnsafe(s: String): BlockId = unsafeWrap(HexString.fromStringUnsafe(s))
+    def castUnsafe(s: String): BlockId       = s.asInstanceOf[BlockId]
   }
 
   type TokenId = HexString
@@ -91,6 +90,22 @@ package object uexplorer {
   object ErgoTreeT8Hex {
     def fromStringUnsafe(s: String): ErgoTreeT8Hex = unsafeWrap(HexString.fromStringUnsafe(s))
     def castUnsafe(s: String): ErgoTreeHex         = s.asInstanceOf[ErgoTreeHex]
+  }
+
+  type ErgoTreeHash = HexString
+
+  object ErgoTreeHash {
+    def fromStringUnsafe(s: String): HexString = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
+
+    def castUnsafe(s: String): HexString = s.asInstanceOf[HexString]
+  }
+
+  type ErgoTreeT8Hash = HexString
+
+  object ErgoTreeT8Hash {
+    def fromStringUnsafe(s: String): ErgoTreeT8Hash = unsafeWrap(HexString.fromStringUnsafe(s))
+
+    def castUnsafe(s: String): ErgoTreeT8Hash = s.asInstanceOf[ErgoTreeT8Hash]
   }
 
   opaque type TxId = String

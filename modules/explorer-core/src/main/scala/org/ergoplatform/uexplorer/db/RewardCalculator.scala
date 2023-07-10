@@ -48,7 +48,7 @@ object RewardCalculator {
       else reward
     val fee = apiBlock.transactions.transactions
       .flatMap(_.outputs)
-      .filter(_.ergoTree == Const.Protocol.FeeContract.ergoTree)
+      .filter(_.ergoTree == Const.Protocol.FeeContract.ergoTreeHex)
       .map(_.value)
       .sum
     ps.networkPrefix.value.toByte match {

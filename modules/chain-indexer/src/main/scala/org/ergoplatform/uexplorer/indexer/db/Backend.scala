@@ -6,9 +6,9 @@ import akka.{Done, NotUsed}
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.backend.H2Backend
 import org.ergoplatform.uexplorer.cassandra.CassandraBackend
-import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, BlockInfo, FullBlock}
-import org.ergoplatform.uexplorer.storage.H2Backend
+import org.ergoplatform.uexplorer.db.Backend
 import pureconfig.ConfigReader
 
 import java.util.concurrent.ConcurrentHashMap
@@ -33,7 +33,7 @@ object Backend {
     case Cassandra(parallelism) =>
       CassandraBackend(parallelism)
     case H2 =>
-      H2Backend()
+      H2Backend(system)
   }
 
 }

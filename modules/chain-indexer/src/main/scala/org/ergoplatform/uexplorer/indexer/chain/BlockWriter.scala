@@ -7,13 +7,12 @@ import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
 import org.ergoplatform.uexplorer.{Resiliency, UnexpectedStateError}
-import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, BlockWithInputs, ForkInserted, LinkedBlock, UtxoTracker}
+import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, ForkInserted, LinkedBlock, NormalizedBlock, UtxoTracker}
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 import java.util.concurrent.Flow.Processor
-import org.reactivestreams.FlowAdapters.toProcessor
 
 import concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -30,10 +29,10 @@ class BlockWriter(
   with LazyLogging {
 
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
-    fork.size > 1 && storage.containsBlock(fork.head.info.parentId, fork.head.info.height - 1) &&
+    fork.size > 1 && storage.containsBlock(fork.head.block.parentId, fork.head.block.height - 1) &&
       fork.sliding(2).forall {
         case first :: second :: Nil =>
-          first.b.header.id == second.info.parentId
+          first.b.header.id == second.block.parentId
         case _ =>
           false
       }
@@ -42,14 +41,14 @@ class BlockWriter(
     if (!hasParentAndIsChained(winningFork)) {
       Failure(
         new UnexpectedStateError(
-          s"Inserting fork ${winningFork.map(_.b.header.id).mkString(",")} at height ${winningFork.map(_.info.height).mkString(",")} illegal"
+          s"Inserting fork ${winningFork.map(_.b.header.id).mkString(",")} at height ${winningFork.map(_.block.height).mkString(",")} illegal"
         )
       )
     } else {
-      logger.info(s"Adding fork from height ${winningFork.head.info.height} until ${winningFork.last.info.height}")
+      logger.info(s"Adding fork from height ${winningFork.head.block.height} until ${winningFork.last.block.height}")
       for {
         preForkVersion <- Try(storage.getBlockById(winningFork.head.b.header.id).map(_.revision).get)
-        loosingFork = winningFork.flatMap(b => storage.getBlocksByHeight(b.info.height).filter(_._1 != b.b.header.id)).toMap
+        loosingFork = winningFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id)).toMap
         _ <- Try(storage.store.rollbackTo(preForkVersion))
       } yield ForkInserted(winningFork, loosingFork)
     }
@@ -58,9 +57,7 @@ class BlockWriter(
     Flow[BestBlockInserted]
       .buffer(100, OverflowStrategy.backpressure)
       .async
-      .via(
-        Flow.fromProcessor(() => toProcessor(backend.blockWriteFlow))
-      )
+      .via(backend.blockWriteFlow)
 
   private val graphPersistenceFlow =
     Flow[BestBlockInserted]
@@ -71,6 +68,7 @@ class BlockWriter(
           _.graphWriteFlow
         )
       )
+      .async(ActorAttributes.IODispatcher.dispatcher, 16)
 
   val insertBranchFlow: Flow[List[LinkedBlock], BestBlockInserted, Future[ChainSyncResult]] =
     Flow
@@ -84,7 +82,7 @@ class BlockWriter(
           }
       }
       .wireTap { b =>
-        if (b.blockWithInputs.info.height % mvStoreConf.heightCompactRate == 0)
+        if (b.blockWithInputs.block.height % mvStoreConf.heightCompactRate == 0)
           storageService.compact(indexing = true, mvStoreConf.maxIndexingCompactTime, mvStoreConf.maxIdleCompactTime)
         else Success(())
       }
@@ -114,18 +112,18 @@ class BlockWriter(
       )
 
   private val storagePersistence = broadcastTo3Workers(
-    Flow.fromFunction[BlockWithInputs, BlockWithInputs] { b =>
+    Flow.fromFunction[NormalizedBlock, NormalizedBlock] { b =>
       storage.persistErgoTreeUtxos(b.outputRecords).get
       storage.removeInputBoxesByErgoTree(b.inputRecords).get
       b
     },
-    Flow.fromFunction[BlockWithInputs, BlockWithInputs] { b =>
+    Flow.fromFunction[NormalizedBlock, NormalizedBlock] { b =>
       storage.persistErgoTreeT8Utxos(b.outputRecords).get
       storage.removeInputBoxesByErgoTreeT8(b.inputRecords).get
       b
     },
-    Flow.fromFunction[BlockWithInputs, BlockWithInputs] { b =>
-      storage.insertNewBlock(b.b.header.id, b.info, storage.getCurrentRevision).get
+    Flow.fromFunction[NormalizedBlock, NormalizedBlock] { b =>
+      storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision).get
       b
     }
   )

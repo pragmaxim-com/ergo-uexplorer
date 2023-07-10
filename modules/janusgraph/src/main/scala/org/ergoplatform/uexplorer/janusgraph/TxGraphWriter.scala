@@ -6,8 +6,9 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.structure.{Direction, Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.*
-import org.ergoplatform.uexplorer.db.{InputRecords, OutputRecord}
+import org.ergoplatform.uexplorer.db.{InputRecords, Utxo}
 import org.ergoplatform.uexplorer.HexString.unwrapped
+
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -17,14 +18,19 @@ object TxGraphWriter extends LazyLogging {
   private val blackListBoxes = Set(Protocol.Emission.inputBox, Protocol.NoPremine.box, Protocol.Foundation.inputBox)
 
   private val blackListAddresses =
-    Set(Protocol.FeeContract.ergoTree, Protocol.Emission.ergoTree, Protocol.NoPremine.ergoTree, Protocol.Foundation.ergoTree)
+    Set(
+      Protocol.FeeContract.ergoTreeHash,
+      Protocol.Emission.ergoTreeHash,
+      Protocol.NoPremine.ergoTreeHash,
+      Protocol.Foundation.ergoTreeHash
+    )
 
   def writeGraph(
     txId: TxId,
     height: Height,
     timestamp: Timestamp,
-    inputsByErgoTree: mutable.Map[ErgoTreeHex, mutable.Map[BoxId, Value]],
-    outputs: Iterable[OutputRecord]
+    inputsByErgoTree: mutable.Map[ErgoTreeHash, mutable.Map[BoxId, Value]],
+    outputs: Iterable[Utxo]
   )(g: Graph): Unit = {
     val newTxVertex = g.addVertex(T.id, Utils.vertexHash(txId.unwrapped, g), T.label, "txId")
     newTxVertex.property("txId", txId)
@@ -48,11 +54,11 @@ object TxGraphWriter extends LazyLogging {
 
     outputs
       .filterNot(t =>
-        inputsByErgoTree.contains(t.ergoTreeHex) || blackListBoxes.contains(t.boxId) || blackListAddresses.contains(
-          t.ergoTreeHex
-        ) || t.value < CoinsInOneErgo
+        inputsByErgoTree.contains(t.ergoTreeHash) || blackListBoxes.contains(t.boxId) || blackListAddresses.contains(
+          t.ergoTreeHash
+        ) || t.ergValue < CoinsInOneErgo
       )
-      .groupBy(_.ergoTreeHex)
+      .groupBy(_.ergoTreeHash)
       .foreach { case (ergoTree, outputs) =>
         val outputAddressVertexIt = g.vertices(Utils.vertexHash(ergoTree.unwrapped, g))
         val newOutputAddressVertex =
@@ -63,7 +69,7 @@ object TxGraphWriter extends LazyLogging {
             newOutputAddressVertex.property("address", ergoTree)
             newOutputAddressVertex
           }
-        newTxVertex.addEdge("to", newOutputAddressVertex, "value", outputs.iterator.map(_.value).sum)
+        newTxVertex.addEdge("to", newOutputAddressVertex, "value", outputs.iterator.map(_.ergValue).sum)
       }
   }
 

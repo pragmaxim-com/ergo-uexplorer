@@ -10,7 +10,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.cassandra.{AkkaStreamSupport, CassandraBackend}
+import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
 import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
 import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
@@ -27,7 +27,6 @@ import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.http.BlockHttpClient
-import org.ergoplatform.uexplorer.indexer.http.Routes
 import org.ergoplatform.uexplorer.http.LocalNodeUriMagnet
 import org.ergoplatform.uexplorer.http.RemoteNodeUriMagnet
 import org.ergoplatform.uexplorer.db.{FullBlock, UtxoTracker}
@@ -59,17 +58,12 @@ object ChainIndexer extends App with AkkaStreamSupport with LazyLogging {
           implicit val localNodeUriMagnet: LocalNodeUriMagnet   = conf.localUriMagnet
           implicit val remoteNodeUriMagnet: RemoteNodeUriMagnet = conf.remoteUriMagnet
 
-          val bindingFuture = Http().newServerAt("localhost", 8089).bind(new Routes().shutdown)
           CoordinatedShutdown(system).addTask(
             CoordinatedShutdown.PhaseBeforeServiceUnbind,
             "stop-akka-streams"
           ) { () =>
-            for {
-              _ <- Future(killSwitch.shutdown())
-              _ = logger.info("Stopping akka-streams and http server")
-              binding <- bindingFuture
-              done    <- binding.unbind()
-            } yield done
+            logger.info("Stopping akka-streams and http server")
+            Future(killSwitch.shutdown()).map(_ => Done)
           }
 
           val initializationF =

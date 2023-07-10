@@ -10,35 +10,35 @@ case class BlockWithReward(
   b: ApiFullBlock,
   minerRewardInfo: MinerRewardInfo
 ) {
-  def toBlockWithOutput(outputRecords: ArraySeq[OutputRecord]) =
+  def toBlockWithOutput(outputRecords: OutputRecords) =
     BlockWithOutputs(b, minerRewardInfo, outputRecords)
 }
 
 case class BlockWithOutputs(
   b: ApiFullBlock,
   minerRewardInfo: MinerRewardInfo,
-  outputRecords: ArraySeq[OutputRecord]
+  outputRecords: OutputRecords
 ) {
-  def toLinkedBlock(blockInfo: BlockInfo, parentInfoOpt: Option[BlockInfo]) =
-    LinkedBlock(b, minerRewardInfo, outputRecords, blockInfo, parentInfoOpt)
+  def toLinkedBlock(block: Block, parentBlockOpt: Option[Block]) =
+    LinkedBlock(b, minerRewardInfo, outputRecords, block, parentBlockOpt)
 }
 
 case class LinkedBlock(
   b: ApiFullBlock,
   minerRewardInfo: MinerRewardInfo,
-  outputRecords: ArraySeq[OutputRecord],
-  info: BlockInfo,
-  parentInfoOpt: Option[BlockInfo]
+  outputRecords: OutputRecords,
+  block: Block,
+  parentBlockOpt: Option[Block]
 ) {
-  def toBlockWithInputs(inputRecords: InputRecords) =
-    BlockWithInputs(b, minerRewardInfo, inputRecords, outputRecords, info, parentInfoOpt)
+  def toNormalizedBlock(inputRecords: InputRecords) =
+    NormalizedBlock(b, minerRewardInfo, inputRecords, outputRecords, block, parentBlockOpt)
 }
 
-case class BlockWithInputs(
+case class NormalizedBlock(
   b: ApiFullBlock,
   minerRewardInfo: MinerRewardInfo,
   inputRecords: InputRecords,
-  outputRecords: ArraySeq[OutputRecord],
-  info: BlockInfo,
-  parentInfoOpt: Option[BlockInfo]
+  outputRecords: OutputRecords,
+  block: Block,
+  parentBlockOpt: Option[Block]
 )

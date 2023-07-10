@@ -1,10 +1,13 @@
 package org.ergoplatform.uexplorer.db
 
+import akka.NotUsed
+import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.BlockId
-import java.util.concurrent.Flow._
+
+import java.util.concurrent
+import java.util.concurrent.Flow.*
 import scala.concurrent.Future
 import scala.util.Try
-import java.util.concurrent.Flow.Processor
 
 trait Backend {
 
@@ -12,9 +15,9 @@ trait Backend {
 
   def removeBlocks(blockIds: Set[BlockId]): Future[Unit]
 
-  def blockWriteFlow: Processor[BestBlockInserted, BestBlockInserted]
+  def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
 
-  def writeBlock(b: BlockWithInputs): BlockWithInputs
+  def writeBlock(b: NormalizedBlock): NormalizedBlock
 
   def close(): Future[Unit]
 }

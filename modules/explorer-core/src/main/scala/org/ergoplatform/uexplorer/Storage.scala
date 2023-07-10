@@ -1,9 +1,8 @@
 package org.ergoplatform.uexplorer
 
 import org.ergoplatform.uexplorer.chain.ChainTip
-import org.ergoplatform.uexplorer.db.BlockInfo
 import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex, Height, Value}
-
+import org.ergoplatform.uexplorer.db.Block
 import java.nio.file.Path
 import scala.collection.immutable.TreeSet
 import scala.collection.concurrent
@@ -21,13 +20,13 @@ trait Storage {
 
   def getCurrentRevision: Long
 
-  def getBlockById(blockId: BlockId): Option[BlockInfo]
+  def getBlockById(blockId: BlockId): Option[Block]
 
   def getLastHeight: Option[Height]
 
-  def getLastBlocks: Map[BlockId, BlockInfo]
+  def getLastBlocks: Map[BlockId, Block]
 
-  def getBlocksByHeight(atHeight: Height): Map[BlockId, BlockInfo]
+  def getBlocksByHeight(atHeight: Height): Map[BlockId, Block]
 
   def getErgoTreeHexByUtxo(boxId: BoxId): Option[ErgoTreeHex]
 
