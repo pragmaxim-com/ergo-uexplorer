@@ -18,8 +18,8 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
 
   def inspectNewPoolTx(
     tx: ApiTransaction,
-    storage: Storage,
-    graphTraversalSource: Option[GraphTraversalSource]
+    storage: ReadableStorage,
+    graphTraversalSource: GraphTraversalSource
   ): List[TxMatch] = {
     def sumErgoTreeValues(ergoTrees: Set[ErgoTreeHex]): Map[ErgoTreeHex, Value] =
       ergoTrees
@@ -60,8 +60,8 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
 
   def inspectNewBlock(
     newBlock: BestBlockInserted,
-    storage: Storage,
-    graphTraversalSource: Option[GraphTraversalSource]
+    storage: ReadableStorage,
+    graphTraversalSource: GraphTraversalSource
   ): List[BlockMatch] = List.empty
 
 }

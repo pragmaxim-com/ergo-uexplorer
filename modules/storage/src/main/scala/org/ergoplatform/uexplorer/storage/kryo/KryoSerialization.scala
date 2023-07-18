@@ -7,8 +7,7 @@ import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.Jdk
 import com.esotericsoftware.kryo.serializers.{CollectionSerializer, ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
 import org.ergoplatform.uexplorer.db.Block
-import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
-import org.ergoplatform.uexplorer.mvstore.ValueCodec
+import org.ergoplatform.uexplorer.mvstore.{SuperNodeCounter, ValueCodec}
 import org.ergoplatform.uexplorer.mvstore.multimap.MultiMapCodec
 import org.ergoplatform.uexplorer.storage.kryo.*
 
@@ -29,7 +28,7 @@ object KryoSerialization {
       kryo.register(Collections.singleton(null).getClass)
       kryo.register(classOf[util.HashMap[_, _]], mapSerializer)
       kryo.register(classOf[util.HashSet[_]], setSerializer)
-      kryo.register(classOf[Counter])
+      kryo.register(classOf[SuperNodeCounter])
       kryo.register(classOf[Block])
       setSerializer.setAcceptsNull(false)
       setSerializer.setElementsCanBeNull(false)

@@ -11,13 +11,12 @@ import org.ergoplatform.uexplorer.Const.Protocol.{Emission, FeeContract, Foundat
 import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.*
-import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.ergoplatform.uexplorer.mvstore.multiset.MultiMvSet
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
 import org.ergoplatform.uexplorer.storage.Implicits.*
 import org.ergoplatform.uexplorer.storage.MvStorage.*
 import org.h2.mvstore.{MVMap, MVStore}
-
+import zio.*
 import java.io.{BufferedInputStream, File}
 import java.nio.ByteBuffer
 import java.nio.file.{CopyOption, Files, Path, Paths}
@@ -43,11 +42,11 @@ case class MvStorage(
   ergoTreeHexByUtxo: MapLike[BoxId, ErgoTreeHex],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, Block]
-)(implicit val store: MVStore)
-  extends Storage
+)(implicit val store: MVStore, mvStoreConf: MvStoreConf)
+  extends WritableStorage
   with LazyLogging {
 
-  def getReportByPath: Map[Path, Vector[(String, Counter)]] =
+  private def getReportByPath: Map[Path, Vector[(String, SuperNodeCounter)]] =
     Map(
       utxosByErgoTreeHex.getReport,
       utxosByErgoTreeT8Hex.getReport
@@ -70,6 +69,65 @@ case class MvStorage(
     )
     chainTip
   }
+
+  private def clearEmptySuperNodes(): Try[Unit] =
+    utxosByErgoTreeHex.clearEmptySuperNodes().flatMap { _ =>
+      utxosByErgoTreeT8Hex.clearEmptySuperNodes()
+    }
+
+  def compact(
+    indexing: Boolean
+  ): Task[Unit] = ZIO.attempt {
+    logger.info(s"Compacting file at $getCompactReport")
+    val compactTime = if (indexing) mvStoreConf.maxIndexingCompactTime else mvStoreConf.maxIdleCompactTime
+    val result      = if (!indexing) clearEmptySuperNodes() else Success(())
+    result.map(_ => store.compactFile(compactTime.toMillis.toInt))
+  }
+
+  private def getCompactReport: String = {
+    val height                                                      = getLastHeight.getOrElse(0)
+    val MultiColSize(superNodeSize, superNodeTotalSize, commonSize) = utxosByErgoTreeHex.size
+    val nonEmptyAddressCount                                        = superNodeSize + commonSize
+    val progress =
+      s"storage height: $height, " +
+        s"utxo count: ${ergoTreeHexByUtxo.size}, " +
+        s"supernode-utxo-count : $superNodeTotalSize, " +
+        s"non-empty-address count: $nonEmptyAddressCount \n"
+    val cs  = store.getCacheSize
+    val csu = store.getCacheSizeUsed
+    val chr = store.getCacheHitRatio
+    val cc  = store.getChunkCount
+    val cfr = store.getChunksFillRate
+    val fr  = store.getFillRate
+    val lr  = store.getLeafRatio
+    val pc  = store.getPageCount
+    val mps = store.getMaxPageSize
+    val kpp = store.getKeysPerPage
+    val debug =
+      s"cache size used: $csu from: $cs at ratio: $chr, chunks: $cc at fill rate: $cfr, fill rate: $fr, " +
+        s"leaf ratio: $lr, page count: $pc, max page size: $mps, keys per page: $kpp"
+    progress + debug
+  }
+
+  def writeReportAndCompact(blocksIndexed: Int): Task[Unit] =
+    if (blocksIndexed > 100000) {
+      getReportByPath.foreach { case (path, report) =>
+        val lines =
+          report.map { case (hotKey, SuperNodeCounter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
+            val stats  = s"$writeOps $readOps $boxesAdded $boxesRemoved ${boxesAdded - boxesRemoved}"
+            val indent = 45
+            s"$stats ${List.fill(Math.max(4, indent - stats.length))(" ").mkString("")} $hotKey"
+          }
+        tool.FileUtils.writeReport(lines, path).recover { case ex =>
+          logger.error(s"Failing to write report", ex)
+        }
+      }
+      compact(true).logError
+    } else ZIO.succeed(())
+
+  def commit(): Revision = store.commit()
+
+  def rollbackTo(rev: Revision): Unit = store.rollbackTo(rev)
 
   def removeInputBoxesByErgoTree(inputRecords: InputRecords): Try[_] = Try {
     inputRecords.byErgoTree.iterator
@@ -185,7 +243,6 @@ case class MvStorage(
 
   override def getCurrentRevision: Revision = store.getCurrentVersion
 
-  def commit(): Revision = store.commit()
 }
 
 object MvStorage extends LazyLogging {
@@ -193,36 +250,42 @@ object MvStorage extends LazyLogging {
 
   private val VersionsToKeep = 10
 
-  def apply(
-    cacheSize: CacheSize,
-    dbFile: File = tempDir.resolve(s"mv-store-$randomNumberPerRun.db").toFile
-  ): Try[MvStorage] = Try {
-    dbFile.getParentFile.mkdirs()
-    implicit val store: MVStore =
-      new MVStore.Builder()
-        .fileName(dbFile.getAbsolutePath)
-        .cacheSize(cacheSize)
-        .cacheConcurrency(4)
-        .autoCommitDisabled()
-        .open()
+  private def zlayer(dbFile: File): ZLayer[MvStoreConf, Throwable, MvStorage] =
+    ZLayer.service[MvStoreConf].flatMap { mvStoreConf =>
+      ZLayer.scoped(
+        ZIO.acquireRelease {
+          ZIO.attempt {
+            dbFile.getParentFile.mkdirs()
+            implicit val store: MVStore =
+              new MVStore.Builder()
+                .fileName(dbFile.getAbsolutePath)
+                .cacheSize(mvStoreConf.get.cacheSize)
+                .cacheConcurrency(4)
+                .autoCommitDisabled()
+                .open()
 
-    store.setVersionsToKeep(VersionsToKeep)
-    store.setRetentionTime(3600 * 1000 * 24 * 7)
+            store.setVersionsToKeep(VersionsToKeep)
+            store.setRetentionTime(3600 * 1000 * 24 * 7)
 
-    logger.info(s"Opening mvstore at version ${store.getCurrentVersion}")
+            logger.info(s"Opening mvstore at version ${store.getCurrentVersion}")
+            MvStorage(
+              multiset.MultiMvSet[ErgoTreeHex, util.Set, BoxId]("utxosByErgoTreeHex"),
+              multiset.MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
+              MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
+              MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
+              MvMap[BlockId, Block]("blockById")
+            )(store, mvStoreConf.get)
+          }
+        } { storage =>
+          logger.info(s"Closing mvstore at version ${storage.store.getCurrentVersion}")
+          ZIO.succeed(storage.store.close())
+        }
+      )
+    }
 
-    MvStorage(
-      multiset.MultiMvSet[ErgoTreeHex, util.Set, BoxId]("utxosByErgoTreeHex"),
-      multiset.MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
-      MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
-      MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
-      MvMap[BlockId, Block]("blockById")
-    )
-  }
+  def zlayerWithTempDir: ZLayer[MvStoreConf, Throwable, MvStorage] = zlayer(
+    tempDir.resolve(s"mv-store-$randomNumberPerRun.db").toFile
+  )
 
-  def withDefaultDir(cacheSize: CacheSize): Try[MvStorage] =
-    MvStorage(
-      cacheSize,
-      ergoHomeDir.resolve("mv-store.db").toFile
-    )
+  def zlayerWithDefaultDir: ZLayer[MvStoreConf, Throwable, MvStorage] = zlayer(ergoHomeDir.resolve("mv-store.db").toFile)
 }

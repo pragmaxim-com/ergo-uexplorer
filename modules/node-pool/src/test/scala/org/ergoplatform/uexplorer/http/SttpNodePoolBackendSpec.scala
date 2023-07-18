@@ -1,12 +1,9 @@
 package org.ergoplatform.uexplorer.http
 
-import akka.actor.testkit.typed.scaladsl.ActorTestKit
-import akka.actor.typed.{ActorRef, ActorSystem}
-import akka.stream.{KillSwitches, SharedKillSwitch}
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.freespec.AsyncFreeSpec
-import org.scalatest.matchers.should.Matchers
+import org.ergoplatform.uexplorer.config.ExplorerConfig
+import zio.{Runtime, *}
+import zio.test.*
+import zio.test.Assertion.*
 import sttp.capabilities
 import sttp.client3.*
 import sttp.client3.testing.SttpBackendStub
@@ -22,8 +19,13 @@ import org.ergoplatform.uexplorer.http.Peer
 import org.ergoplatform.uexplorer.http.SttpNodePoolBackend
 import org.ergoplatform.uexplorer.http.NodePool
 import org.ergoplatform.uexplorer.http.NodePoolState
+import sttp.capabilities.zio.ZioStreams
+import sttp.client3.httpclient.zio.HttpClientZioBackend
+import zio.config.*
+import zio.*
+import zio.config.typesafe.TypesafeConfigProvider
 
-class SttpNodePoolBackendSpec extends AsyncFreeSpec with Matchers with BeforeAndAfterAll with ScalaFutures {
+object SttpNodePoolBackendSpec extends ZIOSpecDefault with TestSupport {
 
   private val appVersion = "4.0.42"
   private val stateType  = "utxo"
@@ -34,62 +36,58 @@ class SttpNodePoolBackendSpec extends AsyncFreeSpec with Matchers with BeforeAnd
 
   private val proxyUri = uri"http://proxy"
 
-  private val testKit                       = ActorTestKit()
-  implicit private val sys: ActorSystem[_]  = testKit.internalSystem
-  implicit val killSwitch: SharedKillSwitch = KillSwitches.shared("nodepool")
+  def stubLayers(
+    fn: SttpBackendStub[Task, ZioStreams] => SttpBackendStub[Task, ZioStreams]
+  ): ZLayer[Any, Config.Error, NodePool with SttpNodePoolBackend] =
+    ZLayer.scoped(
+      ZIO.acquireRelease(ZIO.succeed(UnderlyingBackend(fn(HttpClientZioBackend.stub))))(b => ZIO.succeed(b.backend.close()))
+    ) >+> NodePoolConf.layer >+> MetadataHttpClient.layer >+> NodePool.layer >+> SttpNodePoolBackend.layer
 
-  override def afterAll(): Unit = {
-    super.afterAll()
-    sys.terminate()
-  }
+  def spec =
+    suite("nodepool-backend")(
+      test("node pool backend should try all peers in given order until one succeeds") {
+        implicit val testingBackend: SttpBackendStub[Task, ZioStreams] = HttpClientZioBackend.stub.whenAnyRequest
+          .thenRespondCyclicResponses(
+            Response("error", StatusCode.InternalServerError, "Local node failed"),
+            Response("error", StatusCode.InternalServerError, "Remote node not available"),
+            Response.ok[String]("Remote peer available")
+          )
 
-  "node pool backend should try all peers in given order until one succeeds" in {
-    implicit val testingBackend: SttpBackendStub[Future, _] = SttpBackendStub.asynchronousFuture.whenAnyRequest
-      .thenRespondCyclicResponses(
-        Response("error", StatusCode.InternalServerError, "Local node failed"),
-        Response("error", StatusCode.InternalServerError, "Remote node not available"),
-        Response.ok[String]("Remote peer available")
-      )
+        def proxyRequest(p: Peer) =
+          basicRequest.get(p.uri).responseGetRight.send(testingBackend).map(_.body)
 
-    def proxyRequest(p: Peer) =
-      basicRequest.get(p.uri).responseGetRight.send(testingBackend).map(_.body)
-
-    SttpNodePoolBackend
-      .fallbackQuery[String](List(localNode, remoteNode, remotePeer), TreeSet.empty)(proxyRequest)
-      .map { case (invalidPeers, response) =>
-        response shouldBe Success("Remote peer available")
-        invalidPeers shouldBe TreeSet(localNode, remoteNode)
+        SttpNodePoolBackend
+          .fallbackQuery[String](List(localNode, remoteNode, remotePeer), TreeSet.empty)(proxyRequest)
+          .map { case (invalidPeers, response) =>
+            assertTrue(response == Success("Remote peer available"), invalidPeers == TreeSet(localNode, remoteNode))
+          }
+      },
+      test("node pool backend should swap uri in request") {
+        assertTrue(SttpNodePoolBackend.swapUri(basicRequest.get(proxyUri), localNode.uri) == basicRequest.get(localNode.uri))
+      },
+      test("node pool backend should get peers from node pool to proxy request to and invalidate failing peers") {
+        (for {
+          nodePool <- ZIO.service[NodePool]
+          x        <- nodePool.updateOpenApiPeers(TreeSet(localNode, remoteNode, remotePeer))
+          r <- ZIO
+                 .serviceWithZIO[SttpNodePoolBackend](_.send(basicRequest.get(proxyUri).responseGetRight))
+                 .map(_.body)
+                 .flatMap { resp =>
+                   nodePool.getAvailablePeers.map { availablePeers =>
+                     assertTrue(resp == "Remote peer available", availablePeers.toList == List(remoteNode, remotePeer))
+                   }
+                 }
+        } yield r)
+          .provide(
+            stubLayers(
+              _.whenRequestMatches(_.uri == localNode.uri)
+                .thenRespond(Response("error", StatusCode.InternalServerError, "Local node failed"))
+                .whenRequestMatches(_.uri == remoteNode.uri)
+                .thenRespond("Remote peer available")
+                .whenRequestMatches(_.uri == proxyUri)
+                .thenRespondServerError()
+            )
+          )
       }
-  }
-
-  "node pool backend should swap uri in request" in {
-    SttpNodePoolBackend.swapUri(basicRequest.get(proxyUri), localNode.uri) shouldBe basicRequest.get(localNode.uri)
-  }
-
-  "node pool backend should get peers from node pool to proxy request to and invalidate failing peers" in {
-    implicit val underlyingBackend: SttpBackendStub[Future, capabilities.WebSockets] = SttpBackendStub.asynchronousFuture
-      .whenRequestMatches(_.uri == localNode.uri)
-      .thenRespond(Response("error", StatusCode.InternalServerError, "Local node failed"))
-      .whenRequestMatches(_.uri == remoteNode.uri)
-      .thenRespond("Remote peer available")
-      .whenRequestMatches(_.uri == proxyUri)
-      .thenRespondServerError()
-
-    implicit val nodePoolRef: ActorRef[NodePool.NodePoolRequest] =
-      testKit.spawn(NodePool.initialized(NodePoolState(TreeSet(localNode, remoteNode, remotePeer), TreeSet.empty)))
-    val fallbackProxyBackend = new SttpNodePoolBackend[capabilities.WebSockets]
-
-    fallbackProxyBackend
-      .send(basicRequest.get(proxyUri).responseGetRight)
-      .map(_.body)
-      .map { resp =>
-        resp shouldBe "Remote peer available"
-      }
-      .flatMap { _ =>
-        NodePool.getAvailablePeers.map { availablePeers =>
-          availablePeers.peerAddresses shouldBe List(remoteNode, remotePeer)
-        }
-      }
-  }
-
+    )
 }

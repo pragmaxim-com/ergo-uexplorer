@@ -10,12 +10,10 @@ import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
 import scorex.util.encode.Base16
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
-
+import zio.*
 import java.util
 import scala.collection.immutable.TreeSet
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
@@ -44,14 +42,14 @@ object ChainTip {
   }
 }
 
-class ChainLinker(getBlock: BlockId => Future[ApiFullBlock], chainTip: ChainTip) extends LazyLogging {
+class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(implicit ps: ProtocolSettings) extends LazyLogging {
 
   def linkChildToAncestors(acc: List[LinkedBlock] = List.empty)(
     block: BlockWithOutputs
-  )(implicit ps: ProtocolSettings): Future[List[LinkedBlock]] =
+  ): Task[List[LinkedBlock]] =
     chainTip.getParent(block.b) match {
       case parentBlockOpt if parentBlockOpt.isDefined || block.b.header.height == 1 =>
-        Future.fromTry(
+        ZIO.fromTry(
           chainTip.putOnlyNew(block.b.header.id, BlockBuilder(block, parentBlockOpt)).map { newBlock =>
             block.toLinkedBlock(newBlock, parentBlockOpt) :: acc
           }
@@ -60,8 +58,8 @@ class ChainLinker(getBlock: BlockId => Future[ApiFullBlock], chainTip: ChainTip)
         logger.info(s"Encountered fork at height ${block.b.header.height} and block ${block.b.header.id}")
         for {
           apiBlock     <- getBlock(block.b.header.parentId)
-          rewardBlock  <- Future.fromTry(RewardCalculator(apiBlock))
-          outputBlock  <- Future.fromTry(OutputBuilder(rewardBlock)(ps.addressEncoder))
+          rewardBlock  <- ZIO.fromTry(RewardCalculator(apiBlock))
+          outputBlock  <- ZIO.fromTry(OutputBuilder(rewardBlock)(ps.addressEncoder))
           linkedBlocks <- linkChildToAncestors(acc)(outputBlock)
         } yield linkedBlocks
     }

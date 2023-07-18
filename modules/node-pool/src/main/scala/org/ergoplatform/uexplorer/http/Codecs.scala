@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.http
 
 import io.circe.{Decoder, HCursor}
-import org.ergoplatform.uexplorer.{AvlTreePathProofHex, BoxId, *}
+import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.node.*
 import io.circe.generic.auto.*
 import org.ergoplatform.ErgoAddressEncoder

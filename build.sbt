@@ -12,6 +12,7 @@ lazy val commonSettings = Seq(
   resolvers ++= Resolver.sonatypeOssRepos("public") ++ Resolver.sonatypeOssRepos("snapshots"),
   ThisBuild / evictionErrorLevel := Level.Info,
   excludeDependencies ++= allExclusions,
+  Compile / doc / sources := Seq.empty,
   scalacOptions ++= Seq(
     "-deprecation",
     "-encoding",
@@ -83,40 +84,41 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `node-pool`, backend, mvstore, storage, cassandra, janusgraph, indexer)// TODO return `alert-plugin` and org.ergoplatform.uexplorer.plugin.alert.AlertPlugin to META-INF.services
+  ).aggregate(core, `node-pool`, backend, mvstore, storage, indexer)// TODO return `alert-plugin, cassandra, janusgraph` and org.ergoplatform.uexplorer.plugin.alert.AlertPlugin to META-INF.services
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= akkaStream("3") ++ circe("3") ++ monocle("3") ++ refined("3") ++ Seq(retry("3"), pureConfig, ergoWallet, gremlin, loggingApi, scalaLogging("3")))
+    .settings(libraryDependencies ++= zio("3") ++ circe("3") ++ monocle("3") ++ refined("3") ++ Seq(retry("3"), pureConfig, ergoWallet, gremlin, loggingApi, scalaLogging("3")))
 
 lazy val `node-pool` =
   Utils.mkModule("node-pool", "node-pool")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= akkaStream("3") ++ sttp("3") ++ scalatest("3"))
+    .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
+    .settings(libraryDependencies ++= zio("3") ++ sttp("3"))
     .dependsOn(core)
 
 lazy val mvstore =
   Utils.mkModule("mvstore", "mvstore")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= Seq(h2, loggingApi, scalaLogging("3")) ++ scalatest("3"))
+    .settings(libraryDependencies ++= zio("3") ++ Seq(h2, loggingApi, scalaLogging("3")) ++ scalatest("3"))
 
 lazy val storage =
   Utils.mkModule("storage", "storage")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= akkaStream("3") ++ Seq(kryo) ++ scalatest("3"))
+    .settings(libraryDependencies ++= zio("3") ++ Seq(kryo) ++ scalatest("3"))
     .dependsOn(mvstore, core)
 
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= akkaStream("3") ++ cassandraDb ++ Seq(commonsCodec))
+    .settings(libraryDependencies ++= zio("3") ++ cassandraDb ++ Seq(commonsCodec))
     .dependsOn(core)
 
 lazy val janusgraph =
   Utils.mkModule("janusgraph", "janusgraph")
     .settings(commonSettings)
-    .settings(libraryDependencies ++= akkaStream("3") ++ janusGraph ++ cassandraDb ++ scalatest("3"))
+    .settings(libraryDependencies ++= zio("3") ++ janusGraph ++ cassandraDb ++ scalatest("3"))
     .dependsOn(core)
 
 lazy val `alert-plugin` =
@@ -131,7 +133,7 @@ lazy val backend =
   Utils.mkModule("backend", "backend")
     .settings(commonSettings)
     .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
-    .settings(libraryDependencies ++= akkaStream("3") ++ zio("3") ++ Seq(h2) ++ scalatest("3"))
+    .settings(libraryDependencies ++= zio("3") ++ Seq(h2) ++ scalatest("3"))
     .dependsOn(core)
 
 lazy val indexer =
@@ -139,5 +141,6 @@ lazy val indexer =
     .enablePlugins(JavaAppPackaging)
     .settings(commonSettings)
     .settings(chainIndexerAssemblySettings)
-    .settings(libraryDependencies ++= Seq(logback, akkaHttp("3")) ++ akkaStream("3") ++ scalatest("3"))
-    .dependsOn(core, `node-pool` % "compile->compile;test->test", backend, storage, cassandra, janusgraph)
+    .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
+    .settings(libraryDependencies ++= Seq(logback) ++ zio("3") ++ scalatest("3"))
+    .dependsOn(core, `node-pool` % "compile->compile;test->test", backend, storage) //todo return cassandra and janusgraph

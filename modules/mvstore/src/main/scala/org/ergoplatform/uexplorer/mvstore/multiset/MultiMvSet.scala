@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.mvstore.multiset
 
 import org.ergoplatform.uexplorer.mvstore.*
-import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
@@ -19,7 +18,7 @@ case class MultiMvSet[K, C[_], V](
   store: MVStore,
   c: MultiSetCodec[C, V],
   sc: SuperNodeSetCodec[C, V],
-  vc: ValueCodec[Counter],
+  vc: ValueCodec[SuperNodeCounter],
   kc: HotKeyCodec[K]
 ) extends MultiSetLike[K, C, V] {
 
@@ -33,7 +32,7 @@ case class MultiMvSet[K, C[_], V](
   def clearEmptySuperNodes(): Try[Unit] =
     superNodeMap.clearEmptySuperNodes()
 
-  def getReport: (Path, Vector[(String, Counter)]) =
+  def getReport: (Path, Vector[(String, SuperNodeCounter)]) =
     ergoHomeDir.resolve(s"hot-keys-$id-$randomNumberPerRun.csv") -> superNodeMap.getReport
 
   def removeSubsetOrFail(k: K, values: IterableOnce[V], size: Int)(f: C[V] => Option[C[V]]): Try[Unit] =

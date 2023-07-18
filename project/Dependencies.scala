@@ -1,9 +1,7 @@
 import sbt.*
 
 object Version {
-  lazy val akka            = "2.8.2"
-  lazy val akkaHttp        = "10.5.2"
-  lazy val sttp            = "3.8.2"
+  lazy val sttp            = "3.8.16"
   lazy val circe           = "0.14.3"
   lazy val enumeratum      = "1.7.0"
   lazy val cassandraDriver = "4.15.0"
@@ -36,13 +34,20 @@ object Dependencies {
   lazy val kryo = "com.esotericsoftware" % "kryo" % "5.5.0"
 
   def zio(v: String) = Seq(
-    // "dev.zio"     % s"zio-streams_$v"                 % "2.0.15",
-    "dev.zio"     % s"zio_$v"            % Version.zio,
-    "dev.zio"     % s"zio-http_$v"       % "3.0.0-RC2",
-    "dev.zio"     % s"zio-json_$v"       % "0.5.0",
-    "io.getquill" % s"quill-jdbc_$v"     % "4.6.0.1",
-    "io.getquill" % s"quill-jdbc-zio_$v" % "4.6.0.1"
-  )
+    "dev.zio"     % s"zio-streams_$v"         % "2.0.15",
+    "dev.zio"     % s"zio_$v"                 % Version.zio,
+    "dev.zio"     % s"zio-http_$v"            % "3.0.0-RC2",
+    "dev.zio"     % s"zio-json_$v"            % "0.5.0",
+    "io.getquill" % s"quill-jdbc_$v"          % "4.6.0.1",
+    "io.getquill" % s"quill-jdbc-zio_$v"      % "4.6.0.1",
+    "dev.zio"     % s"zio-config_$v"          % "4.0.0-RC16",
+    "dev.zio"     % s"zio-config-typesafe_$v" % "4.0.0-RC16",
+    "dev.zio"     % s"zio-config-magnolia_$v" % "4.0.0-RC16",
+    "dev.zio"     % s"zio-config-refined_$v"  % "4.0.0-RC16",
+    "dev.zio"     % s"zio-logging_$v"         % "2.1.13",
+    "nl.vroste"   % s"rezilience_$v"          % "0.9.4",
+    "dev.zio"     % s"zio-logging-slf4j_$v"   % "2.1.13" // val bootstrap = SLF4J.slf4j(LogLevel.Info, LogFormat.colored)
+  ) ++ zioTest(v)
 
   lazy val cassandraDb = List(
     "com.datastax.oss" % "java-driver-core"             % Version.cassandraDriver,
@@ -54,17 +59,6 @@ object Dependencies {
   val loggingApi              = "org.slf4j"                  % "slf4j-api"         % "2.0.3"
   val logback                 = "ch.qos.logback"             % "logback-classic"   % "1.4.3"
   def scalaLogging(v: String) = "com.typesafe.scala-logging" % s"scala-logging_$v" % "3.9.5"
-
-  def akkaHttp(v: String) = "com.typesafe.akka" % s"akka-http_$v" % Version.akkaHttp
-
-  def akkaStream(v: String) = Seq(
-    "com.typesafe.akka" % s"akka-actor_$v"               % Version.akka,
-    "com.typesafe.akka" % s"akka-actor-typed_$v"         % Version.akka,
-    "com.typesafe.akka" % s"akka-stream-typed_$v"        % Version.akka,
-    "com.typesafe.akka" % s"akka-actor-testkit-typed_$v" % Version.akka % Test,
-    "com.typesafe.akka" % s"akka-slf4j_$v"               % Version.akka,
-    scalaLogging(v)
-  )
 
   def zioTest(v: String) = Seq(
     "dev.zio" % s"zio-test_$v"          % Version.zio % Test,
@@ -100,7 +94,7 @@ object Dependencies {
   def retry(v: String) = "com.softwaremill.retry" % s"retry_$v" % "0.3.6"
 
   def sttp(v: String) = List(
-    "com.softwaremill.sttp.client3" % s"core_$v"  % Version.sttp,
+    "com.softwaremill.sttp.client3" % s"zio_$v"   % "3.8.16",
     "com.softwaremill.sttp.client3" % s"circe_$v" % Version.sttp
   )
 
@@ -112,9 +106,7 @@ object Dependencies {
 
   lazy val allExclusions =
     Seq(
-      ExclusionRule("com.typesafe.akka", "akka-actor_2.13"),
-      ExclusionRule("com.typesafe.akka", "akka-stream_2.13"),
-      ExclusionRule("com.typesafe.akka", "akka-protobuf-v3_2.13"),
+      ExclusionRule("com.typesafe.scala-logging", "scala-logging_2.13"),
       ExclusionRule("org.scala-lang.modules", "scala-collection-compat_2.13"),
       ExclusionRule("org.scala-lang.modules", "scala-java8-compat_2.13"),
       ExclusionRule("com.typesafe", "ssl-config-core_2.13"),
@@ -122,7 +114,7 @@ object Dependencies {
       ExclusionRule("com.lihaoyi", "fansi_2.13"),
       ExclusionRule("com.lihaoyi", "pprint_2.13"),
       ExclusionRule("io.suzaku", "boopickle_2.13")
-    ) ++ (cats("2.13") ++ circe("2.13") ++ akkaStream("2.13") :+ commonsLogging).map { x =>
+    ) ++ (cats("2.13") ++ circe("2.13") :+ commonsLogging).map { x =>
       ExclusionRule(x.organization, x.name)
     }
 }

@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.http
 
 import org.ergoplatform.uexplorer.http.NodePool.*
 
-import scala.collection.immutable.SortedSet
+import scala.collection.immutable.{SortedSet, TreeSet}
 
 case class NodePoolState(openApiPeers: SortedSet[Peer], invalidPeers: SortedSet[Peer]) {
 
@@ -24,5 +24,8 @@ case class NodePoolState(openApiPeers: SortedSet[Peer], invalidPeers: SortedSet[
     s"$validPeersStr$invalidPeersStr"
   }
 
-  def sortPeers: AvailablePeers = AvailablePeers(openApiPeers.toList)
+}
+
+object NodePoolState {
+  def empty: NodePoolState = NodePoolState(TreeSet.empty, TreeSet.empty)
 }

@@ -1,10 +1,5 @@
 package org.ergoplatform.uexplorer.cassandra
 
-import akka.actor.CoordinatedShutdown
-import akka.actor.typed.ActorSystem
-import akka.stream.OverflowStrategy
-import akka.stream.scaladsl.Flow
-import akka.{Done, NotUsed}
 import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.config.{DriverConfig, DriverConfigLoader}
 import com.datastax.oss.driver.api.core.context.DriverContext
@@ -20,12 +15,13 @@ import org.ergoplatform.uexplorer.cassandra.entity.*
 import java.net.InetSocketAddress
 import java.util.concurrent.{CompletableFuture, CompletionStage}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FutureConverters.*
 import scala.util.Try
 import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, FullBlock, NormalizedBlock}
+import zio.Task
 
 class CassandraBackend(parallelism: Int)(implicit
   val cqlSession: CqlSession,
@@ -43,14 +39,13 @@ class CassandraBackend(parallelism: Int)(implicit
   with CassandraBlockUpdater
   with CassandraHeadersReader {
 
-  def close(): Future[Unit] = {
+  def close(): Task[Unit] = {
     logger.info(s"Stopping Cassandra session")
     cqlSession.closeAsync().toCompletableFuture.asScala.map(_ => ())
   }
 
-  override def writeBlock(b: NormalizedBlock): BlockId = ???
-
-  val blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
+  override def writeBlock(b: NormalizedBlock, condition: Task[Any]): Future[BlockId] = ???
+  /*
     Flow[BestBlockInserted]
       // format: off
       .via(headerWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
@@ -61,6 +56,7 @@ class CassandraBackend(parallelism: Int)(implicit
       .via(assetsWriteFlow(parallelism)).buffer(BufferSize, OverflowStrategy.backpressure)
       .via(outputsWriteFlow(parallelism))
       // format: on
+   */
 
 }
 

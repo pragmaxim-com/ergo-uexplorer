@@ -1,99 +1,68 @@
 package org.ergoplatform.uexplorer.indexer
 
-import akka.actor.CoordinatedShutdown
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
-import akka.http.scaladsl.Http
-import akka.stream.ActorAttributes.supervisionStrategy
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{KillSwitches, SharedKillSwitch}
-import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ProtocolSettings
-import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
-import org.ergoplatform.uexplorer.db.{FullBlock, UtxoTracker}
-import org.ergoplatform.uexplorer.http.{BlockHttpClient, LocalNodeUriMagnet, RemoteNodeUriMagnet}
+import org.ergoplatform.uexplorer.backend.PersistentRepo
+import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, PersistentBlockRepo}
+import org.ergoplatform.uexplorer.backend.boxes.{BoxRepo, PersistentBoxRepo}
+import org.ergoplatform.uexplorer.config.ExplorerConfig
+import org.ergoplatform.uexplorer.db.{FullBlock, GraphBackend, UtxoTracker}
+import org.ergoplatform.uexplorer.http.*
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.db.Backend
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.*
-import org.ergoplatform.uexplorer.indexer.mempool.{MempoolStateHolder, MempoolSyncer}
+import org.ergoplatform.uexplorer.indexer.db.{Backend, GraphBackend}
+import org.ergoplatform.uexplorer.indexer.mempool.{MemPool, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
-import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.storage.MvStorage
 import org.slf4j.LoggerFactory
+import sttp.client3.httpclient.zio.HttpClientZioBackend
+import zio.config.typesafe.TypesafeConfigProvider
+import zio.*
 
 import java.io.{PrintWriter, StringWriter}
 import java.util.ServiceLoader
 import scala.collection.immutable.{ArraySeq, ListMap}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
-import scala.jdk.CollectionConverters.*
+import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
-object ChainIndexer extends App with AkkaStreamSupport with LazyLogging {
+object ChainIndexer extends ZIOAppDefault {
 
-  Try(args.headOption).foreach(println)
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
+    Runtime.setConfigProvider(ExplorerConfig())
 
-  ChainIndexerConf.loadWithFallback match {
-    case Left(failures) =>
-      failures.toList.foreach(f => println(s"Config error ${f.description} at ${f.origin}"))
-      System.exit(1)
-    case Right((conf, config)) =>
-      val guardian: Behavior[Nothing] =
-        Behaviors.setup[Nothing] { implicit ctx =>
-          implicit val system: ActorSystem[Nothing] = ctx.system
-          implicit val protocol: ProtocolSettings   = conf.protocol
-          implicit val enc: ErgoAddressEncoder      = protocol.addressEncoder
-          implicit val mempoolStateHolderRef: ActorRef[MempoolStateHolderRequest] =
-            ctx.spawn(MempoolStateHolder.behavior(MempoolState.empty), "MempoolStateHolder")
-
-          implicit val killSwitch: SharedKillSwitch             = KillSwitches.shared("uexplorer-kill-switch")
-          implicit val localNodeUriMagnet: LocalNodeUriMagnet   = conf.localUriMagnet
-          implicit val remoteNodeUriMagnet: RemoteNodeUriMagnet = conf.remoteUriMagnet
-
-          CoordinatedShutdown(system).addTask(
-            CoordinatedShutdown.PhaseBeforeServiceUnbind,
-            "stop-akka-streams"
-          ) { () =>
-            logger.info("Stopping akka-streams and http server")
-            Future(killSwitch.shutdown()).map(_ => Done)
-          }
-
-          val initializationF =
-            for {
-              blockHttpClient <- BlockHttpClient.withNodePoolBackend
-              pluginManager   <- PluginManager.initialize
-              graphBackendOpt <- Future.fromTry(GraphBackend(conf.graphBackendType))
-              storage         <- Future.fromTry(MvStorage.withDefaultDir(conf.mvStore.cacheSize))
-              backend         <- Future.fromTry(Backend(conf.backendType))
-              storageService = StorageService(storage, conf.mvStore)
-              blockReader    = new BlockReader(blockHttpClient)
-              blockWriter    = new BlockWriter(storage, storageService, conf.mvStore, backend, graphBackendOpt)
-              chainIndexer   = new StreamExecutor(true, blockHttpClient, blockReader, blockWriter, storage)
-              mempoolSyncer  = new MempoolSyncer(blockHttpClient)
-              initializer    = new Initializer(storage, backend, graphBackendOpt)
-              scheduler      = new Scheduler(pluginManager, chainIndexer, mempoolSyncer, initializer)
-              done <- scheduler.validateAndSchedule(0.seconds, conf.mvStore.maxIdleCompactTime + 5.seconds)
-            } yield done
-
-          initializationF.andThen {
-            case Failure(ex) =>
-              val sw = new StringWriter()
-              ex.printStackTrace(new PrintWriter(sw))
-              println(s"Shutting down due to unexpected error:\n$sw")
-              CoordinatedShutdown.get(system).run(CoordinatedShutdown.ActorSystemTerminateReason)
-            case Success(_) =>
-              CoordinatedShutdown.get(system).run(CoordinatedShutdown.ActorSystemTerminateReason)
-          }
-          Behaviors.same
-        }
-      val system: ActorSystem[Nothing] = ActorSystem[Nothing](guardian, "uexplorer", config)
-      Await.result(system.whenTerminated, Duration.Inf)
-  }
-
+  def run =
+    (for {
+      serverFiber   <- Backend.runServer
+      nodePoolFiber <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule())
+      done = serverFiber.zip(nodePoolFiber)
+    } yield done).provide(
+      ChainIndexerConf.layer,
+      ChainIndexerConf.layer.project(_.mvStore),
+      ChainIndexerConf.layer.project(_.nodePool),
+      MemPool.layer,
+      NodePool.layer,
+      UnderlyingBackend.layer,
+      SttpNodePoolBackend.layer,
+      Backend.layerH2,
+      MetadataHttpClient.layer,
+      BlockHttpClient.layer,
+      PersistentBlockRepo.layer,
+      PersistentBoxRepo.layer,
+      PersistentRepo.layer,
+      StreamScheduler.layer,
+      PluginManager.layer,
+      StreamExecutor.layer,
+      MempoolSyncer.layer,
+      Initializer.layer,
+      BlockReader.layer,
+      BlockWriter.layer,
+      GraphBackend.layer,
+      MvStorage.zlayerWithDefaultDir
+    )
 }

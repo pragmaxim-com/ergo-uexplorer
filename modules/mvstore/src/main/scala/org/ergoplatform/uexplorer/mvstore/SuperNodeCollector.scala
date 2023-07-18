@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.mvstore
 
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.h2.mvstore.MVStore
 
 import java.io.{BufferedInputStream, File, FileInputStream, FileWriter}
@@ -45,7 +44,7 @@ class SuperNodeCollector[HK: HotKeyCodec](id: String) extends LazyLogging {
 
   def getHotKeyString(hotKey: HK): Option[String] = stringifiedHotKeys.get(hotKey)
 
-  def filterAndSortHotKeys(hotKeysWithCounter: Iterator[(HK, Counter)]): Vector[(String, Counter)] =
+  def filterAndSortHotKeys(hotKeysWithCounter: Iterator[(HK, SuperNodeCounter)]): Vector[(String, SuperNodeCounter)] =
     hotKeysWithCounter
       .collect {
         case (hotKey, counter) if counter.isHot && !stringifiedHotKeys.contains(hotKey) =>
@@ -56,10 +55,14 @@ class SuperNodeCollector[HK: HotKeyCodec](id: String) extends LazyLogging {
 
 }
 
-object SuperNodeCollector {
+case class SuperNodeCounter(writeOps: Long, readOps: Long, boxesAdded: Int, boxesRemoved: Int) {
+  import SuperNodeCounter.hotLimit
+  def this() = this(0, 0, 0, 0)
+
+  def isHot: Boolean =
+    writeOps > hotLimit || readOps > hotLimit || boxesAdded > hotLimit || boxesRemoved > hotLimit
+}
+
+object SuperNodeCounter {
   private val hotLimit = 10000
-  case class Counter(writeOps: Long, readOps: Long, boxesAdded: Int, boxesRemoved: Int) {
-    def this() = this(0, 0, 0, 0)
-    def isHot: Boolean = writeOps > hotLimit || readOps > hotLimit || boxesAdded > hotLimit || boxesRemoved > hotLimit
-  }
 }

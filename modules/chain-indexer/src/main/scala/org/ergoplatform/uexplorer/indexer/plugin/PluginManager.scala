@@ -1,80 +1,69 @@
 package org.ergoplatform.uexplorer.indexer.plugin
 
-import akka.Done
-import akka.actor.CoordinatedShutdown
-import akka.actor.typed.ActorSystem
-import akka.stream.scaladsl.Source
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
-import org.ergoplatform.uexplorer.Storage
+import org.ergoplatform.uexplorer.ReadableStorage
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolStateHolder.MempoolStateChanges
 import org.ergoplatform.uexplorer.plugin.Plugin
-
+import zio.*
+import zio.stream.ZStream
 import java.util.ServiceLoader
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
+import org.ergoplatform.uexplorer.indexer.mempool.MemPoolStateChanges
+import zio.stream.ZSink
 
-class PluginManager(plugins: List[Plugin]) extends LazyLogging {
+case class PluginManager(plugins: List[Plugin]) extends LazyLogging {
 
-  def close(): Future[Unit] = Future.sequence(plugins.map(_.close)).map(_ => ())
+  def close(): Task[Unit] = ZIO.collectAllDiscard(plugins.map(_.close))
 
   def executePlugins(
-    storage: Storage,
-    stateChanges: MempoolStateChanges,
-    graphTraversalSource: Option[GraphTraversalSource],
+    storage: ReadableStorage,
+    stateChanges: MemPoolStateChanges,
+    graphTraversalSource: GraphTraversalSource,
     newBlockOpt: Option[BestBlockInserted]
-  )(implicit actorSystem: ActorSystem[Nothing]): Future[Done] = {
+  ): Task[Long] = {
     val poolExecutionPlan =
       stateChanges.stateTransitionByTx.flatMap { case (newTx, _) =>
         plugins.map(p => (p, newTx))
       }
     val chainExecutionPlan = newBlockOpt.toList.flatMap(newBlock => plugins.map(_ -> newBlock))
-    Source
-      .fromIterator(() => poolExecutionPlan.iterator)
-      .mapAsync(1) { case (plugin, newTx) =>
+    ZStream
+      .fromIterator(poolExecutionPlan.iterator)
+      .mapZIO { case (plugin, newTx) =>
         plugin.processMempoolTx(
           newTx,
           storage,
           graphTraversalSource
         )
       }
-      .run()
+      .run(ZSink.count)
       .flatMap { _ =>
-        Source(chainExecutionPlan)
-          .mapAsync(1) { case (plugin, newBlock) =>
+        ZStream
+          .fromIterable(chainExecutionPlan)
+          .mapZIO { case (plugin, newBlock) =>
             plugin.processNewBlock(newBlock, storage, graphTraversalSource)
           }
-          .run()
+          .run(ZSink.count)
       }
-      .recover { case ex: Throwable =>
-        logger.error("Plugin failure should not propagate upstream", ex)
-        Done
-      }
+      .logError("Plugin failure should not propagate upstream")
   }
 
 }
 
 object PluginManager extends LazyLogging {
-  def loadPlugins: Try[List[Plugin]] = Try(ServiceLoader.load(classOf[Plugin]).iterator().asScala.toList)
+  def loadPlugins: Task[List[Plugin]] = ZIO.attempt(ServiceLoader.load(classOf[Plugin]).iterator().asScala.toList)
 
-  def initialize(implicit system: ActorSystem[Nothing]): Future[PluginManager] =
-    Future.fromTry(loadPlugins).flatMap { plugins =>
+  def layerNoPlugins: ZLayer[Any, Throwable, PluginManager] = ZLayer.succeed(PluginManager(List.empty))
+
+  def layer: ZLayer[Any, Throwable, PluginManager] = ZLayer.scoped(
+    loadPlugins.flatMap { plugins =>
       if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
-      Future
-        .sequence(plugins.map(_.init))
-        .map { _ =>
-          val pluginManager = new PluginManager(plugins)
-          CoordinatedShutdown(system).addTask(
-            CoordinatedShutdown.PhaseServiceStop,
-            "stop-plugin-manager"
-          ) { () =>
-            pluginManager.close().map(_ => Done)
-          }
-          logger.info("Plugins initialized")
-          pluginManager
+      ZIO
+        .collectAllParDiscard(plugins.map(_.init))
+        .flatMap { _ =>
+          ZIO.acquireRelease(ZIO.succeed(PluginManager(plugins)))(p => ZIO.succeed(p.close()))
         }
     }
+  )
 }

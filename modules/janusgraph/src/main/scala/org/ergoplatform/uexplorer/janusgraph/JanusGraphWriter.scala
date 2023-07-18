@@ -1,14 +1,11 @@
 package org.ergoplatform.uexplorer.janusgraph
 
-import akka.NotUsed
-import akka.stream.ActorAttributes
-import akka.stream.scaladsl.{Flow, Source}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.structure.{Graph, T, Vertex}
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock, NormalizedBlock}
 import org.janusgraph.core.Multiplicity
-
+import zio.*
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -43,7 +40,7 @@ trait JanusGraphWriter extends LazyLogging {
     }
   }
 
-  def writeTxsAndCommit(blocks: Seq[BestBlockInserted]): IterableOnce[BestBlockInserted] = {
+  def writeTxsAndCommit(block: BestBlockInserted): Task[BestBlockInserted] = ZIO.attempt {
     blocks.iterator
       .foreach { case BestBlockInserted(b, _) =>
         b.inputRecords.byTxId.foreach { case (txId, inputRecords) =>
@@ -56,12 +53,4 @@ trait JanusGraphWriter extends LazyLogging {
     janusGraph.tx().commit()
     blocks
   }
-
-  def graphWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed] =
-    Flow[BestBlockInserted]
-      .grouped(32)
-      .mapAsync(1) { blocks =>
-        Future(writeTxsAndCommit(blocks))
-      }
-      .mapConcat(identity)
 }

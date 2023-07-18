@@ -19,10 +19,25 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
 
   private val dsLayer = ZLayer.succeed(ds)
 
-  override def persistBlockInTx(
+  override def isEmpty: Task[Boolean] =
+    for {
+      blockEmpty <- blockRepo.isEmpty
+      boxEmpty   <- boxRepo.isEmpty
+    } yield blockEmpty && boxEmpty
+
+  override def removeBlocks(blockIds: Set[BlockId]): Task[Unit] = blockRepo.delete(blockIds).unit
+
+  override def writeBlock(b: NormalizedBlock, condition: Task[Any]): Task[BlockId] = {
+    val outputs = b.outputRecords
+    val inputs  = b.inputRecords.byErgoTree
+    persistBlockInTx(b.block, outputs, inputs.flatMap(_._2), condition)
+  }
+
+  private def persistBlockInTx(
     block: Block,
     outputs: OutputRecords,
-    inputs: Iterable[BoxId]
+    inputs: Iterable[BoxId],
+    condition: Task[Any]
   ): Task[BlockId] = {
     val ergoTrees   = outputs.byErgoTree.keys
     val ergoTreeT8s = outputs.byErgoTreeT8.keys
@@ -30,6 +45,7 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
     ctx
       .transaction {
         for
+          _       <- condition
           blockId <- blockRepo.insert(block)
           _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, utxos)
           _       <- boxRepo.deleteUtxos(inputs)

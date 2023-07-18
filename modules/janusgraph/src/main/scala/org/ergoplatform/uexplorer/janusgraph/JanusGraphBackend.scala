@@ -48,6 +48,7 @@ object JanusGraphBackend extends LazyLogging {
         CoordinatedShutdown.PhaseServiceStop,
         "stop-janus-graph-backend"
       ) { () =>
+        logger.info("Closing janus graph backend")
         backend.close().map { _ =>
           Done
         }

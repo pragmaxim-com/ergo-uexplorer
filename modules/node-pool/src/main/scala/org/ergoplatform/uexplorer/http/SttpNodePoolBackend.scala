@@ -1,68 +1,56 @@
 package org.ergoplatform.uexplorer.http
 
-import akka.actor.typed.*
-import akka.actor.typed.scaladsl.AskPattern.*
-import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorAttributes, KillSwitches, SharedKillSwitch}
-import akka.util.Timeout
-import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.{Resiliency, Utils}
+import org.ergoplatform.uexplorer.Utils
 import org.ergoplatform.uexplorer.http.NodePool.*
 import org.ergoplatform.uexplorer.http.SttpNodePoolBackend.swapUri
 import sttp.capabilities.Effect
 import sttp.client3.*
 import sttp.model.Uri
+import zio.*
 
 import scala.collection.immutable.{SortedSet, TreeSet}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 import scala.util.*
+import sttp.capabilities.zio.ZioStreams
+import sttp.client3.httpclient.zio.{HttpClientZioBackend, SttpClient}
 
-class SttpNodePoolBackend[P]()(implicit
-  sys: ActorSystem[Nothing],
-  nodePoolRef: ActorRef[NodePoolRequest],
-  underlying: SttpBackend[Future, P],
-  killSwitch: SharedKillSwitch
-) extends DelegateSttpBackend[Future, P](underlying)
-  with Resiliency {
+case class SttpNodePoolBackend(
+  underlyingBackend: UnderlyingBackend,
+  metadataClient: MetadataHttpClient,
+  nodePool: NodePool
+) extends DelegateSttpBackend[Task, ZioStreams](underlyingBackend.backend) {
   import SttpNodePoolBackend.fallbackQuery
 
-  implicit private val timeout: Timeout = 5.seconds
+  override def close(): Task[Unit] =
+    nodePool.clean *> super.close()
 
-  override def close(): Future[Unit] = {
-    nodePoolRef.tell(GracefulShutdown)
-    super.close()
-  }
-
-  private def updateNodePool(metadataClient: MetadataHttpClient[_]): Future[NodePoolState] =
+  private def updateNodePool: Task[Unit] =
     metadataClient.getAllOpenApiPeers
       .flatMap { validPeers =>
-        nodePoolRef.ask(ref => UpdateOpenApiPeers(validPeers, ref))
+        nodePool.updateOpenApiPeers(validPeers)
       }
 
-  def keepNodePoolUpdated(metadataClient: MetadataHttpClient[_]): Future[NodePoolState] =
-    updateNodePool(metadataClient)
-      .andThen { case Success(_) =>
-        schedule(15.seconds, 30.seconds)(updateNodePool(metadataClient)).via(killSwitch.flow).run()
-      }
+  def keepNodePoolUpdated: ZIO[Any, Throwable, Fiber.Runtime[Throwable, Long]] =
+    for
+      done  <- updateNodePool
+      fiber <- ZIO.scoped(updateNodePool.scheduleFork(Schedule.fixed(30.seconds)))
+    yield fiber
 
-  override def send[T, R >: P with Effect[Future]](origRequest: Request[T, R]): Future[Response[T]] = {
+  override def send[T, R >: ZioStreams with Effect[Task]](origRequest: Request[T, R]): Task[Response[T]] = {
 
-    def proxy(peer: Peer): Future[Response[T]] =
-      underlying.send(swapUri(origRequest, peer.uri))
+    def proxy(peer: Peer): Task[Response[T]] =
+      underlyingBackend.backend.send(swapUri(origRequest, peer.uri))
 
-    NodePool.getAvailablePeers
+    nodePool.getAvailablePeers
       .flatMap {
-        case AvailablePeers(peers) if peers.isEmpty =>
-          Future.failed(new Exception(s"Run out of peers to make http call to, master should be always available", null))
-        case AvailablePeers(peers) =>
-          fallbackQuery(peers)(proxy).flatMap {
+        case peers if peers.isEmpty =>
+          ZIO.fail(new Exception(s"Ran out of peers to make http call to, master should be always available", null))
+        case peers =>
+          fallbackQuery(peers.toList)(proxy).flatMap {
             case (invalidPeers, blockTry) if invalidPeers.nonEmpty =>
-              NodePool.invalidatePeers(invalidPeers).flatMap(_ => Future.fromTry(blockTry))
+              nodePool.invalidatePeers(invalidPeers) *> blockTry.fold(ZIO.fail, ZIO.succeed)
             case (_, blockTry) =>
-              Future.fromTry(blockTry)
+              blockTry.fold(ZIO.fail, ZIO.succeed)
           }
       }
   }
@@ -71,12 +59,8 @@ class SttpNodePoolBackend[P]()(implicit
 
 object SttpNodePoolBackend extends LazyLogging {
 
-  def apply[P](nodePoolRef: ActorRef[NodePoolRequest])(implicit
-    s: ActorSystem[Nothing],
-    underlyingBackend: SttpBackend[Future, P],
-    killSwitch: SharedKillSwitch
-  ): SttpNodePoolBackend[P] =
-    new SttpNodePoolBackend()(s, nodePoolRef, underlyingBackend, killSwitch)
+  def layer: ZLayer[UnderlyingBackend with MetadataHttpClient with NodePool, Nothing, SttpNodePoolBackend] =
+    ZLayer.fromFunction(SttpNodePoolBackend.apply _)
 
   def swapUri[T, R](reqWithDummyUri: Request[T, R], peerUri: Uri): Request[T, R] =
     reqWithDummyUri.get(Utils.copyUri(reqWithDummyUri.uri, peerUri))
@@ -84,21 +68,22 @@ object SttpNodePoolBackend extends LazyLogging {
   def fallbackQuery[R](
     peerAddresses: List[Peer],
     invalidPeers: SortedSet[Peer] = TreeSet.empty
-  )(run: Peer => Future[R]): Future[(InvalidPeers, Try[R])] =
+  )(run: Peer => Task[R]): Task[(NodePool.InvalidPeers, Try[R])] =
     peerAddresses.headOption match {
       case Some(peerAddress) =>
-        run(peerAddress).transformWith {
-          case Success(block) =>
-            Future.successful(invalidPeers -> Success(block))
-          case Failure(ex) =>
+        run(peerAddress)
+          .map { block =>
+            invalidPeers -> Success(block)
+          }
+          .catchNonFatalOrDie { ex =>
             if (peerAddresses.tail.nonEmpty) {
               logger.warn(s"Peer $peerAddress failed, retrying with another peer...", ex)
             }
             fallbackQuery(peerAddresses.tail, invalidPeers + peerAddresses.head)(run)
-        }
+          }
       case None =>
         logger.warn(s"We ran out of peers, all peers unavailable...")
-        Future.successful(invalidPeers, Failure(new Exception("Run out of peers!")))
+        ZIO.succeed(invalidPeers, Failure(new Exception("Run out of peers!")))
     }
 
 }
