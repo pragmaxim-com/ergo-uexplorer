@@ -41,8 +41,8 @@ class AlertPlugin extends Plugin {
 
   def processMempoolTx(
     newTx: ApiTransaction,
-    utxoState: Storage,
-    graphTraversalSource: Option[GraphTraversalSource]
+    utxoState: ReadableStorage,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(
@@ -61,8 +61,8 @@ class AlertPlugin extends Plugin {
 
   def processNewBlock(
     newBlock: BestBlockInserted,
-    utxoState: Storage,
-    graphTraversalSource: Option[GraphTraversalSource]
+    utxoState: ReadableStorage,
+    graphTraversalSource: GraphTraversalSource
   ): Future[Unit] =
     discord.flatMap { c =>
       c.sendMessages(

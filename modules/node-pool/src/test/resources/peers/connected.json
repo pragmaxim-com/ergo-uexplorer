@@ -12,7 +12,7 @@
     "lastHandshake" : 1663262565226,
     "name" : "ERGO-WELSH-PUBLICCLOUD-NODE",
     "connectionType" : "Outgoing",
-    "restApiUrl" : "https://foo.io"
+    "restApiUrl" : "http://peer"
   },
   {
     "address" : "/13.40.184.113:9030",

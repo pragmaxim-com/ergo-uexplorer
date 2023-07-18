@@ -1,32 +1,36 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import akka.NotUsed
-import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{ActorAttributes, OverflowStrategy}
 import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.cassandra.AkkaStreamSupport
+import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.db.Backend
-import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
-import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
-import org.ergoplatform.uexplorer.{Resiliency, UnexpectedStateError}
+import org.ergoplatform.uexplorer.storage.MvStorage
+import org.ergoplatform.uexplorer.{ProtocolSettings, ReadableStorage, UnexpectedStateError, WritableStorage}
+import zio.*
+import zio.prelude.CommutativeBothOps
 
 import java.util.concurrent.Flow.Processor
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+import zio.stream.ZPipeline
+import zio.stream.ZStream
+import zio.stream.ZSink
+import org.ergoplatform.uexplorer.node.ApiFullBlock
+import org.ergoplatform.uexplorer.chain.ChainLinker
+import org.ergoplatform.uexplorer.backend.Repo
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 
-class BlockWriter(
-  storage: MvStorage,
-  storageService: StorageService,
-  mvStoreConf: MvStoreConf,
-  backend: Backend,
-  graphBackendOpt: Option[GraphBackend]
-)(implicit enc: ErgoAddressEncoder)
-  extends AkkaStreamSupport
-  with LazyLogging {
+case class BlockWriter(
+  storage: WritableStorage,
+  repo: Repo,
+  graphBackend: GraphBackend,
+  chainIndexerConf: ChainIndexerConf
+) extends LazyLogging {
+
+  implicit private val ps: ProtocolSettings    = chainIndexerConf.protocol
+  implicit private val enc: ErgoAddressEncoder = ps.addressEncoder
 
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
     fork.size > 1 && storage.containsBlock(fork.head.block.parentId, fork.head.block.height - 1) &&
@@ -37,9 +41,9 @@ class BlockWriter(
           false
       }
 
-  private def rollbackFork(winningFork: List[LinkedBlock]): Try[ForkInserted] =
+  private def rollbackFork(winningFork: List[LinkedBlock]): Task[ForkInserted] =
     if (!hasParentAndIsChained(winningFork)) {
-      Failure(
+      ZIO.fail(
         new UnexpectedStateError(
           s"Inserting fork ${winningFork.map(_.b.header.id).mkString(",")} at height ${winningFork.map(_.block.height).mkString(",")} illegal"
         )
@@ -47,96 +51,99 @@ class BlockWriter(
     } else {
       logger.info(s"Adding fork from height ${winningFork.head.block.height} until ${winningFork.last.block.height}")
       for {
-        preForkVersion <- Try(storage.getBlockById(winningFork.head.b.header.id).map(_.revision).get)
+        preForkVersion <- ZIO.attempt(storage.getBlockById(winningFork.head.b.header.id).map(_.revision).get)
         loosingFork = winningFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id)).toMap
-        _ <- Try(storage.store.rollbackTo(preForkVersion))
+        _ <- ZIO.attempt(storage.rollbackTo(preForkVersion))
       } yield ForkInserted(winningFork, loosingFork)
     }
 
-  private val backendPersistence =
-    Flow[BestBlockInserted]
-      .buffer(100, OverflowStrategy.backpressure)
-      .async
-      .via(backend.blockWriteFlow)
+  def insertBranchFlow(
+    source: ZStream[Any, Throwable, ApiFullBlock],
+    chainLinker: ChainLinker
+  ): Task[ChainSyncResult] =
+    BlockProcessor
+      .processingFlow(chainLinker)
+      .mapStream[Any, Throwable, BestBlockInserted] {
+        case bestBlock :: Nil =>
+          ZStream.fromIterable(List(bestBlock)).via(insertBlockFlow)
+        case winningFork =>
+          ZStream
+            .fromIterableZIO(
+              for {
+                forkInserted <- rollbackFork(winningFork)
+                _            <- repo.removeBlocks(forkInserted.loosingFork.keySet)
+              } yield forkInserted.winningFork
+            )
+            .via(insertBlockFlow)
+      }
+      .tap { b =>
+        if (b.normalizedBlock.block.height % chainIndexerConf.mvStore.heightCompactRate == 0)
+          storage.compact(indexing = true)
+        else ZIO.succeed(())
+      }
+      .tap { block =>
+        graphBackend.writeTxsAndCommit(block)
+      }
+      .apply(source)
+      .run(
+        ZSink.foldLeftChunks[BestBlockInserted, Option[(BestBlockInserted, Int)]](Option.empty) {
+          case (prev @ Some(last, count), in) =>
+            in.lastOption.map(x => (x, count + 1)).orElse(prev)
+          case (None, in) =>
+            in.lastOption.map(_ -> 1)
+        }
+      )
+      .tap { lastBlock =>
+        storage.writeReportAndCompact(lastBlock.map(_._2).getOrElse(0))
+      }
+      .map { lastBlock =>
+        ChainSyncResult(
+          lastBlock.map(_._1),
+          storage.asInstanceOf[ReadableStorage],
+          graphBackend.graphTraversalSource
+        )
+      }
 
-  private val graphPersistenceFlow =
-    Flow[BestBlockInserted]
-      .buffer(100, OverflowStrategy.backpressure)
-      .async
-      .via(
-        graphBackendOpt.fold(Flow.fromFunction[BestBlockInserted, BestBlockInserted](identity))(
-          _.graphWriteFlow
+  private def persistBlock(b: NormalizedBlock): Task[BestBlockInserted] =
+    repo
+      .writeBlock(
+        b,
+        ZIO.collectAllParDiscard(
+          List(
+            ZIO.fromTry {
+              storage.persistErgoTreeUtxos(b.outputRecords).flatMap { _ =>
+                storage.removeInputBoxesByErgoTree(b.inputRecords)
+              }
+            },
+            ZIO.fromTry {
+              storage.persistErgoTreeT8Utxos(b.outputRecords).flatMap { _ =>
+                storage.removeInputBoxesByErgoTreeT8(b.inputRecords)
+              }
+            },
+            ZIO.fromTry {
+              storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
+            }
+          )
         )
       )
-      .async(ActorAttributes.IODispatcher.dispatcher, 16)
-
-  val insertBranchFlow: Flow[List[LinkedBlock], BestBlockInserted, Future[ChainSyncResult]] =
-    Flow
-      .apply[List[LinkedBlock]]
-      .flatMapConcat {
-        case bestBlock :: Nil =>
-          Source.single(bestBlock).via(insertBlockFlow)
-        case winningFork =>
-          insertForkFlow(winningFork).mapMaterializedValue { loosingFork =>
-            backend.removeBlocks(loosingFork.keySet).map(_ => NotUsed)
-          }
-      }
-      .wireTap { b =>
-        if (b.normalizedBlock.block.height % mvStoreConf.heightCompactRate == 0)
-          storageService.compact(indexing = true, mvStoreConf.maxIndexingCompactTime, mvStoreConf.maxIdleCompactTime)
-        else Success(())
-      }
-      .via(backendPersistence)
-      .via(graphPersistenceFlow)
-      .alsoToMat(Sink.fold(0) { case (count, _) => count + 1 }) { case (_, futureCount) => futureCount }
-      .alsoToMat(Sink.lastOption[BestBlockInserted]) { case (totalCountF, lastBlockF) =>
-        for {
-          lastBlock  <- lastBlockF
-          totalCount <- totalCountF
-        } yield {
-          storageService.writeReportAndCompact(totalCount).fold(_ => NotUsed, _ => NotUsed)
-          ChainSyncResult(
-            lastBlock,
-            storageService.readableStorage,
-            graphBackendOpt.map(_.graphTraversalSource)
-          )
-        }
-      }
-
-  def insertForkFlow(winningFork: List[LinkedBlock]): Source[BestBlockInserted, ForkInserted.LoosingFork] =
-    rollbackFork(winningFork)
-      .fold(
-        Source.failed[BestBlockInserted](_).mapMaterializedValue(_ => Map.empty),
-        forkInserted =>
-          Source(forkInserted.winningFork).via(insertBlockFlow).mapMaterializedValue(_ => forkInserted.loosingFork)
-      )
-
-  private val storagePersistence = broadcastTo3Workers(
-    Flow.fromFunction[NormalizedBlock, NormalizedBlock] { b =>
-      storage.persistErgoTreeUtxos(b.outputRecords).get
-      storage.removeInputBoxesByErgoTree(b.inputRecords).get
-      b
-    },
-    Flow.fromFunction[NormalizedBlock, NormalizedBlock] { b =>
-      storage.persistErgoTreeT8Utxos(b.outputRecords).get
-      storage.removeInputBoxesByErgoTreeT8(b.inputRecords).get
-      b
-    },
-    Flow.fromFunction[NormalizedBlock, NormalizedBlock] { b =>
-      storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision).get
-      b
-    }
-  )
-
-  val insertBlockFlow: Flow[LinkedBlock, BestBlockInserted, NotUsed] =
-    Flow
-      .apply[LinkedBlock]
-      .map(UtxoTracker.getBlockWithInputs(_, storage).get)
-      .async
-      .via(storagePersistence)
-      .map { lb =>
+      .map { _ =>
         storage.commit()
-        BestBlockInserted(lb, None)
+        BestBlockInserted(b, None)
       }
+
+  val insertBlockFlow: ZPipeline[Any, Throwable, LinkedBlock, BestBlockInserted] =
+    ZPipeline
+      .mapZIOPar(1)(UtxoTracker.getBlockWithInputs(_, storage))
+      .mapZIOPar(1)(persistBlock)
+
+}
+
+object BlockWriter {
+  def layer: ZLayer[
+    WritableStorage with Repo with GraphBackend with ChainIndexerConf,
+    Nothing,
+    BlockWriter
+  ] =
+    ZLayer.fromFunction(BlockWriter.apply _)
 
 }

@@ -13,8 +13,8 @@ object ConnectedPeer {
 
   private def hasFragments(uri: URI) =
     Option(uri.getQuery).exists(_.nonEmpty) ||
-    Option(uri.getPath).exists(_.nonEmpty) ||
-    Option(uri.getFragment).exists(_.nonEmpty)
+      Option(uri.getPath).exists(_.nonEmpty) ||
+      Option(uri.getFragment).exists(_.nonEmpty)
 
   private def parseUri(urlStr: String): Try[Uri] =
     Try(new URL(urlStr).toURI)
@@ -32,11 +32,10 @@ object ConnectedPeer {
       )
     }
 
-  implicit val decoder: Decoder[ConnectedPeer] = (c: HCursor) => {
+  implicit val decoder: Decoder[ConnectedPeer] = (c: HCursor) =>
     for {
       restApiUri <- c.getOrElse[Option[Uri]]("restApiUrl")(Option.empty[Uri])
     } yield new ConnectedPeer(restApiUri.map(Utils.stripUri))
-  }
 }
 
 sealed trait Peer {
@@ -54,13 +53,12 @@ object Peer {
   implicit def ascWeightOrdering[P <: Peer]: Ordering[P] =
     Ordering.by[P, Int](_.weight)
 
-  def baseDecoder: Decoder[(StateType, AppVersion, Height)] = (c: HCursor) => {
+  def baseDecoder: Decoder[(StateType, AppVersion, Height)] = (c: HCursor) =>
     for {
       stateType  <- c.downField("stateType").as[StateType]
       appVersion <- c.downField("appVersion").as[AppVersion]
       fullHeight <- c.downField("fullHeight").as[Option[Height]]
     } yield (appVersion, stateType, fullHeight.getOrElse(0))
-  }
 
   implicit def remoteNodeDecoder(implicit m: UriMagnet[RemoteNode]): Decoder[RemoteNode] = (c: HCursor) =>
     baseDecoder(c).map { case (stateType, appVersion, fullHeight) =>

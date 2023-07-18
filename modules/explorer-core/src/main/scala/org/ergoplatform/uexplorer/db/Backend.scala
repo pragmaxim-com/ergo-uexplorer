@@ -1,23 +1,18 @@
 package org.ergoplatform.uexplorer.db
 
-import akka.NotUsed
-import akka.stream.scaladsl.Flow
 import org.ergoplatform.uexplorer.BlockId
+import zio.Task
 
-import java.util.concurrent
-import java.util.concurrent.Flow.*
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 trait Backend {
 
-  def isEmpty: Future[Boolean]
+  def isEmpty: Task[Boolean]
 
-  def removeBlocks(blockIds: Set[BlockId]): Future[Unit]
+  def removeBlocks(blockIds: Set[BlockId]): Task[Unit]
 
-  def blockWriteFlow: Flow[BestBlockInserted, BestBlockInserted, NotUsed]
+  def writeBlock(b: NormalizedBlock, condition: Task[Any]): Task[BlockId]
 
-  def writeBlock(b: NormalizedBlock): BlockId
-
-  def close(): Future[Unit]
+  def close(): Task[Unit]
 }

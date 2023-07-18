@@ -6,25 +6,24 @@ import com.esotericsoftware.kryo.serializers.DefaultSerializers.CollectionsSingl
 import com.esotericsoftware.kryo.serializers.ImmutableCollectionsSerializers.JdkImmutableSetSerializer
 import com.esotericsoftware.kryo.serializers.{ImmutableCollectionsSerializers, MapSerializer}
 import com.esotericsoftware.kryo.util.Pool
-import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
-import org.ergoplatform.uexplorer.mvstore.ValueCodec
+import org.ergoplatform.uexplorer.mvstore.{SuperNodeCounter, ValueCodec}
 
 import java.nio.ByteBuffer
 import java.util
 import scala.util.Try
 
-object CounterCodec extends ValueCodec[Counter] {
-  override def readAll(bytes: Array[Byte]): Counter = {
+object CounterCodec extends ValueCodec[SuperNodeCounter] {
+  override def readAll(bytes: Array[Byte]): SuperNodeCounter = {
     val input = new Input(bytes)
     val kryo  = KryoSerialization.pool.obtain()
-    try kryo.readObject(input, classOf[Counter])
+    try kryo.readObject(input, classOf[SuperNodeCounter])
     finally {
       KryoSerialization.pool.free(kryo)
       input.close()
     }
   }
 
-  override def writeAll(obj: Counter): Array[Byte] = {
+  override def writeAll(obj: SuperNodeCounter): Array[Byte] = {
     val buffer = ByteBuffer.allocate(64)
     val output = new ByteBufferOutput(buffer)
     val kryo   = KryoSerialization.pool.obtain()

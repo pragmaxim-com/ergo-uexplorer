@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.mvstore.multimap
 
 import org.ergoplatform.uexplorer.mvstore.*
-import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 
@@ -19,7 +18,7 @@ case class MultiMvMap[PK, C[_, _], K, V](
   store: MVStore,
   c: MultiMapCodec[C, K, V],
   sc: SuperNodeMapCodec[C, K, V],
-  vc: ValueCodec[Counter],
+  vc: ValueCodec[SuperNodeCounter],
   kc: HotKeyCodec[PK]
 ) extends MultiMapLike[PK, C, K, V] {
 
@@ -29,7 +28,7 @@ case class MultiMvMap[PK, C[_, _], K, V](
   def clearEmptySuperNodes(): Try[Unit] =
     superNodeMap.clearEmptySuperNodes()
 
-  def getReport: (Path, Vector[(String, Counter)]) =
+  def getReport: (Path, Vector[(String, SuperNodeCounter)]) =
     ergoHomeDir.resolve(s"hot-keys-$id-$randomNumberPerRun.csv") -> superNodeMap.getReport
 
   def get(pk: PK, sk: K): Option[V] =

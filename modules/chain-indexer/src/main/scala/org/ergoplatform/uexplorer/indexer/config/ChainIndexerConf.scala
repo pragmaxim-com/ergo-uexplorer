@@ -1,70 +1,64 @@
 package org.ergoplatform.uexplorer.indexer.config
 
-import cats.data.NonEmptyList
-import cats.syntax.list.*
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.typesafe.scalalogging.LazyLogging
-import eu.timepit.refined.api.{Refined, Validate}
-import eu.timepit.refined.refineV
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.mining.emission.EmissionRules
 import org.ergoplatform.settings.MonetarySettings
-import org.ergoplatform.uexplorer.ProtocolSettings
-import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, RemoteNodeUriMagnet}
-import org.ergoplatform.uexplorer.indexer.db.Backend.BackendType
-import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend.GraphBackendType
+import org.ergoplatform.uexplorer.config.ExplorerConfig
+import org.ergoplatform.uexplorer.{Address, NetworkPrefix, ProtocolSettings}
+import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, NodePoolConf, RemoteNodeUriMagnet}
 import org.ergoplatform.uexplorer.storage.MvStorage.*
 import org.ergoplatform.uexplorer.storage.MvStoreConf
-import pureconfig.ConfigReader.Result
-import pureconfig.error.CannotConvert
-import pureconfig.generic.derivation.default.*
-import pureconfig.{ConfigReader, ConfigSource}
+import pureconfig.ConfigSource
+import zio.config.*
+import zio.config.magnolia.*
+import zio.config.typesafe.*
 import sttp.model.Uri
+import zio.*
 
 import java.io.File
-import scala.concurrent.duration.FiniteDuration
+
+@nameWithLabel("type")
+sealed trait BackendType
+case class H2(parallelism: Int) extends BackendType
+case class Cassandra(parallelism: Int) extends BackendType
+
+@nameWithLabel("type")
+sealed trait GraphBackendType
+case class JanusGraph(parallelism: Int) extends GraphBackendType
+case class InMemoryGraph(parallelism: Int) extends GraphBackendType
 
 case class ChainIndexerConf(
   mvStore: MvStoreConf,
-  nodeAddressToInitFrom: Uri,
-  peerAddressToPollFrom: Uri,
+  nodePool: NodePoolConf,
   backendType: BackendType,
   graphBackendType: GraphBackendType,
-  protocol: ProtocolSettings
-) derives ConfigReader {
-  def remoteUriMagnet: RemoteNodeUriMagnet = RemoteNodeUriMagnet(peerAddressToPollFrom)
-  def localUriMagnet: LocalNodeUriMagnet   = LocalNodeUriMagnet(nodeAddressToInitFrom)
-}
+  protocol: ProtocolSettings,
+  benchmarkMode: Boolean
+)
 
 object ChainIndexerConf extends LazyLogging {
-  implicit def nelReader[A: ConfigReader]: ConfigReader[NonEmptyList[A]] =
-    implicitly[ConfigReader[List[A]]].emap { list =>
-      list.toNel.toRight(CannotConvert(list.toString, s"NonEmptyList", "List is empty"))
-    }
+  import NodePoolConf.*
 
-  implicit def uriConfigReader(implicit cr: ConfigReader[String]): ConfigReader[Uri] =
-    cr.emap(addr => Uri.parse(addr).left.map(r => CannotConvert(addr, "Uri", r)))
+  implicit val addressConfig: DeriveConfig[Address] =
+    DeriveConfig[String].map(addr => Address.fromStringUnsafe(addr))
 
-  lazy val loadDefaultOrThrow: (ChainIndexerConf, Config) =
-    ConfigSource.default.at("uexplorer.chain-indexer").loadOrThrow[ChainIndexerConf] -> ConfigFactory.load()
+  implicit val networkConfig: DeriveConfig[NetworkPrefix] =
+    DeriveConfig[String].map(prefix => NetworkPrefix.fromStringUnsafe(prefix))
 
-  lazy val loadWithFallback: Result[(ChainIndexerConf, Config)] = {
+  def config: zio.Config[ChainIndexerConf] = deriveConfig[ChainIndexerConf]
+
+  def configIO: IO[zio.Config.Error, ChainIndexerConf] =
+    ExplorerConfig().load[ChainIndexerConf](config)
+
+  def layer: ZLayer[Any, zio.Config.Error, ChainIndexerConf] = ZLayer.fromZIO(configIO)
+
+  /*
     def formatting(formatted: Boolean) = ConfigRenderOptions.concise().setFormatted(formatted).setJson(true)
-    val rootConfig =
-      ConfigFactory
-        .parseFile(new File("conf/chain-indexer.conf"))
-        .withFallback(ConfigFactory.load())
-        .resolve()
-
     val chainIndexerConf =
       rootConfig.getValue("uexplorer.chain-indexer").render(formatting(true))
     logger.info(s"ChainIndexer config: $chainIndexerConf")
+   */
 
-    ConfigSource
-      .file("conf/chain-indexer.conf")
-      .withFallback(ConfigSource.default)
-      .at("uexplorer.chain-indexer")
-      .load[ChainIndexerConf]
-      .map(_ -> rootConfig)
-  }
 }

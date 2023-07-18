@@ -3,7 +3,6 @@ package org.ergoplatform.uexplorer
 import org.ergoplatform.uexplorer.mvstore.tempDir
 
 import java.nio.file.Paths
-import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 
 package object mvstore {
@@ -14,7 +13,7 @@ package object mvstore {
 
   type CacheSize         = Int
   type HeightCompactRate = Int
-  type MaxCompactTime    = FiniteDuration
+  type MaxCompactTime    = zio.Duration
   type MultiColId        = String
 
   type Appended = Boolean // put & not replaced

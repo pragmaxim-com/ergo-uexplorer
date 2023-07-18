@@ -1,10 +1,5 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import akka.actor.typed.ActorSystem
-import akka.stream.scaladsl.{Compression, FileIO, Flow, Framing, Keep, Sink, Source}
-import akka.stream.*
-import akka.util.ByteString
-import akka.{Done, NotUsed}
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.ErgoAddressEncoder
@@ -13,56 +8,55 @@ import org.ergoplatform.uexplorer.chain.{ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.http.{BlockHttpClient, Codecs}
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.*
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.db.Backend
-import org.ergoplatform.uexplorer.janusgraph.api.GraphBackend
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.storage.MvStorage
-import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, Resiliency, Storage}
+import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, ReadableStorage}
 
 import java.nio.file.{Path, Paths}
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent
 import scala.collection.immutable.{ListMap, TreeSet}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
+import zio.stream.*
+import zio.*
 
-class StreamExecutor(
-  bench: Boolean,
+case class StreamExecutor(
   blockHttpClient: BlockHttpClient,
   blockReader: BlockReader,
   blockWriter: BlockWriter,
-  storage: Storage
-)(implicit s: ActorSystem[Nothing], ps: ProtocolSettings, killSwitch: SharedKillSwitch)
-  extends LazyLogging {
+  storage: ReadableStorage,
+  conf: ChainIndexerConf
+) extends LazyLogging {
 
-  private def blockIndexingSink(chainLinker: ChainLinker): Sink[ApiFullBlock, Future[ChainSyncResult]] =
-    Flow[ApiFullBlock]
-      .via(BlockProcessor.processingFlow(chainLinker))
-      .viaMat(blockWriter.insertBranchFlow)(Keep.right)
-      .via(killSwitch.flow)
-      .withAttributes(ActorAttributes.supervisionStrategy(Resiliency.decider))
-      .to(Sink.ignore)
+  implicit private val ps: ProtocolSettings = conf.protocol
 
-  def indexNewBlocks: Future[ChainSyncResult] =
+  def indexNewBlocks: Task[ChainSyncResult] =
     for
       bestBlockHeight <- blockHttpClient.getBestBlockHeight
       fromHeight = storage.getLastHeight.getOrElse(0) + 1
       _ = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
       _ = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
-      chainTip <- Future.fromTry(storage.getChainTip)
+      chainTip <- ZIO.fromTry(storage.getChainTip).debug("chainTip")
       chainLinker = new ChainLinker(blockHttpClient.getBlockForId, chainTip)
-      syncResult <-
-        blockReader.getBlockSource(fromHeight, bench).runWith(blockIndexingSink(chainLinker))
+      syncResult <- blockWriter.insertBranchFlow(blockReader.getBlockSource(fromHeight, conf.benchmarkMode), chainLinker)
     yield syncResult
-
 }
 
 object StreamExecutor {
+
+  def layer: ZLayer[
+    BlockHttpClient with BlockReader with BlockWriter with ReadableStorage with ChainIndexerConf,
+    Nothing,
+    StreamExecutor
+  ] =
+    ZLayer.fromFunction(StreamExecutor.apply _)
+
   case class ChainSyncResult(
     lastBlock: Option[BestBlockInserted],
-    storage: Storage,
-    graphTraversalSource: Option[GraphTraversalSource]
+    storage: ReadableStorage,
+    graphTraversalSource: GraphTraversalSource
   )
 }

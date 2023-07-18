@@ -3,7 +3,6 @@ package org.ergoplatform.uexplorer.storage
 import org.ergoplatform.uexplorer.db.Block
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.mvstore.*
-import org.ergoplatform.uexplorer.mvstore.SuperNodeCollector.Counter
 import org.ergoplatform.uexplorer.mvstore.multimap.MultiMapCodec
 import org.ergoplatform.uexplorer.mvstore.multiset.MultiSetCodec
 import org.ergoplatform.uexplorer.storage.kryo.*
@@ -14,7 +13,7 @@ object Implicits {
   implicit val blockIdsCodec: ValueCodec[java.util.Set[BlockId]] = BlockIdsCodec
   implicit val boxCodec: MultiSetCodec[java.util.Set, BoxId]     = BoxCodec
   implicit val blockCodec: ValueCodec[Block]                     = BlockCodec
-  implicit val counterCodec: ValueCodec[Counter]                 = CounterCodec
+  implicit val counterCodec: ValueCodec[SuperNodeCounter]        = CounterCodec
   implicit val addressCodec: ValueCodec[ErgoTreeHex]             = ErgoTreeHexCodec
 
   implicit val hexCodec: HotKeyCodec[HexString] = new HotKeyCodec[HexString] {

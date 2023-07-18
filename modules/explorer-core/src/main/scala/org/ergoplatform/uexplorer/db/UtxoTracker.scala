@@ -6,7 +6,7 @@ import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.db.UtxoTracker.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
-
+import zio.*
 import java.util
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.VectorBuilder
@@ -25,8 +25,8 @@ object UtxoTracker {
 
   def getBlockWithInputs(
     b: LinkedBlock,
-    storage: Storage
-  )(implicit enc: ErgoAddressEncoder): Try[NormalizedBlock] = Try {
+    storage: ReadableStorage
+  )(implicit enc: ErgoAddressEncoder): Task[NormalizedBlock] = ZIO.attempt {
 
     val outputErgoTreeLookup =
       b.outputRecords.byErgoTree
