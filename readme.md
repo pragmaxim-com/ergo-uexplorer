@@ -1,4 +1,6 @@
-# Σrgo μΣxplorer (WIP - heavily developed and unstable, freshly migrated to Zio 2)
+# Σrgo μΣxplorer
+
+WIP - heavily developed and unstable, freshly migrated to Zio 2
 
 ## Rationale
 
