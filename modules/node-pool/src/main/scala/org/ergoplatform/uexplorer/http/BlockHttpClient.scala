@@ -4,7 +4,7 @@ import io.circe.refined.*
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.ergoplatform.uexplorer.{BlockId, Const, Height, ResiliencySupport, TxId}
+import org.ergoplatform.uexplorer.{BlockId, Const, Height, TxId}
 import sttp.client3.*
 import sttp.client3.circe.*
 import sttp.client3.httpclient.zio.HttpClientZioBackend

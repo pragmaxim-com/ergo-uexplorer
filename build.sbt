@@ -84,7 +84,7 @@ def chainIndexerAssemblySettings = Seq(
 lazy val root = (project in file("."))
   .settings(
     name := "ergo-uexplorer"
-  ).aggregate(core, `node-pool`, backend, mvstore, storage, indexer)// TODO return `alert-plugin, cassandra, janusgraph` and org.ergoplatform.uexplorer.plugin.alert.AlertPlugin to META-INF.services
+  ).aggregate(core, `node-pool`, `alert-plugin`, backend, mvstore, storage, indexer)// TODO return `cassandra, janusgraph` and org.ergoplatform.uexplorer.plugin.alert.AlertPlugin to META-INF.services
 
 lazy val core =
   Utils.mkModule("explorer-core", "explorer-core")

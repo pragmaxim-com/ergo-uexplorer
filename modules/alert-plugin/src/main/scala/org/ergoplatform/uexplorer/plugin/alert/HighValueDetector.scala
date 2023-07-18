@@ -21,12 +21,15 @@ class HighValueDetector(txErgValueThreshold: Long, blockErgValueThreshold: Long)
     storage: ReadableStorage,
     graphTraversalSource: GraphTraversalSource
   ): List[TxMatch] = {
-    def sumErgoTreeValues(ergoTrees: Set[ErgoTreeHex]): Map[ErgoTreeHex, Value] =
+    def sumErgoTreeValues(ergoTrees: Set[ErgoTreeHex]): Map[ErgoTreeHex, Value] = Map.empty
+    // TODO this needs utxosByErgoTreeHex to become MultiMap again :-D
+    /*
       ergoTrees
         .flatMap(a => storage.getUtxosByErgoTreeHex(a).map(a -> _))
         .foldLeft(Map.empty[ErgoTreeHex, Value]) { case (acc, (ergoTree, valueByBox)) =>
           acc.updated(ergoTree, valueByBox.values.asScala.sum)
         }
+     */
 
     val outputsWithoutPaybacksAndFees =
       tx.outputs.filterNot(o =>

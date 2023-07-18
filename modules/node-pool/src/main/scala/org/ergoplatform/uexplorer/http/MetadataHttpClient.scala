@@ -1,8 +1,9 @@
 package org.ergoplatform.uexplorer.http
 
+import com.typesafe.scalalogging.LazyLogging
 import io.circe.Decoder
 import org.ergoplatform.uexplorer.Const.EpochLength
-import org.ergoplatform.uexplorer.{Const, ResiliencySupport}
+import org.ergoplatform.uexplorer.Const
 import sttp.client3.*
 import sttp.client3.circe.asJson
 import zio.stream.ZStream
@@ -21,7 +22,7 @@ import sttp.client3.httpclient.zio.{HttpClientZioBackend, SttpClient}
 import scala.concurrent.duration.FiniteDuration
 import sttp.model.Uri
 
-case class MetadataHttpClient(underlying: UnderlyingBackend, conf: NodePoolConf) extends ResiliencySupport {
+case class MetadataHttpClient(underlying: UnderlyingBackend, conf: NodePoolConf) extends LazyLogging {
 
   private val allowedHeightDiff = 20
 
