@@ -20,9 +20,9 @@ class ChainTip(byBlockId: FifoLinkedHashMap[BlockId, Block]) {
   def toMap: Map[BlockId, Block] = byBlockId.asScala.toMap
   def getParent(block: ApiFullBlock): Option[Block] =
     Option(byBlockId.get(block.header.parentId)).filter(_.height == block.header.height - 1)
-  def putOnlyNew(blockId: BlockId, block: Block): Try[Block] =
-    Option(byBlockId.put(blockId, block)).fold(Success(block)) { oldVal =>
-      Failure(
+  def putOnlyNew(blockId: BlockId, block: Block): Task[Block] =
+    Option(byBlockId.put(blockId, block)).fold(ZIO.succeed(block)) { oldVal =>
+      ZIO.fail(
         new AssertionError(
           s"Trying to cache blockId $blockId at height ${block.height} but there already was $oldVal"
         )
@@ -48,17 +48,15 @@ class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(i
   ): Task[List[LinkedBlock]] =
     chainTip.getParent(block.b) match {
       case parentBlockOpt if parentBlockOpt.isDefined || block.b.header.height == 1 =>
-        ZIO.fromTry(
-          chainTip.putOnlyNew(block.b.header.id, BlockBuilder(block, parentBlockOpt)).map { newBlock =>
-            block.toLinkedBlock(newBlock, parentBlockOpt) :: acc
-          }
-        )
+        chainTip.putOnlyNew(block.b.header.id, BlockBuilder(block, parentBlockOpt)).map { newBlock =>
+          block.toLinkedBlock(newBlock, parentBlockOpt) :: acc
+        }
       case _ =>
         for {
           _            <- ZIO.log(s"Fork detected at height ${block.b.header.height} and block ${block.b.header.id}")
           apiBlock     <- getBlock(block.b.header.parentId)
-          rewardBlock  <- ZIO.fromTry(RewardCalculator(apiBlock))
-          outputBlock  <- ZIO.fromTry(OutputBuilder(rewardBlock)(ps.addressEncoder))
+          rewardBlock  <- RewardCalculator(apiBlock)
+          outputBlock  <- OutputBuilder(rewardBlock)(ps.addressEncoder)
           linkedBlocks <- linkChildToAncestors(acc)(outputBlock)
         } yield linkedBlocks
     }

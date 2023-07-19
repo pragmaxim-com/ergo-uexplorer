@@ -105,20 +105,17 @@ case class BlockWriter(
 
   private def persistBlock(b: NormalizedBlock): Task[BestBlockInserted] =
     repo
-      .writeBlock(
-        b,
-        ZIO.collectAllParDiscard(
+      .writeBlock(b)(
+        preTx = ZIO.collectAllParDiscard(
           List(
             storage.persistErgoTreeUtxos(b.outputRecords) *> storage.removeInputBoxesByErgoTree(b.inputRecords),
             storage.persistErgoTreeT8Utxos(b.outputRecords) *> storage.removeInputBoxesByErgoTreeT8(b.inputRecords),
             storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
           )
-        )
+        ),
+        postTx = ZIO.attempt(storage.commit())
       )
-      .map { _ =>
-        storage.commit()
-        BestBlockInserted(b, None)
-      }
+      .as(BestBlockInserted(b, None))
 
   val insertBlockFlow: ZPipeline[Any, Throwable, LinkedBlock, BestBlockInserted] =
     ZPipeline

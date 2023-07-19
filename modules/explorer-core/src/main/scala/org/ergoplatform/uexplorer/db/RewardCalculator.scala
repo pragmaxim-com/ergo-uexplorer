@@ -8,6 +8,7 @@ import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
 import scorex.util.encode.Base16
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
+import zio.{Task, ZIO}
 
 import scala.collection.immutable.ArraySeq
 import scala.util.Try
@@ -19,27 +20,22 @@ object RewardCalculator {
   // CPU greedy (2% of all runtime)
   private def getMinerRewardAddress(
     apiBlock: ApiFullBlock
-  )(implicit ps: ProtocolSettings): Try[Address] =
-    Base16
-      .decode(apiBlock.header.minerPk)
-      .flatMap { bytes =>
-        Try(GroupElementSerializer.parse(SigmaSerializer.startReader(bytes)))
-      }
-      .flatMap { x =>
-        val minerPk = ProveDlog(x)
+  )(implicit ps: ProtocolSettings): Task[Address] =
+    ZIO
+      .fromTry(Base16.decode(apiBlock.header.minerPk))
+      .map { bytes =>
+        val ecPointType = GroupElementSerializer.parse(SigmaSerializer.startReader(bytes))
+        val minerPk     = ProveDlog(ecPointType)
         val rewardScript =
           ErgoScriptPredef.rewardOutputScript(
             ps.monetary.minerRewardDelay,
             minerPk
           )
-        val addressStr =
-          Pay2SAddress(rewardScript)(ps.addressEncoder).toString
-        Try(Address.fromStringUnsafe(addressStr))
+        val addressStr = Pay2SAddress(rewardScript)(ps.addressEncoder).toString
+        Address.fromStringUnsafe(addressStr)
       }
 
-  private def getMinerRewardAndFee(
-    apiBlock: ApiFullBlock
-  )(implicit ps: ProtocolSettings): (Long, Long) = {
+  private def getMinerRewardAndFee(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): (Long, Long) = {
     val emission = ps.emission.emissionAtHeight(apiBlock.header.height.toLong)
     val reward   = math.min(Const.TeamTreasuryThreshold, emission)
     val eip27Reward =
@@ -61,7 +57,7 @@ object RewardCalculator {
     }
   }
 
-  def apply(block: ApiFullBlock)(implicit ps: ProtocolSettings): Try[BlockWithReward] =
+  def apply(block: ApiFullBlock)(implicit ps: ProtocolSettings): Task[BlockWithReward] =
     for {
       minerRewardAddress <- getMinerRewardAddress(block)
       (reward, fee) = getMinerRewardAndFee(block)

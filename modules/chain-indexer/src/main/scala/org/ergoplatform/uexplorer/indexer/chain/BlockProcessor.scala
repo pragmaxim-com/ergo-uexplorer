@@ -13,10 +13,10 @@ object BlockProcessor {
 
   def processingFlow(
     chainLinker: ChainLinker
-  )(implicit ps: ProtocolSettings) =
+  )(implicit ps: ProtocolSettings): ZPipeline[Any, Throwable, ApiFullBlock, List[LinkedBlock]] =
     ZPipeline
-      .mapZIOPar[Any, Throwable, ApiFullBlock, BlockWithReward](2)(b => ZIO.fromTry(RewardCalculator(b)))
-      .mapZIOPar(2)(b => ZIO.fromTry(OutputBuilder(b)(ps.addressEncoder)))
+      .mapZIOPar[Any, Throwable, ApiFullBlock, BlockWithReward](2)(b => RewardCalculator(b))
+      .mapZIOPar(2)(b => OutputBuilder(b)(ps.addressEncoder))
       .mapZIO(b => chainLinker.linkChildToAncestors()(b))
 
 }
