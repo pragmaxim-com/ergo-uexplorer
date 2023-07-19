@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.indexer
 
-import com.typesafe.scalalogging.{LazyLogging, StrictLogging}
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.backend.PersistentRepo
@@ -16,11 +15,13 @@ import org.ergoplatform.uexplorer.indexer.mempool.{MemPool, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.plugin.Plugin
-import org.ergoplatform.uexplorer.storage.MvStorage
+import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 import org.slf4j.LoggerFactory
 import sttp.client3.httpclient.zio.HttpClientZioBackend
-import zio.config.typesafe.TypesafeConfigProvider
 import zio.*
+import zio.config.typesafe.TypesafeConfigProvider
+import zio.logging.LogFormat
+import zio.logging.backend.SLF4J
 
 import java.io.{PrintWriter, StringWriter}
 import java.util.ServiceLoader
@@ -33,8 +34,7 @@ import scala.util.{Failure, Success, Try}
 
 object ChainIndexer extends ZIOAppDefault {
 
-  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
-    Runtime.setConfigProvider(ExplorerConfig())
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = SLF4J.slf4j(LogFormat.colored)
 
   def run =
     (for {
@@ -43,8 +43,8 @@ object ChainIndexer extends ZIOAppDefault {
       done = serverFiber.zip(nodePoolFiber)
     } yield done).provide(
       ChainIndexerConf.layer,
-      ChainIndexerConf.layer.project(_.mvStore),
-      ChainIndexerConf.layer.project(_.nodePool),
+      NodePoolConf.layer,
+      MvStoreConf.layer,
       MemPool.layer,
       NodePool.layer,
       UnderlyingBackend.layer,

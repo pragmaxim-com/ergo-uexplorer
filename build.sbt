@@ -41,6 +41,8 @@ def pluginAssemblySettings(moduleName: String) = Seq(
     case "logback.xml" => MergeStrategy.first
     case other if other.contains("module-info.class") => MergeStrategy.discard
     case other if other.contains("io.netty.versions") => MergeStrategy.first
+    case PathList("deriving.conf") => MergeStrategy.concat
+    case other if other.contains("getquill") => MergeStrategy.last
     case other => (assembly / assemblyMergeStrategy).value(other)
   },
   Universal / mappings := {

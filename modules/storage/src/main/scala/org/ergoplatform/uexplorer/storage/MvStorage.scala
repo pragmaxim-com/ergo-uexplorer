@@ -4,7 +4,6 @@ import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ByteBufferInput, ByteBufferOutput, Input, Output}
 import com.esotericsoftware.kryo.serializers.MapSerializer
 import com.esotericsoftware.kryo.util.Pool
-import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol.{Emission, FeeContract, Foundation}
@@ -43,8 +42,7 @@ case class MvStorage(
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, Block]
 )(implicit val store: MVStore, mvStoreConf: MvStoreConf)
-  extends WritableStorage
-  with LazyLogging {
+  extends WritableStorage {
 
   private def getReportByPath: Map[Path, Vector[(String, SuperNodeCounter)]] =
     Map(
@@ -52,7 +50,7 @@ case class MvStorage(
       utxosByErgoTreeT8Hex.getReport
     )
 
-  def getChainTip: Try[ChainTip] = Try {
+  def getChainTip: Task[ChainTip] = {
     val chainTip =
       ChainTip(
         blockIdsByHeight
@@ -63,26 +61,28 @@ case class MvStorage(
           }
       )
     val sortedKeys = chainTip.toMap.values.map(_.height).toSeq.sorted
-    assert(
-      sortedKeys.lastOption == getLastHeight,
-      s"MvStore's Iterator works unexpectedly, ${sortedKeys.mkString(", ")} but last key is $getLastHeight!"
-    )
-    chainTip
+    if (sortedKeys.lastOption != getLastHeight)
+      ZIO.fail(
+        new IllegalStateException(
+          s"MvStore's Iterator works unexpectedly, ${sortedKeys.mkString(", ")} but last key is $getLastHeight!"
+        )
+      )
+    else
+      ZIO.succeed(chainTip) <* ZIO.log(s"Chain tip from ${sortedKeys.headOption} to ${sortedKeys.lastOption}")
   }
 
-  private def clearEmptySuperNodes(): Try[Unit] =
-    utxosByErgoTreeHex.clearEmptySuperNodes().flatMap { _ =>
-      utxosByErgoTreeT8Hex.clearEmptySuperNodes()
-    }
+  private def clearEmptySuperNodes: Task[Unit] =
+    utxosByErgoTreeHex.clearEmptySuperNodes *> utxosByErgoTreeT8Hex.clearEmptySuperNodes
 
   def compact(
     indexing: Boolean
-  ): Task[Unit] = ZIO.attempt {
-    logger.info(s"Compacting file at $getCompactReport")
-    val compactTime = if (indexing) mvStoreConf.maxIndexingCompactTime else mvStoreConf.maxIdleCompactTime
-    val result      = if (!indexing) clearEmptySuperNodes() else Success(())
-    result.map(_ => store.compactFile(compactTime.toMillis.toInt))
-  }
+  ): Task[Unit] =
+    for {
+      _ <- ZIO.log(s"Compacting file at $getCompactReport")
+      _ <- ZIO.unless(indexing)(clearEmptySuperNodes)
+      compactTime = if (indexing) mvStoreConf.maxIndexingCompactTime else mvStoreConf.maxIdleCompactTime
+      _ <- ZIO.attempt(store.compactFile(compactTime.toMillis.toInt))
+    } yield ()
 
   private def getCompactReport: String = {
     val height                                                      = getLastHeight.getOrElse(0)
@@ -111,25 +111,23 @@ case class MvStorage(
 
   def writeReportAndCompact(blocksIndexed: Int): Task[Unit] =
     if (blocksIndexed > 100000) {
-      getReportByPath.foreach { case (path, report) =>
-        val lines =
-          report.map { case (hotKey, SuperNodeCounter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
+      ZIO.collectAllDiscard(
+        getReportByPath.map { case (path, report) =>
+          val lines = report.map { case (hotKey, SuperNodeCounter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
             val stats  = s"$writeOps $readOps $boxesAdded $boxesRemoved ${boxesAdded - boxesRemoved}"
             val indent = 45
             s"$stats ${List.fill(Math.max(4, indent - stats.length))(" ").mkString("")} $hotKey"
           }
-        tool.FileUtils.writeReport(lines, path).recover { case ex =>
-          logger.error(s"Failing to write report", ex)
+          tool.FileUtils.writeReport(lines, path)
         }
-      }
-      compact(true).logError
+      ) *> compact(true)
     } else ZIO.succeed(())
 
   def commit(): Revision = store.commit()
 
   def rollbackTo(rev: Revision): Unit = store.rollbackTo(rev)
 
-  def removeInputBoxesByErgoTree(inputRecords: InputRecords): Try[_] = Try {
+  def removeInputBoxesByErgoTree(inputRecords: InputRecords): Task[_] = ZIO.attempt {
     inputRecords.byErgoTree.iterator
       .map { case (ergoTreeHex, inputIds) =>
         val inputBoxes =
@@ -148,7 +146,7 @@ case class MvStorage(
       }
   }
 
-  def removeInputBoxesByErgoTreeT8(inputRecords: InputRecords): Try[_] = Try {
+  def removeInputBoxesByErgoTreeT8(inputRecords: InputRecords): Task[_] = ZIO.attempt {
     inputRecords.byErgoTreeT8.iterator
       .map { case (ergoTreeT8, inputIds) =>
         val inputBoxes = inputIds.filter(boxId => boxId != Emission.inputBox && boxId != Foundation.inputBox)
@@ -161,7 +159,7 @@ case class MvStorage(
       }
   }
 
-  def persistErgoTreeT8Utxos(outputRecords: OutputRecords): Try[_] = Try {
+  def persistErgoTreeT8Utxos(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
     outputRecords.byErgoTreeT8
       .collect { case (ergoTreeT8, boxes) =>
         utxosByErgoTreeT8Hex
@@ -174,7 +172,7 @@ case class MvStorage(
       }
   }
 
-  def persistErgoTreeUtxos(outputRecords: OutputRecords): Try[_] = Try {
+  def persistErgoTreeUtxos(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
     outputRecords.byErgoTree
       .map { case (ergoTreeHex, boxes) =>
         ergoTreeHexByUtxo
@@ -190,10 +188,10 @@ case class MvStorage(
     blockId: BlockId,
     block: Block,
     currentVersion: Revision
-  ): Try[Set[BlockId]] =
+  ): Task[Set[BlockId]] =
     blockById
       .putIfAbsentOrFail(blockId, block.persistable(currentVersion))
-      .map { _ =>
+      .as {
         blockIdsByHeight
           .adjust(block.height)(
             _.fold(javaSetOf(blockId)) { existingBlockIds =>
@@ -202,10 +200,10 @@ case class MvStorage(
             }
           )
       }
-      .map { blockIds =>
-        val r = blockIds.asScala.toSet
-        if (blockIds.size > 1) logger.info(s"Fork at height ${block.height} with ${r.mkString(", ")}")
-        r
+      .map(_.asScala.toSet)
+      .tap {
+        case blockIds if blockIds.size > 1 => ZIO.log(s"Fork at height ${block.height} with ${blockIds.mkString(", ")}")
+        case _                             => ZIO.unit
       }
 
   def getBlocksByHeight(atHeight: Height): Map[BlockId, Block] =
@@ -245,7 +243,7 @@ case class MvStorage(
 
 }
 
-object MvStorage extends LazyLogging {
+object MvStorage {
   import scala.concurrent.duration.*
 
   private val VersionsToKeep = 10
@@ -254,31 +252,33 @@ object MvStorage extends LazyLogging {
     ZLayer.service[MvStoreConf].flatMap { mvStoreConf =>
       ZLayer.scoped(
         ZIO.acquireRelease {
-          ZIO.attempt {
-            dbFile.getParentFile.mkdirs()
-            implicit val store: MVStore =
-              new MVStore.Builder()
-                .fileName(dbFile.getAbsolutePath)
-                .cacheSize(mvStoreConf.get.cacheSize)
-                .cacheConcurrency(4)
-                .autoCommitDisabled()
-                .open()
+          ZIO
+            .attempt {
+              dbFile.getParentFile.mkdirs()
+              implicit val store: MVStore =
+                new MVStore.Builder()
+                  .fileName(dbFile.getAbsolutePath)
+                  .cacheSize(mvStoreConf.get.cacheSize)
+                  .cacheConcurrency(4)
+                  .autoCommitDisabled()
+                  .open()
 
-            store.setVersionsToKeep(VersionsToKeep)
-            store.setRetentionTime(3600 * 1000 * 24 * 7)
-
-            logger.info(s"Opening mvstore at version ${store.getCurrentVersion}")
-            MvStorage(
-              multiset.MultiMvSet[ErgoTreeHex, util.Set, BoxId]("utxosByErgoTreeHex"),
-              multiset.MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
-              MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
-              MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
-              MvMap[BlockId, Block]("blockById")
-            )(store, mvStoreConf.get)
-          }
+              store.setVersionsToKeep(VersionsToKeep)
+              store.setRetentionTime(3600 * 1000 * 24 * 7)
+              store
+            }
+            .tap(store => ZIO.log(s"Opened mvstore at version ${store.getCurrentVersion}"))
+            .map { implicit store =>
+              MvStorage(
+                multiset.MultiMvSet[ErgoTreeHex, util.Set, BoxId]("utxosByErgoTreeHex"),
+                multiset.MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
+                MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
+                MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
+                MvMap[BlockId, Block]("blockById")
+              )(store, mvStoreConf.get)
+            }
         } { storage =>
-          logger.info(s"Closing mvstore at version ${storage.store.getCurrentVersion}")
-          ZIO.succeed(storage.store.close())
+          ZIO.log(s"Closing mvstore at version ${storage.store.getCurrentVersion}") *> ZIO.succeed(storage.store.close())
         }
       )
     }

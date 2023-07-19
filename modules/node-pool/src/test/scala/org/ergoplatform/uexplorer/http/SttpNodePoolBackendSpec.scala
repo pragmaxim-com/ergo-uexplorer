@@ -38,7 +38,7 @@ object SttpNodePoolBackendSpec extends ZIOSpecDefault with TestSupport {
 
   def stubLayers(
     fn: SttpBackendStub[Task, ZioStreams] => SttpBackendStub[Task, ZioStreams]
-  ): ZLayer[Any, Config.Error, NodePool with SttpNodePoolBackend] =
+  ): ZLayer[Any, Throwable, NodePool with SttpNodePoolBackend] =
     ZLayer.scoped(
       ZIO.acquireRelease(ZIO.succeed(UnderlyingBackend(fn(HttpClientZioBackend.stub))))(b => ZIO.succeed(b.backend.close()))
     ) >+> NodePoolConf.layer >+> MetadataHttpClient.layer >+> NodePool.layer >+> SttpNodePoolBackend.layer
@@ -58,8 +58,10 @@ object SttpNodePoolBackendSpec extends ZIOSpecDefault with TestSupport {
 
         SttpNodePoolBackend
           .fallbackQuery[String](List(localNode, remoteNode, remotePeer), TreeSet.empty)(proxyRequest)
-          .map { case (invalidPeers, response) =>
-            assertTrue(response == Success("Remote peer available"), invalidPeers == TreeSet(localNode, remoteNode))
+          .flatMap { case (invalidPeers, responseTask) =>
+            responseTask.map { response =>
+              assertTrue(response == "Remote peer available", invalidPeers == TreeSet(localNode, remoteNode))
+            }
           }
       },
       test("node pool backend should swap uri in request") {
@@ -68,7 +70,7 @@ object SttpNodePoolBackendSpec extends ZIOSpecDefault with TestSupport {
       test("node pool backend should get peers from node pool to proxy request to and invalidate failing peers") {
         (for {
           nodePool <- ZIO.service[NodePool]
-          x        <- nodePool.updateOpenApiPeers(TreeSet(localNode, remoteNode, remotePeer))
+          newPeers <- nodePool.updateOpenApiPeers(TreeSet(localNode, remoteNode, remotePeer))
           r <- ZIO
                  .serviceWithZIO[SttpNodePoolBackend](_.send(basicRequest.get(proxyUri).responseGetRight))
                  .map(_.body)

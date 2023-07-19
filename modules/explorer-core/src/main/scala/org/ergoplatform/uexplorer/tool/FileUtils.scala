@@ -1,27 +1,25 @@
 package org.ergoplatform.uexplorer.tool
 
-import com.typesafe.scalalogging.LazyLogging
+import zio.{Task, ZIO}
 
 import java.io.{File, FileWriter}
 import java.nio.file.Path
 import scala.util.{Success, Try}
 
-object FileUtils extends LazyLogging {
+object FileUtils {
 
-  def writeReport(lines: IndexedSeq[String], targetPath: Path): Try[_] = {
+  def writeReport(lines: IndexedSeq[String], targetPath: Path): Task[Unit] = {
     val targetFile = targetPath.toFile
     if (targetFile.exists()) {
-      logger.info(s"Writing to a file ${targetFile.getAbsolutePath} that already exists")
-      Success(())
+      ZIO.log(s"Writing to a file ${targetFile.getAbsolutePath} that already exists")
     } else {
-      Try {
-        logger.info(s"Writing ${lines.size} lines to ${targetFile.getAbsolutePath}")
+      ZIO.log(s"Writing ${lines.size} lines to ${targetFile.getAbsolutePath}") *> ZIO.attempt {
         val report     = lines.mkString("", "\n", "\n")
         val fileWriter = new FileWriter(targetFile)
         try fileWriter.write(report)
         finally fileWriter.close()
         report
-      }
+      }.unit
     }
   }
 

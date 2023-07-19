@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.structure.Graph
 import org.ergoplatform.uexplorer.db.Backend
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
@@ -22,7 +21,7 @@ case class Initializer(
   storage: ReadableStorage,
   repo: Repo,
   graphBackend: GraphBackend
-) extends LazyLogging {
+) {
 
   def init: Task[ChainIntegrity] =
     repo.isEmpty.map { backendEmpty =>
@@ -32,7 +31,6 @@ case class Initializer(
         HalfEmptyInconsistency(s"Storage must be empty when backend is.")
       } else if (storage.isEmpty && backendEmpty) {
         if (graphBackend.initGraph) {
-          logger.info(s"Chain is empty, loading from scratch ...")
           ChainEmpty
         } else {
           GraphInconsistency("Janus graph must be empty when main db is empty, drop janusgraph keyspace!")

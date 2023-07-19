@@ -3,7 +3,6 @@ package org.ergoplatform.uexplorer.indexer.mempool
 import org.ergoplatform.uexplorer.ReadableStorage
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 
-import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHex, TxId}

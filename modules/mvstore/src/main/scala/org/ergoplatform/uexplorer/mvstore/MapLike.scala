@@ -1,5 +1,7 @@
 package org.ergoplatform.uexplorer.mvstore
 
+import zio.Task
+
 import scala.util.Try
 
 trait MapLike[K, V] {
@@ -54,7 +56,7 @@ trait MapLike[K, V] {
 
   def putIfAbsent(key: K, value: V): Option[V]
 
-  def putIfAbsentOrFail(key: K, value: V): Try[Unit]
+  def putIfAbsentOrFail(key: K, value: V): Task[Unit]
 
   def putAllNewOrFail(entries: IterableOnce[(K, V)]): Try[Unit]
 

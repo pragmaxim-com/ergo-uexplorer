@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.chain
 
-import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.chain.ChainTip.FifoLinkedHashMap
@@ -42,7 +41,7 @@ object ChainTip {
   }
 }
 
-class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(implicit ps: ProtocolSettings) extends LazyLogging {
+class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(implicit ps: ProtocolSettings) {
 
   def linkChildToAncestors(acc: List[LinkedBlock] = List.empty)(
     block: BlockWithOutputs
@@ -55,8 +54,8 @@ class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(i
           }
         )
       case _ =>
-        logger.info(s"Encountered fork at height ${block.b.header.height} and block ${block.b.header.id}")
         for {
+          _            <- ZIO.log(s"Fork detected at height ${block.b.header.height} and block ${block.b.header.id}")
           apiBlock     <- getBlock(block.b.header.parentId)
           rewardBlock  <- ZIO.fromTry(RewardCalculator(apiBlock))
           outputBlock  <- ZIO.fromTry(OutputBuilder(rewardBlock)(ps.addressEncoder))

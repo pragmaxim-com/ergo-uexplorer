@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.mvstore
 
-import com.typesafe.scalalogging.LazyLogging
 import org.h2.mvstore.MVStore
 
 import java.io.{BufferedInputStream, File, FileInputStream, FileWriter}
@@ -12,7 +11,7 @@ import scala.io.Source
 import scala.jdk.CollectionConverters.*
 import scala.util.{Random, Success, Try}
 
-class SuperNodeCollector[HK: HotKeyCodec](id: String) extends LazyLogging {
+class SuperNodeCollector[HK: HotKeyCodec](id: String) {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
 
   private val stringifiedHotKeys: Map[HK, String] =
@@ -34,13 +33,8 @@ class SuperNodeCollector[HK: HotKeyCodec](id: String) extends LazyLogging {
       .map(k => hotKeyCodec.deserialize(k) -> k)
       .toMap
 
-  def getExistingStringifiedHotKeys(mvStoreMapNames: Set[String]): Map[HK, String] = {
-    val existingStringifiedHotKeys = stringifiedHotKeys.filter(e => mvStoreMapNames.contains(e._2))
-    logger.info(
-      s"MvStore contains ${existingStringifiedHotKeys.size} $id superNodes from ${stringifiedHotKeys.size} registered"
-    )
-    existingStringifiedHotKeys
-  }
+  def getExistingStringifiedHotKeys(mvStoreMapNames: Set[String]): Map[HK, String] =
+    stringifiedHotKeys.filter(e => mvStoreMapNames.contains(e._2))
 
   def getHotKeyString(hotKey: HK): Option[String] = stringifiedHotKeys.get(hotKey)
 

@@ -14,7 +14,7 @@ trait ReadableStorage {
 
   def isEmpty: Boolean
 
-  def getChainTip: Try[ChainTip]
+  def getChainTip: Task[ChainTip]
 
   def containsBlock(blockId: BlockId, atHeight: Height): Boolean
 
@@ -42,13 +42,13 @@ trait WritableStorage extends ReadableStorage {
 
   def rollbackTo(rev: Revision): Unit
 
-  def removeInputBoxesByErgoTree(inputRecords: InputRecords): Try[_]
+  def removeInputBoxesByErgoTree(inputRecords: InputRecords): Task[_]
 
-  def removeInputBoxesByErgoTreeT8(inputRecords: InputRecords): Try[_]
+  def removeInputBoxesByErgoTreeT8(inputRecords: InputRecords): Task[_]
 
-  def persistErgoTreeT8Utxos(outputRecords: OutputRecords): Try[_]
+  def persistErgoTreeT8Utxos(outputRecords: OutputRecords): Task[_]
 
-  def persistErgoTreeUtxos(outputRecords: OutputRecords): Try[_]
+  def persistErgoTreeUtxos(outputRecords: OutputRecords): Task[_]
 
   def compact(indexing: Boolean): Task[Unit]
 
@@ -56,5 +56,5 @@ trait WritableStorage extends ReadableStorage {
     blockId: BlockId,
     block: Block,
     currentVersion: Revision
-  ): Try[Set[BlockId]]
+  ): Task[Set[BlockId]]
 }

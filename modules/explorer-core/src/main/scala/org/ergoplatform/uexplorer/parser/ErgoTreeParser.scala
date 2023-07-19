@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.parser
 
 import com.google.bitcoin.core.Base58
-import com.typesafe.scalalogging.LazyLogging
 import eu.timepit.refined.auto.*
 import io.circe.{Decoder, DecodingFailure}
 import org.ergoplatform.uexplorer.{Address, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hash, ErgoTreeT8Hex}
@@ -15,7 +14,7 @@ import sigmastate.serialization.{ErgoTreeSerializer, SigmaSerializer}
 
 import scala.util.{Failure, Success, Try}
 
-object ErgoTreeParser extends LazyLogging {
+object ErgoTreeParser {
 
   private val treeSerializer: ErgoTreeSerializer = ErgoTreeSerializer.DefaultSerializer
 
