@@ -21,8 +21,12 @@ object NodePoolConf {
   val config: zio.Config[NodePoolConf] =
     deriveConfig[NodePoolConf].nested("nodePool")
 
-  def configIO: IO[zio.Config.Error, NodePoolConf] = ExplorerConfig().load[NodePoolConf](config)
+  def configIO: ZIO[Any, Throwable, NodePoolConf] =
+    for {
+      provider <- ExplorerConfig.provider(debugLog = false)
+      conf     <- provider.load[NodePoolConf](config)
+    } yield conf
 
-  def layer: ZLayer[Any, zio.Config.Error, NodePoolConf] = ZLayer.fromZIO(configIO)
+  def layer: ZLayer[Any, Throwable, NodePoolConf] = ZLayer.fromZIO(configIO)
 
 }

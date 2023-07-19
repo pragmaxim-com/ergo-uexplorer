@@ -6,14 +6,17 @@ import scala.collection.immutable.{SortedSet, TreeSet}
 
 case class NodePoolState(openApiPeers: SortedSet[Peer], invalidPeers: SortedSet[Peer]) {
 
-  def invalidatePeers(invalidatedPeers: Set[Peer]): (Set[Peer], NodePoolState) = {
+  def invalidatePeers(invalidatedPeers: InvalidPeers): (InvalidPeers, NodePoolState) = {
     val newInvalidPeers = invalidPeers ++ invalidatedPeers
     val newOpenApiPeers = openApiPeers.diff(newInvalidPeers)
     invalidatedPeers.diff(invalidPeers) -> NodePoolState(newOpenApiPeers, newInvalidPeers)
   }
 
-  def updatePeers(validPeers: SortedSet[Peer]): NodePoolState =
-    NodePoolState(validPeers.diff(invalidPeers.filter(_.weight > 2)), invalidPeers -- validPeers.filter(_.weight < 3))
+  def updatePeers(validPeers: SortedSet[Peer]): (NewPeers, NodePoolState) = {
+    val newPeersWoInvalidPeers = validPeers.diff(invalidPeers.filter(_.weight > 2))
+    val newPeersAdded          = newPeersWoInvalidPeers.diff(openApiPeers)
+    newPeersAdded -> NodePoolState(newPeersWoInvalidPeers, invalidPeers -- validPeers.filter(_.weight < 3))
+  }
 
   override def toString: String = {
     val validPeersStr = openApiPeers.headOption

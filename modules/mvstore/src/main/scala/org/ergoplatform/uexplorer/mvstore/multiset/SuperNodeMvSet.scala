@@ -1,10 +1,10 @@
 package org.ergoplatform.uexplorer.mvstore.multiset
 
-import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.mvstore.*
 import org.h2.mvstore.db.NullValueDataType
 import org.h2.mvstore.{MVMap, MVStore}
 import org.h2.value.Value
+import zio.{Task, ZIO}
 
 import java.io.File
 import java.nio.file.Path
@@ -17,24 +17,10 @@ import scala.util.{Failure, Success, Try}
 
 class SuperNodeMvSet[HK, C[_], V](
   id: String,
-  superNodeCollector: SuperNodeCollector[HK]
+  superNodeCollector: SuperNodeCollector[HK],
+  existingMapsByHotKey: concurrent.Map[HK, MVMap[V, Value]]
 )(implicit store: MVStore, codec: SuperNodeSetCodec[C, V], vc: ValueCodec[SuperNodeCounter])
-  extends SuperNodeSetLike[HK, C, V]
-  with LazyLogging {
-
-  private lazy val existingMapsByHotKey: concurrent.Map[HK, MVMap[V, Value]] =
-    new ConcurrentHashMap[HK, MVMap[V, Value]]().asScala.addAll(
-      superNodeCollector
-        .getExistingStringifiedHotKeys(store.getMapNames.asScala.toSet)
-        .view
-        .mapValues { name =>
-          store.openMap(
-            name,
-            MVMap.Builder[V, Value].valueType(NullValueDataType.INSTANCE)
-          )
-        }
-        .toMap
-    )
+  extends SuperNodeSetLike[HK, C, V] {
 
   private lazy val counterByHotKey = new MvMap[HK, SuperNodeCounter](s"$id-counter")
 
@@ -55,7 +41,7 @@ class SuperNodeMvSet[HK, C[_], V](
       Some(SuperNodeCounter(writeOps + 1, readOps, added, removed + size))
     }
 
-  def clearEmptySuperNodes(): Try[Unit] = Try {
+  def clearEmptySuperNodes: Task[Unit] = {
     val emptyMaps =
       existingMapsByHotKey
         .foldLeft(Set.newBuilder[HK]) {
@@ -65,13 +51,16 @@ class SuperNodeMvSet[HK, C[_], V](
             acc
         }
         .result()
-    logger.info(s"Going to remove ${emptyMaps.size} empty $id supernode maps")
-    emptyMaps
-      .foreach { hk =>
-        existingMapsByHotKey
-          .remove(hk)
-          .foreach(store.removeMap)
-      }
+    ZIO.log(s"$id contains ${existingMapsByHotKey.size} supernodes") *>
+    ZIO.log(s"Going to remove ${emptyMaps.size} empty $id supernode maps") *>
+    ZIO.attempt(
+      emptyMaps
+        .foreach { hk =>
+          existingMapsByHotKey
+            .remove(hk)
+            .foreach(store.removeMap)
+        }
+    )
   }
 
   def getReport: Vector[(String, SuperNodeCounter)] =
@@ -117,7 +106,6 @@ class SuperNodeMvSet[HK, C[_], V](
         /*
             .flatMap { _ =>
               if (mvMap.isEmpty) {
-                logger.info(s"Removing supernode map for $superNodeName as it was emptied")
                 existingSupernodeMapsByKey.remove(sk).fold(Try(store.removeMap(superNodeName))) { m =>
                   Try(store.removeMap(m))
                 }
@@ -145,6 +133,22 @@ object SuperNodeMvSet {
     store: MVStore,
     sc: SuperNodeSetCodec[C, V],
     vc: ValueCodec[SuperNodeCounter]
-  ): SuperNodeMvSet[HK, C, V] =
-    new SuperNodeMvSet[HK, C, V](id, new SuperNodeCollector[HK](id))
+  ): SuperNodeMvSet[HK, C, V] = {
+    val superNodeCollector = new SuperNodeCollector[HK](id)
+    val existingMapsByHotKey: concurrent.Map[HK, MVMap[V, Value]] =
+      new ConcurrentHashMap[HK, MVMap[V, Value]]().asScala.addAll(
+        superNodeCollector
+          .getExistingStringifiedHotKeys(store.getMapNames.asScala.toSet)
+          .view
+          .mapValues { name =>
+            store.openMap(
+              name,
+              MVMap.Builder[V, Value].valueType(NullValueDataType.INSTANCE)
+            )
+          }
+          .toMap
+      )
+
+    new SuperNodeMvSet[HK, C, V](id, superNodeCollector, existingMapsByHotKey)
+  }
 }

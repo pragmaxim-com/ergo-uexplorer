@@ -1,13 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.tool
 
-import com.typesafe.scalalogging.LazyLogging
-import org.ergoplatform.uexplorer.http.{
-  BlockHttpClient,
-  LocalNodeUriMagnet,
-  MetadataHttpClient,
-  RemoteNodeUriMagnet,
-  UnderlyingBackend
-}
+import org.ergoplatform.uexplorer.http.*
 import org.ergoplatform.uexplorer.indexer.chain.{BlockReader, StreamExecutor}
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import sttp.client3.httpclient.zio.HttpClientZioBackend
@@ -21,7 +14,7 @@ import scala.util.{Failure, Success}
 import zio.*
 import zio.stream.*
 
-object DownloadBlocksAsLinesFromNodeToFile extends ZIOAppDefault with LazyLogging {
+object DownloadBlocksAsLinesFromNodeToFile extends ZIOAppDefault {
 
   private val targetFile = Paths.get(java.lang.System.getProperty("user.home"), ".ergo-uexplorer", "ergo-chain.lines.gz")
   targetFile.toFile.getParentFile.mkdirs()
@@ -30,7 +23,7 @@ object DownloadBlocksAsLinesFromNodeToFile extends ZIOAppDefault with LazyLoggin
     (for
       blockHttpClient <- ZIO.service[BlockHttpClient]
       blockReader     <- ZIO.service[BlockReader]
-      _ = println(s"Initiating download")
+      _               <- ZIO.log(s"Initiating download")
       result <- blockReader
                   .blockIdSource(1)
                   .mapZIO(blockHttpClient.getBlockForIdAsString)

@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.http.{BlockHttpClient, Codecs}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{BlockId, Height}
@@ -14,12 +13,11 @@ import zio.stream.ZStream
 
 class BlockReader(
   blockHttpClient: BlockHttpClient
-) extends Codecs
-  with LazyLogging {
+) extends Codecs {
   private val benchPath = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer", "ergo-chain.lines.gz")
 
   def getBlockSource(fromHeight: Int, bench: Boolean): ZStream[Any, Throwable, ApiFullBlock] =
-    if (bench)
+    if (bench && benchPath.toFile.exists())
       blockSourceFromFS.buffer(1024)
     else
       blockIdSource(fromHeight)
@@ -29,7 +27,6 @@ class BlockReader(
 
   def blockSourceFromFS: ZStream[Any, Throwable, ApiFullBlock] = {
     import io.circe.parser.decode
-    logger.info(s"Running benchmark, reading all blocks from filesystem")
     ZStream
       .fromFile(benchPath.toFile())
       .via(ZPipeline.gunzip() >>> ZPipeline.utf8Decode >>> ZPipeline.splitLines)
@@ -41,7 +38,6 @@ class BlockReader(
       .unfoldZIO(fromHeight) { offset =>
         blockHttpClient.getBlockIdsByOffset(offset, 100).map {
           case blockIds if blockIds.nonEmpty =>
-            logger.info(s"Height $offset")
             Some((blockIds, offset + blockIds.size))
           case _ =>
             None

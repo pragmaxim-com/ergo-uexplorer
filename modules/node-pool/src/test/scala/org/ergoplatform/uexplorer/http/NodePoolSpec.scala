@@ -22,12 +22,12 @@ object NodePoolSpec extends ZIOSpecDefault {
       test("update should remove master/local nodes from invalid") {
         val initialState  = NodePoolState(TreeSet.empty, TreeSet(localNode, remoteNode))
         val expectedState = NodePoolState(TreeSet(localNode, remoteNode), TreeSet.empty)
-        assertTrue(initialState.updatePeers(TreeSet(localNode, remoteNode)) == expectedState)
+        assertTrue(initialState.updatePeers(TreeSet(localNode, remoteNode))._2 == expectedState)
       },
       test("update should not remove peers from invalid") {
         val initialState  = NodePoolState(TreeSet.empty, TreeSet(remotePeer))
         val expectedState = NodePoolState(TreeSet.empty, TreeSet(remotePeer))
-        assertTrue(initialState.updatePeers(TreeSet(remotePeer)) == expectedState)
+        assertTrue(initialState.updatePeers(TreeSet(remotePeer))._2 == expectedState)
       }
     )
 }

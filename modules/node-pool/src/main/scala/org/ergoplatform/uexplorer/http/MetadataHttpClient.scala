@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.http
 
-import com.typesafe.scalalogging.LazyLogging
 import io.circe.Decoder
 import org.ergoplatform.uexplorer.Const.EpochLength
 import org.ergoplatform.uexplorer.Const
@@ -22,7 +21,7 @@ import sttp.client3.httpclient.zio.{HttpClientZioBackend, SttpClient}
 import scala.concurrent.duration.FiniteDuration
 import sttp.model.Uri
 
-case class MetadataHttpClient(underlying: UnderlyingBackend, conf: NodePoolConf) extends LazyLogging {
+case class MetadataHttpClient(underlying: UnderlyingBackend, conf: NodePoolConf) {
 
   private val allowedHeightDiff = 20
 
@@ -39,14 +38,7 @@ case class MetadataHttpClient(underlying: UnderlyingBackend, conf: NodePoolConf)
       .map(_.body)
       .fold(
         _ => Option.empty[T],
-        peer =>
-          if (peer.fullHeight < minHeight.getOrElse(0) || peer.stateType != "utxo") {
-            logger.warn(s"Peer has empty fullHeight or it has not utxo state : $peer")
-            None
-          } else {
-            logger.info(s"Found valid peer with height ${peer.fullHeight}")
-            Some(peer)
-          }
+        peer => Option.unless(peer.fullHeight < minHeight.getOrElse(0) || peer.stateType != "utxo")(peer)
       )
 
   def getLocalNodeInfo: Task[Option[LocalNode]]   = getPeerInfo[LocalNode]()

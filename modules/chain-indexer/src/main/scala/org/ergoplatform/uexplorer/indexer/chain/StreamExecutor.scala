@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ExeContext.Implicits
@@ -29,19 +28,17 @@ case class StreamExecutor(
   blockWriter: BlockWriter,
   storage: ReadableStorage,
   conf: ChainIndexerConf
-) extends LazyLogging {
+) {
 
   implicit private val ps: ProtocolSettings = conf.protocol
 
   def indexNewBlocks: Task[ChainSyncResult] =
     for
-      bestBlockHeight <- blockHttpClient.getBestBlockHeight
-      fromHeight = storage.getLastHeight.getOrElse(0) + 1
-      _ = if (bestBlockHeight > fromHeight) logger.info(s"Going to index blocks from $fromHeight to $bestBlockHeight")
-      _ = if (bestBlockHeight == fromHeight) logger.info(s"Going to index block $bestBlockHeight")
-      chainTip <- ZIO.fromTry(storage.getChainTip).debug("chainTip")
+      _        <- blockHttpClient.getBestBlockHeight
+      chainTip <- storage.getChainTip
       chainLinker = new ChainLinker(blockHttpClient.getBlockForId, chainTip)
-      syncResult <- blockWriter.insertBranchFlow(blockReader.getBlockSource(fromHeight, conf.benchmarkMode), chainLinker)
+      blockSource = blockReader.getBlockSource(storage.getLastHeight.getOrElse(0) + 1, conf.benchmarkMode)
+      syncResult <- blockWriter.insertBranchFlow(blockSource, chainLinker)
     yield syncResult
 }
 

@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.mvstore.multiset
 import org.ergoplatform.uexplorer.mvstore.*
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
+import zio.Task
 
 import java.nio.file.Path
 import java.util.Map.Entry
@@ -29,8 +30,8 @@ case class MultiMvSet[K, C[_], V](
 
   def size: MultiColSize = MultiColSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
 
-  def clearEmptySuperNodes(): Try[Unit] =
-    superNodeMap.clearEmptySuperNodes()
+  def clearEmptySuperNodes: Task[Unit] =
+    superNodeMap.clearEmptySuperNodes
 
   def getReport: (Path, Vector[(String, SuperNodeCounter)]) =
     ergoHomeDir.resolve(s"hot-keys-$id-$randomNumberPerRun.csv") -> superNodeMap.getReport

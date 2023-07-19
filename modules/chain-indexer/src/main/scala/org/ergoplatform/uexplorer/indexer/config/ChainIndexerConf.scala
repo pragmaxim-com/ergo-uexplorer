@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.indexer.config
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.mining.emission.EmissionRules
 import org.ergoplatform.settings.MonetarySettings
@@ -38,7 +37,7 @@ case class ChainIndexerConf(
   benchmarkMode: Boolean
 )
 
-object ChainIndexerConf extends LazyLogging {
+object ChainIndexerConf {
   import NodePoolConf.*
 
   implicit val addressConfig: DeriveConfig[Address] =
@@ -49,16 +48,12 @@ object ChainIndexerConf extends LazyLogging {
 
   def config: zio.Config[ChainIndexerConf] = deriveConfig[ChainIndexerConf]
 
-  def configIO: IO[zio.Config.Error, ChainIndexerConf] =
-    ExplorerConfig().load[ChainIndexerConf](config)
+  def configIO: ZIO[Any, Throwable, ChainIndexerConf] =
+    for {
+      provider <- ExplorerConfig.provider(debugLog = true)
+      conf     <- provider.load[ChainIndexerConf](config)
+    } yield conf
 
-  def layer: ZLayer[Any, zio.Config.Error, ChainIndexerConf] = ZLayer.fromZIO(configIO)
-
-  /*
-    def formatting(formatted: Boolean) = ConfigRenderOptions.concise().setFormatted(formatted).setJson(true)
-    val chainIndexerConf =
-      rootConfig.getValue("uexplorer.chain-indexer").render(formatting(true))
-    logger.info(s"ChainIndexer config: $chainIndexerConf")
-   */
+  def layer: ZLayer[Any, Throwable, ChainIndexerConf] = ZLayer.fromZIO(configIO)
 
 }

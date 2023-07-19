@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.http
 
-import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.uexplorer.Utils
 import org.ergoplatform.uexplorer.http.NodePool.*
 import org.ergoplatform.uexplorer.http.SttpNodePoolBackend.swapUri
@@ -25,10 +24,11 @@ case class SttpNodePoolBackend(
     nodePool.clean *> super.close()
 
   private def updateNodePool: Task[Unit] =
-    metadataClient.getAllOpenApiPeers
-      .flatMap { validPeers =>
-        nodePool.updateOpenApiPeers(validPeers)
-      }
+    for
+      allPeers <- metadataClient.getAllOpenApiPeers
+      newPeers <- nodePool.updateOpenApiPeers(allPeers)
+      _        <- ZIO.log(s"New peers added : ${newPeers.mkString(",")}")
+    yield ()
 
   def keepNodePoolUpdated: ZIO[Any, Throwable, Fiber.Runtime[Throwable, Long]] =
     for
@@ -48,16 +48,18 @@ case class SttpNodePoolBackend(
         case peers =>
           fallbackQuery(peers.toList)(proxy).flatMap {
             case (invalidPeers, blockTry) if invalidPeers.nonEmpty =>
-              nodePool.invalidatePeers(invalidPeers) *> blockTry.fold(ZIO.fail, ZIO.succeed)
+              nodePool
+                .invalidatePeers(invalidPeers)
+                .tap(invalidPeers => ZIO.log(s"Peers invalidated : ${invalidPeers.mkString(",")}")) *> blockTry
             case (_, blockTry) =>
-              blockTry.fold(ZIO.fail, ZIO.succeed)
+              blockTry
           }
       }
   }
 
 }
 
-object SttpNodePoolBackend extends LazyLogging {
+object SttpNodePoolBackend {
 
   def layer: ZLayer[UnderlyingBackend with MetadataHttpClient with NodePool, Nothing, SttpNodePoolBackend] =
     ZLayer.fromFunction(SttpNodePoolBackend.apply _)
@@ -68,22 +70,23 @@ object SttpNodePoolBackend extends LazyLogging {
   def fallbackQuery[R](
     peerAddresses: List[Peer],
     invalidPeers: SortedSet[Peer] = TreeSet.empty
-  )(run: Peer => Task[R]): Task[(NodePool.InvalidPeers, Try[R])] =
+  )(run: Peer => Task[R]): Task[(NodePool.InvalidPeers, Task[R])] =
     peerAddresses.headOption match {
       case Some(peerAddress) =>
         run(peerAddress)
           .map { block =>
-            invalidPeers -> Success(block)
+            invalidPeers -> ZIO.succeed(block)
           }
           .catchNonFatalOrDie { ex =>
-            if (peerAddresses.tail.nonEmpty) {
-              logger.warn(s"Peer $peerAddress failed, retrying with another peer...", ex)
-            }
-            fallbackQuery(peerAddresses.tail, invalidPeers + peerAddresses.head)(run)
+            ZIO.logErrorCause(s"Peer $peerAddress failed, retrying with another peer...", Cause.fail(ex)) *> fallbackQuery(
+              peerAddresses.tail,
+              invalidPeers + peerAddresses.head
+            )(run)
           }
       case None =>
-        logger.warn(s"We ran out of peers, all peers unavailable...")
-        ZIO.succeed(invalidPeers, Failure(new Exception("Run out of peers!")))
+        ZIO.logWarning(s"We ran out of peers, all peers unavailable...") *> ZIO.succeed(
+          invalidPeers -> ZIO.fail(new Exception("Run out of peers!"))
+        )
     }
 
 }

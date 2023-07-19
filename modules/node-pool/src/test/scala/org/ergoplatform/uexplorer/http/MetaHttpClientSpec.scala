@@ -28,7 +28,7 @@ object MetaHttpClientSpec extends ZIOSpecDefault with TestSupport {
 
   def stubLayers(
     fn: SttpBackendStub[Task, ZioStreams] => SttpBackendStub[Task, ZioStreams]
-  ): ZLayer[Any, Config.Error, MetadataHttpClient] =
+  ): ZLayer[Any, Throwable, MetadataHttpClient] =
     ZLayer.scoped(
       ZIO.acquireRelease(ZIO.succeed(UnderlyingBackend(fn(HttpClientZioBackend.stub))))(b => ZIO.succeed(b.backend.close()))
     ) ++ NodePoolConf.layer >>> MetadataHttpClient.layer

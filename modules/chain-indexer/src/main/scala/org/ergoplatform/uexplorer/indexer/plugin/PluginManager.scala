@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.indexer.plugin
 
-import com.typesafe.scalalogging.LazyLogging
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource
 import org.ergoplatform.uexplorer.ReadableStorage
 import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
@@ -13,7 +12,7 @@ import scala.util.Try
 import org.ergoplatform.uexplorer.indexer.mempool.MemPoolStateChanges
 import zio.stream.ZSink
 
-case class PluginManager(plugins: List[Plugin]) extends LazyLogging {
+case class PluginManager(plugins: List[Plugin]) {
 
   def close(): Task[Unit] = ZIO.collectAllDiscard(plugins.map(_.close))
 
@@ -51,19 +50,18 @@ case class PluginManager(plugins: List[Plugin]) extends LazyLogging {
 
 }
 
-object PluginManager extends LazyLogging {
+object PluginManager {
   def loadPlugins: Task[List[Plugin]] = ZIO.attempt(ServiceLoader.load(classOf[Plugin]).iterator().asScala.toList)
 
   def layerNoPlugins: ZLayer[Any, Throwable, PluginManager] = ZLayer.succeed(PluginManager(List.empty))
 
   def layer: ZLayer[Any, Throwable, PluginManager] = ZLayer.scoped(
     loadPlugins.flatMap { plugins =>
-      if (plugins.nonEmpty) logger.info(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}")
       ZIO
         .collectAllParDiscard(plugins.map(_.init))
         .flatMap { _ =>
           ZIO.acquireRelease(ZIO.succeed(PluginManager(plugins)))(p => ZIO.succeed(p.close()))
-        }
+        } <* ZIO.when(plugins.nonEmpty)(ZIO.log(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}"))
     }
   )
 }

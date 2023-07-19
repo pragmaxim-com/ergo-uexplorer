@@ -1,6 +1,5 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import com.typesafe.scalalogging.LazyLogging
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.db.*
@@ -27,7 +26,7 @@ case class BlockWriter(
   repo: Repo,
   graphBackend: GraphBackend,
   chainIndexerConf: ChainIndexerConf
-) extends LazyLogging {
+) {
 
   implicit private val ps: ProtocolSettings    = chainIndexerConf.protocol
   implicit private val enc: ErgoAddressEncoder = ps.addressEncoder
@@ -49,8 +48,8 @@ case class BlockWriter(
         )
       )
     } else {
-      logger.info(s"Adding fork from height ${winningFork.head.block.height} until ${winningFork.last.block.height}")
       for {
+        _ <- ZIO.log(s"Adding fork from height ${winningFork.head.block.height} until ${winningFork.last.block.height}")
         preForkVersion <- ZIO.attempt(storage.getBlockById(winningFork.head.b.header.id).map(_.revision).get)
         loosingFork = winningFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id)).toMap
         _ <- ZIO.attempt(storage.rollbackTo(preForkVersion))
@@ -110,19 +109,9 @@ case class BlockWriter(
         b,
         ZIO.collectAllParDiscard(
           List(
-            ZIO.fromTry {
-              storage.persistErgoTreeUtxos(b.outputRecords).flatMap { _ =>
-                storage.removeInputBoxesByErgoTree(b.inputRecords)
-              }
-            },
-            ZIO.fromTry {
-              storage.persistErgoTreeT8Utxos(b.outputRecords).flatMap { _ =>
-                storage.removeInputBoxesByErgoTreeT8(b.inputRecords)
-              }
-            },
-            ZIO.fromTry {
-              storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
-            }
+            storage.persistErgoTreeUtxos(b.outputRecords) *> storage.removeInputBoxesByErgoTree(b.inputRecords),
+            storage.persistErgoTreeT8Utxos(b.outputRecords) *> storage.removeInputBoxesByErgoTreeT8(b.inputRecords),
+            storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
           )
         )
       )

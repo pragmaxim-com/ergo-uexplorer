@@ -2,6 +2,7 @@ package org.ergoplatform.uexplorer.mvstore
 
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
+import zio.{Task, ZIO}
 
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
@@ -89,9 +90,9 @@ case class MvMap[K, V: ValueCodec](id: String)(implicit store: MVStore) extends 
   def putIfAbsent(key: K, value: V): Option[V] =
     Option(underlying.putIfAbsent(key, codec.writeAll(value))).map(codec.readAll)
 
-  def putIfAbsentOrFail(key: K, value: V): Try[Unit] =
-    Option(underlying.putIfAbsent(key, codec.writeAll(value))).fold(Success(())) { oldVal =>
-      Failure(new AssertionError(s"Key $key already present with value ${codec.readAll(oldVal)}"))
+  def putIfAbsentOrFail(key: K, value: V): Task[Unit] =
+    Option(underlying.putIfAbsent(key, codec.writeAll(value))).fold(ZIO.succeed(())) { oldVal =>
+      ZIO.fail(new AssertionError(s"Key $key already present with value ${codec.readAll(oldVal)}"))
     }
 
   def putIfAbsentAndForget(key: K, value: V): Unit = underlying.putIfAbsent(key, codec.writeAll(value))

@@ -24,7 +24,9 @@ case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBa
   private val proxyUri = uri"http://proxy"
 
   def getBestBlockHeight: Task[Height] =
-    metadataHttpClient.getMasterNodes.map(_.minBy(_.fullHeight).fullHeight)
+    metadataHttpClient.getMasterNodes
+      .map(_.minBy(_.fullHeight).fullHeight)
+      .tap(h => ZIO.log(s"Best block height is $h"))
 
   def getUnconfirmedTxs: Task[ListMap[TxId, ApiTransaction]] =
     basicRequest
@@ -54,6 +56,7 @@ case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBa
         case Left(error) =>
           ZIO.fail(new Exception(s"Getting block id at fromHeightIncl $fromHeightIncl failed", error))
       }
+      .tap(blockIds => ZIO.log(s"Retrieved ${blockIds.size} block ids from height $fromHeightIncl"))
       .retry(Schedule.exponential(1.seconds, 2.0).upTo(1.minute))
 
   def getBlockIdForHeight(height: Int): Task[BlockId] =
