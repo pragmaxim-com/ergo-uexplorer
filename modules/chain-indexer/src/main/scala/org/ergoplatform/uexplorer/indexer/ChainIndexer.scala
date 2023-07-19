@@ -34,7 +34,8 @@ import scala.util.{Failure, Success, Try}
 
 object ChainIndexer extends ZIOAppDefault {
 
-  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = SLF4J.slf4j(LogFormat.colored)
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
+    Runtime.removeDefaultLoggers >>> SLF4J.slf4j(LogFormat.colored)
 
   def run =
     (for {

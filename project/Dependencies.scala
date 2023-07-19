@@ -46,7 +46,7 @@ object Dependencies {
     "dev.zio"     % s"zio-config-refined_$v"  % "4.0.0-RC16",
     "dev.zio"     % s"zio-logging_$v"         % "2.1.13",
     "nl.vroste"   % s"rezilience_$v"          % "0.9.4",
-    "dev.zio"     % s"zio-logging-slf4j_$v"   % "2.1.13"
+    "dev.zio"     % s"zio-logging-slf4j2_$v"  % "2.1.13"
   ) ++ zioTest(v)
 
   lazy val cassandraDb = List(
