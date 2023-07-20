@@ -92,7 +92,7 @@ case class MvStorage(
       s"storage height: $height, " +
         s"utxo count: ${ergoTreeHexByUtxo.size}, " +
         s"supernode-utxo-count : $superNodeTotalSize, " +
-        s"non-empty-address count: $nonEmptyAddressCount \n"
+        s"non-empty-address count: $nonEmptyAddressCount "
     val cs  = store.getCacheSize
     val csu = store.getCacheSizeUsed
     val chr = store.getCacheHitRatio

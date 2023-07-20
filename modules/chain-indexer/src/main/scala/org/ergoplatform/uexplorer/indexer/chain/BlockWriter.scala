@@ -119,8 +119,7 @@ case class BlockWriter(
 
   val insertBlockFlow: ZPipeline[Any, Throwable, LinkedBlock, BestBlockInserted] =
     ZPipeline
-      .mapZIOPar(1)(UtxoTracker.getBlockWithInputs(_, storage))
-      .mapZIOPar(1)(persistBlock)
+      .mapZIOPar(1)(UtxoTracker.getBlockWithInputs(_, storage).flatMap(persistBlock))
 
 }
 
