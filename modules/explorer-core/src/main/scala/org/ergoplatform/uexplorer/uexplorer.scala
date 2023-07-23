@@ -5,14 +5,18 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.string.{HexStringSpec, MatchesRegex, ValidByte}
 import eu.timepit.refined.refineV
 import io.circe.*
-import org.ergoplatform.uexplorer.{BoxCount, LastHeight, TxCount}
+import org.ergoplatform.uexplorer.{BoxCount, BoxId, LastHeight, TxCount}
 import scorex.crypto.hash.Digest32
 import eu.timepit.refined.auto.autoUnwrap
+
 import scala.collection.mutable
 import scala.collection.compat.immutable.ArraySeq
 import scala.collection.immutable.{ArraySeq, TreeMap}
 import scala.collection.immutable.ListMap
 import scala.util.Try
+import zio.json.*
+import zio.*
+import zio.json.interop.refined.*
 
 package object uexplorer {
 
@@ -61,6 +65,7 @@ package object uexplorer {
     extension (x: HexString) def unwrapped: String = x
     def fromStringUnsafe(s: String): HexString     = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
     def castUnsafe(s: String): HexString           = s.asInstanceOf[HexString]
+    given Ordering[HexString]                      = Ordering.by[HexString, String](_.unwrapped)
   }
 
   object AvlTreePathProofHex {
@@ -69,8 +74,10 @@ package object uexplorer {
 
   type BlockId = HexString
   object BlockId {
-    def fromStringUnsafe(s: String): BlockId = unsafeWrap(HexString.fromStringUnsafe(s))
-    def castUnsafe(s: String): BlockId       = s.asInstanceOf[BlockId]
+    def fromStringUnsafe(s: String): BlockId     = unsafeWrap(HexString.fromStringUnsafe(s))
+    def castUnsafe(s: String): BlockId           = s.asInstanceOf[BlockId]
+    given JsonEncoder[BlockId]                   = JsonEncoder.string.contramap(BlockId.fromStringUnsafe)
+    extension (x: BlockId) def unwrapped: String = x
   }
 
   type TokenId = HexString
@@ -114,6 +121,8 @@ package object uexplorer {
     def apply(s: String): TxId                = s
     given Encoder[TxId]                       = Encoder.encodeString
     given Decoder[TxId]                       = Decoder.decodeString
+    given JsonEncoder[TxId]                   = JsonEncoder.string
+    given JsonDecoder[TxId]                   = JsonDecoder.string
     extension (x: TxId) def unwrapped: String = x
     def castUnsafe(s: String): TxId           = s.asInstanceOf[TxId]
   }
@@ -123,8 +132,9 @@ package object uexplorer {
   object BoxId {
     def apply(s: String): BoxId = s
 
-    given Encoder[BoxId] = Encoder.encodeString
-
+    given Encoder[BoxId]                       = Encoder.encodeString
+    given JsonEncoder[BoxId]                   = JsonEncoder.string
+    given JsonDecoder[BoxId]                   = JsonDecoder.string
     given Decoder[BoxId]                       = Decoder.decodeString
     extension (x: BoxId) def unwrapped: String = x
     def castUnsafe(s: String): BoxId           = s.asInstanceOf[BoxId]

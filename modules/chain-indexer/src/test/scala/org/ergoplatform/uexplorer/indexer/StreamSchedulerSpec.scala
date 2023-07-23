@@ -14,7 +14,7 @@ import org.ergoplatform.uexplorer.indexer.mempool.{MemPool, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
-import org.ergoplatform.uexplorer.{ProtocolSettings, ReadableStorage}
+import org.ergoplatform.uexplorer.{BlockId, ProtocolSettings, ReadableStorage}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AsyncFreeSpec
@@ -57,7 +57,7 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport {
           Response.ok(Rest.blocks.forOffset(offset, limit).map(blockId => s""""$blockId"""") mkString ("[", ",", "]"))
         case r if r.uri.path.startsWith(List("blocks")) =>
           val blockId = r.uri.path.last
-          Response.ok(Rest.blocks.byId(blockId))
+          Response.ok(Rest.blocks.byId(BlockId.fromStringUnsafe(blockId)))
       }
 
   def spec =

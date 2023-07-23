@@ -17,7 +17,7 @@ import zio.stream.ZPipeline
 import zio.stream.ZStream
 import zio.stream.ZSink
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.chain.ChainLinker
+import org.ergoplatform.uexplorer.chain.{BlockProcessor, ChainLinker}
 import org.ergoplatform.uexplorer.backend.Repo
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 

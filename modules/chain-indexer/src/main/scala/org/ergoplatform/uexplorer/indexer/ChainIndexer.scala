@@ -4,7 +4,7 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.ProtocolSettings
 import org.ergoplatform.uexplorer.backend.PersistentRepo
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, PersistentBlockRepo}
-import org.ergoplatform.uexplorer.backend.boxes.{BoxRepo, PersistentBoxRepo}
+import org.ergoplatform.uexplorer.backend.boxes.PersistentBoxRepo
 import org.ergoplatform.uexplorer.config.ExplorerConfig
 import org.ergoplatform.uexplorer.db.{FullBlock, GraphBackend}
 import org.ergoplatform.uexplorer.http.*
