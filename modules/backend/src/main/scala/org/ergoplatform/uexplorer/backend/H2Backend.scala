@@ -7,7 +7,7 @@ import io.getquill.util.LoadConfig
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, BlockRoutes, PersistentBlockRepo}
 import org.ergoplatform.uexplorer.backend.boxes.{BoxRepo, BoxRoutes, PersistentBoxRepo}
-import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, Block, NormalizedBlock}
+import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, Block, LinkedBlock}
 import zio.http.Server
 import zio.{Exit, Promise, Scope, Task, Unsafe, ZIO, ZLayer}
 import zio.*
@@ -32,7 +32,7 @@ object H2Backend extends Backend {
 
   override def removeBlocks(blockIds: Set[BlockId]): Task[Unit] = ???
 
-  override def writeBlock(b: NormalizedBlock, condition: Task[Any]): Task[BlockId] = ???
+  override def writeBlock(b: LinkedBlock, condition: Task[Any]): Task[BlockId] = ???
 
   override def close(): Task[Unit] = ???
 }

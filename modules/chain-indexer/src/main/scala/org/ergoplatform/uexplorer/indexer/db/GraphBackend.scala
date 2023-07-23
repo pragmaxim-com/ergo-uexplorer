@@ -4,7 +4,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSo
 import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph
 import org.apache.tinkerpop.gremlin.structure.{Graph, Transaction}
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock, NormalizedBlock}
+import org.ergoplatform.uexplorer.db.{BestBlockInserted, FullBlock}
 import pureconfig.ConfigReader
 import zio.*
 

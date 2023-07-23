@@ -5,7 +5,6 @@ import org.ergoplatform.uexplorer.backend.blocks.PersistentBlockRepo
 import org.ergoplatform.uexplorer.backend.boxes.PersistentBoxRepo
 import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo}
 import org.ergoplatform.uexplorer.config.ExplorerConfig
-import org.ergoplatform.uexplorer.db.UtxoTracker
 import org.ergoplatform.uexplorer.http.*
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
@@ -75,8 +74,8 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport {
           memPoolState.underlyingTxs.size == 9
         )).provide(
           ChainIndexerConf.layer,
-          ChainIndexerConf.layer.project(_.nodePool),
-          ChainIndexerConf.layer.project(_.mvStore),
+          NodePoolConf.layer,
+          MvStoreConf.layer,
           MemPool.layer,
           NodePool.layer,
           UnderlyingBackend.layerFor(testingBackend),

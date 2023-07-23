@@ -28,16 +28,4 @@ case class LinkedBlock(
   outputRecords: OutputRecords,
   block: Block,
   parentBlockOpt: Option[Block]
-) {
-  def toNormalizedBlock(inputRecords: InputRecords) =
-    NormalizedBlock(b, minerRewardInfo, inputRecords, outputRecords, block, parentBlockOpt)
-}
-
-case class NormalizedBlock(
-  b: ApiFullBlock,
-  minerRewardInfo: MinerRewardInfo,
-  inputRecords: InputRecords,
-  outputRecords: OutputRecords,
-  block: Block,
-  parentBlockOpt: Option[Block]
 )
