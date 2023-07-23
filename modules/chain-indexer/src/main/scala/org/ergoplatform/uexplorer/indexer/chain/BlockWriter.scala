@@ -76,7 +76,7 @@ case class BlockWriter(
             .via(insertBlockFlow)
       }
       .tap { b =>
-        if (b.normalizedBlock.block.height % chainIndexerConf.mvStore.heightCompactRate == 0)
+        if (b.linkedBlock.block.height % chainIndexerConf.mvStore.heightCompactRate == 0)
           storage.compact(indexing = true)
         else ZIO.succeed(())
       }
@@ -103,13 +103,15 @@ case class BlockWriter(
         )
       }
 
-  private def persistBlock(b: NormalizedBlock): Task[BestBlockInserted] =
+  private def persistBlock(b: LinkedBlock): Task[BestBlockInserted] =
     repo
       .writeBlock(b)(
         preTx = ZIO.collectAllParDiscard(
           List(
-            storage.persistErgoTreeUtxos(b.outputRecords) *> storage.removeInputBoxesByErgoTree(b.inputRecords),
-            storage.persistErgoTreeT8Utxos(b.outputRecords) *> storage.removeInputBoxesByErgoTreeT8(b.inputRecords),
+            storage.persistErgoTreeByUtxo(b.outputRecords)
+              *> storage.removeInputBoxesByErgoTree(b.b.transactions.transactions),
+            storage.persistErgoTreeT8ByUtxo(b.outputRecords)
+              *> storage.removeInputBoxesByErgoTreeT8(b.b.transactions.transactions),
             storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
           )
         ),
@@ -119,7 +121,7 @@ case class BlockWriter(
 
   val insertBlockFlow: ZPipeline[Any, Throwable, LinkedBlock, BestBlockInserted] =
     ZPipeline
-      .mapZIOPar(1)(UtxoTracker.getBlockWithInputs(_, storage).flatMap(persistBlock))
+      .mapZIO(persistBlock)
 
 }
 

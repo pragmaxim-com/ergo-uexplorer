@@ -25,7 +25,7 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
 import java.util.stream.Collectors
 import java.util.zip.GZIPInputStream
 import scala.collection.compat.immutable.ArraySeq
-import scala.collection.immutable.{TreeMap, TreeSet}
+import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
 import scala.collection.mutable.ListBuffer
 import scala.collection.{concurrent, mutable}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -39,6 +39,7 @@ case class MvStorage(
   utxosByErgoTreeHex: MultiMvSet[ErgoTreeHex, java.util.Set, BoxId],
   utxosByErgoTreeT8Hex: MultiMvSet[ErgoTreeT8Hex, java.util.Set, BoxId],
   ergoTreeHexByUtxo: MapLike[BoxId, ErgoTreeHex],
+  ergoTreeT8HexByUtxo: MapLike[BoxId, ErgoTreeT8Hex],
   blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
   blockById: MapLike[BlockId, Block]
 )(implicit val store: MVStore, mvStoreConf: MvStoreConf)
@@ -91,6 +92,7 @@ case class MvStorage(
     val progress =
       s"storage height: $height, " +
         s"utxo count: ${ergoTreeHexByUtxo.size}, " +
+        s"utxo with template count: ${ergoTreeT8HexByUtxo.size}, " +
         s"supernode-utxo-count : $superNodeTotalSize, " +
         s"non-empty-address count: $nonEmptyAddressCount "
     val cs  = store.getCacheSize
@@ -127,58 +129,62 @@ case class MvStorage(
 
   def rollbackTo(rev: Revision): Unit = store.rollbackTo(rev)
 
-  def removeInputBoxesByErgoTree(inputRecords: InputRecords): Task[_] = ZIO.attempt {
-    inputRecords.byErgoTree.iterator
-      .map { case (ergoTreeHex, inputIds) =>
-        val inputBoxes =
-          inputIds.filter { boxId =>
-            boxId != Emission.inputBox && boxId != Foundation.inputBox
-          }
-        ergoTreeHexByUtxo
-          .removeAllOrFail(inputBoxes)
-          .flatMap { _ =>
-            utxosByErgoTreeHex.removeSubsetOrFail(ergoTreeHex, inputBoxes.iterator, inputBoxes.size) { existingBoxIds =>
-              inputBoxes.iterator.foreach(existingBoxIds.remove)
-              Option(existingBoxIds).collect { case m if !m.isEmpty => m }
-            }
-          }
-          .get
+  def removeInputBoxesByErgoTree(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.attempt {
+    val inputIds = transactions.flatMap(_.inputs.map(_.boxId))
+    inputIds
+      .flatMap { inputId =>
+        ergoTreeHexByUtxo.get(inputId).map(_ -> inputId)
       }
+      .groupBy(_._1)
+      .foreach { case (et, inputBoxes) =>
+        utxosByErgoTreeHex.removeSubsetOrFail(et, inputBoxes.iterator.map(_._2), inputBoxes.size) { existingBoxIds =>
+          inputBoxes.iterator.foreach(t => existingBoxIds.remove(t._2))
+          Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+        }
+      }
+
+    ergoTreeHexByUtxo
+      .removeAllOrFail(inputIds)
+
   }
 
-  def removeInputBoxesByErgoTreeT8(inputRecords: InputRecords): Task[_] = ZIO.attempt {
-    inputRecords.byErgoTreeT8.iterator
-      .map { case (ergoTreeT8, inputIds) =>
-        val inputBoxes = inputIds.filter(boxId => boxId != Emission.inputBox && boxId != Foundation.inputBox)
-        utxosByErgoTreeT8Hex
-          .removeSubsetOrFail(ergoTreeT8, inputBoxes, inputBoxes.size) { existingBoxIds =>
-            inputBoxes.foreach(existingBoxIds.remove)
-            Option(existingBoxIds).collect { case m if !m.isEmpty => m }
-          }
-          .get
+  def removeInputBoxesByErgoTreeT8(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.attempt {
+    val inputIds = transactions.flatMap(_.inputs.map(_.boxId))
+    inputIds
+      .flatMap { inputId =>
+        ergoTreeT8HexByUtxo.get(inputId).map(_ -> inputId)
       }
+      .groupBy(_._1)
+      .foreach { case (etT8, inputBoxes) =>
+        utxosByErgoTreeT8Hex.removeSubsetOrFail(etT8, inputBoxes.iterator.map(_._2), inputBoxes.size) { existingBoxIds =>
+          inputBoxes.iterator.foreach(t => existingBoxIds.remove(t._2))
+          Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+        }
+      }
+
+    ergoTreeT8HexByUtxo
+      .removeAllOrFail(inputIds)
   }
 
-  def persistErgoTreeT8Utxos(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
-    outputRecords.byErgoTreeT8
-      .collect { case (ergoTreeT8, boxes) =>
-        utxosByErgoTreeT8Hex
-          .adjustAndForget(
-            ergoTreeT8.hex,
-            boxes.iterator.map(_.boxId),
-            boxes.size
-          )
-          .get
-      }
-  }
-
-  def persistErgoTreeUtxos(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
+  // TODO parallel writes to 2 different NvMaps
+  def persistErgoTreeByUtxo(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
     outputRecords.byErgoTree
-      .map { case (ergoTreeHex, boxes) =>
+      .foreach { case (ergoTreeHex, boxes) =>
         ergoTreeHexByUtxo
           .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> ergoTreeHex.hex))
           .flatMap { _ =>
             utxosByErgoTreeHex.adjustAndForget(ergoTreeHex.hex, boxes.iterator.map(_.boxId), boxes.size)
+          }
+          .get
+      }
+  }
+  def persistErgoTreeT8ByUtxo(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
+    outputRecords.byErgoTreeT8
+      .foreach { case (ergoTreeT8, boxes) =>
+        ergoTreeT8HexByUtxo
+          .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> ergoTreeT8.hex))
+          .flatMap { _ =>
+            utxosByErgoTreeT8Hex.adjustAndForget(ergoTreeT8.hex, boxes.iterator.map(_.boxId), boxes.size)
           }
           .get
       }
@@ -213,7 +219,11 @@ case class MvStorage(
       .getOrElse(Map.empty)
 
   def isEmpty: Boolean =
-    utxosByErgoTreeHex.isEmpty && ergoTreeHexByUtxo.isEmpty && blockIdsByHeight.isEmpty && blockById.isEmpty
+    utxosByErgoTreeHex.isEmpty &&
+      ergoTreeHexByUtxo.isEmpty &&
+      ergoTreeT8HexByUtxo.isEmpty &&
+      blockIdsByHeight.isEmpty &&
+      blockById.isEmpty
 
   def getLastHeight: Option[Height] = blockIdsByHeight.lastKey
 
@@ -230,6 +240,8 @@ case class MvStorage(
   def getBlockById(blockId: BlockId): Option[Block] = blockById.get(blockId)
 
   def getErgoTreeHexByUtxo(boxId: BoxId): Option[ErgoTreeHex] = ergoTreeHexByUtxo.get(boxId)
+
+  def getErgoTreeT8HexByUtxo(boxId: BoxId): Option[ErgoTreeT8Hex] = ergoTreeT8HexByUtxo.get(boxId)
 
   def findMissingHeights: TreeSet[Height] = {
     val lastHeight = getLastHeight
@@ -273,6 +285,7 @@ object MvStorage {
                 multiset.MultiMvSet[ErgoTreeHex, util.Set, BoxId]("utxosByErgoTreeHex"),
                 multiset.MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
                 MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
+                MvMap[BoxId, ErgoTreeT8Hex]("ergoTreeT8HexByUtxo"),
                 MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
                 MvMap[BlockId, Block]("blockById")
               )(store, mvStoreConf.get)

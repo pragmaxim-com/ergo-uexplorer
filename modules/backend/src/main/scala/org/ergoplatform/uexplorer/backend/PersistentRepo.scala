@@ -27,10 +27,10 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
 
   override def removeBlocks(blockIds: Set[BlockId]): Task[Unit] = blockRepo.delete(blockIds).unit
 
-  override def writeBlock(b: NormalizedBlock)(preTx: Task[Any], postTx: Task[Any]): Task[BlockId] = {
+  override def writeBlock(b: LinkedBlock)(preTx: Task[Any], postTx: Task[Any]): Task[BlockId] = {
     val outputs = b.outputRecords
-    val inputs  = b.inputRecords.byErgoTree
-    persistBlockInTx(b.block, outputs, inputs.flatMap(_._2), preTx, postTx)
+    val inputs  = b.b.transactions.transactions.flatMap(_.inputs.map(_.boxId))
+    persistBlockInTx(b.block, outputs, inputs, preTx, postTx)
   }
 
   private def persistBlockInTx(

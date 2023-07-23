@@ -12,7 +12,7 @@ trait Backend {
 
   def removeBlocks(blockIds: Set[BlockId]): Task[Unit]
 
-  def writeBlock(b: NormalizedBlock, condition: Task[Any]): Task[BlockId]
+  def writeBlock(b: LinkedBlock, condition: Task[Any]): Task[BlockId]
 
   def close(): Task[Unit]
 }
