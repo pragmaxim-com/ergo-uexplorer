@@ -14,7 +14,9 @@ object Const {
 
   object Protocol {
 
-    val genesisBlockId = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
+    val genesisBlockId      = BlockId.fromStringUnsafe("0000000000000000000000000000000000000000000000000000000000000000")
+    val firstBlockId        = BlockId.fromStringUnsafe("b0244dfc267baca974a4caee06120321562784303a8a688976ae56170e4d175b")
+    val firstBlockRewardBox = BoxId("45dc27302332bcb93604ae63c0a543894b38af31e6aebdb40291e3e8ecaef031")
 
     object Emission {
       val tx                     = TxId("4c6282be413c6e300a530618b37790be5f286ded758accc2aebd41554a1be308")

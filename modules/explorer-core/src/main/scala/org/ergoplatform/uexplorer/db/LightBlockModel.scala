@@ -6,17 +6,10 @@ import org.ergoplatform.uexplorer.Address.unwrappedAddress
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
 import org.ergoplatform.uexplorer.HexString.unwrapped
-
 import scala.collection.mutable
-
-trait BoxLike {
-  def boxId: BoxId
-  def blockId: BlockId
-  def txId: TxId
-  def ergoTreeHash: ErgoTreeHash
-  def ergoTreeT8Hash: Option[ErgoTreeT8Hash]
-  def ergValue: Value
-}
+import zio.json.*
+import zio.*
+import zio.json.interop.refined._
 
 case class Box(
   boxId: BoxId,
@@ -25,7 +18,12 @@ case class Box(
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
   ergValue: Value
-) extends BoxLike
+)
+
+object Box {
+  implicit val encoder: JsonEncoder[Box] = DeriveJsonEncoder.gen[Box]
+  implicit val decoder: JsonDecoder[Box] = DeriveJsonDecoder.gen[Box]
+}
 
 case class Utxo(
   boxId: BoxId,
@@ -34,8 +32,13 @@ case class Utxo(
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
   ergValue: Value
-) extends BoxLike {
+) {
   def toBox = Box(boxId, blockId, txId, ergoTreeHash, ergoTreeT8Hash, ergValue)
+}
+
+object Utxo {
+  implicit val encoder: JsonEncoder[Utxo] = DeriveJsonEncoder.gen[Utxo]
+  implicit val decoder: JsonDecoder[Utxo] = DeriveJsonDecoder.gen[Utxo]
 }
 
 case class ErgoTree(hash: ErgoTreeHash, blockId: BlockId, hex: ErgoTreeHex)
@@ -99,4 +102,8 @@ final case class Block(
   ) // kryo needs a no-arg constructor
 
   def persistable(revision: Revision): Block = copy(revision = revision)
+}
+
+object Block {
+  implicit val encoder: JsonEncoder[Block] = DeriveJsonEncoder.gen[Block]
 }

@@ -36,7 +36,7 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
   private def persistBlockInTx(
     block: Block,
     outputs: OutputRecords,
-    inputs: Iterable[BoxId],
+    inputIds: Iterable[BoxId],
     preTx: Task[Any],
     postTx: Task[Any]
   ): Task[BlockId] = {
@@ -49,7 +49,7 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
           _       <- preTx
           blockId <- blockRepo.insert(block)
           _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, utxos)
-          _       <- boxRepo.deleteUtxos(inputs)
+          _       <- boxRepo.deleteUtxos(inputIds)
           _       <- postTx
         yield blockId
       }

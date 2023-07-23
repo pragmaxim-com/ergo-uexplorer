@@ -20,9 +20,9 @@ trait BoxRepo:
 
   def lookupUtxo(boxId: BoxId): Task[Option[Utxo]]
 
-  def lookupBoxes(boxes: Iterable[BoxId]): Task[List[Box]]
+  def lookupBoxes(boxes: Set[BoxId]): Task[List[Box]]
 
-  def lookupUtxos(boxes: Iterable[BoxId]): Task[List[Utxo]]
+  def lookupUtxos(boxes: Set[BoxId]): Task[List[Utxo]]
 
   def isEmpty: Task[Boolean]
 
@@ -46,10 +46,10 @@ object BoxRepo:
   def lookupUtxo(boxId: BoxId): ZIO[BoxRepo, Throwable, Option[Utxo]] =
     ZIO.serviceWithZIO[BoxRepo](_.lookupUtxo(boxId))
 
-  def lookupBoxes(boxes: Iterable[BoxId]): ZIO[BoxRepo, Throwable, List[Box]] =
+  def lookupBoxes(boxes: Set[BoxId]): ZIO[BoxRepo, Throwable, List[Box]] =
     ZIO.serviceWithZIO[BoxRepo](_.lookupBoxes(boxes))
 
-  def lookupUtxos(boxes: Iterable[BoxId]): ZIO[BoxRepo, Throwable, List[Utxo]] =
+  def lookupUtxos(boxes: Set[BoxId]): ZIO[BoxRepo, Throwable, List[Utxo]] =
     ZIO.serviceWithZIO[BoxRepo](_.lookupUtxos(boxes))
 
   def isEmpty: ZIO[BoxRepo, Throwable, Boolean] =

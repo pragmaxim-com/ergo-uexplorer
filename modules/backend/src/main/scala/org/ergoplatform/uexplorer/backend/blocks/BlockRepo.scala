@@ -15,7 +15,7 @@ trait BlockRepo:
 
   def delete(blockId: BlockId): Task[Long]
 
-  def delete(blockIds: Iterable[BlockId]): Task[Long]
+  def delete(blockIds: Set[BlockId]): Task[Long]
 
 object BlockRepo:
   def insert(block: Block): ZIO[BlockRepo, Throwable, BlockId] =
@@ -33,5 +33,5 @@ object BlockRepo:
   def delete(blockId: BlockId): ZIO[BlockRepo, Throwable, Long] =
     ZIO.serviceWithZIO[BlockRepo](_.delete(blockId))
 
-  def delete(ids: Iterable[BlockId]): ZIO[BlockRepo, Throwable, Long] =
+  def delete(ids: Set[BlockId]): ZIO[BlockRepo, Throwable, Long] =
     ZIO.serviceWithZIO[BlockRepo](_.delete(ids))

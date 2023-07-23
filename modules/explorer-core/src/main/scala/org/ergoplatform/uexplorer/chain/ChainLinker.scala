@@ -36,6 +36,8 @@ object ChainTip {
     new ChainTip(newFifoMap)
   }
 
+  def empty: ChainTip = ChainTip(List.empty)
+
   class FifoLinkedHashMap[K, V](maxSize: Int = 100) extends util.LinkedHashMap[K, V] {
     override def removeEldestEntry(eldest: java.util.Map.Entry[K, V]): Boolean = this.size > maxSize
   }

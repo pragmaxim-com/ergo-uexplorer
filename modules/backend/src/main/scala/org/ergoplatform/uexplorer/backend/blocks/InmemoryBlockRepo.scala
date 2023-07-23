@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.backend.blocks
 
 import org.ergoplatform.uexplorer.BlockId
+import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.db.Block
 import zio.*
 
@@ -21,11 +22,16 @@ case class InmemoryBlockRepo(map: Ref[Map[BlockId, Block]]) extends BlockRepo:
 
   override def delete(blockId: BlockId): Task[Long] = map.update(_ - blockId).as(1)
 
-  override def delete(blockIds: Iterable[BlockId]): Task[Long] = map.update(_ -- blockIds).as(1)
+  override def delete(blockIds: Set[BlockId]): Task[Long] = map.update(_ -- blockIds).as(1)
 
 object InmemoryBlockRepo {
   def layer: ZLayer[Any, Nothing, InmemoryBlockRepo] =
     ZLayer.fromZIO(
-      Ref.make(Map.empty[BlockId, Block]).map(new InmemoryBlockRepo(_))
+      Ref.make(Map.empty).map(new InmemoryBlockRepo(_))
+    )
+
+  def layerWithBlocks(blocks: List[Block]): ZLayer[Any, Nothing, InmemoryBlockRepo] =
+    ZLayer.fromZIO(
+      Ref.make(blocks.map(b => b.blockId -> b).toMap).map(new InmemoryBlockRepo(_))
     )
 }

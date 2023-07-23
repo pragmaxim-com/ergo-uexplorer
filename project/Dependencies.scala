@@ -34,19 +34,21 @@ object Dependencies {
   lazy val kryo = "com.esotericsoftware" % "kryo" % "5.5.0"
 
   def zio(v: String) = Seq(
-    "dev.zio"     % s"zio-streams_$v"         % "2.0.15",
-    "dev.zio"     % s"zio_$v"                 % Version.zio,
-    "dev.zio"     % s"zio-http_$v"            % "3.0.0-RC2",
-    "dev.zio"     % s"zio-json_$v"            % "0.5.0",
-    "io.getquill" % s"quill-jdbc_$v"          % "4.6.0.1",
-    "io.getquill" % s"quill-jdbc-zio_$v"      % "4.6.0.1",
-    "dev.zio"     % s"zio-config_$v"          % "4.0.0-RC16",
-    "dev.zio"     % s"zio-config-typesafe_$v" % "4.0.0-RC16",
-    "dev.zio"     % s"zio-config-magnolia_$v" % "4.0.0-RC16",
-    "dev.zio"     % s"zio-config-refined_$v"  % "4.0.0-RC16",
-    "dev.zio"     % s"zio-logging_$v"         % "2.1.13",
-    "nl.vroste"   % s"rezilience_$v"          % "0.9.4",
-    "dev.zio"     % s"zio-logging-slf4j2_$v"  % "2.1.13"
+    "dev.zio"     % s"zio-streams_$v"              % "2.0.15",
+    "dev.zio"     % s"zio_$v"                      % Version.zio,
+    "dev.zio"     % s"zio-http_$v"                 % "3.0.0-RC2",
+    "dev.zio"     % s"zio-http-testkit_$v"         % "3.0.0-RC2",
+    "dev.zio"     % s"zio-json_$v"                 % "0.6.0",
+    "dev.zio"     % s"zio-json-interop-refined_$v" % "0.6.0",
+    "io.getquill" % s"quill-jdbc_$v"               % "4.6.0.1",
+    "io.getquill" % s"quill-jdbc-zio_$v"           % "4.6.0.1",
+    "dev.zio"     % s"zio-config_$v"               % "4.0.0-RC16",
+    "dev.zio"     % s"zio-config-typesafe_$v"      % "4.0.0-RC16",
+    "dev.zio"     % s"zio-config-magnolia_$v"      % "4.0.0-RC16",
+    "dev.zio"     % s"zio-config-refined_$v"       % "4.0.0-RC16",
+    "dev.zio"     % s"zio-logging_$v"              % "2.1.13",
+    "nl.vroste"   % s"rezilience_$v"               % "0.9.4",
+    "dev.zio"     % s"zio-logging-slf4j2_$v"       % "2.1.13"
   ) ++ zioTest(v)
 
   lazy val cassandraDb = List(

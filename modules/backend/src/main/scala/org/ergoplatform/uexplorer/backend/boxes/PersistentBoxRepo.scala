@@ -49,7 +49,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
   ): Task[Iterable[BoxId]] =
     (for {
       _ <- ZIO.foreachDiscard(ergoTrees)(et => ctx.run(insertErgoTreeQuery(et))) // todo 298
-      _ <- ZIO.foreachDiscard(ergoTreeT8s)(et => ctx.run(insertErgoTreeT8Query(et)))
+      _ <- ZIO.foreachDiscard(ergoTreeT8s)(etT8 => ctx.run(insertErgoTreeT8Query(etT8)))
       _ <- ctx.run(insertBoxesQuery(utxos.map(_.toBox)))
       _ <- ctx.run(insertUtxosQuery(utxos))
     } yield utxos.map(_.boxId)).provide(dsLayer)
@@ -94,7 +94,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       .provide(dsLayer)
       .map(_.headOption)
 
-  override def lookupBoxes(ids: Iterable[BoxId]): Task[List[Box]] =
+  override def lookupBoxes(ids: Set[BoxId]): Task[List[Box]] =
     ctx
       .run {
         quote {
@@ -104,7 +104,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       }
       .provide(dsLayer)
 
-  override def lookupUtxos(ids: Iterable[BoxId]): Task[List[Utxo]] =
+  override def lookupUtxos(ids: Set[BoxId]): Task[List[Utxo]] =
     ctx
       .run {
         quote {
