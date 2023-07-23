@@ -68,7 +68,7 @@ object BoxRoutes extends Codecs:
                    BoxRepo
                      .lookupUtxos(boxIds)
                      .flatMap { utxos =>
-                       val utxoIds = utxos.map(_.boxId)
+                       val utxoIds = utxos.map(_.boxId).toSet
                        BoxRepo
                          .lookupBoxes(boxIds)
                          .map(allBoxes => allBoxes.filter(b => !utxoIds.contains(b.boxId)))
