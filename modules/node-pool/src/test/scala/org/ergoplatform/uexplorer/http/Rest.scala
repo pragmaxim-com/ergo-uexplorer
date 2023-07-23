@@ -7,7 +7,7 @@ import org.ergoplatform.uexplorer.chain.{BlockProcessor, ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.LinkedBlock
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import zio.stream.{ZSink, ZStream}
-import zio.{Task, ZIO}
+import zio.{Chunk, Task, ZIO}
 
 import java.io.BufferedInputStream
 import java.util.zip.GZIPInputStream
@@ -63,11 +63,11 @@ object Rest {
   }
 
   object chain {
-    def forHeights(heights: Iterable[Height])(implicit ps: ProtocolSettings): ZIO[Any, Throwable, Set[LinkedBlock]] =
+    def forHeights(heights: Iterable[Height])(implicit ps: ProtocolSettings): ZIO[Any, Throwable, Chunk[LinkedBlock]] =
       BlockProcessor
         .processingFlow(ChainLinker(blocks.getById, ChainTip.empty))
         .map(_.head)
         .apply(blocks.stream(heights))
-        .run(ZSink.collectAllToSet)
+        .run(ZSink.collectAll)
   }
 }
