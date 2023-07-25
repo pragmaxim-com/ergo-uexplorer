@@ -27,6 +27,12 @@ object ErgoTreeParser {
     constants.nonEmpty
   }
 
+  def ergoTreeHex2Hash(ergoTreeHex: ErgoTreeHex): Task[ErgoTreeHash] = ZIO.fromTry(
+    ergoTreeHex2ErgoTree(ergoTreeHex).map { ergoTree =>
+      ErgoTreeHash.fromStringUnsafe(Base16.encode(Sha256.hash(ergoTree.bytes)))
+    }
+  )
+
   @inline def ergoTreeHex2T8Hex(
     ergoTree: ErgoTreeHex
   )(implicit enc: ErgoAddressEncoder): Task[Option[ErgoTreeT8Hex]] =
