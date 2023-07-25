@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
 import org.ergoplatform.uexplorer.backend.Codecs
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, ErgoTreeHash, ErgoTreeHex}
 import zio.*
 import zio.http.*
 import zio.json.*
@@ -69,6 +69,42 @@ object BoxRoutes extends Codecs:
       case Method.GET -> Root / "boxes" / "any" / "addresses" / address =>
         BoxService
           .getAnyBoxesByAddress(Address.fromStringUnsafe(address))
+          .map(boxes => Response.json(boxes.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "spent" / "ergo-trees" / ergoTree =>
+        BoxService
+          .getSpentBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
+          .map(boxes => Response.json(boxes.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "unspent" / "ergo-trees" / ergoTree =>
+        BoxService
+          .getUnspentBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
+          .map(utxos => Response.json(utxos.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "any" / "ergo-trees" / ergoTree =>
+        BoxService
+          .getAnyBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
+          .map(boxes => Response.json(boxes.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "spent" / "ergo-tree-hashes" / ergoTreeHash =>
+        BoxService
+          .getSpentBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
+          .map(boxes => Response.json(boxes.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "unspent" / "ergo-tree-hashes" / ergoTreeHash =>
+        BoxService
+          .getUnspentBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
+          .map(utxos => Response.json(utxos.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "any" / "ergo-tree-hashes" / ergoTreeHash =>
+        BoxService
+          .getAnyBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
