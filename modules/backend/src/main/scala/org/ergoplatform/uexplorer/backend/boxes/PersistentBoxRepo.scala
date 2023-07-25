@@ -3,11 +3,12 @@ package org.ergoplatform.uexplorer.backend.boxes
 import io.getquill.*
 import io.getquill.context.ZioJdbc.DataSourceLayer
 import io.getquill.jdbczio.Quill
-import org.ergoplatform.uexplorer.BoxId
+import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHash}
 import org.ergoplatform.uexplorer.backend.Codecs
 import org.ergoplatform.uexplorer.db.*
 import zio.*
 
+import java.sql.SQLException
 import java.util.UUID
 import javax.sql.DataSource
 
@@ -100,6 +101,30 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
         quote {
           query[Box]
             .filter(p => liftQuery(ids).contains(p.boxId))
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupBoxesByHash(etHash: ErgoTreeHash): Task[Iterable[Box]] =
+    ctx
+      .run {
+        quote {
+          query[ErgoTree]
+            .join(query[Box])
+            .on((et, box) => et.hash == box.ergoTreeHash)
+            .map((_, box) => Box(box.boxId, box.blockId, box.txId, box.ergoTreeHash, box.ergoTreeT8Hash, box.ergValue))
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupUtxosByHash(etHash: ErgoTreeHash): Task[Iterable[Utxo]] =
+    ctx
+      .run {
+        quote {
+          query[ErgoTree]
+            .join(query[Utxo])
+            .on((et, utxo) => et.hash == utxo.ergoTreeHash)
+            .map((_, utxo) => Utxo(utxo.boxId, utxo.blockId, utxo.txId, utxo.ergoTreeHash, utxo.ergoTreeT8Hash, utxo.ergValue))
         }
       }
       .provide(dsLayer)

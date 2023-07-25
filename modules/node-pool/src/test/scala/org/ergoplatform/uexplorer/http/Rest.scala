@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.http
 
 import io.circe.parser.*
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.{BlockId, Height, HexString, ProtocolSettings}
+import org.ergoplatform.uexplorer.{BlockId, Height, HexString, CoreConf}
 import org.ergoplatform.uexplorer.chain.{BlockProcessor, ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.LinkedBlock
 import org.ergoplatform.uexplorer.node.ApiFullBlock
@@ -63,7 +63,7 @@ object Rest {
   }
 
   object chain {
-    def forHeights(heights: Iterable[Height])(implicit ps: ProtocolSettings): ZIO[Any, Throwable, Chunk[LinkedBlock]] =
+    def forHeights(heights: Iterable[Height])(implicit ps: CoreConf): ZIO[Any, Throwable, Chunk[LinkedBlock]] =
       BlockProcessor
         .processingFlow(ChainLinker(blocks.getById, ChainTip.empty))
         .map(_.head)

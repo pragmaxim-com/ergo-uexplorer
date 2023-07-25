@@ -43,7 +43,7 @@ object ChainTip {
   }
 }
 
-class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(implicit ps: ProtocolSettings) {
+class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(implicit ps: CoreConf) {
 
   def linkChildToAncestors(acc: List[LinkedBlock] = List.empty)(
     block: BlockWithOutputs

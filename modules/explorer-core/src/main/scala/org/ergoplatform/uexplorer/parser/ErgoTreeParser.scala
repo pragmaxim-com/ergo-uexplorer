@@ -11,8 +11,9 @@ import sigmastate.*
 import sigmastate.Values.{ErgoTree, FalseLeaf, SigmaPropConstant, Value}
 import sigmastate.basics.DLogProtocol.ProveDlogProp
 import sigmastate.serialization.{ErgoTreeSerializer, SigmaSerializer}
+import zio.{Task, ZIO}
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 object ErgoTreeParser {
 
@@ -28,8 +29,8 @@ object ErgoTreeParser {
 
   @inline def ergoTreeHex2T8Hex(
     ergoTree: ErgoTreeHex
-  )(implicit enc: ErgoAddressEncoder): Try[Option[ErgoTreeT8Hex]] =
-    Base16.decode(ergoTree).map {
+  )(implicit enc: ErgoAddressEncoder): Task[Option[ErgoTreeT8Hex]] =
+    ZIO.fromTry(Base16.decode(ergoTree)).map {
       case bytes if isErgoTreeT8(bytes) =>
         val tree = treeSerializer.deserializeErgoTree(bytes)
         val t8Opt =
@@ -82,33 +83,44 @@ object ErgoTreeParser {
       .flatMap(enc.fromProposition)
       .getOrElse(Pay2SAddress(FalseLeaf.toSigmaProp): ErgoAddress)
 
-  @inline def ergoAddress2Base58Address(address: ErgoAddress)(implicit enc: ErgoAddressEncoder): Try[Address] = Try {
-    val withNetworkByte = (enc.networkPrefix + address.addressTypePrefix).toByte +: address.contentBytes
-    val checksum        = ErgoAddressEncoder.hash256(withNetworkByte).take(ErgoAddressEncoder.ChecksumLength)
-    // avoiding Address.fromStringUnsafe, as Base58 produced valid result for all Ergo addresses so far
-    Base58.encode(withNetworkByte ++ checksum).asInstanceOf[Address]
-  }
+  @inline def ergoAddress2Base58Address(address: ErgoAddress)(implicit enc: ErgoAddressEncoder): Task[Address] =
+    ZIO.attempt {
+      val withNetworkByte = (enc.networkPrefix + address.addressTypePrefix).toByte +: address.contentBytes
+      val checksum        = ErgoAddressEncoder.hash256(withNetworkByte).take(ErgoAddressEncoder.ChecksumLength)
+      // avoiding Address.fromStringUnsafe, as Base58 produced valid result for all Ergo addresses so far
+      Base58.encode(withNetworkByte ++ checksum).asInstanceOf[Address]
+    }
 
-  @inline def base58Address2ErgoTreeHex(address: Address)(implicit enc: ErgoAddressEncoder): Try[ErgoTreeHex] =
+  @inline def base58Address2ErgoTreeHex(address: Address)(implicit enc: ErgoAddressEncoder): Task[ErgoTreeHex] =
     base58Address2ErgoTree(address).map { ergoTree =>
       ErgoTreeHex.fromStringUnsafe(Base16.encode(ergoTree.bytes))
     }
 
+  @inline def base58Address2ErgoTreeHash(address: Address)(implicit enc: ErgoAddressEncoder): Task[ErgoTreeHash] =
+    base58Address2ErgoTree(address).map { ergoTree =>
+      ErgoTreeHash.fromStringUnsafe(Base16.encode(Sha256.hash(ergoTree.bytes)))
+    }
+
   @inline def base58Address2ErgoTreeT8Hex(
     address: Address
-  )(implicit enc: ErgoAddressEncoder): Try[ErgoTreeT8Hex] =
+  )(implicit enc: ErgoAddressEncoder): Task[ErgoTreeT8Hex] =
     base58Address2ErgoTree(address).map { ergoTree =>
       ErgoTreeT8Hex.fromStringUnsafe(Base16.encode(ergoTree.template))
     }
 
-  @inline def base58Address2ErgoTree(address: Address)(implicit enc: ErgoAddressEncoder): Try[ErgoTree] =
-    base58AddressToErgoAddress(address).map(_.script)
+  @inline def base58Address2ErgoTreeT8Hash(address: Address)(implicit enc: ErgoAddressEncoder): Task[ErgoTreeT8Hash] =
+    base58Address2ErgoTree(address).map { ergoTree =>
+      ErgoTreeT8Hex.fromStringUnsafe(Base16.encode(Sha256.hash(ergoTree.template)))
+    }
 
-  @inline def ergoTreeHex2Base58Address(ergoTreeHex: ErgoTreeHex)(implicit enc: ErgoAddressEncoder): Try[Address] =
+  @inline def base58Address2ErgoTree(address: Address)(implicit enc: ErgoAddressEncoder): Task[ErgoTree] =
+    ZIO.fromTry(enc.fromString(address).map(_.script))
+
+  @inline def ergoTreeHex2Base58Address(ergoTreeHex: ErgoTreeHex)(implicit enc: ErgoAddressEncoder): Task[Address] =
     ergoAddress2Base58Address(ergoTreeHex2ErgoAddress(ergoTreeHex))
 
-  def base58AddressToErgoAddress(address: Address)(implicit enc: ErgoAddressEncoder): Try[ErgoAddress] =
-    enc.fromString(address)
+  def base58AddressToErgoAddress(address: Address)(implicit enc: ErgoAddressEncoder): Task[ErgoAddress] =
+    ZIO.fromTry(enc.fromString(address))
 
   def ergoTreeToHex(ergoTree: ErgoTree): ErgoTreeHex = ErgoTreeHex.fromStringUnsafe(Base16.encode(ergoTree.bytes))
 }

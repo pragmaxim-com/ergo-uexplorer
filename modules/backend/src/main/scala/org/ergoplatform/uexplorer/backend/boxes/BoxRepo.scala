@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.{BlockId, BoxId}
+import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHash}
 import zio.*
 
 trait BoxRepo:
@@ -21,6 +21,10 @@ trait BoxRepo:
   def lookupUtxo(boxId: BoxId): Task[Option[Utxo]]
 
   def lookupBoxes(boxes: Set[BoxId]): Task[List[Box]]
+
+  def lookupBoxesByHash(etHash: ErgoTreeHash): Task[Iterable[Box]]
+
+  def lookupUtxosByHash(etHash: ErgoTreeHash): Task[Iterable[Utxo]]
 
   def lookupUtxos(boxes: Set[BoxId]): Task[List[Utxo]]
 
@@ -46,10 +50,10 @@ object BoxRepo:
   def lookupUtxo(boxId: BoxId): ZIO[BoxRepo, Throwable, Option[Utxo]] =
     ZIO.serviceWithZIO[BoxRepo](_.lookupUtxo(boxId))
 
-  def lookupBoxes(boxes: Set[BoxId]): ZIO[BoxRepo, Throwable, List[Box]] =
+  def lookupBoxes(boxes: Set[BoxId]): ZIO[BoxRepo, Throwable, Iterable[Box]] =
     ZIO.serviceWithZIO[BoxRepo](_.lookupBoxes(boxes))
 
-  def lookupUtxos(boxes: Set[BoxId]): ZIO[BoxRepo, Throwable, List[Utxo]] =
+  def lookupUtxos(boxes: Set[BoxId]): ZIO[BoxRepo, Throwable, Iterable[Utxo]] =
     ZIO.serviceWithZIO[BoxRepo](_.lookupUtxos(boxes))
 
   def isEmpty: ZIO[BoxRepo, Throwable, Boolean] =

@@ -20,7 +20,7 @@ object RewardCalculator {
   // CPU greedy (2% of all runtime)
   private def getMinerRewardAddress(
     apiBlock: ApiFullBlock
-  )(implicit ps: ProtocolSettings): Task[Address] =
+  )(implicit ps: CoreConf): Task[Address] =
     ZIO
       .fromTry(Base16.decode(apiBlock.header.minerPk))
       .map { bytes =>
@@ -35,7 +35,7 @@ object RewardCalculator {
         Address.fromStringUnsafe(addressStr)
       }
 
-  private def getMinerRewardAndFee(apiBlock: ApiFullBlock)(implicit ps: ProtocolSettings): (Long, Long) = {
+  private def getMinerRewardAndFee(apiBlock: ApiFullBlock)(implicit ps: CoreConf): (Long, Long) = {
     val emission = ps.emission.emissionAtHeight(apiBlock.header.height.toLong)
     val reward   = math.min(Const.TeamTreasuryThreshold, emission)
     val eip27Reward =
@@ -57,7 +57,7 @@ object RewardCalculator {
     }
   }
 
-  def apply(block: ApiFullBlock)(implicit ps: ProtocolSettings): Task[BlockWithReward] =
+  def apply(block: ApiFullBlock)(implicit ps: CoreConf): Task[BlockWithReward] =
     for {
       minerRewardAddress <- getMinerRewardAddress(block)
       (reward, fee) = getMinerRewardAndFee(block)
