@@ -6,7 +6,7 @@ import io.getquill.jdbczio.Quill
 import io.getquill.util.LoadConfig
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, BlockRoutes, PersistentBlockRepo}
-import org.ergoplatform.uexplorer.backend.boxes.{BoxRepo, BoxRoutes, PersistentBoxRepo}
+import org.ergoplatform.uexplorer.backend.boxes.{BoxRepo, BoxRoutes, BoxService, PersistentBoxRepo}
 import org.ergoplatform.uexplorer.db.{Backend, BestBlockInserted, Block, LinkedBlock}
 import zio.http.Server
 import zio.{Exit, Promise, Scope, Task, Unsafe, ZIO, ZLayer}
@@ -22,7 +22,7 @@ import scala.util.Try
 
 object H2Backend extends Backend {
 
-  def server(): ZIO[DataSource with BoxRepo with BlockRepo, Throwable, Fiber.Runtime[Nothing, Nothing]] =
+  def server(): ZIO[DataSource with BoxService with BlockRepo, Throwable, Fiber.Runtime[Nothing, Nothing]] =
     Server
       .serve((BlockRoutes() ++ BoxRoutes()).withDefaultErrorResponse)
       .fork

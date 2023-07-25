@@ -2,11 +2,11 @@ package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
-import org.ergoplatform.uexplorer.{Address, BlockId, ErgoTreeHex, ProtocolSettings, Revision}
+import org.ergoplatform.uexplorer.{Address, BlockId, CoreConf, ErgoTreeHex, Revision}
 
 object BlockBuilder:
   def apply(ppBlock: BlockWithOutputs, prevBlock: Option[Block])(implicit
-    protocolSettings: ProtocolSettings
+    coreConf: CoreConf
   ): Block = {
     val MinerRewardInfo(reward, fee, minerAddress) = ppBlock.minerRewardInfo
     val coinBaseValue                              = reward + fee
@@ -46,7 +46,7 @@ object BlockBuilder:
       totalTxsCount = ppBlock.b.transactions.transactions.length.toLong + prevBlock
         .map(_.totalTxsCount)
         .getOrElse(0L),
-      totalCoinsIssued = protocolSettings.emission.issuedCoinsAfterHeight(ppBlock.b.header.height.toLong),
+      totalCoinsIssued = coreConf.emission.issuedCoinsAfterHeight(ppBlock.b.header.height.toLong),
       totalMiningTime = prevBlock
         .map(_.totalMiningTime)
         .getOrElse(0L) + miningTime,

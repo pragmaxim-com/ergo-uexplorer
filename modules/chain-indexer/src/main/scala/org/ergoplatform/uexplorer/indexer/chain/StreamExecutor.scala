@@ -11,7 +11,7 @@ import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.storage.MvStorage
-import org.ergoplatform.uexplorer.{BlockId, Height, ProtocolSettings, ReadableStorage}
+import org.ergoplatform.uexplorer.{BlockId, Height, CoreConf, ReadableStorage}
 
 import java.nio.file.{Path, Paths}
 import java.util.concurrent.ConcurrentHashMap
@@ -30,7 +30,7 @@ case class StreamExecutor(
   conf: ChainIndexerConf
 ) {
 
-  implicit private val ps: ProtocolSettings = conf.protocol
+  implicit private val ps: CoreConf = conf.protocol
 
   def indexNewBlocks: Task[ChainSyncResult] =
     for

@@ -5,7 +5,7 @@ import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.mining.emission.EmissionRules
 import org.ergoplatform.settings.MonetarySettings
 import org.ergoplatform.uexplorer.config.ExplorerConfig
-import org.ergoplatform.uexplorer.{Address, NetworkPrefix, ProtocolSettings}
+import org.ergoplatform.uexplorer.{Address, CoreConf, NetworkPrefix}
 import org.ergoplatform.uexplorer.http.{LocalNodeUriMagnet, NodePoolConf, RemoteNodeUriMagnet}
 import org.ergoplatform.uexplorer.storage.MvStorage.*
 import org.ergoplatform.uexplorer.storage.MvStoreConf
@@ -33,7 +33,7 @@ case class ChainIndexerConf(
   nodePool: NodePoolConf,
   backendType: BackendType,
   graphBackendType: GraphBackendType,
-  protocol: ProtocolSettings,
+  protocol: CoreConf,
   benchmarkMode: Boolean
 )
 

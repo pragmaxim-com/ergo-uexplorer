@@ -6,7 +6,7 @@ import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.db.Backend
 import org.ergoplatform.uexplorer.storage.MvStorage
-import org.ergoplatform.uexplorer.{ProtocolSettings, ReadableStorage, UnexpectedStateError, WritableStorage}
+import org.ergoplatform.uexplorer.{CoreConf, ReadableStorage, UnexpectedStateError, WritableStorage}
 import zio.*
 import zio.prelude.CommutativeBothOps
 
@@ -28,7 +28,7 @@ case class BlockWriter(
   chainIndexerConf: ChainIndexerConf
 ) {
 
-  implicit private val ps: ProtocolSettings    = chainIndexerConf.protocol
+  implicit private val ps: CoreConf    = chainIndexerConf.protocol
   implicit private val enc: ErgoAddressEncoder = ps.addressEncoder
 
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
