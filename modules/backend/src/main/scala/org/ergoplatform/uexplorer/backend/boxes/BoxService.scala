@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
-import org.ergoplatform.uexplorer.{Address, BoxId, CoreConf, ErgoTreeHash, ErgoTreeHex}
+import org.ergoplatform.uexplorer.{Address, BoxId, CoreConf, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hash, ErgoTreeT8Hex}
 import org.ergoplatform.uexplorer.db.{Box, ErgoTree, Utxo}
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import zio.{Task, ZIO, ZLayer}
@@ -79,6 +79,38 @@ case class BoxService(boxRepo: BoxRepo, coreConf: CoreConf) {
 
   def getAnyBoxesByErgoTreeHash(ergoTreeHash: ErgoTreeHash): Task[Iterable[Box]] =
     boxRepo.lookupBoxesByHash(ergoTreeHash)
+
+  def getSpentBoxesByErgoTreeT8(ergoTreeT8Hex: ErgoTreeT8Hex): Task[Iterable[Box]] =
+    for
+      ergoTreeT8Hash <- ErgoTreeParser.ergoTreeHex2Hash(ergoTreeT8Hex)
+      boxes          <- boxRepo.lookupBoxesByT8Hash(ergoTreeT8Hash)
+      utxoIds        <- boxRepo.lookupUtxosByT8Hash(ergoTreeT8Hash).map(_.map(_.boxId).toSet)
+    yield boxes.filter(b => !utxoIds.contains(b.boxId))
+
+  def getUnspentBoxesByErgoTreeT8(ergoTreeT8Hex: ErgoTreeHex): Task[Iterable[Utxo]] =
+    for
+      ergoTreeHash <- ErgoTreeParser.ergoTreeHex2Hash(ergoTreeT8Hex)
+      utxos        <- boxRepo.lookupUtxosByT8Hash(ergoTreeHash)
+    yield utxos
+
+  def getAnyBoxesByErgoTreeT8(ergoTreeT8Hex: ErgoTreeT8Hex): Task[Iterable[Box]] =
+    for
+      ergoTreeT8Hash <- ErgoTreeParser.ergoTreeHex2Hash(ergoTreeT8Hex)
+      boxes          <- boxRepo.lookupBoxesByT8Hash(ergoTreeT8Hash)
+    yield boxes
+
+  def getSpentBoxesByErgoTreeT8Hash(ergoTreeT8Hash: ErgoTreeT8Hash): Task[Iterable[Box]] =
+    for
+      boxes   <- boxRepo.lookupBoxesByT8Hash(ergoTreeT8Hash)
+      utxoIds <- boxRepo.lookupUtxosByT8Hash(ergoTreeT8Hash).map(_.map(_.boxId).toSet)
+    yield boxes.filter(b => !utxoIds.contains(b.boxId))
+
+  def getUnspentBoxesByErgoTreeT8Hash(ergoTreeT8Hash: ErgoTreeT8Hash): Task[Iterable[Utxo]] =
+    boxRepo.lookupUtxosByT8Hash(ergoTreeT8Hash)
+
+  def getAnyBoxesByErgoTreeT8Hash(ergoTreeT8Hash: ErgoTreeT8Hash): Task[Iterable[Box]] =
+    boxRepo.lookupBoxesByT8Hash(ergoTreeT8Hash)
+
 }
 
 object BoxService {
@@ -130,5 +162,23 @@ object BoxService {
 
   def getAnyBoxesByErgoTreeHash(ergoTreeHash: ErgoTreeHash): ZIO[BoxService, Throwable, Iterable[Box]] =
     ZIO.serviceWithZIO[BoxService](_.getAnyBoxesByErgoTreeHash(ergoTreeHash))
+
+  def getSpentBoxesByErgoTreeT8(ergoTreeT8: ErgoTreeT8Hex): ZIO[BoxService, Throwable, Iterable[Box]] =
+    ZIO.serviceWithZIO[BoxService](_.getSpentBoxesByErgoTreeT8(ergoTreeT8))
+
+  def getUnspentBoxesByErgoTreeT8(ergoTreeT8: ErgoTreeT8Hex): ZIO[BoxService, Throwable, Iterable[Utxo]] =
+    ZIO.serviceWithZIO[BoxService](_.getUnspentBoxesByErgoTreeT8(ergoTreeT8))
+
+  def getAnyBoxesByErgoTreeT8(ergoTreeT8: ErgoTreeT8Hex): ZIO[BoxService, Throwable, Iterable[Box]] =
+    ZIO.serviceWithZIO[BoxService](_.getAnyBoxesByErgoTreeT8(ergoTreeT8))
+
+  def getSpentBoxesByErgoTreeT8Hash(ergoTreeHash: ErgoTreeHash): ZIO[BoxService, Throwable, Iterable[Box]] =
+    ZIO.serviceWithZIO[BoxService](_.getSpentBoxesByErgoTreeT8Hash(ergoTreeHash))
+
+  def getUnspentBoxesByErgoTreeT8Hash(ergoTreeHash: ErgoTreeHash): ZIO[BoxService, Throwable, Iterable[Utxo]] =
+    ZIO.serviceWithZIO[BoxService](_.getUnspentBoxesByErgoTreeT8Hash(ergoTreeHash))
+
+  def getAnyBoxesByErgoTreeT8Hash(ergoTreeHash: ErgoTreeHash): ZIO[BoxService, Throwable, Iterable[Box]] =
+    ZIO.serviceWithZIO[BoxService](_.getAnyBoxesByErgoTreeT8Hash(ergoTreeHash))
 
 }

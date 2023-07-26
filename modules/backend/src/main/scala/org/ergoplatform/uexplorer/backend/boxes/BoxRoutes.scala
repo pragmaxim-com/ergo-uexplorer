@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
 import org.ergoplatform.uexplorer.backend.Codecs
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, ErgoTreeHash, ErgoTreeHex}
+import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hex}
 import zio.*
 import zio.http.*
 import zio.json.*
@@ -72,39 +72,75 @@ object BoxRoutes extends Codecs:
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "spent" / "ergo-trees" / ergoTree =>
+      case Method.GET -> Root / "boxes" / "spent" / "contracts" / "ergo-trees" / ergoTree =>
         BoxService
           .getSpentBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "unspent" / "ergo-trees" / ergoTree =>
+      case Method.GET -> Root / "boxes" / "unspent" / "contracts" / "ergo-trees" / ergoTree =>
         BoxService
           .getUnspentBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "any" / "ergo-trees" / ergoTree =>
+      case Method.GET -> Root / "boxes" / "any" / "contracts" / "ergo-trees" / ergoTree =>
         BoxService
           .getAnyBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "spent" / "ergo-tree-hashes" / ergoTreeHash =>
+      case Method.GET -> Root / "boxes" / "spent" / "contracts" / "ergo-tree-hashes" / ergoTreeHash =>
         BoxService
           .getSpentBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "unspent" / "ergo-tree-hashes" / ergoTreeHash =>
+      case Method.GET -> Root / "boxes" / "unspent" / "contracts" / "ergo-tree-hashes" / ergoTreeHash =>
         BoxService
           .getUnspentBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "any" / "ergo-tree-hashes" / ergoTreeHash =>
+      case Method.GET -> Root / "boxes" / "any" / "contracts" / "ergo-tree-hashes" / ergoTreeHash =>
         BoxService
           .getAnyBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
+          .map(boxes => Response.json(boxes.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "spent" / "templates" / "ergo-trees" / ergoTreeT8 =>
+        BoxService
+          .getSpentBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8))
+          .map(boxes => Response.json(boxes.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "unspent" / "templates" / "ergo-trees" / ergoTreeT8 =>
+        BoxService
+          .getUnspentBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8))
+          .map(utxos => Response.json(utxos.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "any" / "templates" / "ergo-trees" / ergoTreeT8 =>
+        BoxService
+          .getAnyBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8))
+          .map(boxes => Response.json(boxes.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "spent" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash =>
+        BoxService
+          .getSpentBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash))
+          .map(boxes => Response.json(boxes.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "unspent" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash =>
+        BoxService
+          .getUnspentBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash))
+          .map(utxos => Response.json(utxos.toJson))
+          .orDie
+
+      case Method.GET -> Root / "boxes" / "any" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash =>
+        BoxService
+          .getAnyBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash))
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 

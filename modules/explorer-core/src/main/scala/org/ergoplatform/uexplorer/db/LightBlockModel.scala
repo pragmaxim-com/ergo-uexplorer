@@ -42,7 +42,7 @@ object Utxo {
 }
 
 case class ErgoTree(hash: ErgoTreeHash, blockId: BlockId, hex: ErgoTreeHex)
-case class ErgoTreeT8(hash: ErgoTreeHash, blockId: BlockId, hex: ErgoTreeHex)
+case class ErgoTreeT8(hash: ErgoTreeT8Hash, blockId: BlockId, hex: ErgoTreeT8Hex)
 
 case class OutputRecords(
   byErgoTree: mutable.Map[ErgoTree, mutable.Set[Utxo]],
