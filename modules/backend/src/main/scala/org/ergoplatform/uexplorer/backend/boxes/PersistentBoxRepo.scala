@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.backend.boxes
 import io.getquill.*
 import io.getquill.context.ZioJdbc.DataSourceLayer
 import io.getquill.jdbczio.Quill
-import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHash}
+import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHash, ErgoTreeT8Hash}
 import org.ergoplatform.uexplorer.backend.Codecs
 import org.ergoplatform.uexplorer.db.*
 import zio.*
@@ -112,6 +112,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
           query[ErgoTree]
             .join(query[Box])
             .on((et, box) => et.hash == box.ergoTreeHash)
+            .filter((et, _) => et.hash == lift(etHash))
             .map((_, box) => Box(box.boxId, box.blockId, box.txId, box.ergoTreeHash, box.ergoTreeT8Hash, box.ergValue))
         }
       }
@@ -124,6 +125,33 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
           query[ErgoTree]
             .join(query[Utxo])
             .on((et, utxo) => et.hash == utxo.ergoTreeHash)
+            .filter((et, _) => et.hash == lift(etHash))
+            .map((_, utxo) => Utxo(utxo.boxId, utxo.blockId, utxo.txId, utxo.ergoTreeHash, utxo.ergoTreeT8Hash, utxo.ergValue))
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupBoxesByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Iterable[Box]] =
+    ctx
+      .run {
+        quote {
+          query[ErgoTreeT8]
+            .join(query[Box])
+            .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
+            .filter((et, _) => et.hash == lift(etT8Hash))
+            .map((_, box) => Box(box.boxId, box.blockId, box.txId, box.ergoTreeHash, box.ergoTreeT8Hash, box.ergValue))
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupUtxosByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Iterable[Utxo]] =
+    ctx
+      .run {
+        quote {
+          query[ErgoTreeT8]
+            .join(query[Utxo])
+            .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
+            .filter((et, _) => et.hash == lift(etT8Hash))
             .map((_, utxo) => Utxo(utxo.boxId, utxo.blockId, utxo.txId, utxo.ergoTreeHash, utxo.ergoTreeT8Hash, utxo.ergValue))
         }
       }

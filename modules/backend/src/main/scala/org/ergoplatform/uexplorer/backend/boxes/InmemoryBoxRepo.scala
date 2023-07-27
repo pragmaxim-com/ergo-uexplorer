@@ -54,6 +54,12 @@ case class InmemoryBoxRepo(state: Ref[BoxRepoState]) extends BoxRepo:
   override def lookupUtxosByHash(etHash: ErgoTreeHash): Task[Iterable[Utxo]] =
     state.get.map(state => state.unspent.collect { case (_, utxo) if utxo.ergoTreeHash == etHash => utxo })
 
+  override def lookupBoxesByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Iterable[Box]] =
+    state.get.map(state => state.boxes.collect { case (_, box) if box.ergoTreeT8Hash == etT8Hash => box })
+
+  override def lookupUtxosByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Iterable[Utxo]] =
+    state.get.map(state => state.unspent.collect { case (_, utxo) if utxo.ergoTreeT8Hash == etT8Hash => utxo })
+
   override def isEmpty: Task[Boolean] =
     state.get.map(s => s.boxes.isEmpty && s.unspent.isEmpty && s.ets.isEmpty && s.etT8s.isEmpty)
 

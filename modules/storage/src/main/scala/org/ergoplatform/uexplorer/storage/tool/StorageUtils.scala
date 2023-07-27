@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.storage.tool
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.{Address, ErgoTreeHex, ErgoTreeT8Hex}
+import zio.{Task, URIO, ZIO}
 
 import java.io.{BufferedInputStream, FileWriter}
 import java.util.zip.GZIPInputStream
@@ -19,41 +20,44 @@ object StorageUtils {
 
   }
 
-  def ergoTreesFromAddresses: Set[ErgoTreeHex] =
-    Source
-      .fromInputStream(
-        new GZIPInputStream(
-          new BufferedInputStream(
-            Thread
-              .currentThread()
-              .getContextClassLoader
-              .getResourceAsStream("hot-addresses.csv.gz")
+  def ergoTreesFromAddresses: Task[Set[ErgoTreeHex]] =
+    ZIO.collectAll(
+      Source
+        .fromInputStream(
+          new GZIPInputStream(
+            new BufferedInputStream(
+              Thread
+                .currentThread()
+                .getContextClassLoader
+                .getResourceAsStream("hot-addresses.csv.gz")
+            )
           )
         )
-      )
-      .getLines()
-      .map(_.trim)
-      .filterNot(_.isEmpty)
-      .map(k => ErgoTreeParser.base58Address2ErgoTreeHex(Address.fromStringUnsafe(k)).get)
-      .toSet
+        .getLines()
+        .map(_.trim)
+        .filterNot(_.isEmpty)
+        .map(k => ErgoTreeParser.base58Address2ErgoTreeHex(Address.fromStringUnsafe(k)))
+        .toSet
+    )
 
-  def ergoTreeT8s: Set[ErgoTreeT8Hex] =
-    Source
-      .fromInputStream(
-        new GZIPInputStream(
-          new BufferedInputStream(
-            Thread
-              .currentThread()
-              .getContextClassLoader
-              .getResourceAsStream("hot-ergo-trees.csv.gz")
+  def ergoTreeT8s: Task[Set[Option[ErgoTreeT8Hex]]] =
+    ZIO.collectAll(
+      Source
+        .fromInputStream(
+          new GZIPInputStream(
+            new BufferedInputStream(
+              Thread
+                .currentThread()
+                .getContextClassLoader
+                .getResourceAsStream("hot-ergo-trees.csv.gz")
+            )
           )
         )
-      )
-      .getLines()
-      .map(_.trim)
-      .filterNot(_.isEmpty)
-      .map(k => ErgoTreeParser.ergoTreeHex2T8Hex(ErgoTreeHex.fromStringUnsafe(k)))
-      .collect { case Success(Some(t8)) => t8 }
-      .toSet
+        .getLines()
+        .map(_.trim)
+        .filterNot(_.isEmpty)
+        .map(k => ErgoTreeParser.ergoTreeHex2T8Hex(ErgoTreeHex.fromStringUnsafe(k)))
+        .toSet
+    )
 
 }
