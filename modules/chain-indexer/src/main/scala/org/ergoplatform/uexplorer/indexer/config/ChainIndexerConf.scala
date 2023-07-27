@@ -33,7 +33,7 @@ case class ChainIndexerConf(
   nodePool: NodePoolConf,
   backendType: BackendType,
   graphBackendType: GraphBackendType,
-  protocol: CoreConf,
+  core: CoreConf,
   benchmarkMode: Boolean
 )
 

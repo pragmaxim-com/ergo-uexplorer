@@ -28,7 +28,7 @@ case class BlockWriter(
   chainIndexerConf: ChainIndexerConf
 ) {
 
-  implicit private val ps: CoreConf    = chainIndexerConf.protocol
+  implicit private val ps: CoreConf    = chainIndexerConf.core
   implicit private val enc: ErgoAddressEncoder = ps.addressEncoder
 
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
