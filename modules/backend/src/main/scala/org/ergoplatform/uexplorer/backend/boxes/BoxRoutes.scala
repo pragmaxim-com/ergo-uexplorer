@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
 import org.ergoplatform.uexplorer.backend.Codecs
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hex}
+import org.ergoplatform.uexplorer.{Address, BoxId, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hex}
 import zio.*
 import zio.http.*
 import zio.json.*
@@ -54,93 +54,93 @@ object BoxRoutes extends Codecs:
                )
         } yield r).orDie
 
-      case Method.GET -> Root / "boxes" / "spent" / "addresses" / address =>
+      case req @ (Method.GET -> Root / "boxes" / "spent" / "addresses" / address) =>
         BoxService
-          .getSpentBoxesByAddress(Address.fromStringUnsafe(address))
+          .getSpentBoxesByAddress(Address.fromStringUnsafe(address), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "unspent" / "addresses" / address =>
+      case req @ (Method.GET -> Root / "boxes" / "unspent" / "addresses" / address) =>
         BoxService
-          .getUnspentBoxesByAddress(Address.fromStringUnsafe(address))
+          .getUnspentBoxesByAddress(Address.fromStringUnsafe(address), req.url.queryParams)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "any" / "addresses" / address =>
+      case req @ (Method.GET -> Root / "boxes" / "any" / "addresses" / address) =>
         BoxService
-          .getAnyBoxesByAddress(Address.fromStringUnsafe(address))
+          .getAnyBoxesByAddress(Address.fromStringUnsafe(address), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "spent" / "contracts" / "ergo-trees" / ergoTree =>
+      case req @ (Method.GET -> Root / "boxes" / "spent" / "contracts" / "ergo-trees" / ergoTree) =>
         BoxService
-          .getSpentBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
+          .getSpentBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "unspent" / "contracts" / "ergo-trees" / ergoTree =>
+      case req @ (Method.GET -> Root / "boxes" / "unspent" / "contracts" / "ergo-trees" / ergoTree) =>
         BoxService
-          .getUnspentBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
+          .getUnspentBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree), req.url.queryParams)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "any" / "contracts" / "ergo-trees" / ergoTree =>
+      case req @ (Method.GET -> Root / "boxes" / "any" / "contracts" / "ergo-trees" / ergoTree) =>
         BoxService
-          .getAnyBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree))
+          .getAnyBoxesByErgoTree(ErgoTreeHex.fromStringUnsafe(ergoTree), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "spent" / "contracts" / "ergo-tree-hashes" / ergoTreeHash =>
+      case req @ (Method.GET -> Root / "boxes" / "spent" / "contracts" / "ergo-tree-hashes" / ergoTreeHash) =>
         BoxService
-          .getSpentBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
+          .getSpentBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "unspent" / "contracts" / "ergo-tree-hashes" / ergoTreeHash =>
+      case req @ (Method.GET -> Root / "boxes" / "unspent" / "contracts" / "ergo-tree-hashes" / ergoTreeHash) =>
         BoxService
-          .getUnspentBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
+          .getUnspentBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash), req.url.queryParams)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "any" / "contracts" / "ergo-tree-hashes" / ergoTreeHash =>
+      case req @ (Method.GET -> Root / "boxes" / "any" / "contracts" / "ergo-tree-hashes" / ergoTreeHash) =>
         BoxService
-          .getAnyBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash))
+          .getAnyBoxesByErgoTreeHash(ErgoTreeHash.fromStringUnsafe(ergoTreeHash), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "spent" / "templates" / "ergo-trees" / ergoTreeT8 =>
+      case req @ (Method.GET -> Root / "boxes" / "spent" / "templates" / "ergo-trees" / ergoTreeT8) =>
         BoxService
-          .getSpentBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8))
+          .getSpentBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "unspent" / "templates" / "ergo-trees" / ergoTreeT8 =>
+      case req @ (Method.GET -> Root / "boxes" / "unspent" / "templates" / "ergo-trees" / ergoTreeT8) =>
         BoxService
-          .getUnspentBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8))
+          .getUnspentBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8), req.url.queryParams)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "any" / "templates" / "ergo-trees" / ergoTreeT8 =>
+      case req @ (Method.GET -> Root / "boxes" / "any" / "templates" / "ergo-trees" / ergoTreeT8) =>
         BoxService
-          .getAnyBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8))
+          .getAnyBoxesByErgoTreeT8(ErgoTreeT8Hex.fromStringUnsafe(ergoTreeT8), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "spent" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash =>
+      case req @ (Method.GET -> Root / "boxes" / "spent" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash) =>
         BoxService
-          .getSpentBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash))
+          .getSpentBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "unspent" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash =>
+      case req @ (Method.GET -> Root / "boxes" / "unspent" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash) =>
         BoxService
-          .getUnspentBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash))
+          .getUnspentBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash), req.url.queryParams)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
-      case Method.GET -> Root / "boxes" / "any" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash =>
+      case req @ (Method.GET -> Root / "boxes" / "any" / "templates" / "ergo-tree-hashes" / ergoTreeT8Hash) =>
         BoxService
-          .getAnyBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash))
+          .getAnyBoxesByErgoTreeT8Hash(ErgoTreeHash.fromStringUnsafe(ergoTreeT8Hash), req.url.queryParams)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 

@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.db
 
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.RegisterId.*
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister}
 import org.ergoplatform.uexplorer.parser.{ErgoTreeParser, RegistersParser}
 import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
@@ -22,7 +23,7 @@ object OutputBuilder {
       block.b.transactions.transactions.foreach { tx =>
         tx.outputs.foreach { o =>
           val (ergoTreeHash, ergoTreeT8Opt) = ErgoTreeParser.ergoTreeHex2T8(o.ergoTree).get
-          val additionalRegisters = o.additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex)).toMap
+          val additionalRegisters           = o.additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex).serializedValue).toMap
           val utxo =
             Utxo(
               o.boxId,
@@ -30,7 +31,13 @@ object OutputBuilder {
               tx.id,
               ergoTreeHash,
               ergoTreeT8Opt.map(_._2),
-              o.value
+              o.value,
+              additionalRegisters.get(R4),
+              additionalRegisters.get(R5),
+              additionalRegisters.get(R6),
+              additionalRegisters.get(R7),
+              additionalRegisters.get(R8),
+              additionalRegisters.get(R9)
             )
           adjustMultiSet(byErgoTree, ErgoTree(ergoTreeHash, block.b.header.id, o.ergoTree), utxo)
           ergoTreeT8Opt.foreach { case (ergoTreeT8Hex, ergoTreeT8Hash) =>
