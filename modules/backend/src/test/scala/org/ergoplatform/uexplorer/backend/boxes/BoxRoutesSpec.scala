@@ -68,23 +68,23 @@ object BoxRoutesSpec extends ZIOSpecDefault {
       CoreConf.layer
     ),
     test("get spent/unspent/any box(es) by address / ergo-tree / ergo-tree-hash") {
-      val spentByAddressGet   = Request.get(URL(Root / "boxes" / "spent" / "addresses" / Protocol.Emission.address))
-      val unspentByAddressGet = Request.get(URL(Root / "boxes" / "unspent" / "addresses" / Protocol.Emission.address))
-      val anyByAddressGet     = Request.get(URL(Root / "boxes" / "any" / "addresses" / Protocol.Emission.address))
+      val spentByAddressGet   = Request.get(URL(Root / "boxes" / "spent" / "by-address" / Protocol.Emission.address))
+      val unspentByAddressGet = Request.get(URL(Root / "boxes" / "unspent" / "by-address" / Protocol.Emission.address))
+      val anyByAddressGet     = Request.get(URL(Root / "boxes" / "any" / "by-address" / Protocol.Emission.address))
 
-      val spentByErgoTreeGet       = Request.get(URL(Root / "boxes" / "spent" / "contracts" / "ergo-trees" / Protocol.Emission.ergoTreeHex))
-      val unspentByErgoTreeGet     = Request.get(URL(Root / "boxes" / "unspent" / "contracts" / "ergo-trees" / Protocol.Emission.ergoTreeHex))
-      val anyByErgoTreeGet         = Request.get(URL(Root / "boxes" / "any" / "contracts" / "ergo-trees" / Protocol.Emission.ergoTreeHex))
-      val spentByErgoTreeHashGet   = Request.get(URL(Root / "boxes" / "spent" / "contracts" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash))
-      val unspentByErgoTreeHashGet = Request.get(URL(Root / "boxes" / "unspent" / "contracts" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash))
-      val anyByErgoTreeHashGet     = Request.get(URL(Root / "boxes" / "any" / "contracts" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash))
+      val spentByErgoTreeGet       = Request.get(URL(Root / "boxes" / "spent" / "contracts" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex))
+      val unspentByErgoTreeGet     = Request.get(URL(Root / "boxes" / "unspent" / "contracts" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex))
+      val anyByErgoTreeGet         = Request.get(URL(Root / "boxes" / "any" / "contracts" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex))
+      val spentByErgoTreeHashGet   = Request.get(URL(Root / "boxes" / "spent" / "contracts" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash))
+      val unspentByErgoTreeHashGet = Request.get(URL(Root / "boxes" / "unspent" / "contracts" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash))
+      val anyByErgoTreeHashGet     = Request.get(URL(Root / "boxes" / "any" / "contracts" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash))
 
-      val spentByErgoTreeT8Get       = Request.get(URL(Root / "boxes" / "spent" / "templates" / "ergo-trees" / Protocol.Emission.ergoTreeHex))
-      val unspentByErgoTreeT8Get     = Request.get(URL(Root / "boxes" / "unspent" / "templates" / "ergo-trees" / Protocol.Emission.ergoTreeHex))
-      val anyByErgoTreeT8Get         = Request.get(URL(Root / "boxes" / "any" / "templates" / "ergo-trees" / Protocol.Emission.ergoTreeHex))
-      val spentByErgoTreeHashT8Get   = Request.get(URL(Root / "boxes" / "spent" / "templates" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash))
-      val unspentByErgoTreeHashT8Get = Request.get(URL(Root / "boxes" / "unspent" / "templates" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash))
-      val anyByErgoTreeHashT8Get     = Request.get(URL(Root / "boxes" / "any" / "templates" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash))
+      val spentByErgoTreeT8Get       = Request.get(URL(Root / "boxes" / "spent" / "templates" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex))
+      val unspentByErgoTreeT8Get     = Request.get(URL(Root / "boxes" / "unspent" / "templates" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex))
+      val anyByErgoTreeT8Get         = Request.get(URL(Root / "boxes" / "any" / "templates" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex))
+      val spentByErgoTreeHashT8Get   = Request.get(URL(Root / "boxes" / "spent" / "templates" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash))
+      val unspentByErgoTreeHashT8Get = Request.get(URL(Root / "boxes" / "unspent" / "templates" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash))
+      val anyByErgoTreeHashT8Get     = Request.get(URL(Root / "boxes" / "any" / "templates" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash))
 
       for {
         spentByAddress          <- app.runZIO(spentByAddressGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Box]])))
@@ -132,35 +132,35 @@ object BoxRoutesSpec extends ZIOSpecDefault {
       CoreConf.layer
     ),
     test("get spent/unspent/any box(es) by address / ergo-tree / ergo-tree-hash with index filter") {
-      val spentByAddressGet   = Request.get(URL(Root / "boxes" / "spent" / "addresses" / Protocol.Emission.address).withQueryParams(indexFilter))
-      val unspentByAddressGet = Request.get(URL(Root / "boxes" / "unspent" / "addresses" / Protocol.Emission.address).withQueryParams(indexFilter))
-      val anyByAddressGet     = Request.get(URL(Root / "boxes" / "any" / "addresses" / Protocol.Emission.address).withQueryParams(indexFilter))
+      val spentByAddressGet   = Request.get(URL(Root / "boxes" / "spent" / "by-address" / Protocol.Emission.address).withQueryParams(indexFilter))
+      val unspentByAddressGet = Request.get(URL(Root / "boxes" / "unspent" / "by-address" / Protocol.Emission.address).withQueryParams(indexFilter))
+      val anyByAddressGet     = Request.get(URL(Root / "boxes" / "any" / "by-address" / Protocol.Emission.address).withQueryParams(indexFilter))
 
       val spentByErgoTreeGet =
-        Request.get(URL(Root / "boxes" / "spent" / "contracts" / "ergo-trees" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "spent" / "contracts" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
       val unspentByErgoTreeGet =
-        Request.get(URL(Root / "boxes" / "unspent" / "contracts" / "ergo-trees" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "unspent" / "contracts" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
       val anyByErgoTreeGet =
-        Request.get(URL(Root / "boxes" / "any" / "contracts" / "ergo-trees" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "any" / "contracts" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
       val spentByErgoTreeHashGet =
-        Request.get(URL(Root / "boxes" / "spent" / "contracts" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "spent" / "contracts" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
       val unspentByErgoTreeHashGet =
-        Request.get(URL(Root / "boxes" / "unspent" / "contracts" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "unspent" / "contracts" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
       val anyByErgoTreeHashGet =
-        Request.get(URL(Root / "boxes" / "any" / "contracts" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "any" / "contracts" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
 
       val spentByErgoTreeT8Get =
-        Request.get(URL(Root / "boxes" / "spent" / "templates" / "ergo-trees" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "spent" / "templates" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
       val unspentByErgoTreeT8Get =
-        Request.get(URL(Root / "boxes" / "unspent" / "templates" / "ergo-trees" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "unspent" / "templates" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
       val anyByErgoTreeT8Get =
-        Request.get(URL(Root / "boxes" / "any" / "templates" / "ergo-trees" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "any" / "templates" / "by-ergo-tree" / Protocol.Emission.ergoTreeHex).withQueryParams(indexFilter))
       val spentByErgoTreeHashT8Get =
-        Request.get(URL(Root / "boxes" / "spent" / "templates" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "spent" / "templates" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
       val unspentByErgoTreeHashT8Get =
-        Request.get(URL(Root / "boxes" / "unspent" / "templates" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "unspent" / "templates" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
       val anyByErgoTreeHashT8Get =
-        Request.get(URL(Root / "boxes" / "any" / "templates" / "ergo-tree-hashes" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
+        Request.get(URL(Root / "boxes" / "any" / "templates" / "by-ergo-tree-hash" / Protocol.Emission.ergoTreeHash).withQueryParams(indexFilter))
 
       for {
         spentByAddress          <- app.runZIO(spentByAddressGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Box]])))
