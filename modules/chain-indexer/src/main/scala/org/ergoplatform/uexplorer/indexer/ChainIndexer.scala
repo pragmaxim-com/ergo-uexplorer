@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer
 
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.CoreConf
-import org.ergoplatform.uexplorer.backend.PersistentRepo
+import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo}
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, PersistentBlockRepo}
 import org.ergoplatform.uexplorer.backend.boxes.PersistentBoxRepo
 import org.ergoplatform.uexplorer.config.ExplorerConfig
@@ -50,7 +50,7 @@ object ChainIndexer extends ZIOAppDefault {
       NodePool.layer,
       UnderlyingBackend.layer,
       SttpNodePoolBackend.layer,
-      Backend.layerH2,
+      H2Backend.layer,
       MetadataHttpClient.layer,
       BlockHttpClient.layer,
       PersistentBlockRepo.layer,

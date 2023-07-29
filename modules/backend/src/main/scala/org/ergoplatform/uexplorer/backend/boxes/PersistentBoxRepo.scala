@@ -1,15 +1,12 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
 import io.getquill.*
-import io.getquill.context.ZioJdbc.DataSourceLayer
-import io.getquill.jdbczio.Quill
 import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHash, ErgoTreeT8Hash}
 import org.ergoplatform.uexplorer.backend.Codecs
 import org.ergoplatform.uexplorer.db.*
 import zio.*
 
 import java.sql.SQLException
-import java.util.UUID
 import javax.sql.DataSource
 
 case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
@@ -105,58 +102,6 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       }
       .provide(dsLayer)
 
-  override def lookupBoxesByHash(etHash: ErgoTreeHash): Task[Iterable[Box]] =
-    ctx
-      .run {
-        quote {
-          query[ErgoTree]
-            .join(query[Box])
-            .on((et, box) => et.hash == box.ergoTreeHash)
-            .filter((et, _) => et.hash == lift(etHash))
-            .map((_, box) => Box(box.boxId, box.blockId, box.txId, box.ergoTreeHash, box.ergoTreeT8Hash, box.ergValue))
-        }
-      }
-      .provide(dsLayer)
-
-  override def lookupUtxosByHash(etHash: ErgoTreeHash): Task[Iterable[Utxo]] =
-    ctx
-      .run {
-        quote {
-          query[ErgoTree]
-            .join(query[Utxo])
-            .on((et, utxo) => et.hash == utxo.ergoTreeHash)
-            .filter((et, _) => et.hash == lift(etHash))
-            .map((_, utxo) => Utxo(utxo.boxId, utxo.blockId, utxo.txId, utxo.ergoTreeHash, utxo.ergoTreeT8Hash, utxo.ergValue))
-        }
-      }
-      .provide(dsLayer)
-
-  override def lookupBoxesByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Iterable[Box]] =
-    ctx
-      .run {
-        quote {
-          query[ErgoTreeT8]
-            .join(query[Box])
-            .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
-            .filter((et, _) => et.hash == lift(etT8Hash))
-            .map((_, box) => Box(box.boxId, box.blockId, box.txId, box.ergoTreeHash, box.ergoTreeT8Hash, box.ergValue))
-        }
-      }
-      .provide(dsLayer)
-
-  override def lookupUtxosByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Iterable[Utxo]] =
-    ctx
-      .run {
-        quote {
-          query[ErgoTreeT8]
-            .join(query[Utxo])
-            .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
-            .filter((et, _) => et.hash == lift(etT8Hash))
-            .map((_, utxo) => Utxo(utxo.boxId, utxo.blockId, utxo.txId, utxo.ergoTreeHash, utxo.ergoTreeT8Hash, utxo.ergValue))
-        }
-      }
-      .provide(dsLayer)
-
   override def lookupUtxos(ids: Set[BoxId]): Task[List[Utxo]] =
     ctx
       .run {
@@ -165,6 +110,90 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .filter(p => liftQuery(ids).contains(p.boxId))
         }
       }
+      .provide(dsLayer)
+
+  override def lookupBoxesByHash(etHash: ErgoTreeHash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]] =
+    ctx
+      .run {
+        quote {
+          query[ErgoTree]
+            .join(query[Box])
+            .on((et, box) => et.hash == box.ergoTreeHash)
+            .filter((et, _) => et.hash == lift(etHash))
+            .map((_, b) => Box(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .filterByKeys(filter)
+            .filterColumns(columns)
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupUtxosByHash(etHash: ErgoTreeHash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Utxo]] =
+    ctx
+      .run {
+        quote {
+          query[ErgoTree]
+            .join(query[Utxo])
+            .on((et, utxo) => et.hash == utxo.ergoTreeHash)
+            .filter((et, _) => et.hash == lift(etHash))
+            .map((_, b) => Utxo(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .filterByKeys(filter)
+            .filterColumns(columns)
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupUtxoIdsByHash(etHash: ErgoTreeHash): Task[Set[BoxId]] =
+    ctx
+      .run {
+        quote {
+          query[Utxo]
+            .filter(_.ergoTreeHash == lift(etHash))
+            .map(_.boxId)
+        }
+      }
+      .map(_.toSet)
+      .provide(dsLayer)
+
+  override def lookupBoxesByT8Hash(etT8Hash: ErgoTreeT8Hash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]] =
+    ctx
+      .run {
+        quote {
+          query[ErgoTreeT8]
+            .join(query[Box])
+            .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
+            .filter((et, _) => et.hash == lift(etT8Hash))
+            .map((_, b) => Box(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .filterByKeys(filter)
+            .filterColumns(columns)
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupUtxosByT8Hash(etT8Hash: ErgoTreeT8Hash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Utxo]] =
+    ctx
+      .run {
+        quote {
+          query[ErgoTreeT8]
+            .join(query[Utxo])
+            .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
+            .filter((et, _) => et.hash == lift(etT8Hash))
+            .map((_, b) => Utxo(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .filterByKeys(filter)
+            .filterColumns(columns)
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupUtxoIdsByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Set[BoxId]] =
+    ctx
+      .run {
+        quote {
+          query[Utxo]
+            .filter(_.ergoTreeT8Hash.contains(lift(etT8Hash)))
+            .map(_.boxId)
+        }
+      }
+      .map(_.toSet)
       .provide(dsLayer)
 
   override def isEmpty: Task[Boolean] =

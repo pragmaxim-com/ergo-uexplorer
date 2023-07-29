@@ -2,14 +2,13 @@ package org.ergoplatform.uexplorer.db
 
 import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Address.unwrappedAddress
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
-import org.ergoplatform.uexplorer.HexString.unwrapped
-import scala.collection.mutable
-import zio.json.*
 import zio.*
-import zio.json.interop.refined._
+import zio.json.*
+import zio.json.interop.refined.*
+
+import scala.collection.mutable
 
 case class Box(
   boxId: BoxId,
@@ -17,7 +16,13 @@ case class Box(
   txId: TxId,
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
-  ergValue: Value
+  ergValue: Value,
+  r4: Option[BoxRegisterValueHex],
+  r5: Option[BoxRegisterValueHex],
+  r6: Option[BoxRegisterValueHex],
+  r7: Option[BoxRegisterValueHex],
+  r8: Option[BoxRegisterValueHex],
+  r9: Option[BoxRegisterValueHex]
 )
 
 object Box {
@@ -31,9 +36,29 @@ case class Utxo(
   txId: TxId,
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
-  ergValue: Value
+  ergValue: Value,
+  r4: Option[BoxRegisterValueHex],
+  r5: Option[BoxRegisterValueHex],
+  r6: Option[BoxRegisterValueHex],
+  r7: Option[BoxRegisterValueHex],
+  r8: Option[BoxRegisterValueHex],
+  r9: Option[BoxRegisterValueHex]
 ) {
-  def toBox = Box(boxId, blockId, txId, ergoTreeHash, ergoTreeT8Hash, ergValue)
+  def toBox: Box =
+    Box(
+      boxId,
+      blockId,
+      txId,
+      ergoTreeHash,
+      ergoTreeT8Hash,
+      ergValue,
+      r4,
+      r5,
+      r6,
+      r7,
+      r8,
+      r9
+    )
 }
 
 object Utxo {

@@ -43,7 +43,13 @@ create table if not exists Box (
     txId            VARCHAR(64) NOT NULL,
     ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash),
     ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash),
-    ergValue        BIGINT NOT NULL
+    ergValue        BIGINT NOT NULL,
+    r4              VARCHAR,
+    r5              VARCHAR,
+    r6              VARCHAR,
+    r7              VARCHAR,
+    r8              VARCHAR,
+    r9              VARCHAR
 );
 
 create table if not exists Asset (
@@ -59,5 +65,11 @@ create table if not exists Utxo (
     txId            VARCHAR(64) NOT NULL,
     ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash),
     ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash),
-    ergValue        BIGINT NOT NULL
+    ergValue        BIGINT NOT NULL,
+    r4              VARCHAR,
+    r5              VARCHAR,
+    r6              VARCHAR,
+    r7              VARCHAR,
+    r8              VARCHAR,
+    r9              VARCHAR
 );

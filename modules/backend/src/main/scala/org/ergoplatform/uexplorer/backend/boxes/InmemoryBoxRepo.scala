@@ -1,11 +1,9 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
-import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHash, ErgoTreeT8Hash}
-import org.ergoplatform.uexplorer.Const.Protocol
-import org.ergoplatform.uexplorer.db.{Block, Box, ErgoTree, ErgoTreeT8, Utxo}
+import org.ergoplatform.uexplorer.backend.boxes.InmemoryBoxRepo.matchCaseClassWith
+import org.ergoplatform.uexplorer.db.{Box, ErgoTree, ErgoTreeT8, Utxo}
+import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHash, ErgoTreeT8Hash}
 import zio.*
-
-import scala.collection.mutable
 
 case class BoxRepoState(
   unspent: Map[BoxId, Utxo],
@@ -48,22 +46,66 @@ case class InmemoryBoxRepo(state: Ref[BoxRepoState]) extends BoxRepo:
   override def lookupUtxos(utxos: Set[BoxId]): Task[List[Utxo]] =
     state.get.map(_.unspent.filter(t => utxos.contains(t._1)).valuesIterator.toList)
 
-  override def lookupBoxesByHash(etHash: ErgoTreeHash): Task[Iterable[Box]] =
-    state.get.map(state => state.boxes.collect { case (_, box) if box.ergoTreeHash == etHash => box })
+  override def lookupBoxesByHash(etHash: ErgoTreeHash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]] =
+    state.get.map(state =>
+      state.boxes.collect {
+        case (_, box) if box.ergoTreeHash == etHash && matchCaseClassWith(box, columns, filter) =>
+          box
+      }
+    )
 
-  override def lookupUtxosByHash(etHash: ErgoTreeHash): Task[Iterable[Utxo]] =
-    state.get.map(state => state.unspent.collect { case (_, utxo) if utxo.ergoTreeHash == etHash => utxo })
+  override def lookupUtxosByHash(etHash: ErgoTreeHash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Utxo]] =
+    state.get.map(state =>
+      state.unspent.collect {
+        case (_, utxo) if utxo.ergoTreeHash == etHash && matchCaseClassWith(utxo, columns, filter) =>
+          utxo
+      }
+    )
 
-  override def lookupBoxesByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Iterable[Box]] =
-    state.get.map(state => state.boxes.collect { case (_, box) if box.ergoTreeT8Hash == etT8Hash => box })
+  override def lookupBoxesByT8Hash(etT8Hash: ErgoTreeT8Hash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]] =
+    state.get.map(state =>
+      state.boxes.collect {
+        case (_, box) if box.ergoTreeT8Hash.contains(etT8Hash) && matchCaseClassWith(box, columns, filter) =>
+          box
+      }
+    )
 
-  override def lookupUtxosByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Iterable[Utxo]] =
-    state.get.map(state => state.unspent.collect { case (_, utxo) if utxo.ergoTreeT8Hash == etT8Hash => utxo })
+  override def lookupUtxosByT8Hash(etT8Hash: ErgoTreeT8Hash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Utxo]] =
+    state.get.map(state =>
+      state.unspent.collect {
+        case (_, utxo) if utxo.ergoTreeT8Hash.contains(etT8Hash) => utxo
+      }
+    )
+
+  override def lookupUtxoIdsByHash(etHash: ErgoTreeHash): Task[Set[BoxId]] =
+    state.get.map(state =>
+      state.unspent.collect {
+        case (_, utxo) if utxo.ergoTreeHash == etHash => utxo.boxId
+      }.toSet
+    )
+
+  override def lookupUtxoIdsByT8Hash(etT8Hash: ErgoTreeT8Hash): Task[Set[BoxId]] =
+    state.get.map(state =>
+      state.unspent.collect {
+        case (_, utxo) if utxo.ergoTreeT8Hash.contains(etT8Hash) => utxo.boxId
+      }.toSet
+    )
 
   override def isEmpty: Task[Boolean] =
     state.get.map(s => s.boxes.isEmpty && s.unspent.isEmpty && s.ets.isEmpty && s.etT8s.isEmpty)
 
 object InmemoryBoxRepo {
+
+  def matchCaseClassWith(cc: AnyRef, columns: List[String], filter: Map[String, Any]): Boolean = {
+    val ccFields: Map[String, Any] =
+      cc.getClass.getDeclaredFields
+        .tapEach(_.setAccessible(true))
+        .foldLeft(Map.empty)((a, f) => a + (f.getName -> f.get(cc)))
+    filter.removedAll(columns).forall { case (k, v) =>
+      ccFields.get(k).contains(v)
+    }
+  }
+
   def layer: ZLayer[Any, Nothing, InmemoryBoxRepo] =
     ZLayer.fromZIO(
       Ref.make(BoxRepoState.empty).map(new InmemoryBoxRepo(_))
