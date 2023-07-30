@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHash, ErgoTreeT8Hash}
+import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHash, ErgoTreeT8Hash, TokenId}
 import zio.*
 
 trait BoxRepo:
@@ -9,12 +9,17 @@ trait BoxRepo:
   def insertUtxos(
     ergoTrees: Iterable[ErgoTree],
     ergoTreeT8s: Iterable[ErgoTreeT8],
+    assets: List[Asset],
     utxos: Iterable[Utxo]
   ): Task[Iterable[BoxId]]
 
   def deleteUtxo(boxId: BoxId): Task[Long]
 
   def deleteUtxos(boxId: Iterable[BoxId]): Task[Long]
+
+  def lookupUnspentAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset]]
+
+  def lookupAnyAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset]]
 
   def lookupBox(boxId: BoxId): Task[Option[Box]]
 
@@ -23,6 +28,12 @@ trait BoxRepo:
   def lookupBoxes(boxes: Set[BoxId]): Task[List[Box]]
 
   def lookupUtxos(boxes: Set[BoxId]): Task[List[Utxo]]
+
+  def lookupUtxosByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Utxo]]
+
+  def lookupBoxesByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]]
+
+  def lookupUtxoIdsByTokenId(tokenId: TokenId): Task[Set[BoxId]]
 
   def lookupBoxesByHash(etHash: ErgoTreeHash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]]
 
@@ -42,9 +53,10 @@ object BoxRepo:
   def insertUtxos(
     ergoTrees: Iterable[ErgoTree],
     ergoTreeT8s: Iterable[ErgoTreeT8],
+    assets: List[Asset],
     utxos: Iterable[Utxo]
   ): ZIO[BoxRepo, Throwable, Iterable[BoxId]] =
-    ZIO.serviceWithZIO[BoxRepo](_.insertUtxos(ergoTrees, ergoTreeT8s, utxos))
+    ZIO.serviceWithZIO[BoxRepo](_.insertUtxos(ergoTrees, ergoTreeT8s, assets, utxos))
 
   def deleteUtxo(boxId: BoxId): ZIO[BoxRepo, Throwable, Long] =
     ZIO.serviceWithZIO[BoxRepo](_.deleteUtxo(boxId))
@@ -57,6 +69,12 @@ object BoxRepo:
 
   def lookupUtxo(boxId: BoxId): ZIO[BoxRepo, Throwable, Option[Utxo]] =
     ZIO.serviceWithZIO[BoxRepo](_.lookupUtxo(boxId))
+
+  def lookupUtxosByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): ZIO[BoxRepo, Throwable, Iterable[Utxo]] =
+    ZIO.serviceWithZIO[BoxRepo](_.lookupUtxosByTokenId(tokenId, columns, filter))
+
+  def lookupBoxesByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): ZIO[BoxRepo, Throwable, Iterable[Box]] =
+    ZIO.serviceWithZIO[BoxRepo](_.lookupBoxesByTokenId(tokenId, columns, filter))
 
   def lookupBoxesByHash(etHash: ErgoTreeHash, columns: List[String], filter: Map[String, Any]): ZIO[BoxRepo, Throwable, Iterable[Box]] =
     ZIO.serviceWithZIO[BoxRepo](_.lookupBoxesByHash(etHash, columns, filter))

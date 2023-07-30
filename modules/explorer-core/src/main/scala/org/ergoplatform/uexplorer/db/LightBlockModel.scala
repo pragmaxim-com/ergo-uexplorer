@@ -69,9 +69,17 @@ object Utxo {
 case class ErgoTree(hash: ErgoTreeHash, blockId: BlockId, hex: ErgoTreeHex)
 case class ErgoTreeT8(hash: ErgoTreeT8Hash, blockId: BlockId, hex: ErgoTreeT8Hex)
 
+case class Asset(tokenId: TokenId, blockId: BlockId, boxId: BoxId, amount: Amount)
+
+object Asset {
+  implicit val encoder: JsonEncoder[Asset] = DeriveJsonEncoder.gen[Asset]
+  implicit val decoder: JsonDecoder[Asset] = DeriveJsonDecoder.gen[Asset]
+}
+
 case class OutputRecords(
   byErgoTree: mutable.Map[ErgoTree, mutable.Set[Utxo]],
-  byErgoTreeT8: mutable.Map[ErgoTreeT8, mutable.Set[Utxo]]
+  byErgoTreeT8: mutable.Map[ErgoTreeT8, mutable.Set[Utxo]],
+  assets: List[Asset]
 )
 
 final case class Block(

@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
 import io.getquill.*
-import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHash, ErgoTreeT8Hash}
+import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHash, ErgoTreeT8Hash, TokenId}
 import org.ergoplatform.uexplorer.backend.Codecs
 import org.ergoplatform.uexplorer.db.*
 import zio.*
@@ -39,10 +39,15 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     quote {
       query[ErgoTreeT8].insertValue(lift(ergoTreeT8)).onConflictIgnore
     }
+  private def insertAssets(assets: List[Asset]) =
+    quote {
+      liftQuery(assets).foreach(asset => query[Asset].insertValue(asset))
+    }
 
   override def insertUtxos(
     ergoTrees: Iterable[ErgoTree],
     ergoTreeT8s: Iterable[ErgoTreeT8],
+    assets: List[Asset],
     utxos: Iterable[Utxo]
   ): Task[Iterable[BoxId]] =
     (for {
@@ -50,6 +55,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       _ <- ZIO.foreachDiscard(ergoTreeT8s)(etT8 => ctx.run(insertErgoTreeT8Query(etT8)))
       _ <- ctx.run(insertBoxesQuery(utxos.map(_.toBox)))
       _ <- ctx.run(insertUtxosQuery(utxos))
+      _ <- ctx.run(insertAssets(assets))
     } yield utxos.map(_.boxId)).provide(dsLayer)
 
   override def deleteUtxo(boxId: BoxId): Task[Long] =
@@ -66,6 +72,36 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       .run {
         quote {
           query[Utxo].filter(p => liftQuery(boxIds).contains(p.boxId)).delete
+        }
+      }
+      .provide(dsLayer)
+
+  def lookupUnspentAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset]] =
+    ctx
+      .run {
+        quote {
+          query[Utxo]
+            .join(query[Asset])
+            .on((a, utxo) => a.boxId == utxo.boxId)
+            .filter((_, a) => a.tokenId == lift(tokenId))
+            .map((_, a) => Asset(a.tokenId, a.blockId, a.boxId, a.amount))
+            .filterByKeys(filter)
+            .filterColumns(columns)
+        }
+      }
+      .provide(dsLayer)
+
+  def lookupAnyAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset]] =
+    ctx
+      .run {
+        quote {
+          query[Box]
+            .join(query[Asset])
+            .on((a, box) => a.boxId == box.boxId)
+            .filter((_, a) => a.tokenId == lift(tokenId))
+            .map((_, a) => Asset(a.tokenId, a.blockId, a.boxId, a.amount))
+            .filterByKeys(filter)
+            .filterColumns(columns)
         }
       }
       .provide(dsLayer)
@@ -110,6 +146,50 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .filter(p => liftQuery(ids).contains(p.boxId))
         }
       }
+      .provide(dsLayer)
+
+  override def lookupUtxosByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Utxo]] =
+    ctx
+      .run {
+        quote {
+          query[Asset]
+            .join(query[Utxo])
+            .on((a, utxo) => utxo.boxId == a.boxId)
+            .filter((a, _) => a.tokenId == lift(tokenId))
+            .map((_, b) => Utxo(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .filterByKeys(filter)
+            .filterColumns(columns)
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupBoxesByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]] =
+    ctx
+      .run {
+        quote {
+          query[Asset]
+            .join(query[Box])
+            .on((a, b) => b.boxId == a.boxId)
+            .filter((a, _) => a.tokenId == lift(tokenId))
+            .map((_, b) => Box(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .filterByKeys(filter)
+            .filterColumns(columns)
+        }
+      }
+      .provide(dsLayer)
+
+  override def lookupUtxoIdsByTokenId(tokenId: TokenId): Task[Set[BoxId]] =
+    ctx
+      .run {
+        quote {
+          query[Asset]
+            .join(query[Utxo])
+            .on((a, b) => b.boxId == a.boxId)
+            .filter((a, _) => a.tokenId == lift(tokenId))
+            .map((_, b) => b.boxId)
+        }
+      }
+      .map(_.toSet)
       .provide(dsLayer)
 
   override def lookupBoxesByHash(etHash: ErgoTreeHash, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]] =
