@@ -48,7 +48,7 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
         for
           _       <- preTx
           blockId <- blockRepo.insert(block)
-          _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, utxos)
+          _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, outputs.assets, utxos)
           _       <- boxRepo.deleteUtxos(inputIds)
           _       <- postTx
         yield blockId

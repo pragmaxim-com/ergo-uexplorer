@@ -4,13 +4,15 @@ import eu.timepit.refined.auto.autoUnwrap
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.backend.blocks.PersistentBlockRepo
 import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo, Repo}
-import org.ergoplatform.uexplorer.db.{Box, Utxo}
+import org.ergoplatform.uexplorer.db.{Asset, Box, Utxo}
 import org.ergoplatform.uexplorer.http.Rest
 import org.ergoplatform.uexplorer.{CoreConf, NetworkPrefix}
 import zio.*
 import zio.http.*
 import zio.json.*
 import zio.test.*
+
+import scala.collection.immutable.Set
 
 object BoxRoutesSpec extends ZIOSpecDefault {
 
@@ -200,6 +202,36 @@ object BoxRoutesSpec extends ZIOSpecDefault {
         unspentByErgoTreeT8Hash.map(_.boxId).isEmpty,
         spentByErgoTreeT8Hash.map(_.boxId).isEmpty,
         spentByErgoTreeT8Hash.size + unspentByErgoTreeT8Hash.size == anyByErgoTreeT8Hash.size
+      )
+    }.provide(
+      H2Backend.layer,
+      PersistentBoxRepo.layer,
+      BoxService.layer,
+      CoreConf.layer
+    ),
+    test("get assets and boxes by tokenId") {
+      val unspentAssetsByTokenIdGet = Request.get(URL(Root / "assets" / "unspent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
+      val spentAssetsByTokenIdGet   = Request.get(URL(Root / "assets" / "spent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
+      val anyAssetsByTokenIdGet     = Request.get(URL(Root / "assets" / "any" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
+
+      val unspentBoxesByTokenIdGet = Request.get(URL(Root / "boxes" / "unspent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
+      val spentBoxesByTokenIdGet   = Request.get(URL(Root / "boxes" / "spent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
+      val anyBoxesByTokenIdGet     = Request.get(URL(Root / "boxes" / "any" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
+
+      for {
+        unspentAssets <- app.runZIO(unspentAssetsByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
+        spentAssets   <- app.runZIO(spentAssetsByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
+        anyAssets     <- app.runZIO(anyAssetsByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
+        unspentBoxes  <- app.runZIO(unspentBoxesByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
+        spentBoxes    <- app.runZIO(spentBoxesByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
+        anyBoxes      <- app.runZIO(anyBoxesByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
+      } yield assertTrue(
+        unspentAssets.isEmpty,
+        spentAssets.isEmpty,
+        anyAssets.isEmpty,
+        unspentBoxes.isEmpty,
+        spentBoxes.isEmpty,
+        anyBoxes.isEmpty
       )
     }.provide(
       H2Backend.layer,

@@ -14,7 +14,7 @@ final case class AdProof(
   digest: TreeRootHashHex // tree root hash
 )
 
-final case class Asset(
+final case class Asset2(
   tokenId: TokenId,
   boxId: BoxId,
   headerId: BlockId,
@@ -30,7 +30,7 @@ final case class FullBlock(
   inputs: ArraySeq[Input],
   dataInputs: ArraySeq[DataInput],
   outputs: ArraySeq[Output],
-  assets: ArraySeq[Asset],
+  assets: ArraySeq[Asset2],
   registers: ArraySeq[BoxRegister],
   tokens: ArraySeq[Token]
 )

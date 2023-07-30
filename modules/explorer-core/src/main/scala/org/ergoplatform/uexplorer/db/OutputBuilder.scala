@@ -1,18 +1,12 @@
 package org.ergoplatform.uexplorer.db
 
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.RegisterId.*
-import org.ergoplatform.uexplorer.node.{ApiFullBlock, ExpandedRegister}
 import org.ergoplatform.uexplorer.parser.{ErgoTreeParser, RegistersParser}
-import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
-import scorex.util.encode.Base16
-import sigmastate.basics.DLogProtocol.ProveDlog
-import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
 import zio.{Task, ZIO}
 
-import scala.collection.immutable.ArraySeq
 import scala.collection.mutable
-import scala.util.Try
 
 object OutputBuilder {
 
@@ -20,10 +14,12 @@ object OutputBuilder {
     ZIO.attempt {
       val byErgoTree   = mutable.Map.empty[ErgoTree, mutable.Set[Utxo]]
       val byErgoTreeT8 = mutable.Map.empty[ErgoTreeT8, mutable.Set[Utxo]]
+      val assets       = List.newBuilder[Asset]
       block.b.transactions.transactions.foreach { tx =>
         tx.outputs.foreach { o =>
           val (ergoTreeHash, ergoTreeT8Opt) = ErgoTreeParser.ergoTreeHex2T8(o.ergoTree).get
           val additionalRegisters           = o.additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex).serializedValue).toMap
+          assets.addAll(o.assets.map(asset => Asset(asset.tokenId, block.b.header.id, o.boxId, asset.amount)))
           val utxo =
             Utxo(
               o.boxId,
@@ -45,7 +41,7 @@ object OutputBuilder {
           }
         }
       }
-      OutputRecords(byErgoTree, byErgoTreeT8)
+      OutputRecords(byErgoTree, byErgoTreeT8, assets.result())
     }
 
   private def adjustMultiSet[ET, B](m: mutable.Map[ET, mutable.Set[B]], et: ET, boxId: B) =

@@ -25,7 +25,7 @@ case class InmemoryRepo(blockRepo: BlockRepo, boxRepo: BoxRepo) extends Repo:
     for
       _       <- preTx
       blockId <- blockRepo.insert(b.block)
-      _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, utxos)
+      _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, b.outputRecords.assets, utxos)
       _       <- boxRepo.deleteUtxos(b.b.transactions.transactions.flatMap(_.inputs.map(_.boxId)))
       _       <- postTx
     yield blockId
