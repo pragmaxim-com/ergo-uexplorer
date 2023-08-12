@@ -18,12 +18,12 @@ class BlockReader(
 
   def getBlockSource(fromHeight: Int, bench: Boolean): ZStream[Any, Throwable, ApiFullBlock] =
     if (bench && benchPath.toFile.exists())
-      blockSourceFromFS.buffer(1024)
+      blockSourceFromFS.buffer(128)
     else
       blockIdSource(fromHeight)
-        .buffer(1024)
+        .buffer(128)
         .mapZIOPar(1)(blockHttpClient.getBlockForId) // parallelism could be parameterized - low or big pressure on Node
-        .buffer(1024)
+        .buffer(128)
 
   def blockSourceFromFS: ZStream[Any, Throwable, ApiFullBlock] = {
     import io.circe.parser.decode
