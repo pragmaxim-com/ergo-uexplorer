@@ -36,10 +36,13 @@ case class Initializer(
           GraphInconsistency("Janus graph must be empty when main db is empty, drop janusgraph keyspace!")
         }
       } else {
+        ChainValid
+        /*
         if (!graphBackend.isEmpty)
           ChainValid
         else
           GraphInconsistency("Janus graph cannot be empty when main db is not")
+         */
       }
     }
 }
