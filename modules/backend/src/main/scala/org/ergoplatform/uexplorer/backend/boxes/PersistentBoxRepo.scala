@@ -15,6 +15,10 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
 
   private val dsLayer = ZLayer.succeed(ds)
 
+  // TODO https://github.com/zio/zio-protoquill/issues/298
+  inline def onConflictIgnoreForBatchQueries[T](inline entity: Insert[T]): Insert[T] =
+    sql"$entity ON CONFLICT DO NOTHING".as[Insert[T]]
+
   private def insertUtxosQuery(utxos: Iterable[Utxo]) =
     quote {
       liftQuery(utxos).foreach(utxo => query[Utxo].insertValue(utxo))
@@ -24,38 +28,44 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       liftQuery(boxes).foreach(box => query[Box].insertValue(box))
     }
   private def insertErgoTreesQuery(ergoTrees: Iterable[ErgoTree]) =
-    quote { // todo https://github.com/zio/zio-protoquill/issues/298
-      liftQuery(ergoTrees).foreach(ergoTree => query[ErgoTree].insertValue(ergoTree).onConflictIgnore)
+    quote {
+      liftQuery(ergoTrees).foreach(ergoTree => onConflictIgnoreForBatchQueries(query[ErgoTree].insertValue(ergoTree)))
     }
   private def insertErgoTreeT8sQuery(ergoTreeT8s: Iterable[ErgoTreeT8]) =
-    quote { // todo https://github.com/zio/zio-protoquill/issues/298
-      liftQuery(ergoTreeT8s).foreach(ergoTreeT8 => query[ErgoTreeT8].insertValue(ergoTreeT8).onConflictIgnore)
-    }
-  private def insertErgoTreeQuery(ergoTree: ErgoTree) =
     quote {
-      query[ErgoTree].insertValue(lift(ergoTree)).onConflictIgnore
+      liftQuery(ergoTreeT8s).foreach(ergoTreeT8 => onConflictIgnoreForBatchQueries(query[ErgoTreeT8].insertValue(ergoTreeT8)))
     }
-  private def insertErgoTreeT8Query(ergoTreeT8: ErgoTreeT8) =
+  private def insertAssetsToBox(assetsToBox: Iterable[Asset2Box]) =
     quote {
-      query[ErgoTreeT8].insertValue(lift(ergoTreeT8)).onConflictIgnore
+      liftQuery(assetsToBox).foreach(assetToBox => query[Asset2Box].insertValue(assetToBox))
     }
-  private def insertAssets(assets: List[Asset]) =
+  private def insertAssets(assets: Iterable[Asset]) =
     quote {
-      liftQuery(assets).foreach(asset => query[Asset].insertValue(asset))
+      liftQuery(assets).foreach(asset => onConflictIgnoreForBatchQueries(query[Asset].insertValue(asset)))
     }
 
   override def insertUtxos(
     ergoTrees: Iterable[ErgoTree],
     ergoTreeT8s: Iterable[ErgoTreeT8],
-    assets: List[Asset],
+    assetsToBox: Iterable[Asset2Box],
+    assets: Iterable[Asset],
     utxos: Iterable[Utxo]
   ): Task[Iterable[BoxId]] =
     (for {
-      _ <- ZIO.foreachDiscard(ergoTrees)(et => ctx.run(insertErgoTreeQuery(et))) // todo 298
-      _ <- ZIO.foreachDiscard(ergoTreeT8s)(etT8 => ctx.run(insertErgoTreeT8Query(etT8)))
+      _ <- ZIO.collectAllParDiscard(
+             List(
+               ctx.run(insertErgoTreesQuery(ergoTrees)),
+               ctx.run(insertErgoTreeT8sQuery(ergoTreeT8s)),
+               ctx.run(insertAssets(assets))
+             )
+           )
       _ <- ctx.run(insertBoxesQuery(utxos.map(_.toBox)))
-      _ <- ctx.run(insertUtxosQuery(utxos))
-      _ <- ctx.run(insertAssets(assets))
+      _ <- ZIO.collectAllParDiscard(
+             List(
+               ctx.run(insertAssetsToBox(assetsToBox)),
+               ctx.run(insertUtxosQuery(utxos))
+             )
+           )
     } yield utxos.map(_.boxId)).provide(dsLayer)
 
   override def deleteUtxo(boxId: BoxId): Task[Long] =
@@ -76,30 +86,30 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       }
       .provide(dsLayer)
 
-  def lookupUnspentAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset]] =
+  def lookupUnspentAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset2Box]] =
     ctx
       .run {
         quote {
           query[Utxo]
-            .join(query[Asset])
+            .join(query[Asset2Box])
             .on((a, utxo) => a.boxId == utxo.boxId)
             .filter((_, a) => a.tokenId == lift(tokenId))
-            .map((_, a) => Asset(a.tokenId, a.blockId, a.boxId, a.amount))
+            .map((_, a) => Asset2Box(a.tokenId, a.boxId, a.amount))
             .filterByKeys(filter)
             .filterColumns(columns)
         }
       }
       .provide(dsLayer)
 
-  def lookupAnyAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset]] =
+  def lookupAnyAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset2Box]] =
     ctx
       .run {
         quote {
           query[Box]
-            .join(query[Asset])
+            .join(query[Asset2Box])
             .on((a, box) => a.boxId == box.boxId)
             .filter((_, a) => a.tokenId == lift(tokenId))
-            .map((_, a) => Asset(a.tokenId, a.blockId, a.boxId, a.amount))
+            .map((_, a) => Asset2Box(a.tokenId, a.boxId, a.amount))
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -152,11 +162,11 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     ctx
       .run {
         quote {
-          query[Asset]
+          query[Asset2Box]
             .join(query[Utxo])
             .on((a, utxo) => utxo.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
-            .map((_, b) => Utxo(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => Utxo(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -167,11 +177,11 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     ctx
       .run {
         quote {
-          query[Asset]
+          query[Asset2Box]
             .join(query[Box])
             .on((a, b) => b.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
-            .map((_, b) => Box(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => Box(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -182,7 +192,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     ctx
       .run {
         quote {
-          query[Asset]
+          query[Asset2Box]
             .join(query[Utxo])
             .on((a, b) => b.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
@@ -200,7 +210,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Box])
             .on((et, box) => et.hash == box.ergoTreeHash)
             .filter((et, _) => et.hash == lift(etHash))
-            .map((_, b) => Box(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => Box(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -215,7 +225,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Utxo])
             .on((et, utxo) => et.hash == utxo.ergoTreeHash)
             .filter((et, _) => et.hash == lift(etHash))
-            .map((_, b) => Utxo(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => Utxo(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -242,7 +252,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Box])
             .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
             .filter((et, _) => et.hash == lift(etT8Hash))
-            .map((_, b) => Box(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => Box(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -257,7 +267,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Utxo])
             .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
             .filter((et, _) => et.hash == lift(etT8Hash))
-            .map((_, b) => Utxo(b.boxId, b.blockId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => Utxo(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
             .filterByKeys(filter)
             .filterColumns(columns)
         }

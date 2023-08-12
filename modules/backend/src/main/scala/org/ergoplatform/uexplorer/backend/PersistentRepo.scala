@@ -1,16 +1,12 @@
 package org.ergoplatform.uexplorer.backend
 
 import io.getquill.*
-import io.getquill.context.ZioJdbc.DataSourceLayer
-import io.getquill.jdbczio.Quill
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.backend.Codecs
-import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, PersistentBlockRepo}
-import org.ergoplatform.uexplorer.backend.boxes.{BoxRepo, PersistentBoxRepo}
+import org.ergoplatform.uexplorer.backend.blocks.BlockRepo
+import org.ergoplatform.uexplorer.backend.boxes.*
 import org.ergoplatform.uexplorer.db.*
 import zio.*
 
-import java.util.UUID
 import javax.sql.DataSource
 
 case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo) extends Repo with Codecs:
@@ -43,12 +39,18 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
     val ergoTrees   = outputs.byErgoTree.keys
     val ergoTreeT8s = outputs.byErgoTreeT8.keys
     val utxos       = outputs.byErgoTree.values.flatten
+    val assetsToBox =
+      outputs.tokensByUtxo.flatMap { case (box, amountByToken) =>
+        amountByToken.map { case (token, amount) => Asset2Box(token, box, amount) }
+      }
+
+    val assets = outputs.utxosByTokenId.keySet.map(tokenId => Asset(tokenId, block.blockId))
     ctx
       .transaction {
         for
           _       <- preTx
           blockId <- blockRepo.insert(block)
-          _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, outputs.assets, utxos)
+          _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, assetsToBox, assets, utxos)
           _       <- boxRepo.deleteUtxos(inputIds)
           _       <- postTx
         yield blockId

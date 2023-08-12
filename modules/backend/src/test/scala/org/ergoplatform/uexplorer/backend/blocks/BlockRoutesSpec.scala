@@ -10,34 +10,42 @@ import zio.test.*
 import eu.timepit.refined.auto.autoUnwrap
 import zio.json.interop.refined.*
 import org.ergoplatform.uexplorer.BlockId.unwrapped
+import org.ergoplatform.uexplorer.backend.boxes.PersistentBoxRepo
+import org.ergoplatform.uexplorer.{CoreConf, NetworkPrefix}
+import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo, Repo}
 import org.ergoplatform.uexplorer.db.Block
+import org.ergoplatform.uexplorer.http.Rest
 
 import java.util.concurrent.TimeUnit
 
-object BlockRoutesSpec extends ZIOSpecDefault {
+trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] {
 
-  private val app = BlockRoutes()
+  private val blockRoutes = BlockRoutes()
 
-  def spec = suite("BlockRoutesSpec")(
+  def blockRoutesSpec = suite("BlockRoutesSpec")(
     test("get block by id") {
-      val path = Root / "blocks" / Protocol.genesisBlockId.unwrapped
+      val path = Root / "blocks" / Protocol.firstBlockId.unwrapped
       val req  = Request.get(url = URL(path))
 
       for {
-        expectedBody <- app.runZIO(req).flatMap(_.body.asString)
-      } yield assertTrue(new Block().toJson == expectedBody)
+        expectedBody  <- blockRoutes.runZIO(req).flatMap(_.body.asString)
+        expectedBlock <- ZIO.fromEither(expectedBody.fromJson[Block])
+      } yield assertTrue(1 == expectedBlock.height)
     }.provide(
-      InmemoryBlockRepo.layerWithBlocks(List(new Block()))
+      H2Backend.layer,
+      PersistentBlockRepo.layer
     ),
     test("get blocks by ids") {
       val path = Root / "blocks"
-      val req  = Request.post(url = URL(path), body = Body.fromString(List(Protocol.genesisBlockId).toJson))
+      val req  = Request.post(url = URL(path), body = Body.fromString(List(Protocol.firstBlockId).toJson))
 
       for {
-        expectedBody <- app.runZIO(req).flatMap(_.body.asString)
-      } yield assertTrue(List(new Block()).toJson == expectedBody)
+        expectedBody   <- blockRoutes.runZIO(req).flatMap(_.body.asString)
+        expectedBlocks <- ZIO.fromEither(expectedBody.fromJson[List[Block]])
+      } yield assertTrue(List(1) == expectedBlocks.map(_.height))
     }.provide(
-      InmemoryBlockRepo.layerWithBlocks(List(new Block()))
+      H2Backend.layer,
+      PersistentBlockRepo.layer
     )
   )
 }

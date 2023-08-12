@@ -16,7 +16,7 @@ import zio.stream.*
 
 object DownloadBlocksAsLinesFromNodeToFile extends ZIOAppDefault {
 
-  private val targetFile = Paths.get(java.lang.System.getProperty("user.home"), ".ergo-uexplorer", "ergo-chain.lines.gz")
+  private val targetFile = Paths.get(java.lang.System.getProperty("user.home"), ".ergo-uexplorer", "ergo-chain.100k.gz")
   targetFile.toFile.getParentFile.mkdirs()
 
   def run =
@@ -26,6 +26,7 @@ object DownloadBlocksAsLinesFromNodeToFile extends ZIOAppDefault {
       _               <- ZIO.log(s"Initiating download")
       result <- blockReader
                   .blockIdSource(1)
+                  .take(100000)
                   .mapZIO(blockHttpClient.getBlockForIdAsString)
                   .mapConcat(line => (line + java.lang.System.lineSeparator()).getBytes)
                   .via(ZPipeline.gzip())

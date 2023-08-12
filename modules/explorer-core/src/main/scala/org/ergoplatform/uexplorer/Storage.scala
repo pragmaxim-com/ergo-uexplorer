@@ -1,14 +1,14 @@
 package org.ergoplatform.uexplorer
 
 import org.ergoplatform.uexplorer.chain.ChainTip
-import org.ergoplatform.uexplorer.db.{Block, OutputRecords}
+import org.ergoplatform.uexplorer.db.{Asset, Block, LinkedBlock, OutputRecords}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex, Height, Value}
 import zio.Task
 
 import java.nio.file.Path
 import scala.collection.compat.immutable.ArraySeq
-import scala.collection.concurrent
+import scala.collection.{concurrent, mutable}
 import scala.collection.immutable.{ArraySeq, TreeSet}
 import scala.util.Try
 
@@ -39,6 +39,8 @@ trait ReadableStorage {
 
 trait WritableStorage extends ReadableStorage {
 
+  def removeDuplicates(b: LinkedBlock): LinkedBlock
+  
   def writeReportAndCompact(blocksIndexed: Int): Task[Unit]
 
   def commit(): Revision
@@ -52,6 +54,10 @@ trait WritableStorage extends ReadableStorage {
   def persistErgoTreeByUtxo(outputRecords: OutputRecords): Task[_]
 
   def persistErgoTreeT8ByUtxo(outputRecords: OutputRecords): Task[_]
+
+  def persistTokensByUtxo(tokensByUtxo: mutable.Map[BoxId, mutable.Map[TokenId, Amount]]): Task[_]
+
+  def persistUtxosByTokenId(utxosByTokenId: mutable.Map[TokenId, mutable.Set[BoxId]]): Task[_]
 
   def compact(indexing: Boolean): Task[Unit]
 

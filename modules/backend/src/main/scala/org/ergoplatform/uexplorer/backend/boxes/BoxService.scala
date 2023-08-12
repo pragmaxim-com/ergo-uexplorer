@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
-import org.ergoplatform.uexplorer.db.{Asset, Box, Utxo}
+import org.ergoplatform.uexplorer.db.{Asset, Asset2Box, Box, Utxo}
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.{Address, BoxId, CoreConf, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hash, ErgoTreeT8Hex, TokenId}
 import zio.http.QueryParams
@@ -9,14 +9,14 @@ import zio.{Task, ZIO, ZLayer}
 case class BoxService(boxRepo: BoxRepo, coreConf: CoreConf) {
   import BoxService.allColumns
 
-  def getUnspentAssetsByTokenId(tokenId: String, params: QueryParams): Task[Iterable[Asset]] =
+  def getUnspentAssetsByTokenId(tokenId: String, params: QueryParams): Task[Iterable[Asset2Box]] =
     for
       tId <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId))
       indexFilter = params.map.view.mapValues(_.head).toMap
       assets <- boxRepo.lookupUnspentAssetsByTokenId(tId, allColumns, indexFilter)
     yield assets
 
-  def getSpentAssetsByTokenId(tokenId: String, params: QueryParams): Task[Iterable[Asset]] =
+  def getSpentAssetsByTokenId(tokenId: String, params: QueryParams): Task[Iterable[Asset2Box]] =
     for
       tId <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId))
       indexFilter = params.map.view.mapValues(_.head).toMap
@@ -24,7 +24,7 @@ case class BoxService(boxRepo: BoxRepo, coreConf: CoreConf) {
       assets  <- boxRepo.lookupAnyAssetsByTokenId(tId, allColumns, indexFilter)
     yield assets.filter(a => !utxoIds.contains(a.boxId))
 
-  def getAnyAssetsByTokenId(tokenId: String, params: QueryParams): Task[Iterable[Asset]] =
+  def getAnyAssetsByTokenId(tokenId: String, params: QueryParams): Task[Iterable[Asset2Box]] =
     for
       tId <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId))
       indexFilter = params.map.view.mapValues(_.head).toMap
@@ -198,13 +198,13 @@ object BoxService {
   def layer: ZLayer[BoxRepo with CoreConf, Nothing, BoxService] =
     ZLayer.fromFunction(BoxService.apply _)
 
-  def getUnspentAssetsByTokenId(tokenId: String, params: QueryParams): ZIO[BoxService, Throwable, Iterable[Asset]] =
+  def getUnspentAssetsByTokenId(tokenId: String, params: QueryParams): ZIO[BoxService, Throwable, Iterable[Asset2Box]] =
     ZIO.serviceWithZIO[BoxService](_.getUnspentAssetsByTokenId(tokenId, params))
 
-  def getSpentAssetsByTokenId(tokenId: String, params: QueryParams): ZIO[BoxService, Throwable, Iterable[Asset]] =
+  def getSpentAssetsByTokenId(tokenId: String, params: QueryParams): ZIO[BoxService, Throwable, Iterable[Asset2Box]] =
     ZIO.serviceWithZIO[BoxService](_.getSpentAssetsByTokenId(tokenId, params))
 
-  def getAnyAssetsByTokenId(tokenId: String, params: QueryParams): ZIO[BoxService, Throwable, Iterable[Asset]] =
+  def getAnyAssetsByTokenId(tokenId: String, params: QueryParams): ZIO[BoxService, Throwable, Iterable[Asset2Box]] =
     ZIO.serviceWithZIO[BoxService](_.getAnyAssetsByTokenId(tokenId, params))
 
   def getUnspentBoxesByTokenId(tokenId: String, params: QueryParams): ZIO[BoxService, Throwable, Iterable[Utxo]] =

@@ -24,7 +24,7 @@ object H2Backend extends Backend {
     Server
       .serve((BlockRoutes() ++ BoxRoutes()).withDefaultErrorResponse)
       .fork
-      .provideSomeLayer(Server.defaultWithPort(8080))
+      .provideSomeLayer(Server.defaultWithPort(8088))
 
   override def isEmpty: Task[Boolean] = ???
 

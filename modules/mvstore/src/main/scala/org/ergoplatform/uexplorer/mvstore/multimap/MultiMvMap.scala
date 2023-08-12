@@ -26,7 +26,7 @@ case class MultiMvMap[PK, C[_, _], K, V](
   private val commonMap: MapLike[PK, C[K, V]]           = new MvMap[PK, C[K, V]](id)
   private val superNodeMap: SuperNodeMvMap[PK, C, K, V] = SuperNodeMvMap[PK, C, K, V](id)
 
-  def clearEmptySuperNodes(): Task[Unit] = superNodeMap.clearEmptySuperNodes()
+  def clearEmptySuperNodes: Task[Unit] = superNodeMap.clearEmptySuperNodes()
 
   def getReport: (Path, Vector[(String, SuperNodeCounter)]) =
     ergoHomeDir.resolve(s"hot-keys-$id-$randomNumberPerRun.csv") -> superNodeMap.getReport

@@ -1,25 +1,26 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHash, ErgoTreeT8Hash, TokenId}
+import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHash, ErgoTreeT8Hash, TokenId}
 import zio.*
 
 trait BoxRepo:
 
   def insertUtxos(
-    ergoTrees: Iterable[ErgoTree],
-    ergoTreeT8s: Iterable[ErgoTreeT8],
-    assets: List[Asset],
-    utxos: Iterable[Utxo]
+                   ergoTrees: Iterable[ErgoTree],
+                   ergoTreeT8s: Iterable[ErgoTreeT8],
+                   assetsToBox: Iterable[Asset2Box],
+                   assets: Iterable[Asset],
+                   utxos: Iterable[Utxo]
   ): Task[Iterable[BoxId]]
 
   def deleteUtxo(boxId: BoxId): Task[Long]
 
   def deleteUtxos(boxId: Iterable[BoxId]): Task[Long]
 
-  def lookupUnspentAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset]]
+  def lookupUnspentAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset2Box]]
 
-  def lookupAnyAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset]]
+  def lookupAnyAssetsByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Asset2Box]]
 
   def lookupBox(boxId: BoxId): Task[Option[Box]]
 
@@ -51,12 +52,13 @@ trait BoxRepo:
 
 object BoxRepo:
   def insertUtxos(
-    ergoTrees: Iterable[ErgoTree],
-    ergoTreeT8s: Iterable[ErgoTreeT8],
-    assets: List[Asset],
-    utxos: Iterable[Utxo]
+                   ergoTrees: Iterable[ErgoTree],
+                   ergoTreeT8s: Iterable[ErgoTreeT8],
+                   assetsToBox: Iterable[Asset2Box],
+                   assets: Iterable[Asset],
+                   utxos: Iterable[Utxo]
   ): ZIO[BoxRepo, Throwable, Iterable[BoxId]] =
-    ZIO.serviceWithZIO[BoxRepo](_.insertUtxos(ergoTrees, ergoTreeT8s, assets, utxos))
+    ZIO.serviceWithZIO[BoxRepo](_.insertUtxos(ergoTrees, ergoTreeT8s, assetsToBox, assets, utxos))
 
   def deleteUtxo(boxId: BoxId): ZIO[BoxRepo, Throwable, Long] =
     ZIO.serviceWithZIO[BoxRepo](_.deleteUtxo(boxId))
