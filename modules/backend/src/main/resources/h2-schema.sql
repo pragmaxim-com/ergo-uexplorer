@@ -39,9 +39,8 @@ create table if not exists ErgoTreeT8 (
 
 create table if not exists Box (
     boxId           VARCHAR(64) NOT NULL PRIMARY KEY,
-    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
     txId            VARCHAR(64) NOT NULL,
-    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash),
+    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
     ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash),
     ergValue        BIGINT NOT NULL,
     r4              VARCHAR,
@@ -54,16 +53,19 @@ create table if not exists Box (
 
 create table if not exists Asset (
     tokenId         VARCHAR(64) NOT NULL PRIMARY KEY,
-    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
-    boxId           VARCHAR(64) NOT NULL REFERENCES Box (boxId),
+    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE
+);
+
+create table if not exists Asset2Box (
+    tokenId         VARCHAR(64) NOT NULL REFERENCES Asset (tokenId) ON DELETE CASCADE,
+    boxId           VARCHAR(64) NOT NULL REFERENCES Box (boxId) ON DELETE CASCADE,
     amount          BIGINT NOT NULL
 );
 
 create table if not exists Utxo (
     boxId           VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES Box (boxId),
-    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
     txId            VARCHAR(64) NOT NULL,
-    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash),
+    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
     ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash),
     ergValue        BIGINT NOT NULL,
     r4              VARCHAR,

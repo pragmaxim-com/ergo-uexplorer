@@ -1,37 +1,29 @@
 package org.ergoplatform.uexplorer.mvstore
 
-import org.h2.mvstore.MVStore
-
-import java.io.{BufferedInputStream, File, FileInputStream, FileWriter}
-import java.nio.file.{Path, Paths}
-import java.util.concurrent.ConcurrentHashMap
+import java.io.BufferedInputStream
 import java.util.zip.GZIPInputStream
-import scala.collection.concurrent
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
-import scala.util.{Random, Success, Try}
 
 class SuperNodeCollector[HK: HotKeyCodec](id: String) {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
 
   private val stringifiedHotKeys: Map[HK, String] =
-    Source
-      .fromInputStream(
-        new GZIPInputStream(
-          new BufferedInputStream(
-            Thread
-              .currentThread()
-              .getContextClassLoader
-              .getResourceAsStream(s"hot-keys-$id.csv.gz")
-          )
-        )
-      )
-      .getLines()
-      .map(_.trim)
-      .filterNot(_.isEmpty)
-      .toSet
-      .map(k => hotKeyCodec.deserialize(k) -> k)
-      .toMap
+    Option(
+      Thread
+        .currentThread()
+        .getContextClassLoader
+        .getResourceAsStream(s"hot-keys-$id.csv.gz")
+    ).map { resource =>
+      Source
+        .fromInputStream(new GZIPInputStream(new BufferedInputStream(resource)))
+        .getLines()
+        .map(_.trim)
+        .filterNot(_.isEmpty)
+        .toSet
+        .map(k => hotKeyCodec.deserialize(k) -> k)
+        .toMap
+    }.getOrElse(Map.empty)
 
   def getExistingStringifiedHotKeys(mvStoreMapNames: Set[String]): Map[HK, String] =
     stringifiedHotKeys.filter(e => mvStoreMapNames.contains(e._2))

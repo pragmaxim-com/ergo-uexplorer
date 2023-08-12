@@ -11,7 +11,7 @@ import java.nio.file.Path
 import java.util.Map.Entry
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
-import scala.collection.concurrent
+import scala.collection.{concurrent, mutable}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
@@ -25,15 +25,13 @@ class SuperNodeMvSet[HK, C[_], V](
   private lazy val counterByHotKey = new MvMap[HK, SuperNodeCounter](s"$id-counter")
 
   private def collectReadHotKey(k: HK): SuperNodeCounter =
-    counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 1, 0, 0)) {
-      case SuperNodeCounter(writeOps, readOps, added, removed) =>
-        SuperNodeCounter(writeOps + 1, readOps + 1, added, removed)
+    counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 1, 0, 0)) { case SuperNodeCounter(writeOps, readOps, added, removed) =>
+      SuperNodeCounter(writeOps + 1, readOps + 1, added, removed)
     })
 
   private def collectInsertedHotKey(k: HK, size: Int): SuperNodeCounter =
-    counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 0, size, 0)) {
-      case SuperNodeCounter(writeOps, readOps, added, removed) =>
-        SuperNodeCounter(writeOps + 1, readOps, added + size, removed)
+    counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 0, size, 0)) { case SuperNodeCounter(writeOps, readOps, added, removed) =>
+      SuperNodeCounter(writeOps + 1, readOps, added + size, removed)
     })
 
   private def collectRemovedHotKey(k: HK, size: Int): Option[SuperNodeCounter] =
@@ -121,6 +119,29 @@ class SuperNodeMvSet[HK, C[_], V](
       }
 
   def isEmpty: Boolean = existingMapsByHotKey.forall(_._2.isEmpty)
+
+  def get(hotKey: HK): Option[C[V]] =
+    superNodeCollector
+      .getHotKeyString(hotKey)
+      .flatMap { _ =>
+        existingMapsByHotKey.get(hotKey)
+      }
+      .map(codec.readAll)
+
+  def contains(hotKey: HK): Boolean =
+    superNodeCollector
+      .getHotKeyString(hotKey)
+      .exists { _ =>
+        existingMapsByHotKey.contains(hotKey)
+      }
+
+  def contains(hotKey: HK, v: V): Option[Boolean] =
+    superNodeCollector
+      .getHotKeyString(hotKey)
+      .flatMap { _ =>
+        existingMapsByHotKey.get(hotKey)
+      }
+      .map(codec.contains(v, _))
 
   def size: Int = existingMapsByHotKey.size
 

@@ -12,18 +12,22 @@ object OutputBuilder {
 
   private def getOutputRecords(block: BlockWithReward)(implicit enc: ErgoAddressEncoder): Task[OutputRecords] =
     ZIO.attempt {
-      val byErgoTree   = mutable.Map.empty[ErgoTree, mutable.Set[Utxo]]
-      val byErgoTreeT8 = mutable.Map.empty[ErgoTreeT8, mutable.Set[Utxo]]
-      val assets       = List.newBuilder[Asset]
+      val byErgoTree     = mutable.Map.empty[ErgoTree, mutable.Set[Utxo]]
+      val byErgoTreeT8   = mutable.Map.empty[ErgoTreeT8, mutable.Set[Utxo]]
+      val utxosByTokenId = mutable.Map.empty[TokenId, mutable.Set[BoxId]]
+      val tokensByUtxo   = mutable.Map.empty[BoxId, mutable.Map[TokenId, Amount]]
+
       block.b.transactions.transactions.foreach { tx =>
         tx.outputs.foreach { o =>
           val (ergoTreeHash, ergoTreeT8Opt) = ErgoTreeParser.ergoTreeHex2T8(o.ergoTree).get
           val additionalRegisters           = o.additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex).serializedValue).toMap
-          assets.addAll(o.assets.map(asset => Asset(asset.tokenId, block.b.header.id, o.boxId, asset.amount)))
+          o.assets.foreach { asset =>
+            adjustMultiSet(utxosByTokenId, asset.tokenId, o.boxId)
+            adjustMultiMap(tokensByUtxo, o.boxId, asset.tokenId, asset.amount)
+          }
           val utxo =
             Utxo(
               o.boxId,
-              block.b.header.id,
               tx.id,
               ergoTreeHash,
               ergoTreeT8Opt.map(_._2),
@@ -41,11 +45,14 @@ object OutputBuilder {
           }
         }
       }
-      OutputRecords(byErgoTree, byErgoTreeT8, assets.result())
+      OutputRecords(byErgoTree, byErgoTreeT8, utxosByTokenId, tokensByUtxo)
     }
 
-  private def adjustMultiSet[ET, B](m: mutable.Map[ET, mutable.Set[B]], et: ET, boxId: B) =
-    m.adjust(et)(_.fold(mutable.Set(boxId))(_.addOne(boxId)))
+  private def adjustMultiSet[ET, K](m: mutable.Map[ET, mutable.Set[K]], et: ET, k: K) =
+    m.adjust(et)(_.fold(mutable.Set(k))(_.addOne(k)))
+
+  private def adjustMultiMap[ET, K, V](m: mutable.Map[ET, mutable.Map[K, V]], et: ET, k: K, v: V) =
+    m.adjust(et)(_.fold(mutable.Map(k -> v))(_.addOne(k -> v)))
 
   def apply(block: BlockWithReward)(implicit enc: ErgoAddressEncoder): Task[BlockWithOutputs] =
     getOutputRecords(block).map(outputRecords => block.toBlockWithOutput(outputRecords))

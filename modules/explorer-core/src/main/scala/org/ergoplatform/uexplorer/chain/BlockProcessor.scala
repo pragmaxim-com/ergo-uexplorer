@@ -1,8 +1,6 @@
 package org.ergoplatform.uexplorer.chain
 
-import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.CoreConf
-import org.ergoplatform.uexplorer.chain.ChainLinker
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import zio.*

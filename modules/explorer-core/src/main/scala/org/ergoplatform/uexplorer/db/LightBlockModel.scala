@@ -12,7 +12,6 @@ import scala.collection.mutable
 
 case class Box(
   boxId: BoxId,
-  blockId: BlockId,
   txId: TxId,
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
@@ -32,7 +31,6 @@ object Box {
 
 case class Utxo(
   boxId: BoxId,
-  blockId: BlockId,
   txId: TxId,
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
@@ -47,7 +45,6 @@ case class Utxo(
   def toBox: Box =
     Box(
       boxId,
-      blockId,
       txId,
       ergoTreeHash,
       ergoTreeT8Hash,
@@ -69,17 +66,23 @@ object Utxo {
 case class ErgoTree(hash: ErgoTreeHash, blockId: BlockId, hex: ErgoTreeHex)
 case class ErgoTreeT8(hash: ErgoTreeT8Hash, blockId: BlockId, hex: ErgoTreeT8Hex)
 
-case class Asset(tokenId: TokenId, blockId: BlockId, boxId: BoxId, amount: Amount)
-
+case class Asset(tokenId: TokenId, blockId: BlockId)
 object Asset {
   implicit val encoder: JsonEncoder[Asset] = DeriveJsonEncoder.gen[Asset]
   implicit val decoder: JsonDecoder[Asset] = DeriveJsonDecoder.gen[Asset]
 }
 
+case class Asset2Box(tokenId: TokenId, boxId: BoxId, amount: Amount)
+object Asset2Box {
+  implicit val encoder: JsonEncoder[Asset2Box] = DeriveJsonEncoder.gen[Asset2Box]
+  implicit val decoder: JsonDecoder[Asset2Box] = DeriveJsonDecoder.gen[Asset2Box]
+}
+
 case class OutputRecords(
   byErgoTree: mutable.Map[ErgoTree, mutable.Set[Utxo]],
   byErgoTreeT8: mutable.Map[ErgoTreeT8, mutable.Set[Utxo]],
-  assets: List[Asset]
+  utxosByTokenId: mutable.Map[TokenId, mutable.Set[BoxId]],
+  tokensByUtxo: mutable.Map[BoxId, mutable.Map[TokenId, Amount]]
 )
 
 final case class Block(
@@ -139,4 +142,5 @@ final case class Block(
 
 object Block {
   implicit val encoder: JsonEncoder[Block] = DeriveJsonEncoder.gen[Block]
+  implicit val decoder: JsonDecoder[Block] = DeriveJsonDecoder.gen[Block]
 }

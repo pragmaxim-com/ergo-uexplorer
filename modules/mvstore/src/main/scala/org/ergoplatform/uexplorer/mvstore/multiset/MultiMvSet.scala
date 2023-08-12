@@ -28,6 +28,13 @@ case class MultiMvSet[K, C[_], V](
 
   def isEmpty: Boolean = superNodeMap.isEmpty && commonMap.isEmpty
 
+  def get(k: K): Option[C[V]] =
+    superNodeMap
+      .get(k)
+      .orElse(commonMap.get(k))
+
+  def contains(k: K): Boolean = superNodeMap.contains(k) || commonMap.containsKey(k)
+
   def size: MultiColSize = MultiColSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
 
   def clearEmptySuperNodes: Task[Unit] =

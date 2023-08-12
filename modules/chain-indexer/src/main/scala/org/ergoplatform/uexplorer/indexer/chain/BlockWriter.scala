@@ -28,7 +28,7 @@ case class BlockWriter(
   chainIndexerConf: ChainIndexerConf
 ) {
 
-  implicit private val ps: CoreConf    = chainIndexerConf.core
+  implicit private val ps: CoreConf            = chainIndexerConf.core
   implicit private val enc: ErgoAddressEncoder = ps.addressEncoder
 
   private def hasParentAndIsChained(fork: List[LinkedBlock]): Boolean =
@@ -49,7 +49,7 @@ case class BlockWriter(
       )
     } else {
       for {
-        _ <- ZIO.log(s"Adding fork from height ${winningFork.head.block.height} until ${winningFork.last.block.height}")
+        _              <- ZIO.log(s"Adding fork from height ${winningFork.head.block.height} until ${winningFork.last.block.height}")
         preForkVersion <- ZIO.attempt(storage.getBlockById(winningFork.head.b.header.id).map(_.revision).get)
         loosingFork = winningFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id)).toMap
         _ <- ZIO.attempt(storage.rollbackTo(preForkVersion))
@@ -112,6 +112,8 @@ case class BlockWriter(
               *> storage.removeInputBoxesByErgoTree(b.b.transactions.transactions),
             storage.persistErgoTreeT8ByUtxo(b.outputRecords)
               *> storage.removeInputBoxesByErgoTreeT8(b.b.transactions.transactions),
+            storage.persistUtxosByTokenId(b.outputRecords.utxosByTokenId),
+            storage.persistTokensByUtxo(b.outputRecords.tokensByUtxo),
             storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
           )
         ),

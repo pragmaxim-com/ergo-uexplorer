@@ -1,47 +1,32 @@
 package org.ergoplatform.uexplorer.storage
 
-import com.esotericsoftware.kryo.Kryo
-import com.esotericsoftware.kryo.io.{ByteBufferInput, ByteBufferOutput, Input, Output}
-import com.esotericsoftware.kryo.serializers.MapSerializer
-import com.esotericsoftware.kryo.util.Pool
-import org.apache.tinkerpop.shaded.kryo.pool.KryoPool
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Const.Protocol.{Emission, FeeContract, Foundation}
 import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.multimap.MultiMvMap
 import org.ergoplatform.uexplorer.mvstore.multiset.MultiMvSet
-import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
+import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.storage.Implicits.*
-import org.ergoplatform.uexplorer.storage.MvStorage.*
-import org.h2.mvstore.{MVMap, MVStore}
+import org.h2.mvstore.MVStore
 import zio.*
-import java.io.{BufferedInputStream, File}
-import java.nio.ByteBuffer
-import java.nio.file.{CopyOption, Files, Path, Paths}
+
+import java.io.File
+import java.nio.file.Path
 import java.util
-import java.util.Map.Entry
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentSkipListMap}
-import java.util.stream.Collectors
-import java.util.zip.GZIPInputStream
-import scala.collection.compat.immutable.ArraySeq
-import scala.collection.immutable.{ArraySeq, TreeMap, TreeSet}
-import scala.collection.mutable.ListBuffer
-import scala.collection.{concurrent, mutable}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
-import scala.io.Source
+import scala.collection.immutable.{ArraySeq, TreeSet}
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
-import scala.util.{Failure, Random, Success, Try}
 
 case class MvStorage(
-  utxosByErgoTreeHex: MultiMvSet[ErgoTreeHex, java.util.Set, BoxId],
-  utxosByErgoTreeT8Hex: MultiMvSet[ErgoTreeT8Hex, java.util.Set, BoxId],
+  utxosByErgoTreeHex: MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value],
+  utxosByErgoTreeT8Hex: MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId],
   ergoTreeHexByUtxo: MapLike[BoxId, ErgoTreeHex],
   ergoTreeT8HexByUtxo: MapLike[BoxId, ErgoTreeT8Hex],
-  blockIdsByHeight: MapLike[Height, java.util.Set[BlockId]],
-  blockById: MapLike[BlockId, Block]
+  blockIdsByHeight: MapLike[Height, util.Set[BlockId]],
+  blockById: MapLike[BlockId, Block],
+  utxosByTokenId: MultiMvSet[TokenId, util.Set, BoxId],
+  tokensByUtxo: MultiMvMap[BoxId, util.Map, TokenId, Amount]
 )(implicit val store: MVStore, mvStoreConf: MvStoreConf)
   extends WritableStorage {
 
@@ -50,6 +35,9 @@ case class MvStorage(
       utxosByErgoTreeHex.getReport,
       utxosByErgoTreeT8Hex.getReport
     )
+
+  def removeDuplicates(b: LinkedBlock): LinkedBlock = ???
+    /// b.outputRecords.utxosByTokenId.filter { case (tokenId, _) => utxosByTokenId.contains(tokenId) }
 
   def getChainTip: Task[ChainTip] = {
     val chainTip =
@@ -137,7 +125,7 @@ case class MvStorage(
       }
       .groupBy(_._1)
       .foreach { case (et, inputBoxes) =>
-        utxosByErgoTreeHex.removeSubsetOrFail(et, inputBoxes.iterator.map(_._2), inputBoxes.size) { existingBoxIds =>
+        utxosByErgoTreeHex.removeAllOrFail(et, inputBoxes.iterator.map(_._2), inputBoxes.size) { existingBoxIds =>
           inputBoxes.iterator.foreach(t => existingBoxIds.remove(t._2))
           Option(existingBoxIds).collect { case m if !m.isEmpty => m }
         }
@@ -173,11 +161,12 @@ case class MvStorage(
         ergoTreeHexByUtxo
           .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> ergoTreeHex.hex))
           .flatMap { _ =>
-            utxosByErgoTreeHex.adjustAndForget(ergoTreeHex.hex, boxes.iterator.map(_.boxId), boxes.size)
+            utxosByErgoTreeHex.adjustAndForget(ergoTreeHex.hex, boxes.iterator.map(b => b.boxId -> b.ergValue), boxes.size)
           }
           .get
       }
   }
+
   def persistErgoTreeT8ByUtxo(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
     outputRecords.byErgoTreeT8
       .foreach { case (ergoTreeT8, boxes) =>
@@ -188,6 +177,18 @@ case class MvStorage(
           }
           .get
       }
+  }
+
+  def persistTokensByUtxo(assets: mutable.Map[BoxId, mutable.Map[TokenId, Amount]]): Task[_] = ZIO.attempt {
+    assets.foreach { case (boxId, ammountByTokenId) =>
+      tokensByUtxo.adjustAndForget(boxId, ammountByTokenId.iterator, ammountByTokenId.size)
+    }
+  }
+
+  def persistUtxosByTokenId(assets: mutable.Map[TokenId, mutable.Set[BoxId]]): Task[_] = ZIO.attempt {
+    assets.foreach { case (tokenId, boxIds) =>
+      utxosByTokenId.adjustAndForget(tokenId, boxIds.iterator, boxIds.size)
+    }
   }
 
   def insertNewBlock(
@@ -256,7 +257,6 @@ case class MvStorage(
 }
 
 object MvStorage {
-  import scala.concurrent.duration.*
 
   private val VersionsToKeep = 10
 
@@ -282,12 +282,14 @@ object MvStorage {
             .tap(store => ZIO.log(s"Opened mvstore at version ${store.getCurrentVersion}"))
             .map { implicit store =>
               MvStorage(
-                multiset.MultiMvSet[ErgoTreeHex, util.Set, BoxId]("utxosByErgoTreeHex"),
-                multiset.MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
+                MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex"),
+                MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
                 MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
                 MvMap[BoxId, ErgoTreeT8Hex]("ergoTreeT8HexByUtxo"),
                 MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
-                MvMap[BlockId, Block]("blockById")
+                MvMap[BlockId, Block]("blockById"),
+                MultiMvSet[TokenId, util.Set, BoxId]("utxosByTokenId"),
+                MultiMvMap[BoxId, util.Map, TokenId, Amount]("tokensByUtxo")
               )(store, mvStoreConf.get)
             }
         } { storage =>
