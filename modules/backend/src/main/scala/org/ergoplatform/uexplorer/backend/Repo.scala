@@ -11,6 +11,8 @@ trait Repo:
   def removeBlocks(blockIds: Set[BlockId]): Task[Unit]
 
   def writeBlock(b: LinkedBlock)(preTx: Task[Any], postTx: Task[Any]): Task[BlockId]
+  
+  def getLastBlock: Task[Option[Block]]
 
 object Repo:
   def writeBlock(b: LinkedBlock)(preTx: Task[Any], postTx: Task[Any]): ZIO[Repo, Throwable, BlockId] =

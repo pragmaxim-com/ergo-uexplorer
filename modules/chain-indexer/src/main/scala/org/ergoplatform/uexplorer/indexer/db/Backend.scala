@@ -19,20 +19,14 @@ import scala.util.Try
 
 object Backend {
 
-  def layerH2: ZLayer[Any, Throwable, HikariDataSource] = ZLayer.scoped(
-    ZIO.acquireRelease(
-      ZIO.attempt(JdbcContextConfig(LoadConfig("h2")).dataSource)
-    )(ds => ZIO.succeed(ds.close()))
-  )
-
   def runServer: ZIO[ChainIndexerConf, Throwable, Fiber.Runtime[Nothing, Nothing]] =
     ZIO.serviceWithZIO[ChainIndexerConf] { conf =>
       conf.backendType match {
         case Cassandra(parallelism) =>
           // CassandraBackend(parallelism) // TODO cassandra must become Repos !
-          H2Backend.server().provide(layerH2, CoreConf.layer, BoxService.layer, PersistentBlockRepo.layer, PersistentBoxRepo.layer)
+          H2Backend.server().provide(H2Backend.layer, CoreConf.layer, BoxService.layer, PersistentBlockRepo.layer, PersistentBoxRepo.layer)
         case H2(parallelism) =>
-          H2Backend.server().provide(layerH2, CoreConf.layer, BoxService.layer, PersistentBlockRepo.layer, PersistentBoxRepo.layer)
+          H2Backend.server().provide(H2Backend.layer, CoreConf.layer, BoxService.layer, PersistentBlockRepo.layer, PersistentBoxRepo.layer)
       }
 
     }

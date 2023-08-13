@@ -7,6 +7,8 @@ import zio.*
 trait BlockRepo:
   def insert(block: Block): Task[BlockId]
 
+  def getLastBlocks(n: Int): Task[List[Block]]
+
   def lookup(headerId: BlockId): Task[Option[Block]]
 
   def lookupBlocks(ids: Set[BlockId]): Task[List[Block]]
@@ -20,6 +22,9 @@ trait BlockRepo:
 object BlockRepo:
   def insert(block: Block): ZIO[BlockRepo, Throwable, BlockId] =
     ZIO.serviceWithZIO[BlockRepo](_.insert(block))
+
+  def getLastBlocks(n: Int): ZIO[BlockRepo, Throwable, List[Block]] =
+    ZIO.serviceWithZIO[BlockRepo](_.getLastBlocks(n))
 
   def lookup(headerId: BlockId): ZIO[BlockRepo, Throwable, Option[Block]] =
     ZIO.serviceWithZIO[BlockRepo](_.lookup(headerId))

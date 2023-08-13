@@ -27,13 +27,13 @@ object GraphBackend {
           ZLayer.scoped(
             ZIO.acquireRelease(
               ZIO.attempt(new InMemoryGraphBackend) // TODO switch to JanusGraph
-            )(gb => ZIO.succeed(gb.close()))
+            )(gb => ZIO.log(s"Closing graph backend") *> ZIO.succeed(gb.close()))
           )
         case InMemoryGraph(parallelism) =>
           ZLayer.scoped(
             ZIO.acquireRelease(
               ZIO.attempt(new InMemoryGraphBackend)
-            )(gb => ZIO.succeed(gb.close()))
+            )(gb => ZIO.log(s"Closing graph backend") *> ZIO.succeed(gb.close()))
           )
       }
     }

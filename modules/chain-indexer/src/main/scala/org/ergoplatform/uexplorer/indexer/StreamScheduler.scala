@@ -56,7 +56,6 @@ case class StreamScheduler(
 
       case ChainValid =>
         for {
-          _     <- ZIO.log(s"Chain is valid, continue loading ...")
           fiber <- nodePoolBackend.keepNodePoolUpdated
           _     <- periodicSync.repeat(schedule)
         } yield fiber

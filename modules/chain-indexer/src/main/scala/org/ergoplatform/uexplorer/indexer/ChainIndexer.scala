@@ -1,36 +1,21 @@
 package org.ergoplatform.uexplorer.indexer
 
-import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.CoreConf
-import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo}
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, PersistentBlockRepo}
 import org.ergoplatform.uexplorer.backend.boxes.PersistentBoxRepo
-import org.ergoplatform.uexplorer.config.ExplorerConfig
-import org.ergoplatform.uexplorer.db.{FullBlock, GraphBackend}
+import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo}
+import org.ergoplatform.uexplorer.db.GraphBackend
 import org.ergoplatform.uexplorer.http.*
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.indexer.db.{Backend, GraphBackend}
 import org.ergoplatform.uexplorer.indexer.mempool.{MemPool, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
-import org.ergoplatform.uexplorer.parser.ErgoTreeParser
-import org.ergoplatform.uexplorer.plugin.Plugin
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
-import org.slf4j.LoggerFactory
-import sttp.client3.httpclient.zio.HttpClientZioBackend
 import zio.*
-import zio.config.typesafe.TypesafeConfigProvider
 import zio.logging.LogFormat
 import zio.logging.backend.SLF4J
 
-import java.io.{PrintWriter, StringWriter}
-import java.util.ServiceLoader
-import scala.collection.immutable.{ArraySeq, ListMap}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.*
-import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
-import scala.util.{Failure, Success, Try}
 
 object ChainIndexer extends ZIOAppDefault {
 

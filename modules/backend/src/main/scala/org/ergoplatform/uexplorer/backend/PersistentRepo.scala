@@ -29,6 +29,9 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
     persistBlockInTx(b.block, outputs, inputs, preTx, postTx)
   }
 
+  override def getLastBlock: Task[Option[Block]] =
+    blockRepo.getLastBlocks(1).map(_.lastOption)
+
   private def persistBlockInTx(
     block: Block,
     outputs: OutputRecords,

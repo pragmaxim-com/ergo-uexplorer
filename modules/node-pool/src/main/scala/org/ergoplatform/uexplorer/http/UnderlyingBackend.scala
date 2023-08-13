@@ -14,6 +14,8 @@ object UnderlyingBackend {
 
   def layerFor(backend: SttpBackendStub[Task, ZioStreams]): ZLayer[Any, Nothing, UnderlyingBackend] =
     ZLayer.scoped(
-      ZIO.acquireRelease(ZIO.succeed(UnderlyingBackend(backend)))(b => ZIO.succeed(b.backend.close()))
+      ZIO.acquireRelease(
+        ZIO.succeed(UnderlyingBackend(backend))
+      )(b => ZIO.log(s"Closing sttp backend") *> ZIO.succeed(b.backend.close()))
     )
 }

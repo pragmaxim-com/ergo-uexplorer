@@ -1,22 +1,16 @@
 package org.ergoplatform.uexplorer.chain
 
-import eu.timepit.refined.auto.*
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.chain.ChainTip.FifoLinkedHashMap
 import org.ergoplatform.uexplorer.db.*
-import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiHeader}
-import org.ergoplatform.{ErgoAddressEncoder, ErgoScriptPredef, Pay2SAddress}
-import scorex.util.encode.Base16
-import sigmastate.basics.DLogProtocol.ProveDlog
-import sigmastate.serialization.{GroupElementSerializer, SigmaSerializer}
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 import zio.*
+
 import java.util
-import scala.collection.immutable.TreeSet
-import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
-import scala.util.{Failure, Success, Try}
 
 class ChainTip(byBlockId: FifoLinkedHashMap[BlockId, Block]) {
+  def latestBlock: Option[Block] = toMap.values.toSeq.sortBy(_.height).lastOption
   def toMap: Map[BlockId, Block] = byBlockId.asScala.toMap
   def getParent(block: ApiFullBlock): Option[Block] =
     Option(byBlockId.get(block.header.parentId)).filter(_.height == block.header.height - 1)
