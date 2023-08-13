@@ -17,7 +17,7 @@ object H2Backend extends Backend {
   def layer: ZLayer[Any, Throwable, HikariDataSource] = ZLayer.scoped(
     ZIO.acquireRelease(
       ZIO.attempt(JdbcContextConfig(LoadConfig("h2")).dataSource)
-    )(ds => ZIO.succeed(ds.close()))
+    )(ds => ZIO.log(s"Closing h2 backend") *> ZIO.succeed(ds.close()))
   )
 
   def server(): ZIO[DataSource with BoxService with BlockRepo, Throwable, Fiber.Runtime[Nothing, Nothing]] =

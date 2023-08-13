@@ -52,20 +52,12 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     utxos: Iterable[Utxo]
   ): Task[Iterable[BoxId]] =
     (for {
-      _ <- ZIO.collectAllParDiscard(
-             List(
-               ctx.run(insertErgoTreesQuery(ergoTrees)),
-               ctx.run(insertErgoTreeT8sQuery(ergoTreeT8s)),
-               ctx.run(insertAssets(assets))
-             )
-           )
+      _ <- ctx.run(insertErgoTreesQuery(ergoTrees))
+      _ <- ctx.run(insertErgoTreeT8sQuery(ergoTreeT8s))
+      _ <- ctx.run(insertAssets(assets))
       _ <- ctx.run(insertBoxesQuery(utxos.map(_.toBox)))
-      _ <- ZIO.collectAllParDiscard(
-             List(
-               ctx.run(insertAssetsToBox(assetsToBox)),
-               ctx.run(insertUtxosQuery(utxos))
-             )
-           )
+      _ <- ctx.run(insertAssetsToBox(assetsToBox))
+      _ <- ctx.run(insertUtxosQuery(utxos))
     } yield utxos.map(_.boxId)).provide(dsLayer)
 
   override def deleteUtxo(boxId: BoxId): Task[Long] =

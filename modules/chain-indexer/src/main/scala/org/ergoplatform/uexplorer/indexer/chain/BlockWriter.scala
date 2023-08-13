@@ -1,25 +1,15 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.ExeContext.Implicits
+import org.ergoplatform.uexplorer.backend.Repo
+import org.ergoplatform.uexplorer.chain.{BlockProcessor, ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
-import org.ergoplatform.uexplorer.indexer.db.Backend
-import org.ergoplatform.uexplorer.storage.MvStorage
+import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{CoreConf, ReadableStorage, UnexpectedStateError, WritableStorage}
 import zio.*
-import zio.prelude.CommutativeBothOps
-
-import java.util.concurrent.Flow.Processor
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
-import zio.stream.ZPipeline
-import zio.stream.ZStream
-import zio.stream.ZSink
-import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.chain.{BlockProcessor, ChainLinker}
-import org.ergoplatform.uexplorer.backend.Repo
-import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
+import zio.stream.{ZSink, ZStream}
 
 case class BlockWriter(
   storage: WritableStorage,
@@ -56,6 +46,24 @@ case class BlockWriter(
       } yield ForkInserted(winningFork, loosingFork)
     }
 
+  def getChainTip: Task[ChainTip] =
+    storage.getChainTip.flatMap { chainTip =>
+      repo.getLastBlock.flatMap { lastBlock =>
+        if (storage.getCurrentRevision > 1 && chainTip.latestBlock.exists(sb => lastBlock.exists(rb => sb.height > rb.height))) {
+          storage.rollbackTo(storage.getCurrentRevision - 1)
+          ZIO.logWarning(s"Rolled back storage to ${storage.getCurrentRevision} due to storage/repo incompatibility") *> getChainTip
+        } else if (chainTip.latestBlock.map(_.blockId) != lastBlock.map(_.blockId)) {
+          ZIO.fail(
+            new IllegalStateException(
+              s"Storage last block ${chainTip.latestBlock.map(_.height)} is not compatible with repo last block ${lastBlock.map(_.height)}, please delete db files and restart"
+            )
+          )
+        } else {
+          ZIO.log(s"Chain is valid, continue loading ...") *> ZIO.succeed(chainTip)
+        }
+      }
+    }
+
   def insertBranchFlow(
     source: ZStream[Any, Throwable, ApiFullBlock],
     chainLinker: ChainLinker
@@ -64,7 +72,7 @@ case class BlockWriter(
       .processingFlow(chainLinker)
       .mapStream[Any, Throwable, BestBlockInserted] {
         case bestBlock :: Nil =>
-          ZStream.fromIterable(List(bestBlock)).via(insertBlockFlow)
+          ZStream.fromIterable(List(bestBlock)).mapZIO(persistBlock)
         case winningFork =>
           ZStream
             .fromIterableZIO(
@@ -73,7 +81,7 @@ case class BlockWriter(
                 _            <- repo.removeBlocks(forkInserted.loosingFork.keySet)
               } yield forkInserted.winningFork
             )
-            .via(insertBlockFlow)
+            .mapZIO(persistBlock)
       }
       .tap { b =>
         if (b.linkedBlock.block.height % chainIndexerConf.mvStore.heightCompactRate == 0)
@@ -120,10 +128,6 @@ case class BlockWriter(
         postTx = ZIO.attempt(storage.commit())
       )
       .as(BestBlockInserted(b, None))
-
-  val insertBlockFlow: ZPipeline[Any, Throwable, LinkedBlock, BestBlockInserted] =
-    ZPipeline
-      .mapZIO(persistBlock)
 
 }
 

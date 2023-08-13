@@ -40,7 +40,9 @@ object SttpNodePoolBackendSpec extends ZIOSpecDefault with TestSupport {
     fn: SttpBackendStub[Task, ZioStreams] => SttpBackendStub[Task, ZioStreams]
   ): ZLayer[Any, Throwable, NodePool with SttpNodePoolBackend] =
     ZLayer.scoped(
-      ZIO.acquireRelease(ZIO.succeed(UnderlyingBackend(fn(HttpClientZioBackend.stub))))(b => ZIO.succeed(b.backend.close()))
+      ZIO.acquireRelease(
+        ZIO.succeed(UnderlyingBackend(fn(HttpClientZioBackend.stub)))
+      )(b => ZIO.log(s"Closing sttp backend stub") *> ZIO.succeed(b.backend.close()))
     ) >+> NodePoolConf.layer >+> MetadataHttpClient.layer >+> NodePool.layer >+> SttpNodePoolBackend.layer
 
   def spec =

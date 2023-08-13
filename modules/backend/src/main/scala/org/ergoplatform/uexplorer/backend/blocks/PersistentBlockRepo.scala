@@ -29,6 +29,17 @@ case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
       .as(block.blockId)
       .provide(dsLayer)
 
+  override def getLastBlocks(n: Int): Task[List[Block]] =
+    ctx
+      .run {
+        quote {
+          query[Block]
+            .sortBy(_.height)(Ord.desc[Int])
+            .take(lift(n))
+        }
+      }
+      .provide(dsLayer)
+
   override def lookup(headerId: BlockId): Task[Option[Block]] =
     ctx
       .run {
