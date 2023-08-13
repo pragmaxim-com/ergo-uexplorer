@@ -2,12 +2,10 @@ package org.ergoplatform.uexplorer.indexer.chain
 
 import org.ergoplatform.uexplorer.http.{BlockHttpClient, Codecs}
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.{BlockId, Height}
+import org.ergoplatform.uexplorer.BlockId
 import zio.ZLayer
 
-import java.nio.file.{Path, Paths}
-import scala.collection.immutable.TreeSet
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.nio.file.Paths
 import zio.stream.ZPipeline
 import zio.stream.ZStream
 
@@ -23,7 +21,7 @@ class BlockReader(
       blockIdSource(fromHeight)
         .buffer(128)
         .mapZIOPar(1)(blockHttpClient.getBlockForId) // parallelism could be parameterized - low or big pressure on Node
-        .buffer(128)
+        .buffer(32)
 
   def blockSourceFromFS: ZStream[Any, Throwable, ApiFullBlock] = {
     import io.circe.parser.decode
@@ -43,7 +41,6 @@ class BlockReader(
             None
         }
       }
-      .buffer(10)
       .mapConcat(identity)
 
 }

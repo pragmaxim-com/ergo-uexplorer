@@ -1,21 +1,10 @@
 package org.ergoplatform.uexplorer.indexer.chain
 
-import org.apache.tinkerpop.gremlin.structure.Graph
-import org.ergoplatform.uexplorer.db.Backend
-import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
-import org.ergoplatform.uexplorer.indexer.db.Backend
-import org.ergoplatform.uexplorer.storage.MvStorage
-import org.ergoplatform.uexplorer.{BlockId, Const, Height, ReadableStorage}
-import zio.{Task, ZLayer}
-
-import java.nio.file.{Files, Paths}
-import scala.collection.immutable.TreeSet
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.Try
-import org.ergoplatform.uexplorer.db.GraphBackend
+import org.ergoplatform.uexplorer.ReadableStorage
 import org.ergoplatform.uexplorer.backend.Repo
+import org.ergoplatform.uexplorer.db.GraphBackend
+import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
+import zio.{Task, ZLayer}
 
 case class Initializer(
   storage: ReadableStorage,
