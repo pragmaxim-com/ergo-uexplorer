@@ -33,11 +33,10 @@ case class MvStorage(
   private def getReportByPath: Map[Path, Vector[(String, SuperNodeCounter)]] =
     Map(
       utxosByErgoTreeHex.getReport,
-      utxosByErgoTreeT8Hex.getReport
+      utxosByErgoTreeT8Hex.getReport,
+      utxosByTokenId.getReport,
+      tokensByUtxo.getReport
     )
-
-  def removeDuplicates(b: LinkedBlock): LinkedBlock = ???
-    /// b.outputRecords.utxosByTokenId.filter { case (tokenId, _) => utxosByTokenId.contains(tokenId) }
 
   def getChainTip: Task[ChainTip] = {
     val chainTip =
@@ -99,19 +98,17 @@ case class MvStorage(
     progress + debug
   }
 
-  def writeReportAndCompact(blocksIndexed: Int): Task[Unit] =
-    if (blocksIndexed > 100000) {
-      ZIO.collectAllDiscard(
-        getReportByPath.map { case (path, report) =>
-          val lines = report.map { case (hotKey, SuperNodeCounter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
-            val stats  = s"$writeOps $readOps $boxesAdded $boxesRemoved ${boxesAdded - boxesRemoved}"
-            val indent = 45
-            s"$stats ${List.fill(Math.max(4, indent - stats.length))(" ").mkString("")} $hotKey"
-          }
-          tool.FileUtils.writeReport(lines, path)
+  def writeReportAndCompact(indexing: Boolean): Task[Unit] =
+    ZIO.collectAllDiscard(
+      getReportByPath.map { case (path, report) =>
+        val lines = report.map { case (hotKey, SuperNodeCounter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
+          val stats  = s"$writeOps $readOps $boxesAdded $boxesRemoved ${boxesAdded - boxesRemoved}"
+          val indent = 45
+          s"$stats ${List.fill(Math.max(4, indent - stats.length))(" ").mkString("")} $hotKey"
         }
-      ) *> compact(true)
-    } else ZIO.succeed(())
+        tool.FileUtils.writeReport(lines, path)
+      }
+    ) *> compact(indexing)
 
   def commit(): Revision = store.commit()
 
@@ -271,7 +268,6 @@ object MvStorage {
                 new MVStore.Builder()
                   .fileName(dbFile.getAbsolutePath)
                   .cacheSize(mvStoreConf.get.cacheSize)
-                  .cacheConcurrency(4)
                   .autoCommitDisabled()
                   .open()
 

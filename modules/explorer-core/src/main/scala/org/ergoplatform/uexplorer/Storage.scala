@@ -39,9 +39,7 @@ trait ReadableStorage {
 
 trait WritableStorage extends ReadableStorage {
 
-  def removeDuplicates(b: LinkedBlock): LinkedBlock
-  
-  def writeReportAndCompact(blocksIndexed: Int): Task[Unit]
+  def writeReportAndCompact(indexing: Boolean): Task[Unit]
 
   def commit(): Revision
 
