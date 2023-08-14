@@ -49,6 +49,8 @@ trait WritableStorage extends ReadableStorage {
 
   def removeInputBoxesByErgoTreeT8(transactions: ArraySeq[ApiTransaction]): Task[_]
 
+  def removeInputBoxesByTokenId(transactions: ArraySeq[ApiTransaction]): Task[_]
+  
   def persistErgoTreeByUtxo(outputRecords: OutputRecords): Task[_]
 
   def persistErgoTreeT8ByUtxo(outputRecords: OutputRecords): Task[_]

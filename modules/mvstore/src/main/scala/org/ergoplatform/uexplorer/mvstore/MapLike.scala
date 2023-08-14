@@ -24,6 +24,8 @@ trait MapLike[K, V] {
 
   def removeAllOrFail(keys: IterableOnce[K]): Try[Unit]
 
+  def removeAllExisting(keys: IterableOnce[K]): Unit
+
   def ceilingKey(key: K): Option[K]
 
   def clear(): Try[Unit]

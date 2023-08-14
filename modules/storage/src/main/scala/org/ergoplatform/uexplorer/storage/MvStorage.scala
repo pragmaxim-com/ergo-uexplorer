@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.storage
 
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.*
@@ -114,8 +115,9 @@ case class MvStorage(
 
   def rollbackTo(rev: Revision): Unit = store.rollbackTo(rev)
 
-  def removeInputBoxesByErgoTree(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.attempt {
-    val inputIds = transactions.flatMap(_.inputs.map(_.boxId))
+  def removeInputBoxesByErgoTree(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.fromTry {
+    val inputIds =
+      transactions.flatMap(_.inputs.collect { case i if i.boxId != Emission.inputBox && i.boxId != Foundation.inputBox => i.boxId })
     inputIds
       .flatMap { inputId =>
         ergoTreeHexByUtxo.get(inputId).map(_ -> inputId)
@@ -134,21 +136,52 @@ case class MvStorage(
   }
 
   def removeInputBoxesByErgoTreeT8(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.attempt {
-    val inputIds = transactions.flatMap(_.inputs.map(_.boxId))
+    val inputIds =
+      transactions.flatMap(_.inputs.collect { case i if i.boxId != Emission.inputBox && i.boxId != Foundation.inputBox => i.boxId })
     inputIds
       .flatMap { inputId =>
         ergoTreeT8HexByUtxo.get(inputId).map(_ -> inputId)
       }
       .groupBy(_._1)
       .foreach { case (etT8, inputBoxes) =>
-        utxosByErgoTreeT8Hex.removeSubsetOrFail(etT8, inputBoxes.iterator.map(_._2), inputBoxes.size) { existingBoxIds =>
-          inputBoxes.iterator.foreach(t => existingBoxIds.remove(t._2))
-          Option(existingBoxIds).collect { case m if !m.isEmpty => m }
-        }
+        utxosByErgoTreeT8Hex
+          .removeSubsetOrFail(etT8, inputBoxes.iterator.map(_._2), inputBoxes.size) { existingBoxIds =>
+            inputBoxes.iterator.foreach(t => existingBoxIds.remove(t._2))
+            Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+          }
       }
 
     ergoTreeT8HexByUtxo
-      .removeAllOrFail(inputIds)
+      .removeAllExisting(inputIds)
+  }
+
+  def removeInputBoxesByTokenId(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.attempt {
+    val inputIds =
+      transactions.flatMap(_.inputs.collect { case i if i.boxId != Emission.inputBox && i.boxId != Foundation.inputBox => i.boxId })
+    inputIds
+      .flatMap { inputId =>
+        val tokensOpt = tokensByUtxo.getAll(inputId)
+        if (tokensOpt.exists(ts => !ts.isEmpty)) {
+          val tokens = tokensOpt.toSeq.flatMap(_.keySet().asScala)
+          tokensByUtxo
+            .removeAllOrFail(inputId, tokens, tokens.size) { existingBoxIds =>
+              tokens.iterator.foreach(t => existingBoxIds.remove(t))
+              Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+            }
+            .get
+          tokens.map(_ -> inputId)
+        } else
+          Seq.empty
+      }
+      .groupBy(_._1)
+      .foreach { case (tokenId, inputBoxes) =>
+        utxosByTokenId
+          .removeSubsetOrFail(tokenId, inputBoxes.map(_._2), inputBoxes.size) { existingBoxIds =>
+            inputBoxes.iterator.foreach(t => existingBoxIds.remove(t._2))
+            Option(existingBoxIds).collect { case m if !m.isEmpty => m }
+          }
+          .get
+      }
   }
 
   // TODO parallel writes to 2 different NvMaps
@@ -178,13 +211,13 @@ case class MvStorage(
 
   def persistTokensByUtxo(assets: mutable.Map[BoxId, mutable.Map[TokenId, Amount]]): Task[_] = ZIO.attempt {
     assets.foreach { case (boxId, ammountByTokenId) =>
-      tokensByUtxo.adjustAndForget(boxId, ammountByTokenId.iterator, ammountByTokenId.size)
+      tokensByUtxo.adjustAndForget(boxId, ammountByTokenId.iterator, ammountByTokenId.size).get
     }
   }
 
   def persistUtxosByTokenId(assets: mutable.Map[TokenId, mutable.Set[BoxId]]): Task[_] = ZIO.attempt {
     assets.foreach { case (tokenId, boxIds) =>
-      utxosByTokenId.adjustAndForget(tokenId, boxIds.iterator, boxIds.size)
+      utxosByTokenId.adjustAndForget(tokenId, boxIds.iterator, boxIds.size).get
     }
   }
 

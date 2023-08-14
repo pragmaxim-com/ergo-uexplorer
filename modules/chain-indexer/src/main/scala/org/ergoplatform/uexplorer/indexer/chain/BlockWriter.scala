@@ -108,7 +108,7 @@ case class BlockWriter(
             .writeReportAndCompact(false)
             .orDie
         case _ =>
-          ZIO.unit
+          ZIO.log(s"Writing report ...") *> storage.writeReportAndCompact(false).orDie
       }
       .map { lastBlock =>
         ChainSyncResult(
@@ -123,12 +123,10 @@ case class BlockWriter(
       .writeBlock(b)(
         preTx = ZIO.collectAllParDiscard(
           List(
-            storage.persistErgoTreeByUtxo(b.outputRecords)
-              *> storage.removeInputBoxesByErgoTree(b.b.transactions.transactions),
-            storage.persistErgoTreeT8ByUtxo(b.outputRecords)
-              *> storage.removeInputBoxesByErgoTreeT8(b.b.transactions.transactions),
-            storage.persistUtxosByTokenId(b.outputRecords.utxosByTokenId),
-            storage.persistTokensByUtxo(b.outputRecords.tokensByUtxo),
+            storage.persistErgoTreeByUtxo(b.outputRecords) *> storage.removeInputBoxesByErgoTree(b.b.transactions.transactions),
+            storage.persistErgoTreeT8ByUtxo(b.outputRecords) *> storage.removeInputBoxesByErgoTreeT8(b.b.transactions.transactions),
+            storage.persistUtxosByTokenId(b.outputRecords.utxosByTokenId) *> storage.persistTokensByUtxo(b.outputRecords.tokensByUtxo) *> storage
+              .removeInputBoxesByTokenId(b.b.transactions.transactions),
             storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
           )
         ),
