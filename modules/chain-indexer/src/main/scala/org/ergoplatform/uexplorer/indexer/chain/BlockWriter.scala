@@ -9,6 +9,7 @@ import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import org.ergoplatform.uexplorer.{CoreConf, ReadableStorage, UnexpectedStateError, WritableStorage}
 import zio.*
+import zio.Exit.Success
 import zio.stream.{ZSink, ZStream}
 
 case class BlockWriter(
@@ -50,8 +51,9 @@ case class BlockWriter(
     storage.getChainTip.flatMap { chainTip =>
       repo.getLastBlock.flatMap { lastBlock =>
         if (storage.getCurrentRevision > 1 && chainTip.latestBlock.exists(sb => lastBlock.exists(rb => sb.height > rb.height))) {
-          storage.rollbackTo(storage.getCurrentRevision - 1)
-          ZIO.logWarning(s"Rolled back storage to ${storage.getCurrentRevision} due to storage/repo incompatibility") *> getChainTip
+          ZIO.logWarning(
+            s"Rolling back storage to ${storage.getCurrentRevision} due to storage/repo incompatibility"
+          ) *> ZIO.attempt(storage.rollbackTo(lastBlock.get.revision + 1)) *> storage.getChainTip
         } else if (chainTip.latestBlock.map(_.blockId) != lastBlock.map(_.blockId)) {
           ZIO.fail(
             new IllegalStateException(
@@ -100,8 +102,13 @@ case class BlockWriter(
             in.lastOption.map(_ -> 1)
         }
       )
-      .tap { lastBlock =>
-        storage.writeReportAndCompact(lastBlock.map(_._2).getOrElse(0))
+      .onExit {
+        case Success(Some((lastBlock, indexCount))) =>
+          ZIO.log(s"Writing report after block at height ${lastBlock.linkedBlock.block.height}, indexed $indexCount blocks ...") *> storage
+            .writeReportAndCompact(false)
+            .orDie
+        case _ =>
+          ZIO.unit
       }
       .map { lastBlock =>
         ChainSyncResult(

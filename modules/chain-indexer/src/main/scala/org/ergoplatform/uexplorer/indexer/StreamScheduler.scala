@@ -1,20 +1,12 @@
 package org.ergoplatform.uexplorer.indexer
 
-import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.http.SttpNodePoolBackend
 import org.ergoplatform.uexplorer.indexer.chain.Initializer.*
-import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.chain.{Initializer, StreamExecutor}
-import org.ergoplatform.uexplorer.indexer.db.Backend
+import org.ergoplatform.uexplorer.indexer.mempool.{MemPoolStateChanges, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
-import zio.*
-import org.ergoplatform.uexplorer.indexer.mempool.MemPoolStateChanges
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
-import org.ergoplatform.uexplorer.indexer.mempool.MempoolSyncer
 import org.ergoplatform.uexplorer.storage.MvStoreConf
+import zio.*
 
 case class StreamScheduler(
   pluginManager: PluginManager,
