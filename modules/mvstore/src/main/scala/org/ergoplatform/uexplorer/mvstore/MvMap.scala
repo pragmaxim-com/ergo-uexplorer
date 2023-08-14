@@ -42,6 +42,9 @@ case class MvMap[K, V: ValueCodec](id: String)(implicit store: MVStore) extends 
       Failure(new AssertionError(s"Removing non-existing key $key"))
     }
 
+  def removeAllExisting(keys: IterableOnce[K]): Unit =
+    keys.iterator.foreach(key => underlying.remove(key))
+
   def ceilingKey(key: K): Option[K] = Option(underlying.ceilingKey(key))
 
   def clear(): Try[Unit] = Try(underlying.clear())
