@@ -33,7 +33,7 @@ case class StreamScheduler(
 
   def validateAndSchedule(
     schedule: Schedule[Any, Any, Any] = Schedule.fixed(conf.maxIdleCompactTime + 5.seconds)
-  ): Task[Fiber.Runtime[Throwable, Long]] =
+  ): ZIO[Any, Throwable, Fiber.Runtime[Throwable, Long]] =
     initializer.init.flatMap {
       case HalfEmptyInconsistency(error) =>
         ZIO.fail(new IllegalStateException(error))
@@ -41,16 +41,16 @@ case class StreamScheduler(
         ZIO.fail(new IllegalStateException(error))
       case ChainEmpty =>
         for {
-          _     <- ZIO.log(s"Chain is empty, loading from scratch ...")
-          fiber <- nodePoolBackend.keepNodePoolUpdated
-          _     <- periodicSync.repeat(schedule)
-        } yield fiber
+          _         <- ZIO.log(s"Chain is empty, loading from scratch ...")
+          poolFiber <- nodePoolBackend.keepNodePoolUpdated
+          _         <- periodicSync.repeat(schedule)
+        } yield poolFiber
 
       case ChainValid =>
         for {
-          fiber <- nodePoolBackend.keepNodePoolUpdated
-          _     <- periodicSync.repeat(schedule)
-        } yield fiber
+          poolFiber <- nodePoolBackend.keepNodePoolUpdated
+          _         <- periodicSync.repeat(schedule)
+        } yield poolFiber
     }
 }
 

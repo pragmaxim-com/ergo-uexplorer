@@ -22,7 +22,7 @@ case class StreamExecutor(
 
   def indexNewBlocks: Task[ChainSyncResult] =
     for
-      chainTip <- blockWriter.getChainTip
+      chainTip <- storage.getChainTip
       chainLinker = new ChainLinker(blockHttpClient.getBlockForId, chainTip)(conf.core)
       blockSource = blockReader.getBlockSource(storage.getLastHeight.getOrElse(0) + 1, conf.benchmarkMode)
       syncResult <- blockWriter.insertBranchFlow(blockSource, chainLinker)

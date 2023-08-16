@@ -45,6 +45,8 @@ case class MvStorage(
         blockIdsByHeight
           .iterator(None, None, reverse = true)
           .take(100)
+          .toSeq
+          .sortBy(_._1)(Ordering[Int].reverse)
           .flatMap { case (_, blockIds) =>
             blockIds.asScala.flatMap(b => blockById.get(b).map(b -> _))
           }
@@ -115,9 +117,7 @@ case class MvStorage(
 
   def rollbackTo(rev: Revision): Unit = store.rollbackTo(rev)
 
-  def removeInputBoxesByErgoTree(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.fromTry {
-    val inputIds =
-      transactions.flatMap(_.inputs.collect { case i if i.boxId != Emission.inputBox && i.boxId != Foundation.inputBox => i.boxId })
+  def removeInputBoxesByErgoTree(inputIds: Seq[BoxId]): Task[_] = ZIO.fromTry {
     inputIds
       .flatMap { inputId =>
         ergoTreeHexByUtxo.get(inputId).map(_ -> inputId)
@@ -135,9 +135,7 @@ case class MvStorage(
 
   }
 
-  def removeInputBoxesByErgoTreeT8(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.attempt {
-    val inputIds =
-      transactions.flatMap(_.inputs.collect { case i if i.boxId != Emission.inputBox && i.boxId != Foundation.inputBox => i.boxId })
+  def removeInputBoxesByErgoTreeT8(inputIds: Seq[BoxId]): Task[_] = ZIO.attempt {
     inputIds
       .flatMap { inputId =>
         ergoTreeT8HexByUtxo.get(inputId).map(_ -> inputId)
@@ -155,9 +153,7 @@ case class MvStorage(
       .removeAllExisting(inputIds)
   }
 
-  def removeInputBoxesByTokenId(transactions: ArraySeq[ApiTransaction]): Task[_] = ZIO.attempt {
-    val inputIds =
-      transactions.flatMap(_.inputs.collect { case i if i.boxId != Emission.inputBox && i.boxId != Foundation.inputBox => i.boxId })
+  def removeInputBoxesByTokenId(inputIds: Seq[BoxId]): Task[_] = ZIO.attempt {
     inputIds
       .flatMap { inputId =>
         val tokensOpt = tokensByUtxo.getAll(inputId)
@@ -185,8 +181,8 @@ case class MvStorage(
   }
 
   // TODO parallel writes to 2 different NvMaps
-  def persistErgoTreeByUtxo(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
-    outputRecords.byErgoTree
+  def persistErgoTreeByUtxo(byErgoTree: Iterable[(ErgoTree, mutable.Set[Utxo])]): Task[_] = ZIO.attempt {
+    byErgoTree
       .foreach { case (ergoTreeHex, boxes) =>
         ergoTreeHexByUtxo
           .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> ergoTreeHex.hex))
@@ -197,8 +193,8 @@ case class MvStorage(
       }
   }
 
-  def persistErgoTreeT8ByUtxo(outputRecords: OutputRecords): Task[_] = ZIO.attempt {
-    outputRecords.byErgoTreeT8
+  def persistErgoTreeT8ByUtxo(byErgoTreeT8: Iterable[(ErgoTreeT8, mutable.Set[Utxo])]): Task[_] = ZIO.attempt {
+    byErgoTreeT8
       .foreach { case (ergoTreeT8, boxes) =>
         ergoTreeT8HexByUtxo
           .putAllNewOrFail(boxes.iterator.map(b => b.boxId -> ergoTreeT8.hex))

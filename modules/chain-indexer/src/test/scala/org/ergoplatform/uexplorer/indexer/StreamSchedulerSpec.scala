@@ -1,37 +1,24 @@
 package org.ergoplatform.uexplorer.indexer
 
-import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.backend.blocks.PersistentBlockRepo
 import org.ergoplatform.uexplorer.backend.boxes.PersistentBoxRepo
 import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo}
-import org.ergoplatform.uexplorer.config.ExplorerConfig
 import org.ergoplatform.uexplorer.http.*
 import org.ergoplatform.uexplorer.indexer.chain.*
-import org.ergoplatform.uexplorer.indexer.chain.Initializer.ChainEmpty
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.db.{Backend, GraphBackend}
+import org.ergoplatform.uexplorer.indexer.db.GraphBackend
 import org.ergoplatform.uexplorer.indexer.mempool.{MemPool, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
-import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
-import org.ergoplatform.uexplorer.{BlockId, CoreConf, ReadableStorage}
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.freespec.AsyncFreeSpec
-import org.scalatest.matchers.should.Matchers
-import sttp.capabilities.WebSockets
+import org.ergoplatform.uexplorer.{BlockId, ReadableStorage}
 import sttp.capabilities.zio.ZioStreams
 import sttp.client3.*
 import sttp.client3.httpclient.zio.HttpClientZioBackend
 import sttp.client3.testing.SttpBackendStub
 import zio.*
-import zio.config.typesafe.TypesafeConfigProvider
 import zio.test.*
 
-import java.nio.file.Paths
-import scala.collection.immutable.{ListMap, TreeMap}
-import scala.concurrent.Future
-import scala.concurrent.duration.*
+import scala.collection.immutable.ListMap
 
 object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport {
 
@@ -64,7 +51,8 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport {
     suite("meta")(
       test(Rest.info.sync) {
         (for {
-          nodePoolFiber  <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once))
+          fiber          <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once))
+          _              <- fiber.join.catchAllCause(_ => ZIO.succeed(()))
           lastHeight     <- ZIO.serviceWith[ReadableStorage](_.getLastHeight)
           missingHeights <- ZIO.serviceWith[ReadableStorage](_.findMissingHeights)
           memPoolState   <- ZIO.serviceWithZIO[MemPool](_.getTxs)

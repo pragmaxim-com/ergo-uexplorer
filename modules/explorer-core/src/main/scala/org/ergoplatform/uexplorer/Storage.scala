@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer
 
 import org.ergoplatform.uexplorer.chain.ChainTip
-import org.ergoplatform.uexplorer.db.{Asset, Block, LinkedBlock, OutputRecords}
+import org.ergoplatform.uexplorer.db.{Asset, Block, ErgoTree, ErgoTreeT8, LinkedBlock, OutputRecords, Utxo}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex, Height, Value}
 import zio.Task
@@ -45,15 +45,15 @@ trait WritableStorage extends ReadableStorage {
 
   def rollbackTo(rev: Revision): Unit
 
-  def removeInputBoxesByErgoTree(transactions: ArraySeq[ApiTransaction]): Task[_]
+  def removeInputBoxesByErgoTree(inputIds: Seq[BoxId]): Task[_]
 
-  def removeInputBoxesByErgoTreeT8(transactions: ArraySeq[ApiTransaction]): Task[_]
+  def removeInputBoxesByErgoTreeT8(inputIds: Seq[BoxId]): Task[_]
 
-  def removeInputBoxesByTokenId(transactions: ArraySeq[ApiTransaction]): Task[_]
-  
-  def persistErgoTreeByUtxo(outputRecords: OutputRecords): Task[_]
+  def removeInputBoxesByTokenId(inputIds: Seq[BoxId]): Task[_]
 
-  def persistErgoTreeT8ByUtxo(outputRecords: OutputRecords): Task[_]
+  def persistErgoTreeByUtxo(byErgoTree: Iterable[(ErgoTree, mutable.Set[Utxo])]): Task[_]
+
+  def persistErgoTreeT8ByUtxo(byErgoTreeT8: Iterable[(ErgoTreeT8, mutable.Set[Utxo])]): Task[_]
 
   def persistTokensByUtxo(tokensByUtxo: mutable.Map[BoxId, mutable.Map[TokenId, Amount]]): Task[_]
 
