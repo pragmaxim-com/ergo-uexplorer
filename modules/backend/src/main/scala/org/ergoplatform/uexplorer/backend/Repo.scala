@@ -10,10 +10,10 @@ trait Repo:
 
   def removeBlocks(blockIds: Set[BlockId]): Task[Unit]
 
-  def writeBlock(b: LinkedBlock)(preTx: Task[Any], postTx: Task[Any]): Task[BlockId]
+  def writeBlock(b: LinkedBlock, inputIds: Seq[BoxId]): Task[BlockId]
   
   def getLastBlock: Task[Option[Block]]
 
 object Repo:
-  def writeBlock(b: LinkedBlock)(preTx: Task[Any], postTx: Task[Any]): ZIO[Repo, Throwable, BlockId] =
-    ZIO.serviceWithZIO[Repo](_.writeBlock(b)(preTx, postTx))
+  def writeBlock(b: LinkedBlock, inputIds: Seq[BoxId]): ZIO[Repo, Throwable, BlockId] =
+    ZIO.serviceWithZIO[Repo](_.writeBlock(b, inputIds))

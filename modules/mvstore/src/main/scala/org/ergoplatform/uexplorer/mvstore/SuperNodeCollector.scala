@@ -50,5 +50,5 @@ case class SuperNodeCounter(writeOps: Long, readOps: Long, boxesAdded: Int, boxe
 }
 
 object SuperNodeCounter {
-  private val hotLimit = 10000
+  private val hotLimit = 5000
 }

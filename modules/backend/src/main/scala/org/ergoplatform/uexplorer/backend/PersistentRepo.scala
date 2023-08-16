@@ -23,44 +23,27 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
 
   override def removeBlocks(blockIds: Set[BlockId]): Task[Unit] = blockRepo.delete(blockIds).unit
 
-  override def writeBlock(b: LinkedBlock)(preTx: Task[Any], postTx: Task[Any]): Task[BlockId] = {
-    val outputs = b.outputRecords
-    val inputs  = b.b.transactions.transactions.flatMap(_.inputs.map(_.boxId))
-    persistBlockInTx(b.block, outputs, inputs, preTx, postTx)
-  }
-
-  override def getLastBlock: Task[Option[Block]] =
-    blockRepo.getLastBlocks(1).map(_.lastOption)
-
-  private def persistBlockInTx(
-    block: Block,
-    outputs: OutputRecords,
-    inputIds: Iterable[BoxId],
-    preTx: Task[Any],
-    postTx: Task[Any]
-  ): Task[BlockId] = {
-    val ergoTrees   = outputs.byErgoTree.keys
-    val ergoTreeT8s = outputs.byErgoTreeT8.keys
-    val utxos       = outputs.byErgoTree.values.flatten
-    val assetsToBox =
+  override def writeBlock(b: LinkedBlock, inputIds: Seq[BoxId]): Task[BlockId] = {
+    val outputs     = b.outputRecords
+    def ergoTrees   = outputs.byErgoTree.keys
+    def ergoTreeT8s = outputs.byErgoTreeT8.keys
+    def utxos       = outputs.byErgoTree.values.flatten
+    def assets      = outputs.utxosByTokenId.keySet.map(tokenId => Asset(tokenId, b.block.blockId))
+    def assetsToBox =
       outputs.tokensByUtxo.flatMap { case (box, amountByToken) =>
         amountByToken.map { case (token, amount) => Asset2Box(token, box, amount) }
       }
 
-    val assets = outputs.utxosByTokenId.keySet.map(tokenId => Asset(tokenId, block.blockId))
     ctx
-      .transaction {
-        for
-          _       <- preTx
-          blockId <- blockRepo.insert(block)
-          _       <- boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, assetsToBox, assets, utxos)
-          _       <- boxRepo.deleteUtxos(inputIds)
-          _       <- postTx
-        yield blockId
-      }
-      .as(block.blockId)
+      .transaction(
+        blockRepo.insert(b.block) <* boxRepo.insertUtxos(ergoTrees, ergoTreeT8s, assetsToBox, assets, utxos) <* boxRepo.deleteUtxos(inputIds)
+      )
+      .as(b.block.blockId)
       .provide(dsLayer)
   }
+
+  override def getLastBlock: Task[Option[Block]] =
+    blockRepo.getLastBlocks(1).map(_.lastOption)
 
 object PersistentRepo:
   def layer: ZLayer[DataSource with BlockRepo with BoxRepo, Nothing, PersistentRepo] =
