@@ -25,15 +25,18 @@ class BlockReader(
 
   def blockSourceFromFS(fromHeight: Int): ZStream[Any, Throwable, ApiFullBlock] = {
     import io.circe.parser.decode
-    val stream =
+    if (fromHeight == 1)
       ZStream
         .fromFile(benchPath.toFile())
         .via(ZPipeline.gunzip() >>> ZPipeline.utf8Decode >>> ZPipeline.splitLines)
         .map(s => decode[ApiFullBlock](s).toTry.get)
-    if (fromHeight == 1)
-      stream
     else
-      stream.dropUntil(_.header.height == fromHeight - 1)
+      ZStream
+        .fromFile(benchPath.toFile())
+        .via(ZPipeline.gunzip() >>> ZPipeline.utf8Decode >>> ZPipeline.splitLines)
+        .drop(Math.min(0, fromHeight - 20))
+        .map(s => decode[ApiFullBlock](s).toTry.get)
+        .dropUntil(_.header.height == fromHeight - 1)
   }
 
   def blockIdSource(fromHeight: Int): ZStream[Any, Throwable, BlockId] =
