@@ -5,6 +5,7 @@ import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.{HotKey, NewHotKey}
 import org.ergoplatform.uexplorer.mvstore.multimap.MultiMvMap
 import org.ergoplatform.uexplorer.mvstore.multiset.MultiMvSet
 import org.ergoplatform.uexplorer.node.ApiTransaction
@@ -31,7 +32,7 @@ case class MvStorage(
 )(implicit val store: MVStore, mvStoreConf: MvStoreConf)
   extends WritableStorage {
 
-  private def getReportByPath: Map[Path, Vector[(String, SuperNodeCounter)]] =
+  private def getReportByPath: Map[Path, Vector[HotKey]] =
     Map(
       utxosByErgoTreeHex.getReport,
       utxosByErgoTreeT8Hex.getReport,
@@ -103,13 +104,18 @@ case class MvStorage(
 
   def writeReportAndCompact(indexing: Boolean): Task[Unit] =
     ZIO.collectAllDiscard(
-      getReportByPath.map { case (path, report) =>
-        val lines = report.map { case (hotKey, SuperNodeCounter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
+      getReportByPath.map { case (path, hotKeys) =>
+        val header = "writeOps readOps inserted removed diff"
+        val newLines = hotKeys.collect { case NewHotKey(hotKey, SuperNodeCounter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
           val stats  = s"$writeOps $readOps $boxesAdded $boxesRemoved ${boxesAdded - boxesRemoved}"
           val indent = 45
           s"$stats ${List.fill(Math.max(4, indent - stats.length))(" ").mkString("")} $hotKey"
-        }
-        tool.FileUtils.writeReport(lines, path)
+        }.toList
+        ZIO.when(newLines.nonEmpty)(ZIO.log(s"New hotkeys: ${(header :: newLines).mkString("\n", "\n", "")}")) *>
+        SuperNodeCounter.writeReport(
+          hotKeys.map(_.key),
+          path
+        )
       }
     ) *> compact(indexing)
 

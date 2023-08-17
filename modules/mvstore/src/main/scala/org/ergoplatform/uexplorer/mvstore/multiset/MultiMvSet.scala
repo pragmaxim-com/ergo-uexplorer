@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.mvstore.multiset
 
 import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.HotKey
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 import zio.Task
@@ -40,8 +41,8 @@ case class MultiMvSet[K, C[_], V](
   def clearEmptySuperNodes: Task[Unit] =
     superNodeMap.clearEmptySuperNodes
 
-  def getReport: (Path, Vector[(String, SuperNodeCounter)]) =
-    ergoHomeDir.resolve(s"hot-keys-$id-$randomNumberPerRun.csv") -> superNodeMap.getReport
+  def getReport: (Path, Vector[HotKey]) =
+    superNodeMap.getReport
 
   def removeSubsetOrFail(k: K, values: IterableOnce[V], size: Int)(f: C[V] => Option[C[V]]): Try[Unit] =
     superNodeMap.removeAllOrFail(k, values, size).fold(commonMap.removeOrUpdateOrFail(k)(f))(identity)

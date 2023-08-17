@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.mvstore.multiset
 
 import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.HotKey
 import org.h2.mvstore.db.NullValueDataType
 import org.h2.mvstore.{MVMap, MVStore}
 import org.h2.value.Value
@@ -61,7 +62,7 @@ class SuperNodeMvSet[HK, C[_], V](
     )
   }
 
-  def getReport: Vector[(String, SuperNodeCounter)] =
+  def getReport: (Path, Vector[HotKey]) =
     superNodeCollector
       .filterAndSortHotKeys(counterByHotKey.iterator(None, None, false))
 

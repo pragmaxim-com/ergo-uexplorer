@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.mvstore.multimap
 
 import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.HotKey
 import org.h2.mvstore.MVMap.DecisionMaker
 import org.h2.mvstore.{MVMap, MVStore}
 import zio.Task
@@ -28,8 +29,8 @@ case class MultiMvMap[PK, C[_, _], K, V](
 
   def clearEmptySuperNodes: Task[Unit] = superNodeMap.clearEmptySuperNodes()
 
-  def getReport: (Path, Vector[(String, SuperNodeCounter)]) =
-    ergoHomeDir.resolve(s"hot-keys-$id-$randomNumberPerRun.csv") -> superNodeMap.getReport
+  def getReport: (Path, Vector[HotKey]) =
+    superNodeMap.getReport
 
   def get(pk: PK, sk: K): Option[V] =
     superNodeMap
