@@ -7,7 +7,7 @@ import java.nio.file.Path
 import java.util.zip.GZIPInputStream
 import scala.io.Source
 import scala.jdk.CollectionConverters.*
-import zio.stream.{ZSink, ZStream}
+import zio.stream.{ZPipeline, ZSink, ZStream}
 import zio.{Task, ZIO}
 
 class SuperNodeCollector[HK: HotKeyCodec](id: String) {
@@ -77,8 +77,9 @@ object SuperNodeCounter {
     ZIO.attempt(targetPath.toFile.delete()) *>
       ZStream
         .fromIterable(lines)
-        .intersperse("\n")
-        .run(ZSink.fromPath(targetPath).contramapChunks[String](_.flatMap(_.getBytes)))
+        .mapConcat(line => (line + java.lang.System.lineSeparator()).getBytes)
+        .via(ZPipeline.gzip())
+        .run(ZSink.fromPath(targetPath))
         .unit
 
 }
