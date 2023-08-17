@@ -1,14 +1,12 @@
 package org.ergoplatform.uexplorer.storage
 
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.chain.ChainTip
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.{HotKey, NewHotKey}
 import org.ergoplatform.uexplorer.mvstore.multimap.MultiMvMap
 import org.ergoplatform.uexplorer.mvstore.multiset.MultiMvSet
-import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.storage.Implicits.*
 import org.h2.mvstore.MVStore
 import zio.*
@@ -16,7 +14,7 @@ import zio.*
 import java.io.File
 import java.nio.file.Path
 import java.util
-import scala.collection.immutable.{ArraySeq, TreeSet}
+import scala.collection.immutable.TreeSet
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
@@ -312,15 +310,16 @@ object MvStorage {
             }
             .tap(store => ZIO.log(s"Opened mvstore at version ${store.getCurrentVersion}"))
             .map { implicit store =>
+              val homeDir = dbFile.getParentFile.toPath
               MvStorage(
-                MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex"),
-                MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex"),
+                MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex", homeDir),
+                MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex", homeDir),
                 MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
                 MvMap[BoxId, ErgoTreeT8Hex]("ergoTreeT8HexByUtxo"),
                 MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
                 MvMap[BlockId, Block]("blockById"),
-                MultiMvSet[TokenId, util.Set, BoxId]("utxosByTokenId"),
-                MultiMvMap[BoxId, util.Map, TokenId, Amount]("tokensByUtxo")
+                MultiMvSet[TokenId, util.Set, BoxId]("utxosByTokenId", homeDir),
+                MultiMvMap[BoxId, util.Map, TokenId, Amount]("tokensByUtxo", homeDir)
               )(store, mvStoreConf.get)
             }
         } { storage =>

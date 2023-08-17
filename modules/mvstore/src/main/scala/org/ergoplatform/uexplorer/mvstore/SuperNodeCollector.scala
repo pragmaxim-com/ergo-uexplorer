@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.mvstore
 
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.{ExistingHotKey, HotKey, NewHotKey}
 
-import java.io.{BufferedInputStream, FileInputStream}
+import java.io.{BufferedInputStream, File, FileInputStream}
 import java.nio.file.Path
 import java.util.zip.GZIPInputStream
 import scala.io.Source
@@ -10,11 +10,11 @@ import scala.jdk.CollectionConverters.*
 import zio.stream.{ZPipeline, ZSink, ZStream}
 import zio.{Task, ZIO}
 
-class SuperNodeCollector[HK: HotKeyCodec](id: String) {
+class SuperNodeCollector[HK: HotKeyCodec](id: String, hotKeyDir: Path) {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
   private val hotKeyFileName               = s"hot-keys-$id.csv.gz"
   private val stringifiedHotKeys: Map[HK, String] =
-    Option(ergoHomeDir.resolve(hotKeyFileName))
+    Option(hotKeyDir.resolve(hotKeyFileName))
       .filter(_.toFile.exists())
       .map(path => new FileInputStream(path.toFile))
       .orElse(
@@ -52,7 +52,7 @@ class SuperNodeCollector[HK: HotKeyCodec](id: String) {
       .sortBy(_._2.writeOps)(Ordering[Long].reverse)
 
     val existingHotKeys = stringifiedHotKeys.values
-    (ergoHomeDir.resolve(hotKeyFileName), newHotKeys ++ existingHotKeys.map(ExistingHotKey.apply))
+    (hotKeyDir.resolve(hotKeyFileName), newHotKeys ++ existingHotKeys.map(ExistingHotKey.apply))
 
 }
 

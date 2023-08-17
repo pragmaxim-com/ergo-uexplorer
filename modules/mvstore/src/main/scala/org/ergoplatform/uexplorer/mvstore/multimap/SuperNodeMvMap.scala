@@ -181,12 +181,12 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
 }
 
 object SuperNodeMvMap {
-  def apply[HK: HotKeyCodec, C[_, _], K, V](id: String)(implicit
+  def apply[HK: HotKeyCodec, C[_, _], K, V](id: String, hotKeyDir: Path)(implicit
     store: MVStore,
     sc: SuperNodeMapCodec[C, K, V],
     vc: ValueCodec[SuperNodeCounter]
   ): SuperNodeMvMap[HK, C, K, V] = {
-    val superNodeCollector = new SuperNodeCollector[HK](id)
+    val superNodeCollector = new SuperNodeCollector[HK](id, hotKeyDir)
     val existingMapsByHotKey: concurrent.Map[HK, MVMap[K, V]] =
       new ConcurrentHashMap[HK, MVMap[K, V]]().asScala.addAll(
         superNodeCollector

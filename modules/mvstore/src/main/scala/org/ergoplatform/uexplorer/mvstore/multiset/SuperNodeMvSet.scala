@@ -7,12 +7,9 @@ import org.h2.mvstore.{MVMap, MVStore}
 import org.h2.value.Value
 import zio.{Task, ZIO}
 
-import java.io.File
 import java.nio.file.Path
-import java.util.Map.Entry
 import java.util.concurrent.ConcurrentHashMap
-import java.util.stream.Collectors
-import scala.collection.{concurrent, mutable}
+import scala.collection.concurrent
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
@@ -151,12 +148,12 @@ class SuperNodeMvSet[HK, C[_], V](
 }
 
 object SuperNodeMvSet {
-  def apply[HK: HotKeyCodec, C[_], V](id: String)(implicit
+  def apply[HK: HotKeyCodec, C[_], V](id: String, hotKeyDir: Path)(implicit
     store: MVStore,
     sc: SuperNodeSetCodec[C, V],
     vc: ValueCodec[SuperNodeCounter]
   ): SuperNodeMvSet[HK, C, V] = {
-    val superNodeCollector = new SuperNodeCollector[HK](id)
+    val superNodeCollector = new SuperNodeCollector[HK](id, hotKeyDir)
     val existingMapsByHotKey: concurrent.Map[HK, MVMap[V, Value]] =
       new ConcurrentHashMap[HK, MVMap[V, Value]]().asScala.addAll(
         superNodeCollector
