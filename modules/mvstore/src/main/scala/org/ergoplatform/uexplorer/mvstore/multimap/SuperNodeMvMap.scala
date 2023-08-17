@@ -1,6 +1,7 @@
 package org.ergoplatform.uexplorer.mvstore.multimap
 
 import org.ergoplatform.uexplorer.mvstore.*
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.HotKey
 import org.h2.mvstore.{MVMap, MVStore}
 import org.scalameta.logger
 import zio.{Task, ZIO}
@@ -24,15 +25,13 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
   private lazy val counterByHotKey = new MvMap[HK, SuperNodeCounter](s"$id-counter")
 
   private def collectReadHotKey(k: HK): SuperNodeCounter =
-    counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 1, 0, 0)) {
-      case SuperNodeCounter(writeOps, readOps, added, removed) =>
-        SuperNodeCounter(writeOps + 1, readOps + 1, added, removed)
+    counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 1, 0, 0)) { case SuperNodeCounter(writeOps, readOps, added, removed) =>
+      SuperNodeCounter(writeOps + 1, readOps + 1, added, removed)
     })
 
   private def collectInsertedHotKey(k: HK, size: Int): SuperNodeCounter =
-    counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 0, size, 0)) {
-      case SuperNodeCounter(writeOps, readOps, added, removed) =>
-        SuperNodeCounter(writeOps + 1, readOps, added + size, removed)
+    counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 0, size, 0)) { case SuperNodeCounter(writeOps, readOps, added, removed) =>
+      SuperNodeCounter(writeOps + 1, readOps, added + size, removed)
     })
 
   private def collectRemovedHotKey(k: HK, size: Int): Option[SuperNodeCounter] =
@@ -62,7 +61,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
     )
   }
 
-  def getReport: Vector[(String, SuperNodeCounter)] =
+  def getReport: (Path, Vector[HotKey]) =
     superNodeCollector
       .filterAndSortHotKeys(counterByHotKey.iterator(None, None, false))
 
@@ -182,12 +181,12 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
 }
 
 object SuperNodeMvMap {
-  def apply[HK: HotKeyCodec, C[_, _], K, V](id: String)(implicit
+  def apply[HK: HotKeyCodec, C[_, _], K, V](id: String, hotKeyDir: Path)(implicit
     store: MVStore,
     sc: SuperNodeMapCodec[C, K, V],
     vc: ValueCodec[SuperNodeCounter]
   ): SuperNodeMvMap[HK, C, K, V] = {
-    val superNodeCollector = new SuperNodeCollector[HK](id)
+    val superNodeCollector = new SuperNodeCollector[HK](id, hotKeyDir)
     val existingMapsByHotKey: concurrent.Map[HK, MVMap[K, V]] =
       new ConcurrentHashMap[HK, MVMap[K, V]]().asScala.addAll(
         superNodeCollector

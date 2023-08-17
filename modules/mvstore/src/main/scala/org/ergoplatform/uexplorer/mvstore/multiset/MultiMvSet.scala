@@ -1,20 +1,17 @@
 package org.ergoplatform.uexplorer.mvstore.multiset
 
 import org.ergoplatform.uexplorer.mvstore.*
-import org.h2.mvstore.MVMap.DecisionMaker
+import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.HotKey
 import org.h2.mvstore.{MVMap, MVStore}
 import zio.Task
 
 import java.nio.file.Path
-import java.util.Map.Entry
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
-import java.util.stream.Collectors
-import scala.collection.concurrent
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
 case class MultiMvSet[K, C[_], V](
-  id: MultiColId
+                                   id: MultiColId,
+                                   hotKeyDir: Path
 )(implicit
   store: MVStore,
   c: MultiSetCodec[C, V],
@@ -22,9 +19,8 @@ case class MultiMvSet[K, C[_], V](
   vc: ValueCodec[SuperNodeCounter],
   kc: HotKeyCodec[K]
 ) extends MultiSetLike[K, C, V] {
-
   private val commonMap: MapLike[K, C[V]]           = new MvMap[K, C[V]](id)
-  private val superNodeMap: SuperNodeMvSet[K, C, V] = SuperNodeMvSet[K, C, V](id)
+  private val superNodeMap: SuperNodeMvSet[K, C, V] = SuperNodeMvSet[K, C, V](id, hotKeyDir)
 
   def isEmpty: Boolean = superNodeMap.isEmpty && commonMap.isEmpty
 
@@ -40,8 +36,8 @@ case class MultiMvSet[K, C[_], V](
   def clearEmptySuperNodes: Task[Unit] =
     superNodeMap.clearEmptySuperNodes
 
-  def getReport: (Path, Vector[(String, SuperNodeCounter)]) =
-    ergoHomeDir.resolve(s"hot-keys-$id-$randomNumberPerRun.csv") -> superNodeMap.getReport
+  def getReport: (Path, Vector[HotKey]) =
+    superNodeMap.getReport
 
   def removeSubsetOrFail(k: K, values: IterableOnce[V], size: Int)(f: C[V] => Option[C[V]]): Try[Unit] =
     superNodeMap.removeAllOrFail(k, values, size).fold(commonMap.removeOrUpdateOrFail(k)(f))(identity)
