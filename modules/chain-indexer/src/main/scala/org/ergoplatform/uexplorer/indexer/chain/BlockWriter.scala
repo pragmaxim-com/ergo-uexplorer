@@ -52,20 +52,17 @@ case class BlockWriter(
     source: ZStream[Any, Throwable, ApiFullBlock],
     chainLinker: ChainLinker
   ): Task[ChainSyncResult] =
-    BlockProcessor
-      .processingFlow(chainLinker)
-      .mapStream[Any, Throwable, BestBlockInserted] {
+    source
+      .via(BlockProcessor.processingFlow(chainLinker))
+      .mapConcatZIO {
         case bestBlock :: Nil =>
-          ZStream.fromIterable(List(bestBlock)).mapZIO(persistBlock)
+          persistBlock(bestBlock).map(_ :: Nil)
         case winningFork =>
-          ZStream
-            .fromIterableZIO(
-              for {
-                forkInserted <- rollbackFork(winningFork)
-                _            <- repo.removeBlocks(forkInserted.loosingFork.keySet)
-              } yield forkInserted.winningFork
-            )
-            .mapZIO(persistBlock)
+          for {
+            forkInserted <- rollbackFork(winningFork)
+            _            <- repo.removeBlocks(forkInserted.loosingFork.keySet)
+            fork         <- ZIO.foreach(forkInserted.winningFork)(persistBlock)
+          } yield fork
       }
       .tap { b =>
         if (b.linkedBlock.block.height % chainIndexerConf.mvStore.heightCompactRate == 0)
@@ -75,7 +72,6 @@ case class BlockWriter(
       .tap { block =>
         graphBackend.writeTxsAndCommit(block)
       }
-      .apply(source)
       .run(
         ZSink.foldLeft[BestBlockInserted, Option[(BestBlockInserted, Int)]](Option.empty) {
           case (Some(last, count), in) =>
@@ -115,10 +111,7 @@ case class BlockWriter(
       storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
     )
 
-    for
-      storageFork <- ZIO.uninterruptible((ZIO.collectAllParDiscard(storageOps) *> ZIO.attempt(storage.commit())).fork)
-      repoFork    <- ZIO.uninterruptible(repo.writeBlock(b, inputIds).fork)
-      _           <- storageFork.zip(repoFork).join
+    for _ <- (ZIO.collectAllParDiscard(storageOps) *> ZIO.attempt(storage.commit())) <&> repo.writeBlock(b, inputIds)
     yield BestBlockInserted(b, None)
   }
 }

@@ -109,7 +109,7 @@ case class MvStorage(
           val indent = 45
           s"$stats ${List.fill(Math.max(4, indent - stats.length))(" ").mkString("")} $hotKey"
         }.toList
-        ZIO.when(newLines.nonEmpty)(ZIO.log(s"New hotkeys: ${(header :: newLines).mkString("\n", "\n", "")}")) *>
+        ZIO.when(newLines.nonEmpty)(ZIO.log(s"New $path hotkeys: ${(header :: newLines).mkString("\n", "\n", "")}")) *>
         SuperNodeCounter.writeReport(
           hotKeys.map(_.key),
           path
