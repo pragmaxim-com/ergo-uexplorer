@@ -11,7 +11,7 @@ import javax.sql.DataSource
 
 object Backend {
 
-  def runServer: ZIO[DataSource with BoxService with BlockRepo with ChainIndexerConf, Throwable, Fiber.Runtime[Nothing, Nothing]] =
+  def runServer: ZIO[DataSource with BoxService with BlockRepo with ChainIndexerConf, Throwable, Nothing] =
     ZIO.serviceWithZIO[ChainIndexerConf] { conf =>
       conf.backendType match {
         case Cassandra(parallelism) =>

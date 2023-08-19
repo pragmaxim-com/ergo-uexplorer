@@ -1,7 +1,6 @@
 package org.ergoplatform.uexplorer.backend
 
 import org.ergoplatform.uexplorer.{BlockId, BoxId}
-import org.ergoplatform.uexplorer.backend.Codecs
 import org.ergoplatform.uexplorer.db.*
 import zio.*
 
@@ -11,7 +10,9 @@ trait Repo:
   def removeBlocks(blockIds: Set[BlockId]): Task[Unit]
 
   def writeBlock(b: LinkedBlock, inputIds: Seq[BoxId]): Task[BlockId]
-  
+
+  def writeBlock(b: LinkedBlock): Task[BlockId]
+
   def getLastBlock: Task[Option[Block]]
 
 object Repo:

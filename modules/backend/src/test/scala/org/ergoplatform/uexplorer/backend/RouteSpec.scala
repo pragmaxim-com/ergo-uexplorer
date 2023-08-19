@@ -18,7 +18,7 @@ object RouteSpec extends ZIOSpecDefault with BlockRoutesSpec with BoxRoutesSpec 
     (for
       repo   <- ZIO.service[Repo]
       blocks <- Rest.chain.forHeights(1 to 10)
-      _      <- ZIO.collectAllDiscard(blocks.map(b => repo.writeBlock(b)(ZIO.unit, ZIO.unit)))
+      _      <- ZIO.collectAllDiscard(blocks.map(b => repo.writeBlock(b)))
     yield ()).provide(
       H2Backend.layer,
       PersistentBlockRepo.layer,

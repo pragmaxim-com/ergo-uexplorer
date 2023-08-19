@@ -20,11 +20,21 @@ object H2Backend extends Backend {
     )(ds => ZIO.log(s"Closing h2 backend") *> ZIO.succeed(ds.close()))
   )
 
-  def server(): ZIO[DataSource with BoxService with BlockRepo, Throwable, Fiber.Runtime[Nothing, Nothing]] =
+  private val sslConfig = SSLConfig.fromResource(
+    behaviour = SSLConfig.HttpBehaviour.Accept,
+    certPath  = "server.crt",
+    keyPath   = "server.key"
+  )
+
+  def server(): ZIO[DataSource with BoxService with BlockRepo, Throwable, Nothing] =
     Server
       .serve((BlockRoutes() ++ BoxRoutes()).withDefaultErrorResponse)
-      .fork
-      .provideSomeLayer(Server.defaultWithPort(8088))
+      .provideSomeLayer(
+        Server.defaultWith(
+          _.port(8090)
+            .ssl(sslConfig)
+        )
+      )
 
   override def isEmpty: Task[Boolean] = ???
 

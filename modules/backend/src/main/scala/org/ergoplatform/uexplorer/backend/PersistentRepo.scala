@@ -2,6 +2,7 @@ package org.ergoplatform.uexplorer.backend
 
 import io.getquill.*
 import org.ergoplatform.uexplorer.*
+import org.ergoplatform.uexplorer.Const.Protocol.{Emission, Foundation}
 import org.ergoplatform.uexplorer.backend.blocks.BlockRepo
 import org.ergoplatform.uexplorer.backend.boxes.*
 import org.ergoplatform.uexplorer.db.*
@@ -22,6 +23,13 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
     } yield blockEmpty && boxEmpty
 
   override def removeBlocks(blockIds: Set[BlockId]): Task[Unit] = blockRepo.delete(blockIds).unit
+
+  override def writeBlock(b: LinkedBlock): Task[BlockId] = {
+    val inputIds: Seq[BoxId] =
+      b.b.transactions.transactions
+        .flatMap(_.inputs.collect { case i if i.boxId != Emission.inputBox && i.boxId != Foundation.inputBox => i.boxId })
+    writeBlock(b, inputIds)
+  }
 
   override def writeBlock(b: LinkedBlock, inputIds: Seq[BoxId]): Task[BlockId] = {
     val outputs     = b.outputRecords

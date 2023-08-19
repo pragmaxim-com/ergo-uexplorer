@@ -25,7 +25,7 @@ object ChainIndexer extends ZIOAppDefault {
 
   def run =
     (for {
-      serverFiber <- Backend.runServer
+      serverFiber <- Backend.runServer.fork
       fiber       <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule())
       done        <- fiber.zip(serverFiber).join
     } yield done).provide(
