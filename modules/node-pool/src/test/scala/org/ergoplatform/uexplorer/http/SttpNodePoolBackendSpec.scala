@@ -1,29 +1,17 @@
 package org.ergoplatform.uexplorer.http
 
-import org.ergoplatform.uexplorer.config.ExplorerConfig
-import zio.{Runtime, *}
-import zio.test.*
-import zio.test.Assertion.*
+import org.ergoplatform.uexplorer.http.SttpNodePoolBackend.NodePoolSchedule
 import sttp.capabilities
+import sttp.capabilities.zio.ZioStreams
 import sttp.client3.*
+import sttp.client3.httpclient.zio.HttpClientZioBackend
 import sttp.client3.testing.SttpBackendStub
 import sttp.model.StatusCode
+import zio.test.*
+import zio.test.Assertion.*
+import zio.*
 
 import scala.collection.immutable.TreeSet
-import scala.concurrent.Future
-import scala.util.Success
-import org.ergoplatform.uexplorer.http.LocalNode
-import org.ergoplatform.uexplorer.http.RemoteNode
-import org.ergoplatform.uexplorer.http.RemotePeer
-import org.ergoplatform.uexplorer.http.Peer
-import org.ergoplatform.uexplorer.http.SttpNodePoolBackend
-import org.ergoplatform.uexplorer.http.NodePool
-import org.ergoplatform.uexplorer.http.NodePoolState
-import sttp.capabilities.zio.ZioStreams
-import sttp.client3.httpclient.zio.HttpClientZioBackend
-import zio.config.*
-import zio.*
-import zio.config.typesafe.TypesafeConfigProvider
 
 object SttpNodePoolBackendSpec extends ZIOSpecDefault with TestSupport {
 
@@ -43,7 +31,7 @@ object SttpNodePoolBackendSpec extends ZIOSpecDefault with TestSupport {
       ZIO.acquireRelease(
         ZIO.succeed(UnderlyingBackend(fn(HttpClientZioBackend.stub)))
       )(b => ZIO.log(s"Closing sttp backend stub") *> ZIO.succeed(b.backend.close()))
-    ) >+> NodePoolConf.layer >+> MetadataHttpClient.layer >+> NodePool.layer >+> SttpNodePoolBackend.layer
+    ) >+> NodePoolConf.layer >+> MetadataHttpClient.layer >+> NodePool.layer >+> SttpNodePoolBackend.layerWithNoSchedule
 
   def spec =
     suite("nodepool-backend")(
@@ -59,7 +47,7 @@ object SttpNodePoolBackendSpec extends ZIOSpecDefault with TestSupport {
           basicRequest.get(p.uri).responseGetRight.send(testingBackend).map(_.body)
 
         SttpNodePoolBackend
-          .fallbackQuery[String](List(localNode, remoteNode, remotePeer), TreeSet.empty)(proxyRequest)
+          .fallbackQuery[String](List(localNode, remoteNode, remotePeer).zipWithIndex, NodePoolSchedule(None), TreeSet.empty)(proxyRequest)
           .flatMap { case (invalidPeers, responseTask) =>
             responseTask.map { response =>
               assertTrue(response == "Remote peer available", invalidPeers == TreeSet(localNode, remoteNode))

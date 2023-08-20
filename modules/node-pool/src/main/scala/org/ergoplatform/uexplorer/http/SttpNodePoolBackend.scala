@@ -1,8 +1,9 @@
 package org.ergoplatform.uexplorer.http
 
+import nl.vroste.rezilience.Retry.Schedules
 import org.ergoplatform.uexplorer.Utils
 import org.ergoplatform.uexplorer.http.NodePool.*
-import org.ergoplatform.uexplorer.http.SttpNodePoolBackend.swapUri
+import org.ergoplatform.uexplorer.http.SttpNodePoolBackend.{swapUri, NodePoolSchedule}
 import sttp.capabilities.Effect
 import sttp.client3.*
 import sttp.model.Uri
@@ -11,9 +12,8 @@ import zio.*
 import scala.collection.immutable.{SortedSet, TreeSet}
 import scala.util.*
 import sttp.capabilities.zio.ZioStreams
-import sttp.client3.httpclient.zio.{HttpClientZioBackend, SttpClient}
 
-case class SttpNodePoolBackend(
+case class SttpNodePoolBackend(schedule: NodePoolSchedule)(
   underlyingBackend: UnderlyingBackend,
   metadataClient: MetadataHttpClient,
   nodePool: NodePool
@@ -46,7 +46,7 @@ case class SttpNodePoolBackend(
         case peers if peers.isEmpty =>
           ZIO.fail(new Exception(s"Ran out of peers to make http call to, master should be always available", null))
         case peers =>
-          fallbackQuery(peers.toList)(proxy).flatMap {
+          fallbackQuery(peers.toList.zipWithIndex, schedule)(proxy).flatMap {
             case (invalidPeers, blockTry) if invalidPeers.nonEmpty =>
               nodePool
                 .invalidatePeers(invalidPeers)
@@ -60,27 +60,39 @@ case class SttpNodePoolBackend(
 }
 
 object SttpNodePoolBackend {
+  case class NodePoolSchedule(schedule: Option[Schedule[Any, Any, (Any, Long)]])
 
   def layer: ZLayer[UnderlyingBackend with MetadataHttpClient with NodePool, Nothing, SttpNodePoolBackend] =
-    ZLayer.fromFunction(SttpNodePoolBackend.apply _)
+    ZLayer.fromFunction(SttpNodePoolBackend(NodePoolSchedule(Some(Schedules.common(1.second, 3.seconds, 2.0, true, Some(5))))).apply _)
+
+  def layerWithNoSchedule: ZLayer[UnderlyingBackend with MetadataHttpClient with NodePool, Nothing, SttpNodePoolBackend] =
+    ZLayer.fromFunction(SttpNodePoolBackend(NodePoolSchedule(None)).apply _)
 
   def swapUri[T, R](reqWithDummyUri: Request[T, R], peerUri: Uri): Request[T, R] =
     reqWithDummyUri.get(Utils.copyUri(reqWithDummyUri.uri, peerUri))
 
   def fallbackQuery[R](
-    peerAddresses: List[Peer],
+    peerAddressesWithIndex: List[(Peer, Int)],
+    schedule: NodePoolSchedule,
     invalidPeers: SortedSet[Peer] = TreeSet.empty
   )(run: Peer => Task[R]): Task[(NodePool.InvalidPeers, Task[R])] =
-    peerAddresses.headOption match {
-      case Some(peerAddress) =>
-        run(peerAddress)
+    peerAddressesWithIndex.headOption match {
+      case Some((peerAddress, index)) =>
+        val execution =
+          if (index == 0 && schedule.schedule.isDefined)
+            run(peerAddress).retry(schedule.schedule.get)
+          else
+            run(peerAddress)
+
+        execution
           .map { block =>
             invalidPeers -> ZIO.succeed(block)
           }
           .catchNonFatalOrDie { ex =>
             ZIO.logErrorCause(s"Peer $peerAddress failed, retrying with another peer...", Cause.fail(ex)) *> fallbackQuery(
-              peerAddresses.tail,
-              invalidPeers + peerAddresses.head
+              peerAddressesWithIndex.tail,
+              schedule,
+              invalidPeers + peerAddressesWithIndex.head._1
             )(run)
           }
       case None =>
