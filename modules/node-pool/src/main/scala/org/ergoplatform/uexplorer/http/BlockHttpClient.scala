@@ -1,23 +1,14 @@
 package org.ergoplatform.uexplorer.http
 
 import io.circe.refined.*
-import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.ExeContext.Implicits
 import org.ergoplatform.uexplorer.node.{ApiFullBlock, ApiTransaction}
-import org.ergoplatform.uexplorer.{BlockId, Const, Height, TxId}
+import org.ergoplatform.uexplorer.{BlockId, Height, TxId}
+import sttp.capabilities.zio.ZioStreams
 import sttp.client3.*
 import sttp.client3.circe.*
-import sttp.client3.httpclient.zio.HttpClientZioBackend
 import zio.*
-
-import scala.collection.immutable.{ArraySeq, ListMap}
-import scala.collection.{concurrent, mutable}
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{ExecutionContext, Future}
-import nl.vroste.rezilience.Retry
-import nl.vroste.rezilience.Retry.Schedules
-import sttp.capabilities.zio.ZioStreams
+import scala.collection.immutable.ListMap
 
 case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBackend[Task, ZioStreams]) extends Codecs {
 
@@ -41,7 +32,6 @@ case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBa
         case Left(error) =>
           ZIO.fail(new Exception(s"Getting unconfirmed transactions failed", error))
       }
-      .retry(Schedules.common(1.second, 5.seconds, 2.0, true, Some(10)))
 
   def getBlockIdsByOffset(fromHeightIncl: Int, limit: Int): Task[Vector[BlockId]] =
     basicRequest
@@ -57,7 +47,6 @@ case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBa
           ZIO.fail(new Exception(s"Getting block id at fromHeightIncl $fromHeightIncl failed", error))
       }
       .tap(blockIds => ZIO.log(s"Retrieved ${blockIds.size} block ids from height $fromHeightIncl"))
-      .retry(Schedule.exponential(1.seconds, 2.0).upTo(1.minute))
 
   def getBlockIdForHeight(height: Int): Task[BlockId] =
     basicRequest
@@ -74,7 +63,6 @@ case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBa
         case Left(error) =>
           ZIO.fail(new Exception(s"Getting block id at height $height failed", error))
       }
-      .retry(Schedules.common(1.second, 5.seconds, 2.0, true, Some(10)))
 
   def getBlockForIdAsString(blockId: BlockId): Task[String] =
     basicRequest
@@ -84,7 +72,6 @@ case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBa
       .readTimeout(5.seconds)
       .send(sttpB)
       .map(_.body)
-      .retry(Schedules.common(1.second, 5.seconds, 2.0, true, Some(10)))
 
   def getBlockForId(blockId: BlockId): Task[ApiFullBlock] =
     basicRequest
@@ -94,7 +81,6 @@ case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBa
       .readTimeout(5.seconds)
       .send(sttpB)
       .map(_.body)
-      .retry(Schedules.common(1.second, 5.seconds, 2.0, true, Some(10)))
 
   def close(): Task[Unit] =
     sttpB.close()
