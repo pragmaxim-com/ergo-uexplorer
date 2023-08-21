@@ -15,14 +15,14 @@ import scala.collection.concurrent
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-class SuperNodeMvMap[HK, C[_, _], K, V](
+class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
   id: String,
   superNodeCollector: SuperNodeCollector[HK],
-  existingMapsByHotKey: concurrent.Map[HK, MVMap[K, V]]
-)(implicit store: MVStore, codec: SuperNodeMapCodec[C, K, V], vc: ValueCodec[SuperNodeCounter])
+  existingMapsByHotKey: concurrent.Map[HK, MVMap[K, V]],
+  counterByHotKey: MvMap[HK, SuperNodeCounter],
+  hotKeyPath: Path
+)(implicit store: MVStore, codec: SuperNodeMapCodec[C, K, V])
   extends SuperNodeMapLike[HK, C, K, V] {
-
-  private lazy val counterByHotKey = new MvMap[HK, SuperNodeCounter](s"$id-counter")
 
   private def collectReadHotKey(k: HK): SuperNodeCounter =
     counterByHotKey.adjust(k)(_.fold(SuperNodeCounter(1, 1, 0, 0)) { case SuperNodeCounter(writeOps, readOps, added, removed) =>
@@ -62,7 +62,7 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
   }
 
   def getReport: (Path, Vector[HotKey]) =
-    superNodeCollector
+    hotKeyPath -> superNodeCollector
       .filterAndSortHotKeys(counterByHotKey.iterator(None, None, false))
 
   def get(hotKey: HK, sk: K): Option[V] =
@@ -178,23 +178,39 @@ class SuperNodeMvMap[HK, C[_, _], K, V](
 
   def totalSize: Int = existingMapsByHotKey.iterator.map(_._2.size()).sum
 
+  def mergeCommonMap(implicit vc: ValueCodec[C[K, V]]): Task[MapLike[HK, C[K, V]]] =
+    MvMap[HK, C[K, V]](id).tap { commonMap =>
+      ZIO.attempt {
+        existingMapsByHotKey.foreach { case (k, sMap) =>
+          commonMap.get(k).foreach { values =>
+            // require(sMap.isEmpty, s"CommonMap for $k was not empty which means SuperMap shouldBe as it was freshly created")
+            codec.writeAll(sMap, values.entrySet().asScala.map(e => e.getKey -> e.getValue))
+          }
+        }
+      }
+    }
 }
 
 object SuperNodeMvMap {
-  def apply[HK: HotKeyCodec, C[_, _], K, V](id: String, hotKeyDir: Path)(implicit
+  def apply[HK: HotKeyCodec, C[A, B] <: java.util.Map[A, B], K, V](id: String, hotKeyDir: Path)(implicit
     store: MVStore,
     sc: SuperNodeMapCodec[C, K, V],
     vc: ValueCodec[SuperNodeCounter]
-  ): SuperNodeMvMap[HK, C, K, V] = {
-    val superNodeCollector = new SuperNodeCollector[HK](id, hotKeyDir)
-    val existingMapsByHotKey: concurrent.Map[HK, MVMap[K, V]] =
-      new ConcurrentHashMap[HK, MVMap[K, V]]().asScala.addAll(
-        superNodeCollector
-          .getExistingStringifiedHotKeys(store.getMapNames.asScala.toSet)
-          .view
-          .mapValues(store.openMap[K, V])
-          .toMap
-      )
-    new SuperNodeMvMap[HK, C, K, V](id, superNodeCollector, existingMapsByHotKey)
+  ): Task[SuperNodeMvMap[HK, C, K, V]] = {
+    val hotKeyPath = hotKeyDir.resolve(SuperNodeCounter.hotKeyFileName(id))
+    for
+      superNodeCollector <- SuperNodeCollector[HK](hotKeyPath)
+      counterByHotKey    <- MvMap[HK, SuperNodeCounter](s"$id-counter")
+    yield {
+      val existingMapsByHotKey: concurrent.Map[HK, MVMap[K, V]] =
+        new ConcurrentHashMap[HK, MVMap[K, V]]().asScala.addAll(
+          superNodeCollector
+            .getExistingStringifiedHotKeys(store.getMapNames.asScala.toSet)
+            .view
+            .mapValues(store.openMap[K, V])
+            .toMap
+        )
+      new SuperNodeMvMap[HK, C, K, V](id, superNodeCollector, existingMapsByHotKey, counterByHotKey, hotKeyPath)
+    }
   }
 }

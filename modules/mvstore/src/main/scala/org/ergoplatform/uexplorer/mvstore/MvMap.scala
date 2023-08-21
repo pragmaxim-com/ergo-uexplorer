@@ -7,9 +7,7 @@ import zio.{Task, ZIO}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-case class MvMap[K, V: ValueCodec](id: String)(implicit store: MVStore) extends MapLike[K, V] {
-
-  private val underlying: MVMap[K, Array[Byte]] = store.openMap[K, Array[Byte]](id)
+class MvMap[K, V: ValueCodec](underlying: MVMap[K, Array[Byte]]) extends MapLike[K, V] {
 
   private val codec: ValueCodec[V] = implicitly[ValueCodec[V]]
 
@@ -143,5 +141,11 @@ case class MvMap[K, V: ValueCodec](id: String)(implicit store: MVStore) extends 
     underlying.put(key, codec.writeAll(newVal))
     appended -> newVal
   }
+
+}
+
+object MvMap {
+  def apply[K, V: ValueCodec](id: String)(implicit store: MVStore): Task[MvMap[K, V]] =
+    ZIO.attempt(store.openMap[K, Array[Byte]](id)).map(underlying => new MvMap(underlying))
 
 }
