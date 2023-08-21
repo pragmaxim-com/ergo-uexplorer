@@ -26,7 +26,7 @@ case class SttpNodePoolBackend(schedule: NodePoolSchedule)(
   private def updateNodePool: Task[Unit] =
     for
       allPeers <- metadataClient.getAllOpenApiPeers
-      _        <- ZIO.log(s"${allPeers.size} peers is connected")
+      _        <- ZIO.log(s"${allPeers.size} peers connected")
       newPeers <- nodePool.updateOpenApiPeers(allPeers)
       _        <- ZIO.when(newPeers.nonEmpty)(ZIO.log(s"New peers added : ${newPeers.mkString(",")}"))
     yield ()
