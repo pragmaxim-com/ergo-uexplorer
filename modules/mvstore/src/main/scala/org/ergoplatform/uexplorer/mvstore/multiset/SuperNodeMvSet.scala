@@ -151,7 +151,7 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
         .attempt {
           existingMapsByHotKey.flatMap { case (k, sMap) =>
             commonMap.get(k).map { values =>
-              // require(sMap.isEmpty, s"CommonMap for $k was not empty which means SuperMap shouldBe as it was freshly created")
+              require(sMap.isEmpty, s"CommonMap $id for $k was not empty which means SuperSet shouldBe as it was freshly created")
               codec.writeAll(sMap, values.iterator().asScala)
               commonMap.remove(k)
               k
