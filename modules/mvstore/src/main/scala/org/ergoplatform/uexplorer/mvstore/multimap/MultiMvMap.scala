@@ -73,6 +73,7 @@ object MultiMvMap {
     for
       sMap      <- SuperNodeMvMap[PK, C, K, V](id, hotKeyDir)
       commonMap <- sMap.mergeCommonMap
+      _         <- ZIO.attempt(store.commit())
     yield MultiMvMap(commonMap, sMap)
 
 }
