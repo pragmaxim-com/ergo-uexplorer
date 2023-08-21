@@ -147,15 +147,18 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
 
   def mergeCommonMap(implicit vc: ValueCodec[C[V]]): Task[MapLike[HK, C[V]]] =
     MvMap[HK, C[V]](id).tap { commonMap =>
-      ZIO.attempt {
-        existingMapsByHotKey.foreach { case (k, sMap) =>
-          commonMap.get(k).foreach { values =>
-            // require(sMap.isEmpty, s"CommonMap for $k was not empty which means SuperMap shouldBe as it was freshly created")
-            codec.writeAll(sMap, values.iterator().asScala)
-            commonMap.remove(k)
+      ZIO
+        .attempt {
+          existingMapsByHotKey.flatMap { case (k, sMap) =>
+            commonMap.get(k).map { values =>
+              // require(sMap.isEmpty, s"CommonMap for $k was not empty which means SuperMap shouldBe as it was freshly created")
+              codec.writeAll(sMap, values.iterator().asScala)
+              commonMap.remove(k)
+              k
+            }
           }
         }
-      }
+        .tap(keys => ZIO.log(s"Migrated ${keys.size} common maps to super sets ..."))
     }
 }
 
