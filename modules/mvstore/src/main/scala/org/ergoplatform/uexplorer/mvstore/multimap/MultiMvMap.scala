@@ -3,24 +3,17 @@ package org.ergoplatform.uexplorer.mvstore.multimap
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.HotKey
 import org.h2.mvstore.{MVMap, MVStore}
-import zio.Task
+import zio.{Task, ZIO}
 
 import java.nio.file.Path
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-case class MultiMvMap[PK, C[_, _], K, V](
-                                          id: MultiColId,
-                                          hotKeyDir: Path
-)(implicit
-  store: MVStore,
-  c: MultiMapCodec[C, K, V],
-  sc: SuperNodeMapCodec[C, K, V],
-  vc: ValueCodec[SuperNodeCounter],
-  kc: HotKeyCodec[PK]
-) extends MultiMapLike[PK, C, K, V] {
-  private val commonMap: MapLike[PK, C[K, V]]           = new MvMap[PK, C[K, V]](id)
-  private val superNodeMap: SuperNodeMvMap[PK, C, K, V] = SuperNodeMvMap[PK, C, K, V](id, hotKeyDir)
+case class MultiMvMap[PK, C[A, B] <: java.util.Map[A, B], K, V](
+  commonMap: MapLike[PK, C[K, V]],
+  superNodeMap: SuperNodeMvMap[PK, C, K, V]
+)(implicit c: MultiMapCodec[C, K, V])
+  extends MultiMapLike[PK, C, K, V] {
 
   def clearEmptySuperNodes: Task[Unit] = superNodeMap.clearEmptySuperNodes()
 
@@ -63,5 +56,24 @@ case class MultiMvMap[PK, C[_, _], K, V](
       else
         Failure(new AssertionError(s"All inserted values under key $pk should be appended"))
     }
+
+}
+
+object MultiMvMap {
+  def apply[PK, C[A, B] <: java.util.Map[A, B], K, V](
+    id: MultiColId,
+    hotKeyDir: Path
+  )(implicit
+    store: MVStore,
+    c: MultiMapCodec[C, K, V],
+    sc: SuperNodeMapCodec[C, K, V],
+    vc: ValueCodec[SuperNodeCounter],
+    kc: HotKeyCodec[PK]
+  ): Task[MultiMvMap[PK, C, K, V]] =
+    for
+      sMap      <- SuperNodeMvMap[PK, C, K, V](id, hotKeyDir)
+      commonMap <- sMap.mergeCommonMap
+      _         <- ZIO.attempt(store.commit())
+    yield MultiMvMap(commonMap, sMap)
 
 }

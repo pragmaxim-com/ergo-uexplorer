@@ -3,24 +3,17 @@ package org.ergoplatform.uexplorer.mvstore.multiset
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.HotKey
 import org.h2.mvstore.{MVMap, MVStore}
-import zio.Task
+import zio.{Task, ZIO}
 
 import java.nio.file.Path
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-case class MultiMvSet[K, C[_], V](
-                                   id: MultiColId,
-                                   hotKeyDir: Path
-)(implicit
-  store: MVStore,
-  c: MultiSetCodec[C, V],
-  sc: SuperNodeSetCodec[C, V],
-  vc: ValueCodec[SuperNodeCounter],
-  kc: HotKeyCodec[K]
-) extends MultiSetLike[K, C, V] {
-  private val commonMap: MapLike[K, C[V]]           = new MvMap[K, C[V]](id)
-  private val superNodeMap: SuperNodeMvSet[K, C, V] = SuperNodeMvSet[K, C, V](id, hotKeyDir)
+case class MultiMvSet[K, C[A] <: java.util.Collection[A], V](
+  commonMap: MapLike[K, C[V]],
+  superNodeMap: SuperNodeMvSet[K, C, V]
+)(implicit c: MultiSetCodec[C, V])
+  extends MultiSetLike[K, C, V] {
 
   def isEmpty: Boolean = superNodeMap.isEmpty && commonMap.isEmpty
 
@@ -50,5 +43,24 @@ case class MultiMvSet[K, C[_], V](
       else
         Failure(new AssertionError(s"All inserted values under key $k should be appended"))
     }
+
+}
+
+object MultiMvSet {
+  def apply[K, C[A] <: java.util.Collection[A], V](
+    id: MultiColId,
+    hotKeyDir: Path
+  )(implicit
+    store: MVStore,
+    c: MultiSetCodec[C, V],
+    sc: SuperNodeSetCodec[C, V],
+    vc: ValueCodec[SuperNodeCounter],
+    kc: HotKeyCodec[K]
+  ): Task[MultiMvSet[K, C, V]] =
+    for
+      sMap      <- SuperNodeMvSet[K, C, V](id, hotKeyDir)
+      commonMap <- sMap.mergeCommonMap
+      _         <- ZIO.attempt(store.commit())
+    yield MultiMvSet(commonMap, sMap)
 
 }

@@ -26,14 +26,15 @@ case class SttpNodePoolBackend(schedule: NodePoolSchedule)(
   private def updateNodePool: Task[Unit] =
     for
       allPeers <- metadataClient.getAllOpenApiPeers
+      _        <- ZIO.log(s"${allPeers.size} peers connected")
       newPeers <- nodePool.updateOpenApiPeers(allPeers)
-      _        <- ZIO.log(s"New peers added : ${newPeers.mkString(",")}")
+      _        <- ZIO.when(newPeers.nonEmpty)(ZIO.log(s"New peers added : ${newPeers.mkString(",")}"))
     yield ()
 
-  def keepNodePoolUpdated: ZIO[Any, Throwable, Fiber.Runtime[Throwable, Long]] =
+  def keepNodePoolUpdated: Task[Fiber.Runtime[Throwable, Long]] =
     for
-      done  <- updateNodePool
-      fiber <- ZIO.scoped(updateNodePool.scheduleFork(Schedule.fixed(30.seconds)))
+      _     <- updateNodePool
+      fiber <- updateNodePool.repeat(Schedule.fixed(30.seconds)).fork
     yield fiber
 
   override def send[T, R >: ZioStreams with Effect[Task]](origRequest: Request[T, R]): Task[Response[T]] = {

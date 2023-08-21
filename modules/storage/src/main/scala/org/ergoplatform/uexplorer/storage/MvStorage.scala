@@ -309,17 +309,26 @@ object MvStorage {
               store
             }
             .tap(store => ZIO.log(s"Opened mvstore at version ${store.getCurrentVersion}"))
-            .map { implicit store =>
+            .flatMap { implicit store =>
               val homeDir = dbFile.getParentFile.toPath
-              MvStorage(
-                MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex", homeDir),
-                MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex", homeDir),
-                MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo"),
-                MvMap[BoxId, ErgoTreeT8Hex]("ergoTreeT8HexByUtxo"),
-                MvMap[Height, util.Set[BlockId]]("blockIdsByHeight"),
-                MvMap[BlockId, Block]("blockById"),
-                MultiMvSet[TokenId, util.Set, BoxId]("utxosByTokenId", homeDir),
-                MultiMvMap[BoxId, util.Map, TokenId, Amount]("tokensByUtxo", homeDir)
+              for
+                utxosByErgoTreeHex   <- MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex", homeDir)
+                utxosByErgoTreeT8Hex <- MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex", homeDir)
+                ergoTreeHexByUtxo    <- MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo")
+                ergoTreeT8HexByUtxo  <- MvMap[BoxId, ErgoTreeT8Hex]("ergoTreeT8HexByUtxo")
+                blockIdsByHeight     <- MvMap[Height, util.Set[BlockId]]("blockIdsByHeight")
+                blockById            <- MvMap[BlockId, Block]("blockById")
+                utxosByTokenId       <- MultiMvSet[TokenId, util.Set, BoxId]("utxosByTokenId", homeDir)
+                tokensByUtxo         <- MultiMvMap[BoxId, util.Map, TokenId, Amount]("tokensByUtxo", homeDir)
+              yield MvStorage(
+                utxosByErgoTreeHex,
+                utxosByErgoTreeT8Hex,
+                ergoTreeHexByUtxo,
+                ergoTreeT8HexByUtxo,
+                blockIdsByHeight,
+                blockById,
+                utxosByTokenId,
+                tokensByUtxo
               )(store, mvStoreConf.get)
             }
         } { storage =>

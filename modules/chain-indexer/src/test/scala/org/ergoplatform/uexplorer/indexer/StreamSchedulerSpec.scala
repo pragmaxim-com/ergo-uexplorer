@@ -51,8 +51,7 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport {
     suite("meta")(
       test(Rest.info.sync) {
         (for {
-          fiber          <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once))
-          _              <- fiber.join.catchAllCause(_ => ZIO.succeed(()))
+          _              <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once))
           lastHeight     <- ZIO.serviceWith[ReadableStorage](_.getLastHeight)
           missingHeights <- ZIO.serviceWith[ReadableStorage](_.findMissingHeights)
           memPoolState   <- ZIO.serviceWithZIO[MemPool](_.getTxs)

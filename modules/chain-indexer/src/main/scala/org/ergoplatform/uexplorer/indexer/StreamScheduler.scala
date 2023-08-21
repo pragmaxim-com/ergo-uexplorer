@@ -41,16 +41,16 @@ case class StreamScheduler(
         ZIO.fail(new IllegalStateException(error))
       case ChainEmpty =>
         for {
-          _         <- ZIO.log(s"Chain is empty, loading from scratch ...")
-          poolFiber <- nodePoolBackend.keepNodePoolUpdated
-          _         <- periodicSync.repeat(schedule).ignore
-        } yield poolFiber
+          _     <- ZIO.log(s"Chain is empty, loading from scratch ...")
+          fiber <- nodePoolBackend.keepNodePoolUpdated
+          _     <- periodicSync.repeat(schedule).ignore
+        } yield fiber
 
       case ChainValid =>
         for {
-          poolFiber <- nodePoolBackend.keepNodePoolUpdated
-          _         <- periodicSync.repeat(schedule).ignore
-        } yield poolFiber
+          fiber <- nodePoolBackend.keepNodePoolUpdated
+          _     <- periodicSync.repeat(schedule).ignore
+        } yield fiber
     }
 }
 

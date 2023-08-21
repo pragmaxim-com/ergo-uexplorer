@@ -10,39 +10,15 @@ import scala.jdk.CollectionConverters.*
 import zio.stream.{ZPipeline, ZSink, ZStream}
 import zio.{Task, ZIO}
 
-class SuperNodeCollector[HK: HotKeyCodec](id: String, hotKeyDir: Path) {
+class SuperNodeCollector[HK: HotKeyCodec](stringifiedHotKeys: Map[HK, String]) {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
-  private val hotKeyFileName               = s"hot-keys-$id.csv.gz"
-  private val stringifiedHotKeys: Map[HK, String] =
-    Option(hotKeyDir.resolve(hotKeyFileName))
-      .filter(_.toFile.exists())
-      .map(path => new FileInputStream(path.toFile))
-      .orElse(
-        Option(
-          Thread
-            .currentThread()
-            .getContextClassLoader
-            .getResourceAsStream(hotKeyFileName)
-        )
-      )
-      .map { inputStream =>
-        Source
-          .fromInputStream(new GZIPInputStream(new BufferedInputStream(inputStream)))
-          .getLines()
-          .map(_.trim)
-          .filterNot(_.isEmpty)
-          .toSet
-          .map(k => hotKeyCodec.deserialize(k) -> k)
-          .toMap
-      }
-      .getOrElse(Map.empty)
 
   def getExistingStringifiedHotKeys(mvStoreMapNames: Set[String]): Map[HK, String] =
     stringifiedHotKeys.filter(e => mvStoreMapNames.contains(e._2))
 
   def getHotKeyString(hotKey: HK): Option[String] = stringifiedHotKeys.get(hotKey)
 
-  def filterAndSortHotKeys(hotKeysWithCounter: Iterator[(HK, SuperNodeCounter)]): (Path, Vector[HotKey]) =
+  def filterAndSortHotKeys(hotKeysWithCounter: Iterator[(HK, SuperNodeCounter)]): Vector[HotKey] =
     val newHotKeys = hotKeysWithCounter
       .collect {
         case (hotKey, counter) if counter.isHot && !stringifiedHotKeys.contains(hotKey) =>
@@ -51,35 +27,36 @@ class SuperNodeCollector[HK: HotKeyCodec](id: String, hotKeyDir: Path) {
       .toVector
       .sortBy(_._2.writeOps)(Ordering[Long].reverse)
 
-    val existingHotKeys = stringifiedHotKeys.values
-    (hotKeyDir.resolve(hotKeyFileName), newHotKeys ++ existingHotKeys.map(ExistingHotKey.apply))
+    newHotKeys ++ stringifiedHotKeys.values.map(ExistingHotKey.apply)
 
 }
 
-case class SuperNodeCounter(writeOps: Long, readOps: Long, boxesAdded: Int, boxesRemoved: Int) {
-  import SuperNodeCounter.hotLimit
-  def this() = this(0, 0, 0, 0)
-
-  def isHot: Boolean =
-    writeOps > hotLimit || readOps > hotLimit || boxesAdded > hotLimit || boxesRemoved > hotLimit
-}
-
-object SuperNodeCounter {
-  private val hotLimit = 500
-
-  sealed trait HotKey {
-    def key: String
+object SuperNodeCollector {
+  def apply[HK: HotKeyCodec](hotKeyPath: Path): Task[SuperNodeCollector[HK]] = ZIO.attempt {
+    val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
+    new SuperNodeCollector(
+      Option(hotKeyPath)
+        .filter(_.toFile.exists())
+        .map(path => new FileInputStream(path.toFile))
+        .orElse(
+          Option(
+            Thread
+              .currentThread()
+              .getContextClassLoader
+              .getResourceAsStream(hotKeyPath.toFile.getName)
+          )
+        )
+        .map { inputStream =>
+          Source
+            .fromInputStream(new GZIPInputStream(new BufferedInputStream(inputStream)))
+            .getLines()
+            .map(_.trim)
+            .filterNot(_.isEmpty)
+            .toSet
+            .map(k => hotKeyCodec.deserialize(k) -> k)
+            .toMap
+        }
+        .getOrElse(Map.empty)
+    )
   }
-  case class NewHotKey(key: String, counter: SuperNodeCounter) extends HotKey
-  case class ExistingHotKey(key: String) extends HotKey
-
-  def writeReport(lines: IndexedSeq[String], targetPath: Path): Task[Unit] =
-    ZIO.attempt(targetPath.toFile.delete()) *>
-      ZStream
-        .fromIterable(lines)
-        .mapConcat(line => (line + java.lang.System.lineSeparator()).getBytes)
-        .via(ZPipeline.gzip())
-        .run(ZSink.fromPath(targetPath))
-        .unit
-
 }
