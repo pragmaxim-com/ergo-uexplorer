@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.mvstore.multiset
 import org.ergoplatform.uexplorer.mvstore.*
 import org.ergoplatform.uexplorer.mvstore.SuperNodeCounter.HotKey
 import org.h2.mvstore.{MVMap, MVStore}
-import zio.Task
+import zio.{Task, ZIO}
 
 import java.nio.file.Path
 import scala.jdk.CollectionConverters.*
