@@ -185,6 +185,7 @@ class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
           commonMap.get(k).foreach { values =>
             // require(sMap.isEmpty, s"CommonMap for $k was not empty which means SuperMap shouldBe as it was freshly created")
             codec.writeAll(sMap, values.entrySet().asScala.map(e => e.getKey -> e.getValue))
+            commonMap.remove(k)
           }
         }
       }
