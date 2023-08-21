@@ -191,7 +191,7 @@ class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
             }
           }
         }
-        .tap(keys => ZIO.log(s"Migrated ${keys.size} $id common maps to super maps ..."))
+        .tap(keys => ZIO.when(keys.nonEmpty)(ZIO.log(s"Migrated ${keys.size} $id common maps to super maps ...")))
     }
 }
 

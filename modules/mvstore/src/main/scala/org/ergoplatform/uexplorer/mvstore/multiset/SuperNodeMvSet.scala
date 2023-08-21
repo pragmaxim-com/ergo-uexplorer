@@ -158,7 +158,7 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
             }
           }
         }
-        .tap(keys => ZIO.log(s"Migrated ${keys.size} $id common maps to super sets ..."))
+        .tap(keys => ZIO.when(keys.nonEmpty)(ZIO.log(s"Migrated ${keys.size} $id common maps to super sets ...")))
     }
 }
 
