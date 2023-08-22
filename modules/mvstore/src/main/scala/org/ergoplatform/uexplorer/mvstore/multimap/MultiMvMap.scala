@@ -71,9 +71,9 @@ object MultiMvMap {
     kc: HotKeyCodec[PK]
   ): Task[MultiMvMap[PK, C, K, V]] =
     for
-      sMap      <- SuperNodeMvMap[PK, C, K, V](id, hotKeyDir)
-      commonMap <- sMap.mergeCommonMap
+      superMap  <- SuperNodeMvMap[PK, C, K, V](id, hotKeyDir)
+      commonMap <- superMap.mergeCommonMap
       _         <- ZIO.attempt(store.commit())
-    yield MultiMvMap(commonMap, sMap)
+    yield MultiMvMap(commonMap, superMap)
 
 }

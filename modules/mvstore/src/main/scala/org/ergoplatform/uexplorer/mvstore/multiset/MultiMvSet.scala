@@ -58,9 +58,9 @@ object MultiMvSet {
     kc: HotKeyCodec[K]
   ): Task[MultiMvSet[K, C, V]] =
     for
-      sMap      <- SuperNodeMvSet[K, C, V](id, hotKeyDir)
-      commonMap <- sMap.mergeCommonMap
+      superSet  <- SuperNodeMvSet[K, C, V](id, hotKeyDir)
+      commonMap <- superSet.mergeCommonMap
       _         <- ZIO.attempt(store.commit())
-    yield MultiMvSet(commonMap, sMap)
+    yield MultiMvSet(commonMap, superSet)
 
 }
