@@ -43,13 +43,13 @@ case class StreamScheduler(
         for {
           _     <- ZIO.log(s"Chain is empty, loading from scratch ...")
           fiber <- nodePoolBackend.keepNodePoolUpdated
-          _     <- periodicSync.repeat(schedule).ignore
+          _     <- periodicSync.repeatOrElse(schedule, (_, _) => nodePoolBackend.cleanNodePool *> validateAndSchedule(schedule))
         } yield fiber
 
       case ChainValid =>
         for {
           fiber <- nodePoolBackend.keepNodePoolUpdated
-          _     <- periodicSync.repeat(schedule).ignore
+          _     <- periodicSync.repeatOrElse(schedule, (_, _) => nodePoolBackend.cleanNodePool *> validateAndSchedule(schedule))
         } yield fiber
     }
 }

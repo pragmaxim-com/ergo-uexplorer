@@ -26,10 +26,12 @@ case class SttpNodePoolBackend(schedule: NodePoolSchedule)(
   private def updateNodePool: Task[Unit] =
     for
       allPeers <- metadataClient.getAllOpenApiPeers
-      _        <- ZIO.log(s"${allPeers.size} peers connected")
+      _        <- ZIO.log(s"${allPeers.size} peer(s) available : ${allPeers.mkString(",")}")
       newPeers <- nodePool.updateOpenApiPeers(allPeers)
-      _        <- ZIO.when(newPeers.nonEmpty)(ZIO.log(s"New peers added : ${newPeers.mkString(",")}"))
+      _        <- ZIO.when(newPeers.nonEmpty)(ZIO.log(s"New peers connected : ${newPeers.mkString(",")}"))
     yield ()
+
+  def cleanNodePool: Task[Unit] = nodePool.clean
 
   def keepNodePoolUpdated: Task[Fiber.Runtime[Throwable, Long]] =
     for
@@ -64,7 +66,7 @@ object SttpNodePoolBackend {
   case class NodePoolSchedule(schedule: Option[Schedule[Any, Any, (Any, Long)]])
 
   def layer: ZLayer[UnderlyingBackend with MetadataHttpClient with NodePool, Nothing, SttpNodePoolBackend] =
-    ZLayer.fromFunction(SttpNodePoolBackend(NodePoolSchedule(Some(Schedules.common(1.second, 3.seconds, 2.0, true, Some(5))))).apply _)
+    ZLayer.fromFunction(SttpNodePoolBackend(NodePoolSchedule(Some(Schedules.common(1.second, 5.seconds, 2.0, true, Some(10))))).apply _)
 
   def layerWithNoSchedule: ZLayer[UnderlyingBackend with MetadataHttpClient with NodePool, Nothing, SttpNodePoolBackend] =
     ZLayer.fromFunction(SttpNodePoolBackend(NodePoolSchedule(None)).apply _)

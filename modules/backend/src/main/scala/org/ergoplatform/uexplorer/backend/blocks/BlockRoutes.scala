@@ -2,13 +2,31 @@ package org.ergoplatform.uexplorer.backend.blocks
 
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.backend.Codecs
+import org.ergoplatform.uexplorer.db.Block
 import zio.*
 import zio.http.*
 import zio.json.*
 
 object BlockRoutes extends Codecs:
+  case class Info(lastHeight: Int)
+  object Info {
+    implicit val encoder: JsonEncoder[Info] = DeriveJsonEncoder.gen[Info]
+    implicit val decoder: JsonDecoder[Info] = DeriveJsonDecoder.gen[Info]
+  }
+
   def apply(): Http[BlockRepo, Throwable, Request, Response] =
     Http.collectZIO[Request] {
+      case Method.GET -> Root / "info" =>
+        BlockRepo
+          .getLastBlocks(1)
+          .map(_.headOption)
+          .map {
+            case Some(lastBlock) =>
+              Response.json(Info(lastBlock.height).toJson)
+            case None =>
+              Response.json(Info(0).toJson)
+          }
+          .orDie
       case Method.GET -> Root / "blocks" / blockId =>
         BlockRepo
           .lookup(BlockId.fromStringUnsafe(blockId))
