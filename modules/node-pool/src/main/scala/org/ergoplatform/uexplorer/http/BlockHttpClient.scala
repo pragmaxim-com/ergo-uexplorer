@@ -46,7 +46,7 @@ case class BlockHttpClient(metadataHttpClient: MetadataHttpClient, sttpB: SttpBa
         case Left(error) =>
           ZIO.fail(new Exception(s"Getting block id at fromHeightIncl $fromHeightIncl failed", error))
       }
-      .tap(blockIds => ZIO.log(s"Retrieved ${blockIds.size} block ids from height $fromHeightIncl"))
+      .tap(blockIds => ZIO.when(blockIds.nonEmpty)(ZIO.log(s"Retrieved ${blockIds.size} block ids from height $fromHeightIncl")))
 
   def getBlockIdForHeight(height: Int): Task[BlockId] =
     basicRequest

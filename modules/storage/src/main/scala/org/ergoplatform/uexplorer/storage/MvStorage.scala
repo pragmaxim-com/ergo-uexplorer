@@ -39,11 +39,11 @@ case class MvStorage(
     )
 
   def getChainTip: Task[ChainTip] = {
+    val lastHeight = getLastHeight
     val chainTip =
       ChainTip(
         blockIdsByHeight
-          .iterator(None, None, reverse = true)
-          .take(100)
+          .iterator(lastHeight.map(lk => Math.max(1, lk - 100)), lastHeight, reverse = false)
           .toSeq
           .sortBy(_._1)(Ordering[Int].reverse)
           .flatMap { case (_, blockIds) =>
@@ -54,11 +54,11 @@ case class MvStorage(
     if (sortedKeys.lastOption != getLastHeight)
       ZIO.fail(
         new IllegalStateException(
-          s"MvStore's Iterator works unexpectedly, ${sortedKeys.mkString(", ")} but last key is $getLastHeight!"
+          s"MvStore's Iterator works unexpectedly, ${sortedKeys.mkString(", ")} but last key is $lastHeight!"
         )
       )
     else
-      ZIO.succeed(chainTip) <* ZIO.log(s"Chain tip from ${sortedKeys.headOption} to ${sortedKeys.lastOption}")
+      ZIO.succeed(chainTip) <* ZIO.when(sortedKeys.nonEmpty)(ZIO.log(s"Chain tip from ${sortedKeys.headOption} to ${sortedKeys.lastOption}"))
   }
 
   private def clearEmptySuperNodes: Task[Unit] =

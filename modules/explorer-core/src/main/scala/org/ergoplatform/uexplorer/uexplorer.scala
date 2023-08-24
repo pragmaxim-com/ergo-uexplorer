@@ -76,7 +76,6 @@ package object uexplorer {
   object BlockId {
     def fromStringUnsafe(s: String): BlockId     = unsafeWrap(HexString.fromStringUnsafe(s))
     def castUnsafe(s: String): BlockId           = s.asInstanceOf[BlockId]
-    given JsonEncoder[BlockId]                   = JsonEncoder.string.contramap(BlockId.fromStringUnsafe)
     extension (x: BlockId) def unwrapped: String = x
   }
 
