@@ -54,10 +54,13 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport {
           _              <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once))
           lastHeight     <- ZIO.serviceWith[ReadableStorage](_.getLastHeight)
           missingHeights <- ZIO.serviceWith[ReadableStorage](_.findMissingHeights)
+          chainTip       <- ZIO.serviceWithZIO[ReadableStorage](_.getChainTip)
           memPoolState   <- ZIO.serviceWithZIO[MemPool](_.getTxs)
         } yield assertTrue(
           lastHeight.get == 4200,
           missingHeights.isEmpty,
+          chainTip.toMap.size == 100,
+          chainTip.latestBlock.map(_.height).contains(4200),
           memPoolState.underlyingTxs.size == 9
         )).provide(
           ChainIndexerConf.layer,

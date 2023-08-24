@@ -17,6 +17,7 @@ lazy val commonSettings = Seq(
     "-deprecation",
     "-encoding",
     "UTF-8",
+    "-Ykind-projector",
     "-feature",
     "-language:higherKinds",
     "-language:existentials",
@@ -135,7 +136,7 @@ lazy val backend =
   Utils.mkModule("backend", "backend")
     .settings(commonSettings)
     .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
-    .settings(libraryDependencies ++= zio("3") ++ Seq(h2) ++ scalatest("3"))
+    .settings(libraryDependencies ++= zio("3") ++ tapir("3") ++ Seq(h2) ++ scalatest("3"))
     .dependsOn(core, `node-pool` % "compile->compile;test->test")
 
 lazy val indexer =

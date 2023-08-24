@@ -4,7 +4,7 @@ import com.zaxxer.hikari.HikariDataSource
 import io.getquill.JdbcContextConfig
 import io.getquill.util.LoadConfig
 import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, BlockRoutes}
+import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, BlockRoutes, BlockTapirRoutes}
 import org.ergoplatform.uexplorer.backend.boxes.{BoxRoutes, BoxService}
 import org.ergoplatform.uexplorer.db.{Backend, LinkedBlock}
 import zio.*
@@ -28,7 +28,7 @@ object H2Backend extends Backend {
 
   def server(): ZIO[DataSource with BoxService with BlockRepo, Throwable, Nothing] =
     Server
-      .serve((BlockRoutes() ++ BoxRoutes()).withDefaultErrorResponse)
+      .serve((BlockTapirRoutes.routes ++ BoxRoutes()).withDefaultErrorResponse)
       .provideSomeLayer(
         Server.defaultWith(
           _.port(8090)
