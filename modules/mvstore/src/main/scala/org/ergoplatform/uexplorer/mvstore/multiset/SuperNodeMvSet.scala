@@ -147,7 +147,7 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
 
   def mergeCommonMap(implicit vc: ValueCodec[C[V]]): Task[MapLike[HK, C[V]]] =
     MvMap[HK, C[V]](id).tap { commonMap =>
-      ZIO.log("Merging Common Maps with Super Sets") *> ZIO
+      ZIO.log(s"$id : merging Common Maps with Super Sets") *> ZIO
         .attempt {
           existingMapsByHotKey.flatMap { case (k, sMap) =>
             commonMap.get(k).map { values =>
