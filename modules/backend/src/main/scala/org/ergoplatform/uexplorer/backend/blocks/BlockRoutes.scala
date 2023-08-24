@@ -8,11 +8,6 @@ import zio.http.*
 import zio.json.*
 
 object BlockRoutes extends Codecs:
-  case class Info(lastHeight: Int)
-  object Info {
-    implicit val encoder: JsonEncoder[Info] = DeriveJsonEncoder.gen[Info]
-    implicit val decoder: JsonDecoder[Info] = DeriveJsonDecoder.gen[Info]
-  }
 
   def apply(): Http[BlockRepo, Throwable, Request, Response] =
     Http.collectZIO[Request] {

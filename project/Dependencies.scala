@@ -99,7 +99,13 @@ object Dependencies {
     "com.softwaremill.sttp.client3" % s"zio_$v"   % "3.8.16",
     "com.softwaremill.sttp.client3" % s"circe_$v" % Version.sttp
   )
-
+  def tapir(v: String) = List(
+    "com.softwaremill.sttp.tapir" % s"tapir-core_$v"              % "1.7.2",
+    "com.softwaremill.sttp.tapir" % s"tapir-zio-http-server_$v"   % "1.7.2",
+    "com.softwaremill.sttp.tapir" % s"tapir-swagger-ui-bundle_$v" % "1.7.2",
+    "com.softwaremill.sttp.tapir" % s"tapir-zio_$v"               % "1.7.2",
+    "com.softwaremill.sttp.tapir" % s"tapir-json-zio_$v"          % "1.7.2"
+  )
   def monocle(v: String) =
     Seq(
       "dev.optics" % s"monocle-core_$v"  % "3.1.0",
