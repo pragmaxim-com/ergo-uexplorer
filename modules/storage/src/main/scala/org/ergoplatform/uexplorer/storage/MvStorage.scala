@@ -62,28 +62,28 @@ case class MvStorage(
   }
 
   private def clearEmptySuperNodes: Task[Unit] =
-    utxosByErgoTreeHex.clearEmptySuperNodes *> utxosByErgoTreeT8Hex.clearEmptySuperNodes
+    utxosByErgoTreeHex.clearEmptySuperNodes *> utxosByErgoTreeT8Hex.clearEmptySuperNodes *> utxosByTokenId.clearEmptySuperNodes *> tokensByUtxo.clearEmptySuperNodes
 
   def compact(
     indexing: Boolean
   ): Task[Unit] =
     for {
       _ <- ZIO.log(s"Compacting file at $getCompactReport")
-      _ <- ZIO.unless(indexing)(clearEmptySuperNodes)
       compactTime = if (indexing) mvStoreConf.maxIndexingCompactTime else mvStoreConf.maxIdleCompactTime
       _ <- ZIO.attempt(store.compactFile(compactTime.toMillis.toInt))
     } yield ()
 
   private def getCompactReport: String = {
-    val height                                                      = getLastHeight.getOrElse(0)
-    val MultiColSize(superNodeSize, superNodeTotalSize, commonSize) = utxosByErgoTreeHex.size
-    val nonEmptyAddressCount                                        = superNodeSize + commonSize
+    val height                   = getLastHeight.getOrElse(0)
+    val utxosByErgoTreeHexSize   = utxosByErgoTreeHex.size
+    val utxosByErgoTreeT8HexSize = utxosByErgoTreeT8Hex.size
+    val utxosByTokenIdSize       = utxosByTokenId.size
     val progress =
       s"storage height: $height, " +
-        s"utxo count: ${ergoTreeHexByUtxo.size}, " +
-        s"utxo with template count: ${ergoTreeT8HexByUtxo.size}, " +
-        s"supernode-utxo-count : $superNodeTotalSize, " +
-        s"non-empty-address count: $nonEmptyAddressCount "
+        s"utxo count (supernode/common): ${utxosByErgoTreeHexSize.superNodeTotalSize}/${ergoTreeHexByUtxo.size}, " +
+        s"t8-utxo count (supernode/common): ${utxosByErgoTreeT8HexSize.superNodeTotalSize}/${ergoTreeT8HexByUtxo.size}, " +
+        s"token count (supernode/common): ${utxosByTokenIdSize.superNodeTotalSize}/${utxosByTokenId.size}, " +
+        s"non-empty-address count (supernode/common): ${utxosByErgoTreeHexSize.superNodeSize}/${utxosByErgoTreeHexSize.commonSize} "
     val cs  = store.getCacheSize
     val csu = store.getCacheSizeUsed
     val chr = store.getCacheHitRatio
@@ -290,46 +290,49 @@ object MvStorage {
 
   private val VersionsToKeep = 10
 
+  def apply(homeDir: Path, mvStoreConf: MvStoreConf)(implicit store: MVStore): ZIO[Any, Throwable, MvStorage] =
+    for
+      utxosByErgoTreeHex   <- MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex", homeDir)
+      utxosByErgoTreeT8Hex <- MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex", homeDir)
+      ergoTreeHexByUtxo    <- MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo")
+      ergoTreeT8HexByUtxo  <- MvMap[BoxId, ErgoTreeT8Hex]("ergoTreeT8HexByUtxo")
+      blockIdsByHeight     <- MvMap[Height, util.Set[BlockId]]("blockIdsByHeight")
+      blockById            <- MvMap[BlockId, Block]("blockById")
+      utxosByTokenId       <- MultiMvSet[TokenId, util.Set, BoxId]("utxosByTokenId", homeDir)
+      tokensByUtxo         <- MultiMvMap[BoxId, util.Map, TokenId, Amount]("tokensByUtxo", homeDir)
+    yield MvStorage(
+      utxosByErgoTreeHex,
+      utxosByErgoTreeT8Hex,
+      ergoTreeHexByUtxo,
+      ergoTreeT8HexByUtxo,
+      blockIdsByHeight,
+      blockById,
+      utxosByTokenId,
+      tokensByUtxo
+    )(store, mvStoreConf)
+
+  def buildMvStore(dbFile: File, mvStoreConf: MvStoreConf): Task[MVStore] = ZIO
+    .attempt {
+      dbFile.getParentFile.mkdirs()
+      implicit val store: MVStore =
+        new MVStore.Builder()
+          .fileName(dbFile.getAbsolutePath)
+          .cacheSize(mvStoreConf.cacheSize)
+          .autoCommitDisabled()
+          .open()
+
+      store.setVersionsToKeep(VersionsToKeep)
+      store.setRetentionTime(3600 * 1000 * 24 * 7)
+      store
+    }
+
   private def zlayer(dbFile: File): ZLayer[MvStoreConf, Throwable, MvStorage] =
     ZLayer.service[MvStoreConf].flatMap { mvStoreConf =>
       ZLayer.scoped(
         ZIO.acquireRelease {
-          ZIO
-            .attempt {
-              dbFile.getParentFile.mkdirs()
-              implicit val store: MVStore =
-                new MVStore.Builder()
-                  .fileName(dbFile.getAbsolutePath)
-                  .cacheSize(mvStoreConf.get.cacheSize)
-                  .autoCommitDisabled()
-                  .open()
-
-              store.setVersionsToKeep(VersionsToKeep)
-              store.setRetentionTime(3600 * 1000 * 24 * 7)
-              store
-            }
-            .tap(store => ZIO.log(s"Opened mvstore at version ${store.getCurrentVersion}"))
+          buildMvStore(dbFile, mvStoreConf.get)
             .flatMap { implicit store =>
-              val homeDir = dbFile.getParentFile.toPath
-              for
-                utxosByErgoTreeHex   <- MultiMvMap[ErgoTreeHex, util.Map, BoxId, Value]("utxosByErgoTreeHex", homeDir)
-                utxosByErgoTreeT8Hex <- MultiMvSet[ErgoTreeT8Hex, util.Set, BoxId]("utxosByErgoTreeT8Hex", homeDir)
-                ergoTreeHexByUtxo    <- MvMap[BoxId, ErgoTreeHex]("ergoTreeHexByUtxo")
-                ergoTreeT8HexByUtxo  <- MvMap[BoxId, ErgoTreeT8Hex]("ergoTreeT8HexByUtxo")
-                blockIdsByHeight     <- MvMap[Height, util.Set[BlockId]]("blockIdsByHeight")
-                blockById            <- MvMap[BlockId, Block]("blockById")
-                utxosByTokenId       <- MultiMvSet[TokenId, util.Set, BoxId]("utxosByTokenId", homeDir)
-                tokensByUtxo         <- MultiMvMap[BoxId, util.Map, TokenId, Amount]("tokensByUtxo", homeDir)
-              yield MvStorage(
-                utxosByErgoTreeHex,
-                utxosByErgoTreeT8Hex,
-                ergoTreeHexByUtxo,
-                ergoTreeT8HexByUtxo,
-                blockIdsByHeight,
-                blockById,
-                utxosByTokenId,
-                tokensByUtxo
-              )(store, mvStoreConf.get)
+              ZIO.log(s"Building MvStorage at version ${store.getCurrentVersion}") *> MvStorage(dbFile.getParentFile.toPath, mvStoreConf.get)
             }
         } { storage =>
           ZIO.log(s"Closing mvstore at version ${storage.store.getCurrentVersion}") *> ZIO.succeed(storage.store.close())

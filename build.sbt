@@ -99,7 +99,7 @@ lazy val `node-pool` =
     .settings(commonSettings)
     .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
     .settings(libraryDependencies ++= zio("3") ++ sttp("3"))
-    .dependsOn(core)
+    .dependsOn(core % "compile->compile;test->test")
 
 lazy val mvstore =
   Utils.mkModule("mvstore", "mvstore")
@@ -109,8 +109,9 @@ lazy val mvstore =
 lazy val storage =
   Utils.mkModule("storage", "storage")
     .settings(commonSettings)
+    .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
     .settings(libraryDependencies ++= zio("3") ++ Seq(kryo) ++ scalatest("3"))
-    .dependsOn(mvstore, core)
+    .dependsOn(mvstore, core % "compile->compile;test->test")
 
 lazy val cassandra =
   Utils.mkModule("cassandra", "cassandra")
@@ -137,7 +138,7 @@ lazy val backend =
     .settings(commonSettings)
     .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
     .settings(libraryDependencies ++= zio("3") ++ tapir("3") ++ Seq(h2) ++ scalatest("3"))
-    .dependsOn(core, `node-pool` % "compile->compile;test->test")
+    .dependsOn(core % "compile->compile;test->test", `node-pool` % "compile->compile;test->test")
 
 lazy val indexer =
   Utils.mkModule("chain-indexer", "chain-indexer")
@@ -146,4 +147,4 @@ lazy val indexer =
     .settings(chainIndexerAssemblySettings)
     .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
     .settings(libraryDependencies ++= Seq(logback) ++ zio("3") ++ scalatest("3"))
-    .dependsOn(core, `node-pool` % "compile->compile;test->test", backend, storage) //todo return cassandra and janusgraph
+    .dependsOn(core  % "compile->compile;test->test", `node-pool` % "compile->compile;test->test", backend, storage) //todo return cassandra and janusgraph
