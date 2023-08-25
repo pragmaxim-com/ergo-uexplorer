@@ -148,12 +148,12 @@ class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
   def removeAllOrFail(hotKey: HK, secondaryKeys: IterableOnce[K], size: Int): Option[Try[Unit]] =
     superNodeCollector
       .getHotKeyString(hotKey)
-      .flatMap { superNodeName =>
+      .flatMap { hotKeyString =>
         existingMapsByHotKey.get(hotKey).map { mvMap =>
           secondaryKeys.iterator
             .find(k => mvMap.remove(k) == null)
             .fold(Success(())) { sk =>
-              Failure(new AssertionError(s"In $id, removing non-existing secondary key $sk from superNode $superNodeName"))
+              Failure(new AssertionError(s"In $id, removing non-existing secondary key $sk from superNode $hotKeyString"))
             } // we don't remove supernode map when it gets empty as common map as  on/off/on/off is expensive
         /*
             .flatMap { _ =>
@@ -174,24 +174,32 @@ class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
 
   def isEmpty: Boolean = existingMapsByHotKey.forall(_._2.isEmpty)
 
-  def size: Int = existingMapsByHotKey.size
+  def size: Int = existingMapsByHotKey.iterator.count(m => !m._2.isEmpty)
 
   def totalSize: Int = existingMapsByHotKey.iterator.map(_._2.size()).sum
 
   def mergeCommonMap(implicit vc: ValueCodec[C[K, V]]): Task[MapLike[HK, C[K, V]]] =
     MvMap[HK, C[K, V]](id).tap { commonMap =>
-      ZIO.log(s"$id : merging Common Maps with Super Maps") *> ZIO
+      ZIO.log(s"Merging common $id with newly created SuperMap, hotkeys: ${existingMapsByHotKey.size}") *> ZIO
         .attempt {
-          existingMapsByHotKey.flatMap { case (k, sMap) =>
-            commonMap.get(k).map { values =>
-              require(sMap.isEmpty, s"CommonMap $id for $k was not empty which means SuperMap shouldBe as it was freshly created")
-              codec.writeAll(sMap, values.entrySet().asScala.map(e => e.getKey -> e.getValue))
-              commonMap.remove(k)
-              k
+          superNodeCollector.getStringifiedHotKeys.flatMap { case (hotKey, hotKeyString) =>
+            commonMap.get(hotKey).map { values =>
+              existingMapsByHotKey.get(hotKey) match {
+                case None =>
+                  val sMap = store.openMap[K, V](hotKeyString)
+                  existingMapsByHotKey.putIfAbsent(hotKey, sMap)
+                  codec.writeAll(sMap, values.entrySet().asScala.map(e => e.getKey -> e.getValue))
+                  commonMap.remove(hotKey)
+                  hotKey
+                case Some(sMap) =>
+                  codec.writeAll(sMap, values.entrySet().asScala.map(e => e.getKey -> e.getValue))
+                  commonMap.remove(hotKey)
+                  hotKey
+              }
             }
           }
         }
-        .tap(keys => ZIO.when(keys.nonEmpty)(ZIO.log(s"Migrated ${keys.size} $id common maps to super maps ...")))
+        .tap(keys => ZIO.when(keys.nonEmpty)(ZIO.log(s"Migrated ${keys.size} $id keys to ${keys.size} newly created super maps ...")))
     }
 }
 

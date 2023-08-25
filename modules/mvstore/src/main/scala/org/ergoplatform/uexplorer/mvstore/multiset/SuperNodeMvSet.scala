@@ -147,18 +147,30 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
 
   def mergeCommonMap(implicit vc: ValueCodec[C[V]]): Task[MapLike[HK, C[V]]] =
     MvMap[HK, C[V]](id).tap { commonMap =>
-      ZIO.log(s"$id : merging Common Maps with Super Sets") *> ZIO
+      ZIO.log(s"Merging common $id with newly created SuperSet, hotkeys: ${existingMapsByHotKey.size}") *> ZIO
         .attempt {
-          existingMapsByHotKey.flatMap { case (k, sMap) =>
-            commonMap.get(k).map { values =>
-              require(sMap.isEmpty, s"CommonMap $id for $k was not empty which means SuperSet shouldBe as it was freshly created")
-              codec.writeAll(sMap, values.iterator().asScala)
-              commonMap.remove(k)
-              k
+          superNodeCollector.getStringifiedHotKeys.flatMap { case (hotKey, hotKeyString) =>
+            commonMap.get(hotKey).map { values =>
+              existingMapsByHotKey.get(hotKey) match {
+                case None =>
+                  val sMap: MVMap[V, Value] =
+                    store.openMap(
+                      hotKeyString,
+                      MVMap.Builder[V, Value].valueType(NullValueDataType.INSTANCE)
+                    )
+                  existingMapsByHotKey.putIfAbsent(hotKey, sMap)
+                  codec.writeAll(sMap, values.iterator().asScala)
+                  commonMap.remove(hotKey)
+                  hotKey
+                case Some(sMap) =>
+                  codec.writeAll(sMap, values.iterator().asScala)
+                  commonMap.remove(hotKey)
+                  hotKey
+              }
             }
           }
         }
-        .tap(keys => ZIO.when(keys.nonEmpty)(ZIO.log(s"Migrated ${keys.size} $id common maps to super sets ...")))
+        .tap(keys => ZIO.when(keys.nonEmpty)(ZIO.log(s"Migrated ${keys.size} $id keys to ${keys.size} newly created super maps ...")))
     }
 }
 

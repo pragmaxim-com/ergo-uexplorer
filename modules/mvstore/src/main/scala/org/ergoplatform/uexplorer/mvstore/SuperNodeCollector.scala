@@ -13,6 +13,8 @@ import zio.{Task, ZIO}
 class SuperNodeCollector[HK: HotKeyCodec](stringifiedHotKeys: Map[HK, String]) {
   private val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
 
+  def getStringifiedHotKeys: Map[HK, MultiColId] = stringifiedHotKeys
+
   def getExistingStringifiedHotKeys(mvStoreMapNames: Set[String]): Map[HK, String] =
     stringifiedHotKeys.filter(e => mvStoreMapNames.contains(e._2))
 
@@ -32,31 +34,32 @@ class SuperNodeCollector[HK: HotKeyCodec](stringifiedHotKeys: Map[HK, String]) {
 }
 
 object SuperNodeCollector {
-  def apply[HK: HotKeyCodec](hotKeyPath: Path): Task[SuperNodeCollector[HK]] = ZIO.attempt {
-    val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
-    new SuperNodeCollector(
-      Option(hotKeyPath)
-        .filter(_.toFile.exists())
-        .map(path => new FileInputStream(path.toFile))
-        .orElse(
-          Option(
-            Thread
-              .currentThread()
-              .getContextClassLoader
-              .getResourceAsStream(hotKeyPath.toFile.getName)
+  def apply[HK: HotKeyCodec](hotKeyPath: Path): Task[SuperNodeCollector[HK]] =
+    ZIO.log(s"Reading hotkeys from ${hotKeyPath.toFile.getAbsolutePath}") *> ZIO.attempt {
+      val hotKeyCodec: HotKeyCodec[HK] = implicitly[HotKeyCodec[HK]]
+      new SuperNodeCollector(
+        Option(hotKeyPath)
+          .filter(_.toFile.exists())
+          .map(path => new FileInputStream(path.toFile))
+          .orElse(
+            Option(
+              Thread
+                .currentThread()
+                .getContextClassLoader
+                .getResourceAsStream(hotKeyPath.toFile.getName)
+            )
           )
-        )
-        .map { inputStream =>
-          Source
-            .fromInputStream(new GZIPInputStream(new BufferedInputStream(inputStream)))
-            .getLines()
-            .map(_.trim)
-            .filterNot(_.isEmpty)
-            .toSet
-            .map(k => hotKeyCodec.deserialize(k) -> k)
-            .toMap
-        }
-        .getOrElse(Map.empty)
-    )
-  }
+          .map { inputStream =>
+            Source
+              .fromInputStream(new GZIPInputStream(new BufferedInputStream(inputStream)))
+              .getLines()
+              .map(_.trim)
+              .filterNot(_.isEmpty)
+              .toSet
+              .map(k => hotKeyCodec.deserialize(k) -> k)
+              .toMap
+          }
+          .getOrElse(Map.empty)
+      )
+    }
 }
