@@ -20,7 +20,7 @@ trait SuperNodeMapLike[HK, C[_, _], K, V] {
 
   def isEmpty: Boolean
 
-  def size: Int
+  def count: Int
 
   def totalSize: Int
 

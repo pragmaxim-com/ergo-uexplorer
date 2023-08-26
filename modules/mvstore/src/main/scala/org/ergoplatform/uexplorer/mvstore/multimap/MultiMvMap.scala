@@ -43,7 +43,7 @@ case class MultiMvMap[PK, C[A, B] <: java.util.Map[A, B], K, V](
 
   def isEmpty: Boolean = superNodeMap.isEmpty && commonMap.isEmpty
 
-  def size: MultiColSize = MultiColSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
+  def size: MultiColSize = MultiColSize(superNodeMap.count, superNodeMap.totalSize, commonMap.size)
 
   def removeAllOrFail(pk: PK, secondaryKeys: IterableOnce[K], size: Int)(f: C[K, V] => Option[C[K, V]]): Try[Unit] =
     superNodeMap.removeAllOrFail(pk, secondaryKeys, size).fold(commonMap.removeOrUpdateOrFail(pk)(f))(identity)

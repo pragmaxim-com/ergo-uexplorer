@@ -174,7 +174,7 @@ class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
 
   def isEmpty: Boolean = existingMapsByHotKey.forall(_._2.isEmpty)
 
-  def size: Int = existingMapsByHotKey.iterator.count(m => !m._2.isEmpty)
+  def count: Int = existingMapsByHotKey.iterator.count(m => !m._2.isEmpty)
 
   def totalSize: Int = existingMapsByHotKey.iterator.map(_._2.size()).sum
 

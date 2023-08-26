@@ -48,7 +48,7 @@ object MvStorageSpec extends ZIOSpecDefault:
           _ <- ZIO.attempt(implicitly[MVStore].commit())
           _ <- writeHotKeys(testDir.resolve("hot-keys-test-maps.csv.gz"))
           mm2 <- MultiMvMap[BoxId, util.Map, BoxId, Long]("test-maps", testDir)
-        } yield assertTrue(mm2.size.commonSize == 0, mm2.size.superNodeTotalSize == 10000)
+        } yield assertTrue(mm2.size.commonSize == 0, mm2.size.superNodeSum == 10000)
       },
       test("merge common map with super set") {
         for {
@@ -60,6 +60,6 @@ object MvStorageSpec extends ZIOSpecDefault:
           _             <- ZIO.attempt(implicitly[MVStore].commit())
           _             <- writeHotKeys(testDir.resolve("hot-keys-test-sets.csv.gz"))
           mm2           <- MultiMvSet[BoxId, util.Set, BoxId]("test-sets", testDir)
-        } yield assertTrue(mm2.size.commonSize == 0, mm2.size.superNodeTotalSize == 10000)
+        } yield assertTrue(mm2.size.commonSize == 0, mm2.size.superNodeSum == 10000)
       }
     )

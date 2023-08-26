@@ -80,10 +80,10 @@ case class MvStorage(
     val utxosByTokenIdSize       = utxosByTokenId.size
     val progress =
       s"storage height: $height, " +
-        s"utxo count (supernode/common): ${utxosByErgoTreeHexSize.superNodeTotalSize}/${ergoTreeHexByUtxo.size}, " +
-        s"t8-utxo count (supernode/common): ${utxosByErgoTreeT8HexSize.superNodeTotalSize}/${ergoTreeT8HexByUtxo.size}, " +
-        s"token count (supernode/common): ${utxosByTokenIdSize.superNodeTotalSize}/${utxosByTokenId.size}, " +
-        s"non-empty-address count (supernode/common): ${utxosByErgoTreeHexSize.superNodeSize}/${utxosByErgoTreeHexSize.commonSize} "
+        s"utxo count (supernode/common/total): ${utxosByErgoTreeHexSize.superNodeSum}/${utxosByErgoTreeHexSize.commonSize}/${ergoTreeHexByUtxo.size}, " +
+        s"t8-utxo count (supernode/common/total): ${utxosByErgoTreeT8HexSize.superNodeSum}/${utxosByErgoTreeT8HexSize.commonSize}/${ergoTreeT8HexByUtxo.size}, " +
+        s"token-utxo count (supernode/common/total): ${utxosByTokenIdSize.superNodeSum}/${utxosByTokenIdSize.commonSize}/${tokensByUtxo.size}, " +
+        s"non-empty-address count (supernode/common/total): ${utxosByErgoTreeHexSize.superNodeCount}/${utxosByErgoTreeHexSize.commonSize}/${utxosByErgoTreeHex.size} "
     val cs  = store.getCacheSize
     val csu = store.getCacheSizeUsed
     val chr = store.getCacheHitRatio
