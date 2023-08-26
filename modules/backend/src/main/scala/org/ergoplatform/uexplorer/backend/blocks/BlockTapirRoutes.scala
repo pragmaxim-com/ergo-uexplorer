@@ -12,17 +12,12 @@ import sttp.tapir.json.zio.*
 import zio.http.HttpApp
 import zio.http.Server
 import org.ergoplatform.uexplorer.BlockId.unwrapped
+import org.ergoplatform.uexplorer.backend.Codecs
 import sttp.tapir.generic.auto.*
 import sttp.tapir.server.ServerEndpoint
 import zio.json.{JsonDecoder, JsonEncoder}
 
-object BlockTapirRoutes {
-  given Schema[BlockId] = Schema.string
-  given Schema[Address] = Schema.string
-
-  given JsonEncoder[BlockId] = JsonEncoder.string.contramap(_.unwrapped)
-
-  given JsonDecoder[BlockId] = JsonDecoder.string.map(BlockId.fromStringUnsafe)
+object BlockTapirRoutes extends Codecs:
 
   val infoEndpoint: PublicEndpoint[Unit, String, Info, Any] =
     endpoint.get
@@ -86,4 +81,3 @@ object BlockTapirRoutes {
   val routes: HttpApp[BlockRepo, Throwable] =
     ZioHttpInterpreter()
       .toHttp[BlockRepo](List(infoServerEndpoint, blockByIdServerEndpoint, blockByIdsServerEndpoint) ++ swaggerEndpoints)
-}

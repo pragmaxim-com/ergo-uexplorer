@@ -7,59 +7,60 @@ import zio.http.*
 import zio.json.*
 
 object BoxRoutes extends Codecs:
+
   def apply(): Http[BoxService, Throwable, Request, Response] =
     Http.collectZIO[Request] {
       case req @ Method.GET -> Root / "assets" / "unspent" / "by-token-id" / tokenId =>
         BoxService
-          .getUnspentAssetsByTokenId(tokenId, req.url.queryParams)
+          .getUnspentAssetsByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(assets => Response.json(assets.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "assets" / "spent" / "by-token-id" / tokenId =>
         BoxService
-          .getSpentAssetsByTokenId(tokenId, req.url.queryParams)
+          .getSpentAssetsByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(assets => Response.json(assets.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "assets" / "any" / "by-token-id" / tokenId =>
         BoxService
-          .getAnyAssetsByTokenId(tokenId, req.url.queryParams)
+          .getAnyAssetsByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(assets => Response.json(assets.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "unspent" / "by-token-id" / tokenId =>
         BoxService
-          .getUnspentBoxesByTokenId(tokenId, req.url.queryParams)
+          .getUnspentBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "unspent" / "by-token-id" / tokenId =>
         BoxService
-          .getUnspentBoxesByTokenId(tokenId, req.url.queryParams)
+          .getUnspentBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "spent" / "by-token-id" / tokenId =>
         BoxService
-          .getSpentBoxesByTokenId(tokenId, req.url.queryParams)
+          .getSpentBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "spent" / "by-token-id" / tokenId =>
         BoxService
-          .getSpentBoxesByTokenId(tokenId, req.url.queryParams)
+          .getSpentBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "any" / "by-token-id" / tokenId =>
         BoxService
-          .getAnyBoxesByTokenId(tokenId, req.url.queryParams)
+          .getAnyBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "any" / "by-token-id" / tokenId =>
         BoxService
-          .getAnyBoxesByTokenId(tokenId, req.url.queryParams)
+          .getAnyBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
@@ -110,181 +111,181 @@ object BoxRoutes extends Codecs:
 
       case req @ Method.GET -> Root / "boxes" / "spent" / "by-address" / address =>
         BoxService
-          .getSpentBoxesByAddress(address, req.url.queryParams)
+          .getSpentBoxesByAddress(address, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "spent" / "by-address" / address =>
         BoxService
-          .getSpentBoxesByAddress(address, req.url.queryParams)
+          .getSpentBoxesByAddress(address, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "unspent" / "by-address" / address =>
         BoxService
-          .getUnspentBoxesByAddress(address, req.url.queryParams)
+          .getUnspentBoxesByAddress(address, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "unspent" / "by-address" / address =>
         BoxService
-          .getUnspentBoxesByAddress(address, req.url.queryParams)
+          .getUnspentBoxesByAddress(address, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "any" / "by-address" / address =>
         BoxService
-          .getAnyBoxesByAddress(address, req.url.queryParams)
+          .getAnyBoxesByAddress(address, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "any" / "by-address" / address =>
         BoxService
-          .getAnyBoxesByAddress(address, req.url.queryParams)
+          .getAnyBoxesByAddress(address, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "spent" / "contracts" / "by-ergo-tree" / ergoTree =>
         BoxService
-          .getSpentBoxesByErgoTree(ergoTree, req.url.queryParams)
+          .getSpentBoxesByErgoTree(ergoTree, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "spent" / "contracts" / "by-ergo-tree" / ergoTree =>
         BoxService
-          .getSpentBoxesByErgoTree(ergoTree, req.url.queryParams)
+          .getSpentBoxesByErgoTree(ergoTree, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "unspent" / "contracts" / "by-ergo-tree" / ergoTree =>
         BoxService
-          .getUnspentBoxesByErgoTree(ergoTree, req.url.queryParams)
+          .getUnspentBoxesByErgoTree(ergoTree, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "unspent" / "contracts" / "by-ergo-tree" / ergoTree =>
         BoxService
-          .getUnspentBoxesByErgoTree(ergoTree, req.url.queryParams)
+          .getUnspentBoxesByErgoTree(ergoTree, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "any" / "contracts" / "by-ergo-tree" / ergoTree =>
         BoxService
-          .getAnyBoxesByErgoTree(ergoTree, req.url.queryParams)
+          .getAnyBoxesByErgoTree(ergoTree, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "any" / "contracts" / "by-ergo-tree" / ergoTree =>
         BoxService
-          .getAnyBoxesByErgoTree(ergoTree, req.url.queryParams)
+          .getAnyBoxesByErgoTree(ergoTree, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "spent" / "contracts" / "by-ergo-tree-hash" / ergoTreeHash =>
         BoxService
-          .getSpentBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams)
+          .getSpentBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "spent" / "contracts" / "by-ergo-tree-hash" / ergoTreeHash =>
         BoxService
-          .getSpentBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams)
+          .getSpentBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "unspent" / "contracts" / "by-ergo-tree-hash" / ergoTreeHash =>
         BoxService
-          .getUnspentBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams)
+          .getUnspentBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "unspent" / "contracts" / "by-ergo-tree-hash" / ergoTreeHash =>
         BoxService
-          .getUnspentBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams)
+          .getUnspentBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "any" / "contracts" / "by-ergo-tree-hash" / ergoTreeHash =>
         BoxService
-          .getAnyBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams)
+          .getAnyBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "any" / "contracts" / "by-ergo-tree-hash" / ergoTreeHash =>
         BoxService
-          .getAnyBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams)
+          .getAnyBoxesByErgoTreeHash(ergoTreeHash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "spent" / "templates" / "by-ergo-tree" / ergoTreeT8 =>
         BoxService
-          .getSpentBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams)
+          .getSpentBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "spent" / "templates" / "by-ergo-tree" / ergoTreeT8 =>
         BoxService
-          .getSpentBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams)
+          .getSpentBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "unspent" / "templates" / "by-ergo-tree" / ergoTreeT8 =>
         BoxService
-          .getUnspentBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams)
+          .getUnspentBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "unspent" / "templates" / "by-ergo-tree" / ergoTreeT8 =>
         BoxService
-          .getUnspentBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams)
+          .getUnspentBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "any" / "templates" / "by-ergo-tree" / ergoTreeT8 =>
         BoxService
-          .getAnyBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams)
+          .getAnyBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "any" / "templates" / "by-ergo-tree" / ergoTreeT8 =>
         BoxService
-          .getAnyBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams)
+          .getAnyBoxesByErgoTreeT8(ergoTreeT8, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "spent" / "templates" / "by-ergo-tree-hash" / ergoTreeT8Hash =>
         BoxService
-          .getSpentBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams)
+          .getSpentBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "spent" / "templates" / "by-ergo-tree-hash" / ergoTreeT8Hash =>
         BoxService
-          .getSpentBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams)
+          .getSpentBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "unspent" / "templates" / "by-ergo-tree-hash" / ergoTreeT8Hash =>
         BoxService
-          .getUnspentBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams)
+          .getUnspentBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "unspent" / "templates" / "by-ergo-tree-hash" / ergoTreeT8Hash =>
         BoxService
-          .getUnspentBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams)
+          .getUnspentBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(utxos => Response.json(utxos.map(_.boxId).toJson))
           .orDie
 
       case req @ Method.GET -> Root / "boxes" / "any" / "templates" / "by-ergo-tree-hash" / ergoTreeT8Hash =>
         BoxService
-          .getAnyBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams)
+          .getAnyBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.toJson))
           .orDie
 
       case req @ Method.GET -> Root / "box-ids" / "any" / "templates" / "by-ergo-tree-hash" / ergoTreeT8Hash =>
         BoxService
-          .getAnyBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams)
+          .getAnyBoxesByErgoTreeT8Hash(ergoTreeT8Hash, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
           .orDie
 
