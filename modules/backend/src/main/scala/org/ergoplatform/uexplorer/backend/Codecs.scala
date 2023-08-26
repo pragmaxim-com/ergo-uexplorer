@@ -6,9 +6,16 @@ import org.ergoplatform.uexplorer.HexString.unwrapped
 import org.ergoplatform.uexplorer.backend.boxes.*
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, ErgoTreeHash, ErgoTreeT8Hash, HexString, TxId}
+import sttp.tapir.Schema
 import zio.json.*
 
 trait Codecs {
+
+  given Schema[Address] = Schema.string
+  given Schema[BoxId]   = Schema.string
+  given Schema[BlockId] = Schema.string
+  given Schema[TxId]    = Schema.string
+
   given MappedEncoding[HexString, String] = MappedEncoding[HexString, String](_.unwrapped)
   given MappedEncoding[String, HexString] = MappedEncoding[String, HexString](HexString.castUnsafe)
   given MappedEncoding[Address, String]   = MappedEncoding[Address, String](_.unwrappedAddress)
