@@ -19,126 +19,126 @@ import zio.*
 
 trait BoxesByTokenIdRoutes extends Codecs:
 
-  val unspentAssetsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Asset2Box], Any] =
+  protected[backend] val unspentAssetsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Asset2Box], Any] =
     endpoint.get
       .in("assets" / "unspent" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Asset2Box]])
 
-  val unspentAssetsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val unspentAssetsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     unspentAssetsByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getUnspentAssetsByTokenId(tokenId, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val spentAssetsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Asset2Box], Any] =
+  protected[backend] val spentAssetsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Asset2Box], Any] =
     endpoint.get
       .in("assets" / "spent" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Asset2Box]])
 
-  val spentAssetsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val spentAssetsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     spentAssetsByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getSpentAssetsByTokenId(tokenId, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val anyAssetsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Asset2Box], Any] =
+  protected[backend] val anyAssetsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Asset2Box], Any] =
     endpoint.get
       .in("assets" / "any" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Asset2Box]])
 
-  val anyAssetsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val anyAssetsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     anyAssetsByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getAnyAssetsByTokenId(tokenId, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val unspentBoxesByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Utxo], Any] =
+  protected[backend] val unspentBoxesByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Utxo], Any] =
     endpoint.get
       .in("boxes" / "unspent" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Utxo]])
 
-  val unspentBoxesByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val unspentBoxesByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     unspentBoxesByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getUnspentBoxesByTokenId(tokenId, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val unspentBoxIdsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
+  protected[backend] val unspentBoxIdsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
     endpoint.get
       .in("box-ids" / "unspent" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[BoxId]])
 
-  val unspentBoxIdsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val unspentBoxIdsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     unspentBoxIdsByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getUnspentBoxesByTokenId(tokenId, qp.toMap)
         .mapBoth(_.getMessage, _.map(_.boxId))
     }
 
-  val spentBoxesByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Box], Any] =
+  protected[backend] val spentBoxesByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Box], Any] =
     endpoint.get
       .in("boxes" / "spent" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Box]])
 
-  val spentBoxesByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val spentBoxesByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     spentBoxesByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getSpentBoxesByTokenId(tokenId, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val spentBoxIdsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
+  protected[backend] val spentBoxIdsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
     endpoint.get
       .in("box-ids" / "spent" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[BoxId]])
 
-  val spentBoxIdsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val spentBoxIdsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     spentBoxIdsByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getSpentBoxesByTokenId(tokenId, qp.toMap)
         .mapBoth(_.getMessage, _.map(_.boxId))
     }
 
-  val anyBoxesByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Box], Any] =
+  protected[backend] val anyBoxesByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[Box], Any] =
     endpoint.get
       .in("boxes" / "any" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Box]])
 
-  val anyBoxesByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val anyBoxesByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     anyBoxesByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getAnyBoxesByTokenId(tokenId, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val anyBoxIdsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
+  protected[backend] val anyBoxIdsByTokenId: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
     endpoint.get
       .in("box-ids" / "any" / "by-token-id" / path[String]("tokenId"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[BoxId]])
 
-  val anyBoxIdsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val anyBoxIdsByTokenIdEndpoint: ZServerEndpoint[BoxService, Any] =
     anyBoxIdsByTokenId.zServerLogic { case (tokenId, qp) =>
       BoxService
         .getAnyBoxesByTokenId(tokenId, qp.toMap)

@@ -19,84 +19,84 @@ import zio.json.*
 
 trait BoxesByErgoTreeTemplate extends Codecs:
 
-  val spentTemplateBoxesByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[Box], Any] =
+  protected[backend] val spentTemplateBoxesByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[Box], Any] =
     endpoint.get
       .in("boxes" / "spent" / "templates" / "by-ergo-tree" / path[String]("ergoTreeT8"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Box]])
 
-  val spentTemplateBoxesByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val spentTemplateBoxesByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
     spentTemplateBoxesByErgoTree.zServerLogic { case (ergoTreeT8, qp) =>
       BoxService
         .getSpentBoxesByErgoTreeT8(ergoTreeT8, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val spentTemplateBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
+  protected[backend] val spentTemplateBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
     endpoint.get
       .in("box-ids" / "spent" / "templates" / "by-ergo-tree" / path[String]("ergoTreeT8"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[BoxId]])
 
-  val spentTemplateBoxIdsByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val spentTemplateBoxIdsByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
     spentTemplateBoxIdsByErgoTree.zServerLogic { case (templates, qp) =>
       BoxService
         .getSpentBoxesByErgoTreeT8(templates, qp.toMap)
         .mapBoth(_.getMessage, _.map(_.boxId))
     }
 
-  val unspentTemplateBoxesByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[Utxo], Any] =
+  protected[backend] val unspentTemplateBoxesByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[Utxo], Any] =
     endpoint.get
       .in("boxes" / "unspent" / "templates" / "by-ergo-tree" / path[String]("ergoTreeT8"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Utxo]])
 
-  val unspentTemplateBoxesByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val unspentTemplateBoxesByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
     unspentTemplateBoxesByErgoTree.zServerLogic { case (ergoTreeT8, qp) =>
       BoxService
         .getUnspentBoxesByErgoTreeT8(ergoTreeT8, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val unspentTemplateBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
+  protected[backend] val unspentTemplateBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
     endpoint.get
       .in("box-ids" / "unspent" / "templates" / "by-ergo-tree" / path[String]("ergoTreeT8"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[BoxId]])
 
-  val unspentTemplateBoxIdsByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val unspentTemplateBoxIdsByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
     unspentTemplateBoxIdsByErgoTree.zServerLogic { case (ergoTreeT8, qp) =>
       BoxService
         .getUnspentBoxesByErgoTreeT8(ergoTreeT8, qp.toMap)
         .mapBoth(_.getMessage, _.map(_.boxId))
     }
 
-  val anyTemplateBoxesByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[Box], Any] =
+  protected[backend] val anyTemplateBoxesByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[Box], Any] =
     endpoint.get
       .in("boxes" / "any" / "templates" / "by-ergo-tree" / path[String]("ergoTreeT8"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[Box]])
 
-  val anyTemplateBoxesByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val anyTemplateBoxesByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
     anyTemplateBoxesByErgoTree.zServerLogic { case (ergoTreeT8, qp) =>
       BoxService
         .getAnyBoxesByErgoTreeT8(ergoTreeT8, qp.toMap)
         .mapError(_.getMessage)
     }
 
-  val anyTemplateBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
+  protected[backend] val anyTemplateBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), String, Iterable[BoxId], Any] =
     endpoint.get
       .in("box-ids" / "any" / "templates" / "by-ergo-tree" / path[String]("ergoTreeT8"))
       .in(queryParams)
       .errorOut(stringBody)
       .out(jsonBody[Iterable[BoxId]])
 
-  val anyTemplateBoxIdsByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val anyTemplateBoxIdsByErgoTreeEndpoint: ZServerEndpoint[BoxService, Any] =
     anyTemplateBoxIdsByErgoTree.zServerLogic { case (ergoTreeT8, qp) =>
       BoxService
         .getAnyBoxesByErgoTreeT8(ergoTreeT8, qp.toMap)

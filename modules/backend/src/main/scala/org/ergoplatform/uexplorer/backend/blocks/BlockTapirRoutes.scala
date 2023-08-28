@@ -17,15 +17,15 @@ import sttp.tapir.generic.auto.*
 import sttp.tapir.server.ServerEndpoint
 import zio.json.{JsonDecoder, JsonEncoder}
 
-object BlockTapirRoutes extends Codecs:
+trait BlockTapirRoutes extends Codecs:
 
-  val infoEndpoint: PublicEndpoint[Unit, String, Info, Any] =
+  protected[backend] val infoEndpoint: PublicEndpoint[Unit, String, Info, Any] =
     endpoint.get
       .in("info")
       .errorOut(stringBody)
       .out(jsonBody[Info])
 
-  val infoServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
+  protected[backend] val infoServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
     infoEndpoint.zServerLogic { _ =>
       BlockRepo
         .getLastBlocks(1)
@@ -41,14 +41,14 @@ object BlockTapirRoutes extends Codecs:
         )
     }
 
-  val blockByIdEndpoint: PublicEndpoint[BlockId, String, Block, Any] =
+  protected[backend] val blockByIdEndpoint: PublicEndpoint[BlockId, String, Block, Any] =
     endpoint.get
       .in("blocks" / path[String]("blockId"))
       .mapIn(BlockId.fromStringUnsafe)(_.unwrapped)
       .errorOut(stringBody)
       .out(jsonBody[Block])
 
-  val blockByIdServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
+  protected[backend] val blockByIdServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
     blockByIdEndpoint.zServerLogic { blockId =>
       BlockRepo
         .lookup(blockId)
@@ -61,23 +61,16 @@ object BlockTapirRoutes extends Codecs:
         }
     }
 
-  val blockByIdsEndpoint: PublicEndpoint[Set[BlockId], String, List[Block], Any] =
+  protected[backend] val blockByIdsEndpoint: PublicEndpoint[Set[BlockId], String, List[Block], Any] =
     endpoint.post
       .in("blocks")
       .in(jsonBody[Set[BlockId]])
       .errorOut(stringBody)
       .out(jsonBody[List[Block]])
 
-  val blockByIdsServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
+  protected[backend] val blockByIdsServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
     blockByIdsEndpoint.zServerLogic { blockIds =>
       BlockRepo
         .lookupBlocks(blockIds)
         .mapError(_.getMessage)
     }
-
-  val swaggerEndpoints: Seq[ServerEndpoint[Any, RIO[BlockRepo, *]]] =
-    SwaggerInterpreter().fromEndpoints[RIO[BlockRepo, *]](List(infoEndpoint, blockByIdEndpoint, blockByIdsEndpoint), "Block api", "1.0")
-
-  val routes: HttpApp[BlockRepo, Throwable] =
-    ZioHttpInterpreter()
-      .toHttp[BlockRepo](List(infoServerEndpoint, blockByIdServerEndpoint, blockByIdsServerEndpoint) ++ swaggerEndpoints)

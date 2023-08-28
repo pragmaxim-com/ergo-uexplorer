@@ -19,84 +19,84 @@ import zio.*
 
 trait BoxesByIdRoutes extends Codecs:
 
-  val unspentBoxById: PublicEndpoint[BoxId, String, Option[Utxo], Any] =
+  protected[backend] val unspentBoxById: PublicEndpoint[BoxId, String, Option[Utxo], Any] =
     endpoint.get
       .in("boxes" / "unspent" / path[String]("boxId"))
       .mapIn(BoxId(_))(_.unwrapped)
       .errorOut(stringBody)
       .out(jsonBody[Option[Utxo]])
 
-  val unspentBoxByIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val unspentBoxByIdEndpoint: ZServerEndpoint[BoxService, Any] =
     unspentBoxById.zServerLogic { boxId =>
       BoxService
         .getUtxo(boxId)
         .mapError(_.getMessage)
     }
 
-  val unspentBoxesByIds: PublicEndpoint[Set[BoxId], String, List[Utxo], Any] =
+  protected[backend] val unspentBoxesByIds: PublicEndpoint[Set[BoxId], String, List[Utxo], Any] =
     endpoint.post
       .in("boxes" / "unspent")
       .in(jsonBody[Set[BoxId]])
       .errorOut(stringBody)
       .out(jsonBody[List[Utxo]])
 
-  val unspentBoxesByIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val unspentBoxesByIdEndpoint: ZServerEndpoint[BoxService, Any] =
     unspentBoxesByIds.zServerLogic { boxIds =>
       BoxService
         .getUtxos(boxIds)
         .mapError(_.getMessage)
     }
 
-  val spentBoxById: PublicEndpoint[BoxId, String, Option[Box], Any] =
+  protected[backend] val spentBoxById: PublicEndpoint[BoxId, String, Option[Box], Any] =
     endpoint.get
       .in("boxes" / "spent" / path[String]("boxId"))
       .mapIn(BoxId(_))(_.unwrapped)
       .errorOut(stringBody)
       .out(jsonBody[Option[Box]])
 
-  val spentBoxByIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val spentBoxByIdEndpoint: ZServerEndpoint[BoxService, Any] =
     spentBoxById.zServerLogic { boxId =>
       BoxService
         .getSpentBox(boxId)
         .mapError(_.getMessage)
     }
 
-  val spentBoxesByIds: PublicEndpoint[Set[BoxId], String, List[Box], Any] =
+  protected[backend] val spentBoxesByIds: PublicEndpoint[Set[BoxId], String, List[Box], Any] =
     endpoint.post
       .in("boxes" / "spent")
       .in(jsonBody[Set[BoxId]])
       .errorOut(stringBody)
       .out(jsonBody[List[Box]])
 
-  val spentBoxesByIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val spentBoxesByIdEndpoint: ZServerEndpoint[BoxService, Any] =
     spentBoxesByIds.zServerLogic { boxIds =>
       BoxService
         .getSpentBoxes(boxIds)
         .mapError(_.getMessage)
     }
 
-  val anyBoxById: PublicEndpoint[BoxId, String, Option[Box], Any] =
+  protected[backend] val anyBoxById: PublicEndpoint[BoxId, String, Option[Box], Any] =
     endpoint.get
       .in("boxes" / "any" / path[String]("boxId"))
       .mapIn(BoxId(_))(_.unwrapped)
       .errorOut(stringBody)
       .out(jsonBody[Option[Box]])
 
-  val anyBoxByIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val anyBoxByIdEndpoint: ZServerEndpoint[BoxService, Any] =
     anyBoxById.zServerLogic { boxId =>
       BoxService
         .getAnyBox(boxId)
         .mapError(_.getMessage)
     }
 
-  val anyBoxesByIds: PublicEndpoint[Set[BoxId], String, List[Box], Any] =
+  protected[backend] val anyBoxesByIds: PublicEndpoint[Set[BoxId], String, List[Box], Any] =
     endpoint.post
       .in("boxes" / "any")
       .in(jsonBody[Set[BoxId]])
       .errorOut(stringBody)
       .out(jsonBody[List[Box]])
 
-  val anyBoxesByIdEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] val anyBoxesByIdEndpoint: ZServerEndpoint[BoxService, Any] =
     anyBoxesByIds.zServerLogic { boxIds =>
       BoxService
         .getAnyBoxes(boxIds)

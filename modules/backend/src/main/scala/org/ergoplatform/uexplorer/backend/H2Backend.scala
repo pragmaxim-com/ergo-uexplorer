@@ -28,7 +28,7 @@ object H2Backend extends Backend {
 
   def install(): ZIO[BoxService with BlockRepo with Server, Nothing, Int] =
     Server
-      .install((BlockTapirRoutes.routes ++ BoxTapirRoutes.routes).withDefaultErrorResponse)
+      .install(TapirRoutes.routes.withDefaultErrorResponse)
       .logError("Serving at 8090 failed.")
 
   def serve(port: Int): ZIO[DataSource with BoxService with BlockRepo, Throwable, Nothing] =
