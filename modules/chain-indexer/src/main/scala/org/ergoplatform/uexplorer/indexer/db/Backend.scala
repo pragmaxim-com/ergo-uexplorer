@@ -16,9 +16,9 @@ object Backend {
       conf.backendType match {
         case Cassandra(parallelism) =>
           // CassandraBackend(parallelism) // TODO cassandra must become Repos !
-          H2Backend.server()
+          H2Backend.serve(8090) // TODO port configurable
         case H2(parallelism) =>
-          H2Backend.server()
+          H2Backend.serve(8090)
       }
 
     }

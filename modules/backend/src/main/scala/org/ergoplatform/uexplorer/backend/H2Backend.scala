@@ -26,15 +26,18 @@ object H2Backend extends Backend {
     keyPath   = "server.key"
   )
 
-  def server(): ZIO[DataSource with BoxService with BlockRepo, Throwable, Nothing] =
+  def install(): ZIO[BoxService with BlockRepo with Server, Nothing, Int] =
     Server
-      .serve((BlockTapirRoutes.routes ++ BoxTapirRoutes.routes).withDefaultErrorResponse)
-      .provideSomeLayer(
-        Server.defaultWith(
-          _.port(8090)
-            .ssl(sslConfig)
-        )
+      .install((BlockTapirRoutes.routes ++ BoxTapirRoutes.routes).withDefaultErrorResponse)
+      .logError("Serving at 8090 failed.")
+
+  def serve(port: Int): ZIO[DataSource with BoxService with BlockRepo, Throwable, Nothing] =
+    (install() *> ZIO.never).provideSomeLayer(
+      Server.defaultWith(
+        _.port(port)
+          .ssl(sslConfig)
       )
+    )
 
   override def isEmpty: Task[Boolean] = ???
 
