@@ -12,65 +12,67 @@ import sttp.tapir.json.zio.*
 import zio.http.HttpApp
 import zio.http.Server
 import org.ergoplatform.uexplorer.BlockId.unwrapped
-import org.ergoplatform.uexplorer.backend.Codecs
+import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse}
+import sttp.model.StatusCode
 import sttp.tapir.generic.auto.*
 import sttp.tapir.server.ServerEndpoint
 import zio.json.{JsonDecoder, JsonEncoder}
 
 trait BlockTapirRoutes extends Codecs:
 
-  protected[backend] val infoEndpoint: PublicEndpoint[Unit, String, Info, Any] =
+  protected[backend] val infoEndpoint: PublicEndpoint[Unit, (ErrorResponse, StatusCode), Info, Any] =
     endpoint.get
       .in("info")
-      .errorOut(stringBody)
+      .errorOut(jsonBody[ErrorResponse])
+      .errorOut(statusCode)
       .out(jsonBody[Info])
 
-  protected[backend] val infoServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
+  protected[backend] val infoServerEndpoint: ZServerEndpoint[BlockService, Any] =
     infoEndpoint.zServerLogic { _ =>
-      BlockRepo
+      BlockService
         .getLastBlocks(1)
+        .mapError(e => ErrorResponse(StatusCode.InternalServerError.code, e.getMessage) -> StatusCode.InternalServerError)
         .map(_.headOption)
-        .mapBoth(
-          _.getMessage,
-          {
-            case Some(lastBlock) =>
-              Info(lastBlock.height)
-            case None =>
-              Info(0)
-          }
-        )
+        .map {
+          case Some(lastBlock) =>
+            Info(lastBlock.height)
+          case None =>
+            Info(0)
+        }
+
     }
 
-  protected[backend] val blockByIdEndpoint: PublicEndpoint[BlockId, String, Block, Any] =
+  protected[backend] val blockByIdEndpoint: PublicEndpoint[String, (ErrorResponse, StatusCode), Block, Any] =
     endpoint.get
       .in("blocks" / path[String]("blockId"))
-      .mapIn(BlockId.fromStringUnsafe)(_.unwrapped)
-      .errorOut(stringBody)
+      .errorOut(jsonBody[ErrorResponse])
+      .errorOut(statusCode)
       .out(jsonBody[Block])
 
-  protected[backend] val blockByIdServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
+  protected[backend] val blockByIdServerEndpoint: ZServerEndpoint[BlockService, Any] =
     blockByIdEndpoint.zServerLogic { blockId =>
-      BlockRepo
+      BlockService
         .lookup(blockId)
-        .mapError(_.getMessage)
+        .mapError(e => ErrorResponse(StatusCode.InternalServerError.code, e.getMessage) -> StatusCode.InternalServerError)
         .flatMap {
+          case None =>
+            ZIO.fail(ErrorResponse(StatusCode.NotFound.code, "not-found") -> StatusCode.NotFound)
           case Some(block) =>
             ZIO.succeed(block)
-          case None =>
-            ZIO.fail("404 Not Found")
         }
     }
 
-  protected[backend] val blockByIdsEndpoint: PublicEndpoint[Set[BlockId], String, List[Block], Any] =
+  protected[backend] val blockByIdsEndpoint: PublicEndpoint[Set[String], (ErrorResponse, StatusCode), List[Block], Any] =
     endpoint.post
       .in("blocks")
-      .in(jsonBody[Set[BlockId]])
-      .errorOut(stringBody)
+      .in(jsonBody[Set[String]])
+      .errorOut(jsonBody[ErrorResponse])
+      .errorOut(statusCode)
       .out(jsonBody[List[Block]])
 
-  protected[backend] val blockByIdsServerEndpoint: ZServerEndpoint[BlockRepo, Any] =
+  protected[backend] val blockByIdsServerEndpoint: ZServerEndpoint[BlockService, Any] =
     blockByIdsEndpoint.zServerLogic { blockIds =>
-      BlockRepo
+      BlockService
         .lookupBlocks(blockIds)
-        .mapError(_.getMessage)
+        .mapError(e => ErrorResponse(StatusCode.InternalServerError.code, e.getMessage) -> StatusCode.InternalServerError)
     }

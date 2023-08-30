@@ -19,7 +19,7 @@ object Implicits {
 
   implicit val hotBoxCodec: HotKeyCodec[BoxId] = new HotKeyCodec[BoxId] {
     def serialize(key: BoxId): String   = key.unwrapped
-    def deserialize(key: String): BoxId = BoxId(key)
+    def deserialize(key: String): BoxId = BoxId.castUnsafe(key)
   }
 
   implicit val hotHexCodec: HotKeyCodec[HexString] = new HotKeyCodec[HexString] {

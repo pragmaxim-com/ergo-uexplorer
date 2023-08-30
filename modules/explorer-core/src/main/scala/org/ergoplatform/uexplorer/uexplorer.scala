@@ -126,15 +126,15 @@ package object uexplorer {
     def castUnsafe(s: String): TxId           = s.asInstanceOf[TxId]
   }
 
-  opaque type BoxId = String
+  opaque type BoxId = HexString
 
   object BoxId {
-    def apply(s: String): BoxId = s
+    def apply(s: String): BoxId = unsafeWrap(refineV[HexStringSpec].unsafeFrom(s))
 
-    given Encoder[BoxId]                       = Encoder.encodeString
-    given JsonEncoder[BoxId]                   = JsonEncoder.string
-    given JsonDecoder[BoxId]                   = JsonDecoder.string
-    given Decoder[BoxId]                       = Decoder.decodeString
+    given Encoder[BoxId]                       = Encoder.encodeString.contramap(_.unwrapped)
+    given JsonEncoder[BoxId]                   = JsonEncoder.string.contramap(_.unwrapped)
+    given JsonDecoder[BoxId]                   = JsonDecoder.string.map(BoxId(_))
+    given Decoder[BoxId]                       = Decoder.decodeString.map(BoxId.castUnsafe) // for performance reasons, parsing Node-API
     extension (x: BoxId) def unwrapped: String = x
     def castUnsafe(s: String): BoxId           = s.asInstanceOf[BoxId]
   }

@@ -6,10 +6,18 @@ import org.ergoplatform.uexplorer.HexString.unwrapped
 import org.ergoplatform.uexplorer.backend.boxes.*
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, ErgoTreeHash, ErgoTreeT8Hash, HexString, TxId}
+import sttp.model.StatusCode
 import sttp.tapir.Schema
 import zio.json.*
 
 trait Codecs {
+
+  def handleThrowable(t: Throwable): (ErrorResponse, StatusCode) = t match {
+    case IdParsingException(e, msg) =>
+      ErrorResponse(StatusCode.BadRequest.code, msg) -> StatusCode.BadRequest
+    case e: Throwable =>
+      ErrorResponse(StatusCode.InternalServerError.code, e.getMessage) -> StatusCode.InternalServerError
+  }
 
   given Schema[Address] = Schema.string
   given Schema[BoxId]   = Schema.string

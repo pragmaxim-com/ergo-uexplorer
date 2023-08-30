@@ -82,6 +82,7 @@ def chainIndexerAssemblySettings = Seq(
     "-J-Xmx16G",
     "-J-Xms512m",
     "-J-Xss40m",
+    "-J-Dquill.query.tooLong=2000"
   )
 )
 
