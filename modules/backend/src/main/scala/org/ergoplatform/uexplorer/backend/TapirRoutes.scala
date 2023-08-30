@@ -1,6 +1,6 @@
 package org.ergoplatform.uexplorer.backend
 
-import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, BlockTapirRoutes}
+import org.ergoplatform.uexplorer.backend.blocks.{BlockService, BlockTapirRoutes}
 import org.ergoplatform.uexplorer.backend.boxes.{BoxService, BoxTapirRoutes}
 import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.ziohttp.ZioHttpInterpreter
@@ -62,7 +62,7 @@ object TapirRoutes extends BlockTapirRoutes with BoxTapirRoutes:
       anyTemplateBoxIdsByErgoTreeHash
     )
 
-  val blockRoutes: List[ZServerEndpoint[BlockRepo, Any]] =
+  val blockRoutes: List[ZServerEndpoint[BlockService, Any]] =
     List(infoServerEndpoint, blockByIdServerEndpoint, blockByIdsServerEndpoint)
 
   val boxRoutes: List[ZServerEndpoint[BoxService, Any]] =
@@ -114,10 +114,10 @@ object TapirRoutes extends BlockTapirRoutes with BoxTapirRoutes:
       anyTemplateBoxIdsByErgoTreeHashEndpoint
     )
 
-  val swaggerEndpoints: List[ServerEndpoint[Any, RIO[BoxService with BlockRepo, *]]] =
+  val swaggerEndpoints: List[ServerEndpoint[Any, RIO[BoxService with BlockService, *]]] =
     SwaggerInterpreter()
-      .fromEndpoints[RIO[BoxService with BlockRepo, *]](boxSwaggerEndpoints ++ blockSwaggerEndpoints, "uexplorer api", "1.0")
+      .fromEndpoints[RIO[BoxService with BlockService, *]](boxSwaggerEndpoints ++ blockSwaggerEndpoints, "uexplorer api", "1.0")
 
-  val routes: HttpApp[BoxService with BlockRepo, Throwable] =
-    ZioHttpInterpreter().toHttp[BoxService](boxRoutes) ++ ZioHttpInterpreter().toHttp[BlockRepo](blockRoutes) ++ ZioHttpInterpreter()
-      .toHttp[BoxService with BlockRepo](swaggerEndpoints)
+  val routes: HttpApp[BoxService with BlockService, Throwable] =
+    ZioHttpInterpreter().toHttp[BoxService](boxRoutes) ++ ZioHttpInterpreter().toHttp[BlockService](blockRoutes) ++ ZioHttpInterpreter()
+      .toHttp[BoxService with BlockService](swaggerEndpoints)

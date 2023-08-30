@@ -34,6 +34,7 @@ trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] {
       } yield assertTrue(10 == expectedInfo.lastHeight)
     }.provide(
       H2Backend.layer,
+      BlockService.layer,
       PersistentBlockRepo.layer
     ),
     test("get block by id") {
@@ -46,6 +47,7 @@ trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] {
       } yield assertTrue(1 == expectedBlock.height)
     }.provide(
       H2Backend.layer,
+      BlockService.layer,
       PersistentBlockRepo.layer
     ),
     test("get blocks by ids") {
@@ -58,6 +60,7 @@ trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] {
       } yield assertTrue(List(1) == expectedBlocks.map(_.height))
     }.provide(
       H2Backend.layer,
+      BlockService.layer,
       PersistentBlockRepo.layer
     )
   )
