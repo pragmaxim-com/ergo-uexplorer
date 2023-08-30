@@ -199,7 +199,7 @@ case class BoxService(boxRepo: BoxRepo, coreConf: CoreConf) {
 
 object BoxService {
   val indexWhiteList = List("tokenId", "txId", "r4", "r5", "r6", "r7", "r8", "r9")
-  val allColumns     = indexWhiteList ++ List("boxId", "blockId", "ergoTreeHash", "ergoTreeT8Hash", "ergValue")
+  val allColumns     = indexWhiteList ++ List("boxId", "blockId", "ergoTreeHash", "ergoTreeT8Hash", "ergValue", "amount")
 
   def layer: ZLayer[BoxRepo with CoreConf, Nothing, BoxService] =
     ZLayer.fromFunction(BoxService.apply _)
