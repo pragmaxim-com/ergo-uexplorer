@@ -147,7 +147,7 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
 
   def mergeCommonMap(implicit vc: ValueCodec[C[V]]): Task[MapLike[HK, C[V]]] =
     MvMap[HK, C[V]](id).tap { commonMap =>
-      ZIO.log(s"Merging common $id with newly created SuperSet, hotkeys: ${existingMapsByHotKey.size}") *> ZIO
+      ZIO.log(s"Checking if merging ${existingMapsByHotKey.size} hotkeys needs merging at $id") *> ZIO
         .attempt {
           superNodeCollector.getStringifiedHotKeys.flatMap { case (hotKey, hotKeyString) =>
             commonMap.get(hotKey).map { values =>

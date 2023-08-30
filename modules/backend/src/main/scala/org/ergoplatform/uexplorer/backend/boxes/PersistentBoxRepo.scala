@@ -84,7 +84,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
         quote {
           query[Utxo]
             .join(query[Asset2Box])
-            .on((a, utxo) => a.boxId == utxo.boxId)
+            .on((utxo, a) => utxo.boxId == a.boxId)
             .filter((_, a) => a.tokenId == lift(tokenId))
             .map((_, a) => Asset2Box(a.tokenId, a.boxId, a.amount))
             .filterByKeys(filter)
@@ -99,7 +99,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
         quote {
           query[Box]
             .join(query[Asset2Box])
-            .on((a, box) => a.boxId == box.boxId)
+            .on((box, a) => box.boxId == a.boxId)
             .filter((_, a) => a.tokenId == lift(tokenId))
             .map((_, a) => Asset2Box(a.tokenId, a.boxId, a.amount))
             .filterByKeys(filter)
@@ -171,7 +171,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
         quote {
           query[Asset2Box]
             .join(query[Box])
-            .on((a, b) => b.boxId == a.boxId)
+            .on((a, box) => box.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
             .map((_, b) => Box(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
             .filterByKeys(filter)
@@ -186,9 +186,9 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
         quote {
           query[Asset2Box]
             .join(query[Utxo])
-            .on((a, b) => b.boxId == a.boxId)
+            .on((a, utxo) => utxo.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
-            .map((_, b) => b.boxId)
+            .map((_, utxo) => utxo.boxId)
         }
       }
       .map(_.toSet)

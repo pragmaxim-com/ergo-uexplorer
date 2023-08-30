@@ -180,7 +180,7 @@ class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
 
   def mergeCommonMap(implicit vc: ValueCodec[C[K, V]]): Task[MapLike[HK, C[K, V]]] =
     MvMap[HK, C[K, V]](id).tap { commonMap =>
-      ZIO.log(s"Merging common $id with newly created SuperMap, hotkeys: ${existingMapsByHotKey.size}") *> ZIO
+      ZIO.log(s"Checking if merging ${existingMapsByHotKey.size} hotkeys needs merging at $id") *> ZIO
         .attempt {
           superNodeCollector.getStringifiedHotKeys.flatMap { case (hotKey, hotKeyString) =>
             commonMap.get(hotKey).map { values =>
