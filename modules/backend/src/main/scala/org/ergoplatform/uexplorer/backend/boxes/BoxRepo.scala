@@ -7,11 +7,11 @@ import zio.*
 trait BoxRepo:
 
   def insertUtxos(
-                   ergoTrees: Iterable[ErgoTree],
-                   ergoTreeT8s: Iterable[ErgoTreeT8],
-                   assetsToBox: Iterable[Asset2Box],
-                   assets: Iterable[Asset],
-                   utxos: Iterable[Utxo]
+    ergoTrees: Iterable[ErgoTree],
+    ergoTreeT8s: Iterable[ErgoTreeT8],
+    assetsToBox: Iterable[Asset2Box],
+    assets: Iterable[Asset],
+    utxos: Iterable[Utxo]
   ): Task[Iterable[BoxId]]
 
   def deleteUtxo(boxId: BoxId): Task[Long]
@@ -52,11 +52,11 @@ trait BoxRepo:
 
 object BoxRepo:
   def insertUtxos(
-                   ergoTrees: Iterable[ErgoTree],
-                   ergoTreeT8s: Iterable[ErgoTreeT8],
-                   assetsToBox: Iterable[Asset2Box],
-                   assets: Iterable[Asset],
-                   utxos: Iterable[Utxo]
+    ergoTrees: Iterable[ErgoTree],
+    ergoTreeT8s: Iterable[ErgoTreeT8],
+    assetsToBox: Iterable[Asset2Box],
+    assets: Iterable[Asset],
+    utxos: Iterable[Utxo]
   ): ZIO[BoxRepo, Throwable, Iterable[BoxId]] =
     ZIO.serviceWithZIO[BoxRepo](_.insertUtxos(ergoTrees, ergoTreeT8s, assetsToBox, assets, utxos))
 
