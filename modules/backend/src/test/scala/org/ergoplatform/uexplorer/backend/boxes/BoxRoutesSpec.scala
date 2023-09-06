@@ -64,7 +64,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         missingUnspentBoxStatus == Status.NotFound
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -96,7 +96,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentBoxIdsByAddress.size + unspentBoxIdsByAddress.size == anyBoxIdsByAddress.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -128,7 +128,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentBoxIdsByErgoTree.size + unspentBoxIdsByErgoTree.size == anyBoxIdsByErgoTree.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -161,7 +161,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentBoxIdsByErgoTreeT8.size + unspentBoxIdsByErgoTreeT8.size == anyBoxIdsByErgoTreeT8.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -196,7 +196,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentBoxIdsByErgoTreeHash.size + unspentBoxIdsByErgoTreeHash.size == anyBoxesByErgoTreeHash.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -229,7 +229,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentIdsByErgoTreeT8Hash.size + unspentIdsByErgoTreeT8Hash.size == anyIdsByErgoTreeT8Hash.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -261,7 +261,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentIdsByAddress.size + unspentIdsByAddress.size == anyIdsByAddress.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -295,7 +295,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentIdsByErgoTree.size + unspentIdsByErgoTree.size == anyIdsByErgoTree.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -331,7 +331,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentIdsByErgoTreeT8.size + unspentIdsByErgoTreeT8.size == anyIdsByErgoTreeT8.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -369,7 +369,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentIdsByErgoTreeHash.size + unspentIdsByErgoTreeHash.size == anyIdsByErgoTreeHash.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -408,7 +408,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         spentIdsByErgoTreeT8Hash.size + unspentIdsByErgoTreeT8Hash.size == anyIdsByErgoTreeT8Hash.size
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer
@@ -447,7 +447,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] {
         anyBoxIds.isEmpty
       )
     }.provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBoxRepo.layer,
       BoxService.layer,
       CoreConf.layer

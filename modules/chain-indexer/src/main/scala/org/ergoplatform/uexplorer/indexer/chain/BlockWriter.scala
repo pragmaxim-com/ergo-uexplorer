@@ -42,9 +42,10 @@ case class BlockWriter(
     } else {
       for {
         _              <- ZIO.log(s"Adding fork from height ${winningFork.head.block.height} until ${winningFork.last.block.height}")
-        preForkVersion <- ZIO.attempt(storage.getBlockById(winningFork.head.b.header.id).map(_.revision).get)
-        loosingFork = winningFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id)).toMap
-        _ <- ZIO.attempt(storage.rollbackTo(preForkVersion))
+        preForkVersion <- ZIO.attempt(storage.getBlocksByHeight(winningFork.head.b.header.height).map(_._2.revision).head)
+        loosingFork = winningFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id))
+        _ <- ZIO.log(s"Rolling back to version $preForkVersion")
+        _ <- storage.rollbackTo(preForkVersion)
       } yield ForkInserted(winningFork, loosingFork)
     }
 
@@ -60,7 +61,9 @@ case class BlockWriter(
         case winningFork =>
           for {
             forkInserted <- rollbackFork(winningFork)
-            _            <- repo.removeBlocks(forkInserted.loosingFork.keySet)
+            _            <- ZIO.log(s"Removing old fork : ${forkInserted.loosingFork.map(b => b._2.height -> b._1).mkString("\n", "\n", "")}")
+            _            <- repo.removeBlocks(forkInserted.loosingFork.map(_._1))
+            _            <- ZIO.log(s"Adding new fork : ${winningFork.map(b => b.block.height -> b.b.header.id).mkString("\n", "\n", "")}")
             fork         <- ZIO.foreach(forkInserted.winningFork)(persistBlock)
           } yield fork
       }
@@ -111,7 +114,7 @@ case class BlockWriter(
       storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
     )
 
-    for _ <- (ZIO.collectAllParDiscard(storageOps) *> ZIO.attempt(storage.commit())) <&> repo.writeBlock(b, inputIds)
+    for _ <- (ZIO.collectAllParDiscard(storageOps) *> storage.commit()) <&> repo.writeBlock(b, inputIds)
     yield BestBlockInserted(b, None)
   }
 }

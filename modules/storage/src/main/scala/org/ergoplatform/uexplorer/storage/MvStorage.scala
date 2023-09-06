@@ -117,9 +117,9 @@ case class MvStorage(
       }
     ) *> compact(indexing)
 
-  def commit(): Revision = store.commit()
+  def commit(): Task[Revision] = ZIO.attempt(store.commit())
 
-  def rollbackTo(rev: Revision): Unit = store.rollbackTo(rev)
+  def rollbackTo(rev: Revision): Task[Unit] = ZIO.attempt(store.rollbackTo(rev)) *> clearEmptySuperNodes
 
   def removeInputBoxesByErgoTree(inputIds: Seq[BoxId]): Task[_] = ZIO.fromTry {
     inputIds
@@ -136,7 +136,6 @@ case class MvStorage(
 
     ergoTreeHexByUtxo
       .removeAllOrFail(inputIds)
-
   }
 
   def removeInputBoxesByErgoTreeT8(inputIds: Seq[BoxId]): Task[_] = ZIO.attempt {
@@ -340,7 +339,11 @@ object MvStorage {
       )
     }
 
-  def zlayerWithTempDir: ZLayer[MvStoreConf, Throwable, MvStorage] = zlayer(
+  def zlayerWithTempDirPerJvmRun: ZLayer[MvStoreConf, Throwable, MvStorage] = zlayer(
+    tempDir.resolve(s"mv-store-$randomNumberPerJvmRun.db").toFile
+  )
+
+  def zlayerWithTempDirPerEachRun: ZLayer[MvStoreConf, Throwable, MvStorage] = zlayer(
     tempDir.resolve(s"mv-store-$randomNumberPerRun.db").toFile
   )
 

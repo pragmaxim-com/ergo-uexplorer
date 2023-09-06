@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.http
 
 import io.circe.parser.*
 import org.ergoplatform.ErgoAddressEncoder
-import org.ergoplatform.uexplorer.{BlockId, Height, HexString, CoreConf}
+import org.ergoplatform.uexplorer.{BlockId, CoreConf, Height, HexString}
 import org.ergoplatform.uexplorer.chain.{BlockProcessor, ChainLinker, ChainTip}
 import org.ergoplatform.uexplorer.db.LinkedBlock
 import org.ergoplatform.uexplorer.node.ApiFullBlock
@@ -16,20 +16,6 @@ import scala.io.Source
 
 object Rest {
 
-  private def loadCacheFromFile(fileName: String) =
-    Source
-      .fromInputStream(
-        new GZIPInputStream(
-          new BufferedInputStream(Thread.currentThread().getContextClassLoader.getResourceAsStream(fileName))
-        )
-      )
-      .getLines()
-      .filterNot(_.trim.isEmpty)
-      .foldLeft(1 -> TreeMap.empty[Height, String]) { case ((height, cache), blockStr) =>
-        height + 1 -> cache.updated(height, blockStr)
-      }
-      ._2
-
   object info {
     val minNodeHeight            = 4000
     val sync                     = "sync.json"
@@ -38,19 +24,25 @@ object Rest {
     val woRestApiAndWoFullHeight = "wo-rest-api-and-wo-full-height.json"
   }
 
-  object blockIds {
-    lazy val byHeight: SortedMap[Height, BlockId] =
-      loadCacheFromFile("blocks/block_ids.gz").map { case (height, id) => height -> BlockId.castUnsafe(id) }
-  }
+  case class Blocks(blockIdsFile: String, blocksFile: String) extends Codecs {
+    lazy val idsByHeight: SortedMap[Height, BlockId] =
+      Blocks.loadCacheFromFile(blockIdsFile).map { case (height, id) => height -> BlockId.castUnsafe(id) }
 
-  object blocks extends Codecs {
-    lazy val byHeight: SortedMap[Height, String] = loadCacheFromFile("blocks/blocks.gz")
+    lazy val byHeight: SortedMap[Height, String] = Blocks.loadCacheFromFile(blocksFile)
+
     lazy val byId: SortedMap[BlockId, String] = byHeight.map { case (height, block) =>
-      blockIds.byHeight(height) -> block
+      idsByHeight(height) -> block
     }(HexString.given_Ordering_HexString)
 
+    def forHeights(heights: Iterable[Height])(implicit ps: CoreConf): ZIO[Any, Throwable, Chunk[LinkedBlock]] =
+      BlockProcessor
+        .processingFlow(ChainLinker(getById, ChainTip.empty))
+        .map(_.head)
+        .apply(stream(heights))
+        .run(ZSink.collectAll)
+
     def forOffset(offset: Int, limit: Int): Vector[BlockId] =
-      blockIds.byHeight.iteratorFrom(offset).take(limit).map(_._2).toVector
+      idsByHeight.iteratorFrom(offset).take(limit).map(_._2).toVector
 
     def getByHeight(height: Int): ApiFullBlock =
       parse(byHeight(height)).flatMap(_.as[ApiFullBlock]).toOption.get
@@ -62,12 +54,32 @@ object Rest {
       ZStream.fromIterable(heights).map(getByHeight)
   }
 
-  object chain {
-    def forHeights(heights: Iterable[Height])(implicit ps: CoreConf): ZIO[Any, Throwable, Chunk[LinkedBlock]] =
-      BlockProcessor
-        .processingFlow(ChainLinker(blocks.getById, ChainTip.empty))
-        .map(_.head)
-        .apply(blocks.stream(heights))
-        .run(ZSink.collectAll)
+  object Blocks {
+
+    def loadCacheFromFile(fileName: String): SortedMap[Height, String] = {
+      val source =
+        if (fileName.endsWith(".gz"))
+          Source
+            .fromInputStream(
+              new GZIPInputStream(
+                new BufferedInputStream(Thread.currentThread().getContextClassLoader.getResourceAsStream(fileName))
+              )
+            )
+        else
+          Source.fromInputStream(Thread.currentThread().getContextClassLoader.getResourceAsStream(fileName))
+
+      source
+        .getLines()
+        .filterNot(_.trim.isEmpty)
+        .foldLeft(1 -> TreeMap.empty[Height, String]) { case ((height, cache), blockStr) =>
+          height + 1 -> cache.updated(height, blockStr)
+        }
+        ._2
+    }
+
+    def regular: Blocks     = Blocks("blocks/block_ids.gz", "blocks/blocks.gz")
+    def forkShorter: Blocks = Blocks("forks/forkIds_shorter.txt", "forks/forks_shorter.txt")
+    def forkLoner: Blocks   = Blocks("forks/forkIds_longer.txt", "forks/forks_longer.txt")
   }
+
 }

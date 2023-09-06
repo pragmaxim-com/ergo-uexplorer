@@ -37,7 +37,7 @@ object ChainIndexer extends ZIOAppDefault {
       NodePool.layer,
       UnderlyingBackend.layer,
       SttpNodePoolBackend.layer,
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       MetadataHttpClient.layer,
       BlockHttpClient.layer,
       BlockService.layer,

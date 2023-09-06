@@ -37,7 +37,7 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
       Some(SuperNodeCounter(writeOps + 1, readOps, added, removed + size))
     }
 
-  def clearEmptySuperNodes: Task[Unit] = {
+  def clearEmptyOrClosedSuperNodes(): Task[Unit] = {
     val emptyMaps =
       existingMapsByHotKey
         .foldLeft(Set.newBuilder[HK]) {
@@ -47,16 +47,29 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
             acc
         }
         .result()
-    ZIO.log(s"$id contains ${existingMapsByHotKey.size} supernodes") *>
-    ZIO.log(s"Going to remove ${emptyMaps.size} empty $id supernode maps") *>
-    ZIO.attempt(
-      emptyMaps
-        .foreach { hk =>
-          existingMapsByHotKey
-            .remove(hk)
-            .foreach(store.removeMap)
+    val closedMaps =
+      existingMapsByHotKey
+        .foldLeft(Set.newBuilder[HK]) {
+          case (acc, (hotKey, map)) if map.isClosed =>
+            acc.addOne(hotKey)
+          case (acc, _) =>
+            acc
         }
-    )
+        .result()
+    for
+      _ <- ZIO.log(s"$id contains ${existingMapsByHotKey.size} supernode sets")
+      _ <- ZIO.when(emptyMaps.nonEmpty)(ZIO.log(s"Going to remove and close ${emptyMaps.size} empty $id supernode sets"))
+      _ <- ZIO.when(closedMaps.nonEmpty)(ZIO.log(s"Going to remove ${closedMaps.size} closed $id supernode sets"))
+      _ <- ZIO.attempt(closedMaps.foreach(existingMapsByHotKey.remove))
+      _ <- ZIO.attempt(
+             emptyMaps
+               .foreach { hk =>
+                 existingMapsByHotKey
+                   .remove(hk)
+                   .foreach(store.removeMap)
+               }
+           )
+    yield ()
   }
 
   def getReport: (Path, Vector[HotKey]) =

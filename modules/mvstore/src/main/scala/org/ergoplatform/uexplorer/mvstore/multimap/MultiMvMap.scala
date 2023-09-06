@@ -15,7 +15,7 @@ case class MultiMvMap[PK, C[A, B] <: java.util.Map[A, B], K, V](
 )(implicit c: MultiMapCodec[C, K, V])
   extends MultiMapLike[PK, C, K, V] {
 
-  def clearEmptySuperNodes: Task[Unit] = superNodeMap.clearEmptySuperNodes()
+  def clearEmptySuperNodes: Task[Unit] = superNodeMap.clearEmptyOrClosedSuperNodes()
 
   def getReport: (Path, Vector[HotKey]) =
     superNodeMap.getReport

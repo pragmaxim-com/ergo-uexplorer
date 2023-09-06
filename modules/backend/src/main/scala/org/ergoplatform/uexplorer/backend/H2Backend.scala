@@ -1,24 +1,46 @@
 package org.ergoplatform.uexplorer.backend
 
-import com.zaxxer.hikari.HikariDataSource
+import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import io.getquill.JdbcContextConfig
 import io.getquill.util.LoadConfig
 import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, BlockRoutes, BlockService, BlockTapirRoutes}
-import org.ergoplatform.uexplorer.backend.boxes.{BoxRoutes, BoxService, BoxTapirRoutes}
+import org.ergoplatform.uexplorer.backend.blocks.BlockService
+import org.ergoplatform.uexplorer.backend.boxes.BoxService
 import org.ergoplatform.uexplorer.db.{Backend, LinkedBlock}
 import zio.*
 import zio.http.*
-
+import org.ergoplatform.uexplorer.{randomNumberPerJvmRun, randomNumberPerRun}
+import java.util.Properties
 import javax.sql.DataSource
+import scala.jdk.CollectionConverters.*
 
 object H2Backend extends Backend {
 
-  def layer: ZLayer[Any, Throwable, HikariDataSource] = ZLayer.scoped(
+  private def datasourceProps(newDbName: String): Properties = {
+    val properties = new Properties()
+    properties.putAll(
+      Map(
+        "dataSourceClassName" -> "org.h2.jdbcx.JdbcDataSource",
+        "dataSource.url" -> s"jdbc:h2:mem:$newDbName;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;INIT=RUNSCRIPT FROM 'classpath:h2-schema.sql'",
+        "dataSource.user" -> "user"
+      ).asJava
+    )
+    properties
+  }
+
+  def layer(ds: => HikariDataSource): ZLayer[Any, Throwable, HikariDataSource] = ZLayer.scoped(
     ZIO.acquireRelease(
-      ZIO.attempt(JdbcContextConfig(LoadConfig("h2")).dataSource)
+      ZIO.attempt(ds)
     )(ds => ZIO.log(s"Closing h2 backend") *> ZIO.succeed(ds.close()))
   )
+
+  def zLayerFromConf: ZLayer[Any, Throwable, HikariDataSource] = layer(JdbcContextConfig(LoadConfig("h2")).dataSource)
+
+  def zlayerWithTempDirPerEachRun: ZLayer[Any, Throwable, HikariDataSource] =
+    layer(new HikariDataSource(new HikariConfig(datasourceProps(s"test-db-$randomNumberPerRun"))))
+
+  def zlayerWithTempDirPerJvmRun: ZLayer[Any, Throwable, HikariDataSource] =
+    layer(new HikariDataSource(new HikariConfig(datasourceProps(s"test-db-$randomNumberPerJvmRun"))))
 
   private val sslConfig = SSLConfig.fromResource(
     behaviour = SSLConfig.HttpBehaviour.Accept,
