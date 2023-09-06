@@ -18,5 +18,6 @@ case class NodePool(ref: Ref[NodePoolState]) {
 object NodePool {
   type InvalidPeers = SortedSet[Peer]
   type NewPeers     = SortedSet[Peer]
+  type AllPeers     = SortedSet[Peer]
   def layer: ZLayer[Any, Nothing, NodePool] = ZLayer.fromZIO(Ref.make(NodePoolState.empty).map(NodePool(_)))
 }

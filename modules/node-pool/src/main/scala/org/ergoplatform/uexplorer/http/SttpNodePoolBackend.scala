@@ -23,19 +23,20 @@ case class SttpNodePoolBackend(schedule: NodePoolSchedule)(
   override def close(): Task[Unit] =
     nodePool.clean *> super.close()
 
-  private def updateNodePool: Task[Unit] =
+  private def updateNodePool: Task[(AllPeers, NewPeers)] =
     for
       allPeers <- metadataClient.getAllOpenApiPeers
-      _        <- ZIO.log(s"${allPeers.size} peer(s) available : ${allPeers.mkString(",")}")
       newPeers <- nodePool.updateOpenApiPeers(allPeers)
       _        <- ZIO.when(newPeers.nonEmpty)(ZIO.log(s"New peers connected : ${newPeers.mkString(",")}"))
-    yield ()
+    yield allPeers -> newPeers
 
   def cleanNodePool: Task[Unit] = nodePool.clean
 
   def keepNodePoolUpdated: Task[Fiber.Runtime[Throwable, Long]] =
     for
-      _     <- updateNodePool
+      peers <- updateNodePool
+      (allPeers, _) = peers
+      _     <- ZIO.log(s"${allPeers.size} peer(s) available : ${allPeers.mkString(",")}")
       fiber <- updateNodePool.repeat(Schedule.fixed(30.seconds)).fork
     yield fiber
 
