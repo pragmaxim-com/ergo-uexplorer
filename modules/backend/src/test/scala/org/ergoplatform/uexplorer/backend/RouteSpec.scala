@@ -17,10 +17,10 @@ object RouteSpec extends ZIOSpecDefault with BlockRoutesSpec with BoxRoutesSpec 
   ) @@ TestAspect.beforeAll(
     (for
       repo   <- ZIO.service[Repo]
-      blocks <- Rest.chain.forHeights(1 to 10)
+      blocks <- Rest.Blocks.regular.forHeights(1 to 10)
       _      <- ZIO.collectAllDiscard(blocks.map(b => repo.writeBlock(b)))
     yield ()).provide(
-      H2Backend.layer,
+      H2Backend.zLayerFromConf,
       PersistentBlockRepo.layer,
       PersistentBoxRepo.layer,
       PersistentRepo.layer

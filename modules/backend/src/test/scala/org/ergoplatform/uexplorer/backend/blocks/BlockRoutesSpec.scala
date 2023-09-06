@@ -32,11 +32,7 @@ trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] {
         expectedBody <- blockRoutes.runZIO(req).flatMap(_.body.asString)
         expectedInfo <- ZIO.fromEither(expectedBody.fromJson[Info])
       } yield assertTrue(10 == expectedInfo.lastHeight)
-    }.provide(
-      H2Backend.layer,
-      BlockService.layer,
-      PersistentBlockRepo.layer
-    ),
+    },
     test("get block by id") {
       val path = Root / "blocks" / Protocol.firstBlockId.unwrapped
       val req  = Request.get(url = URL(path))
@@ -45,11 +41,7 @@ trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] {
         expectedBody  <- blockRoutes.runZIO(req).flatMap(_.body.asString)
         expectedBlock <- ZIO.fromEither(expectedBody.fromJson[Block])
       } yield assertTrue(1 == expectedBlock.height)
-    }.provide(
-      H2Backend.layer,
-      BlockService.layer,
-      PersistentBlockRepo.layer
-    ),
+    },
     test("get blocks by ids") {
       val path = Root / "blocks"
       val req  = Request.post(url = URL(path), body = Body.fromString(List(Protocol.firstBlockId).toJson))
@@ -58,10 +50,10 @@ trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] {
         expectedBody   <- blockRoutes.runZIO(req).flatMap(_.body.asString)
         expectedBlocks <- ZIO.fromEither(expectedBody.fromJson[List[Block]])
       } yield assertTrue(List(1) == expectedBlocks.map(_.height))
-    }.provide(
-      H2Backend.layer,
-      BlockService.layer,
-      PersistentBlockRepo.layer
-    )
+    }
+  ).provide(
+    H2Backend.zLayerFromConf,
+    BlockService.layer,
+    PersistentBlockRepo.layer
   )
 }

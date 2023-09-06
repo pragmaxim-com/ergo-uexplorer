@@ -79,7 +79,7 @@ case class PersistentBlockRepo(ds: DataSource) extends BlockRepo with Codecs:
       }
       .provide(dsLayer)
 
-  override def delete(blockIds: Set[BlockId]): Task[Long] =
+  override def delete(blockIds: List[BlockId]): Task[Long] =
     ctx
       .run {
         quote {

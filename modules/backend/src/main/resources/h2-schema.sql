@@ -41,7 +41,7 @@ create table if not exists Box (
     boxId           VARCHAR(64) NOT NULL PRIMARY KEY,
     txId            VARCHAR(64) NOT NULL,
     ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
-    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash),
+    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
     ergValue        BIGINT NOT NULL,
     r4              VARCHAR,
     r5              VARCHAR,
@@ -63,10 +63,10 @@ create table if not exists Asset2Box (
 );
 
 create table if not exists Utxo (
-    boxId           VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES Box (boxId),
+    boxId           VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES Box (boxId) ON DELETE CASCADE,
     txId            VARCHAR(64) NOT NULL,
     ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
-    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash),
+    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
     ergValue        BIGINT NOT NULL,
     r4              VARCHAR,
     r5              VARCHAR,

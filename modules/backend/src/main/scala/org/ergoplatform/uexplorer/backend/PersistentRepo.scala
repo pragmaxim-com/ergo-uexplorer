@@ -22,7 +22,7 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
       boxEmpty   <- boxRepo.isEmpty
     } yield blockEmpty && boxEmpty
 
-  override def removeBlocks(blockIds: Set[BlockId]): Task[Unit] = blockRepo.delete(blockIds).unit
+  override def removeBlocks(blockIds: List[BlockId]): Task[Unit] = blockRepo.delete(blockIds).unit
 
   override def writeBlock(b: LinkedBlock): Task[BlockId] = {
     val inputIds: Seq[BoxId] =

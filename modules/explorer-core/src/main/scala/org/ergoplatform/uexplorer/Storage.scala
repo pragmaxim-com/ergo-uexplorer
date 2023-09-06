@@ -41,9 +41,9 @@ trait WritableStorage extends ReadableStorage {
 
   def writeReportAndCompact(indexing: Boolean): Task[Unit]
 
-  def commit(): Revision
+  def commit(): Task[Revision]
 
-  def rollbackTo(rev: Revision): Unit
+  def rollbackTo(rev: Revision): Task[Unit]
 
   def removeInputBoxesByErgoTree(inputIds: Seq[BoxId]): Task[_]
 

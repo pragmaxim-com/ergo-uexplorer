@@ -24,7 +24,9 @@ case class StreamExecutor(
     for
       chainTip <- storage.getChainTip
       chainLinker = new ChainLinker(blockHttpClient.getBlockForId, chainTip)(conf.core)
-      blockSource = blockReader.getBlockSource(storage.getLastHeight.getOrElse(0) + 1, conf.benchmarkMode)
+      lastHeight  = storage.getLastHeight.getOrElse(0) + 1
+      _ <- ZIO.log(s"Getting blocks from height $lastHeight")
+      blockSource = blockReader.getBlockSource(lastHeight, conf.benchmarkMode)
       syncResult <- blockWriter.insertBranchFlow(blockSource, chainLinker)
     yield syncResult
 }

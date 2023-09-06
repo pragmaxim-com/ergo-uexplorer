@@ -1,15 +1,11 @@
 package org.ergoplatform.uexplorer
 
-import org.ergoplatform.uexplorer.mvstore.tempDir
-
 import java.nio.file.Paths
-import scala.util.Random
 
 package object mvstore {
 
-  val tempDir                    = Paths.get(System.getProperty("java.io.tmpdir"))
-  val ergoHomeDir                = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer")
-  val randomNumberPerRun: String = Random.alphanumeric.filter(_.isDigit).take(5).mkString
+  val tempDir     = Paths.get(System.getProperty("java.io.tmpdir"))
+  val ergoHomeDir = Paths.get(System.getProperty("user.home"), ".ergo-uexplorer")
 
   type CacheSize         = Int
   type HeightCompactRate = Int

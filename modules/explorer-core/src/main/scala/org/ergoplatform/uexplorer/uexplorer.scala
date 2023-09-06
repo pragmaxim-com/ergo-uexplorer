@@ -2,23 +2,20 @@ package org.ergoplatform
 
 import eu.timepit.refined.api.RefType.tagRefType.unsafeWrap
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.string.{HexStringSpec, MatchesRegex, ValidByte}
-import eu.timepit.refined.refineV
-import io.circe.*
-import org.ergoplatform.uexplorer.{BoxCount, BoxId, LastHeight, TxCount}
-import scorex.crypto.hash.Digest32
 import eu.timepit.refined.auto.autoUnwrap
+import eu.timepit.refined.refineV
+import eu.timepit.refined.string.{HexStringSpec, MatchesRegex, ValidByte}
+import io.circe.*
+import zio.*
+import zio.json.*
 
 import scala.collection.mutable
-import scala.collection.compat.immutable.ArraySeq
-import scala.collection.immutable.{ArraySeq, TreeMap}
-import scala.collection.immutable.ListMap
-import scala.util.Try
-import zio.json.*
-import zio.*
-import zio.json.interop.refined.*
+import scala.util.Random
 
 package object uexplorer {
+
+  val randomNumberPerJvmRun: String = Random.alphanumeric.filter(_.isDigit).take(5).mkString
+  def randomNumberPerRun: String    = Random.alphanumeric.filter(_.isDigit).take(5).mkString
 
   type Value          = Long
   type Amount         = Long

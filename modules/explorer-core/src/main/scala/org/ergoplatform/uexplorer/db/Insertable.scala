@@ -11,5 +11,5 @@ case class ForkInserted(winningFork: WinningFork, loosingFork: LoosingFork) exte
 
 object ForkInserted {
   type WinningFork = List[LinkedBlock]
-  type LoosingFork = Map[BlockId, Block]
+  type LoosingFork = List[(BlockId, Block)]
 }

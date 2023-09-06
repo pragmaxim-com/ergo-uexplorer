@@ -27,7 +27,7 @@ case class MultiMvSet[K, C[A] <: java.util.Collection[A], V](
   def size: MultiColSize = MultiColSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
 
   def clearEmptySuperNodes: Task[Unit] =
-    superNodeMap.clearEmptySuperNodes
+    superNodeMap.clearEmptyOrClosedSuperNodes()
 
   def getReport: (Path, Vector[HotKey]) =
     superNodeMap.getReport

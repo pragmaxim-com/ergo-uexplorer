@@ -29,7 +29,7 @@ case class BlockService(blockRepo: BlockRepo):
       l   <- blockRepo.delete(hId)
     yield l
 
-  def delete(blockIds: Set[String]): Task[Long] =
+  def delete(blockIds: List[String]): Task[Long] =
     for
       hIds   <- ZIO.attempt(blockIds.map(BlockId.fromStringUnsafe)).mapError(ex => IdParsingException(blockIds.mkString(", "), ex.getMessage))
       blocks <- blockRepo.delete(hIds)
@@ -60,5 +60,5 @@ object BlockService:
   def delete(blockId: String): ZIO[BlockService, Throwable, Long] =
     ZIO.serviceWithZIO[BlockService](_.delete(blockId))
 
-  def delete(ids: Set[String]): ZIO[BlockService, Throwable, Long] =
+  def delete(ids: List[String]): ZIO[BlockService, Throwable, Long] =
     ZIO.serviceWithZIO[BlockService](_.delete(ids))

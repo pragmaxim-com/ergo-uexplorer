@@ -7,7 +7,7 @@ import zio.*
 trait Repo:
   def isEmpty: Task[Boolean]
 
-  def removeBlocks(blockIds: Set[BlockId]): Task[Unit]
+  def removeBlocks(blockIds: List[BlockId]): Task[Unit]
 
   def writeBlock(b: LinkedBlock, inputIds: Seq[BoxId]): Task[BlockId]
 

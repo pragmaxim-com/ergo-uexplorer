@@ -1,55 +1,56 @@
 package org.ergoplatform.uexplorer.indexer
 
+import com.zaxxer.hikari.HikariDataSource
+import org.ergoplatform.uexplorer.{BlockId, ReadableStorage}
+import org.ergoplatform.uexplorer.backend.PersistentRepo
 import org.ergoplatform.uexplorer.backend.blocks.PersistentBlockRepo
 import org.ergoplatform.uexplorer.backend.boxes.PersistentBoxRepo
-import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo}
+import org.ergoplatform.uexplorer.db.GraphBackend
 import org.ergoplatform.uexplorer.http.*
+import org.ergoplatform.uexplorer.http.Rest.Blocks
 import org.ergoplatform.uexplorer.indexer.chain.*
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
-import org.ergoplatform.uexplorer.indexer.db.GraphBackend
 import org.ergoplatform.uexplorer.indexer.mempool.{MemPool, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
-import org.ergoplatform.uexplorer.{BlockId, ReadableStorage}
 import sttp.capabilities.zio.ZioStreams
 import sttp.client3.*
 import sttp.client3.httpclient.zio.HttpClientZioBackend
 import sttp.client3.testing.SttpBackendStub
+import sttp.model.StatusCode
 import zio.*
 import zio.test.*
 
-import scala.collection.immutable.ListMap
+object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport with SpecZioLayers {
 
-object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport {
+  private val regularBlocks     = Rest.Blocks.regular
+  private val forkShorterBlocks = Rest.Blocks.forkShorter
+  private val forkLongerBlocks  = Rest.Blocks.forkLoner
 
-  private val testingBackend: SttpBackendStub[Task, ZioStreams] =
+  private def testingBackend(blocks: Blocks): SttpBackendStub[Task, ZioStreams] =
     HttpClientZioBackend.stub
-      .whenRequestMatches { r =>
-        r.uri.path.endsWith(List("info"))
-      }
-      .thenRespondCyclicResponses(
-        (1 to 3).map(_ => Response.ok(getPeerInfo(Rest.info.poll))): _*
-      )
+      .whenRequestMatches(_.uri.path.endsWith(List("info")))
+      .thenRespond(Response.ok(getPeerInfo(Rest.info.poll)))
       .whenRequestMatchesPartial {
         case r if r.uri.path.endsWith(List("transactions", "unconfirmed")) =>
           Response.ok(getUnconfirmedTxs)
         case r if r.uri.path.endsWith(List("peers", "connected")) =>
           Response.ok(getConnectedPeers)
-        case r if r.uri.path.startsWith(List("blocks", "at")) =>
-          val chainHeight = r.uri.path.last.toInt
-          Response.ok(s"""["${Rest.blockIds.byHeight(chainHeight)}"]""")
         case r if r.uri.path.startsWith(List("blocks")) && r.uri.params.get("offset").isDefined =>
-          val offset = r.uri.params.get("offset").get.toInt
-          val limit  = r.uri.params.get("limit").getOrElse("50").toInt
-          Response.ok(Rest.blocks.forOffset(offset, limit).map(blockId => s""""$blockId"""") mkString ("[", ",", "]"))
+          Response.ok(
+            blocks
+              .forOffset(r.uri.params.get("offset").get.toInt, r.uri.params.get("limit").getOrElse("50").toInt)
+              .map(blockId => s""""$blockId"""") mkString ("[", ",", "]")
+          )
         case r if r.uri.path.startsWith(List("blocks")) =>
-          val blockId = r.uri.path.last
-          Response.ok(Rest.blocks.byId(BlockId.fromStringUnsafe(blockId)))
+          blocks.byId
+            .get(BlockId.fromStringUnsafe(r.uri.path.last))
+            .fold(Response("", StatusCode.NotFound))(r => Response.ok(r))
       }
 
   def spec =
     suite("meta")(
-      test(Rest.info.sync) {
+      test("Regular sync") {
         (for {
           _              <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once))
           lastHeight     <- ZIO.serviceWith[ReadableStorage](_.getLastHeight)
@@ -62,30 +63,13 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport {
           chainTip.toMap.size == 100,
           chainTip.latestBlock.map(_.height).contains(4200),
           memPoolState.underlyingTxs.size == 9
-        )).provide(
-          ChainIndexerConf.layer,
-          NodePoolConf.layer,
-          MvStoreConf.layer,
-          MemPool.layer,
-          NodePool.layer,
-          UnderlyingBackend.layerFor(testingBackend),
-          SttpNodePoolBackend.layer,
-          MetadataHttpClient.layer,
-          BlockHttpClient.layer,
-          H2Backend.layer,
-          PersistentBlockRepo.layer,
-          PersistentBoxRepo.layer,
-          PersistentRepo.layer,
-          StreamScheduler.layer,
-          PluginManager.layerNoPlugins,
-          MvStorage.zlayerWithTempDir,
-          StreamExecutor.layer,
-          MempoolSyncer.layer,
-          Initializer.layer,
-          BlockReader.layer,
-          BlockWriter.layer,
-          GraphBackend.layer
-        )
-      } @@ TestAspect.debug
+        )).provide(allLayersWithDbPerEachRun(testingBackend(regularBlocks)))
+      },
+      test("Forked sync") {
+        for {
+          _ <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once)).provide(allLayersWithDbPerJvmRun(testingBackend(forkShorterBlocks)))
+          _ <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once)).provide(allLayersWithDbPerJvmRun(testingBackend(forkLongerBlocks)))
+        } yield assertTrue(true)
+      }
     )
 }
