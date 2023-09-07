@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.backend.boxes
 
 import org.ergoplatform.uexplorer.BlockId.unwrapped
 import org.ergoplatform.uexplorer.BoxId.unwrapped
-import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse}
+import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, IdParsingException, TapirRoutes}
 import org.ergoplatform.uexplorer.db.{Asset2Box, Block, Box, Utxo}
 import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, TxId}
 import sttp.model.{QueryParams, StatusCode}
@@ -16,13 +16,12 @@ import sttp.tapir.{queryParams, PublicEndpoint, Schema}
 import zio.*
 import zio.http.{HttpApp, Server}
 import zio.json.*
-import org.ergoplatform.uexplorer.backend.IdParsingException
 
-trait BoxesByErgoTreeTemplateHash extends Codecs:
+trait BoxesByErgoTreeTemplateHash extends TapirRoutes with Codecs:
 
   protected[backend] val spentTemplateBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Box], Any] =
     endpoint.get
-      .in("boxes" / "spent" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
+      .in(rootPath / "boxes" / "spent" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -38,7 +37,7 @@ trait BoxesByErgoTreeTemplateHash extends Codecs:
 
   protected[backend] val spentTemplateBoxIdsByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "spent" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
+      .in(rootPath / "box-ids" / "spent" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -55,7 +54,7 @@ trait BoxesByErgoTreeTemplateHash extends Codecs:
 
   protected[backend] val unspentTemplateBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Utxo], Any] =
     endpoint.get
-      .in("boxes" / "unspent" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
+      .in(rootPath / "boxes" / "unspent" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -71,7 +70,7 @@ trait BoxesByErgoTreeTemplateHash extends Codecs:
 
   protected[backend] val unspentTemplateBoxIdsByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "unspent" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
+      .in(rootPath / "box-ids" / "unspent" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -89,7 +88,7 @@ trait BoxesByErgoTreeTemplateHash extends Codecs:
 
   protected[backend] val anyTemplateBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Box], Any] =
     endpoint.get
-      .in("boxes" / "any" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
+      .in(rootPath / "boxes" / "any" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -105,7 +104,7 @@ trait BoxesByErgoTreeTemplateHash extends Codecs:
 
   protected[backend] val anyTemplateBoxIdsByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "any" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
+      .in(rootPath / "box-ids" / "any" / "templates" / "by-ergo-tree-hash" / path[String]("ergoTreeT8Hash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)

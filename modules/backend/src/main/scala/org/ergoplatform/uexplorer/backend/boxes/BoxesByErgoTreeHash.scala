@@ -1,28 +1,21 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
-import org.ergoplatform.uexplorer.BlockId.unwrapped
-import org.ergoplatform.uexplorer.BoxId.unwrapped
-import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse}
-import org.ergoplatform.uexplorer.db.{Asset2Box, Block, Box, Utxo}
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, TxId}
+import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, TapirRoutes}
+import org.ergoplatform.uexplorer.db.{Box, Utxo}
+import org.ergoplatform.uexplorer.{BlockId, BoxId, TxId}
 import sttp.model.{QueryParams, StatusCode}
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.zio.*
-import sttp.tapir.server.ServerEndpoint
-import sttp.tapir.server.ziohttp.ZioHttpInterpreter
-import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import sttp.tapir.ztapir.*
-import sttp.tapir.{queryParams, PublicEndpoint, Schema}
+import sttp.tapir.{PublicEndpoint, Schema, queryParams}
 import zio.*
-import zio.http.{HttpApp, Server}
 import zio.json.*
-import org.ergoplatform.uexplorer.backend.IdParsingException
 
-trait BoxesByErgoTreeHash extends Codecs:
+trait BoxesByErgoTreeHash extends TapirRoutes with Codecs:
 
   protected[backend] val spentContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Box], Any] =
     endpoint.get
-      .in("boxes" / "spent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
+      .in(rootPath / "boxes" / "spent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -38,7 +31,7 @@ trait BoxesByErgoTreeHash extends Codecs:
 
   protected[backend] val spentContractBoxIdsByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "spent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
+      .in(rootPath / "box-ids" / "spent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -55,7 +48,7 @@ trait BoxesByErgoTreeHash extends Codecs:
 
   protected[backend] val unspentContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Utxo], Any] =
     endpoint.get
-      .in("boxes" / "unspent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
+      .in(rootPath / "boxes" / "unspent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -71,7 +64,7 @@ trait BoxesByErgoTreeHash extends Codecs:
 
   protected[backend] val unspentContractBoxIdsByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "unspent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
+      .in(rootPath / "box-ids" / "unspent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -88,7 +81,7 @@ trait BoxesByErgoTreeHash extends Codecs:
 
   protected[backend] val anyContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Box], Any] =
     endpoint.get
-      .in("boxes" / "any" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
+      .in(rootPath / "boxes" / "any" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -104,7 +97,7 @@ trait BoxesByErgoTreeHash extends Codecs:
 
   protected[backend] val anyContractBoxIdsByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "any" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
+      .in(rootPath / "box-ids" / "any" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)

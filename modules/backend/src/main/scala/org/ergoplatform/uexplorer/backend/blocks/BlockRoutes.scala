@@ -1,17 +1,16 @@
 package org.ergoplatform.uexplorer.backend.blocks
 
-import org.ergoplatform.uexplorer.BlockId
-import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, IdParsingException}
+import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, IdParsingException, ZioRoutes}
 import org.ergoplatform.uexplorer.db.Block
 import zio.*
 import zio.http.*
 import zio.json.*
 
-object BlockRoutes extends Codecs:
+object BlockRoutes extends ZioRoutes with Codecs:
 
   def apply(): Http[BlockService, Throwable, Request, Response] =
     Http.collectZIO[Request] {
-      case Method.GET -> Root / "info" =>
+      case Method.GET -> Root / rootPath / "info" =>
         BlockService
           .getLastBlocks(1)
           .map(_.headOption)
@@ -25,7 +24,7 @@ object BlockRoutes extends Codecs:
             ZIO.attempt(Response.json(ErrorResponse(Status.InternalServerError.code, e.getMessage).toJson).withStatus(Status.InternalServerError))
           }
           .orDie
-      case Method.GET -> Root / "blocks" / blockId =>
+      case Method.GET -> Root / rootPath / "blocks" / blockId =>
         BlockService
           .lookup(blockId)
           .map {
@@ -41,7 +40,7 @@ object BlockRoutes extends Codecs:
               ZIO.attempt(Response.json(ErrorResponse(Status.InternalServerError.code, e.getMessage).toJson).withStatus(Status.InternalServerError))
           }
           .orDie
-      case req @ Method.POST -> Root / "blocks" =>
+      case req @ Method.POST -> Root / rootPath / "blocks" =>
         (for {
           u <- req.body.asString.map(_.fromJson[Set[String]])
           r <- u match

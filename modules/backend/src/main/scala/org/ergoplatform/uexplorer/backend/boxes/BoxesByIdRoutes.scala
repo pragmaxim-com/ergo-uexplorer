@@ -1,28 +1,21 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
-import org.ergoplatform.uexplorer.BlockId.unwrapped
-import org.ergoplatform.uexplorer.BoxId.unwrapped
-import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse}
-import org.ergoplatform.uexplorer.db.{Asset2Box, Block, Box, Utxo}
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, TxId}
-import sttp.model.{QueryParams, StatusCode}
+import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, TapirRoutes}
+import org.ergoplatform.uexplorer.db.{Box, Utxo}
+import org.ergoplatform.uexplorer.{BlockId, BoxId, TxId}
+import sttp.model.StatusCode
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.zio.*
-import sttp.tapir.server.ServerEndpoint
-import sttp.tapir.server.ziohttp.ZioHttpInterpreter
-import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import sttp.tapir.ztapir.*
-import sttp.tapir.{queryParams, PublicEndpoint, Schema}
-import zio.http.{HttpApp, Server}
-import zio.json.*
+import sttp.tapir.{PublicEndpoint, queryParams}
 import zio.*
-import org.ergoplatform.uexplorer.backend.IdParsingException
+import zio.json.*
 
-trait BoxesByIdRoutes extends Codecs:
+trait BoxesByIdRoutes extends TapirRoutes with Codecs:
 
   protected[backend] val unspentBoxById: PublicEndpoint[String, (ErrorResponse, StatusCode), Utxo, Any] =
     endpoint.get
-      .in("boxes" / "unspent" / path[String]("boxId"))
+      .in(rootPath / "boxes" / "unspent" / path[String]("boxId"))
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
       .out(jsonBody[Utxo])
@@ -43,7 +36,7 @@ trait BoxesByIdRoutes extends Codecs:
 
   protected[backend] val unspentBoxesByIds: PublicEndpoint[Set[String], (ErrorResponse, StatusCode), List[Utxo], Any] =
     endpoint.post
-      .in("boxes" / "unspent")
+      .in(rootPath / "boxes" / "unspent")
       .in(jsonBody[Set[String]])
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -58,7 +51,7 @@ trait BoxesByIdRoutes extends Codecs:
 
   protected[backend] val spentBoxById: PublicEndpoint[String, (ErrorResponse, StatusCode), Box, Any] =
     endpoint.get
-      .in("boxes" / "spent" / path[String]("boxId"))
+      .in(rootPath / "boxes" / "spent" / path[String]("boxId"))
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
       .out(jsonBody[Box])
@@ -79,7 +72,7 @@ trait BoxesByIdRoutes extends Codecs:
 
   protected[backend] val spentBoxesByIds: PublicEndpoint[Set[String], (ErrorResponse, StatusCode), List[Box], Any] =
     endpoint.post
-      .in("boxes" / "spent")
+      .in(rootPath / "boxes" / "spent")
       .in(jsonBody[Set[String]])
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -94,7 +87,7 @@ trait BoxesByIdRoutes extends Codecs:
 
   protected[backend] val anyBoxById: PublicEndpoint[String, (ErrorResponse, StatusCode), Box, Any] =
     endpoint.get
-      .in("boxes" / "any" / path[String]("boxId"))
+      .in(rootPath / "boxes" / "any" / path[String]("boxId"))
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
       .out(jsonBody[Box])
@@ -114,7 +107,7 @@ trait BoxesByIdRoutes extends Codecs:
 
   protected[backend] val anyBoxesByIds: PublicEndpoint[Set[String], (ErrorResponse, StatusCode), List[Box], Any] =
     endpoint.post
-      .in("boxes" / "any")
+      .in(rootPath / "boxes" / "any")
       .in(jsonBody[Set[String]])
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)

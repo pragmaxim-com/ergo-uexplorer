@@ -1,28 +1,21 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
-import org.ergoplatform.uexplorer.BlockId.unwrapped
-import org.ergoplatform.uexplorer.BoxId.unwrapped
-import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse}
-import org.ergoplatform.uexplorer.db.{Asset2Box, Block, Box, Utxo}
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, TxId}
+import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, TapirRoutes}
+import org.ergoplatform.uexplorer.db.{Box, Utxo}
+import org.ergoplatform.uexplorer.{BlockId, BoxId, TxId}
 import sttp.model.{QueryParams, StatusCode}
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.zio.*
-import sttp.tapir.server.ServerEndpoint
-import sttp.tapir.server.ziohttp.ZioHttpInterpreter
-import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import sttp.tapir.ztapir.*
-import sttp.tapir.{queryParams, PublicEndpoint, Schema}
-import zio.http.{HttpApp, Server}
-import zio.json.*
+import sttp.tapir.{PublicEndpoint, Schema, queryParams}
 import zio.*
-import org.ergoplatform.uexplorer.backend.IdParsingException
+import zio.json.*
 
-trait BoxesByErgoTree extends Codecs:
+trait BoxesByErgoTree extends TapirRoutes with Codecs:
 
   protected[backend] val spentContractBoxesByErgoTree: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Box], Any] =
     endpoint.get
-      .in("boxes" / "spent" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
+      .in(rootPath / "boxes" / "spent" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -38,7 +31,7 @@ trait BoxesByErgoTree extends Codecs:
 
   protected[backend] val spentContractBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "spent" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
+      .in(rootPath / "box-ids" / "spent" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -55,7 +48,7 @@ trait BoxesByErgoTree extends Codecs:
 
   protected[backend] val unspentContractBoxesByErgoTree: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Utxo], Any] =
     endpoint.get
-      .in("boxes" / "unspent" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
+      .in(rootPath / "boxes" / "unspent" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -71,7 +64,7 @@ trait BoxesByErgoTree extends Codecs:
 
   protected[backend] val unspentContractBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "unspent" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
+      .in(rootPath / "box-ids" / "unspent" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -88,7 +81,7 @@ trait BoxesByErgoTree extends Codecs:
 
   protected[backend] val anyContractBoxesByErgoTree: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Box], Any] =
     endpoint.get
-      .in("boxes" / "any" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
+      .in(rootPath / "boxes" / "any" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
@@ -104,7 +97,7 @@ trait BoxesByErgoTree extends Codecs:
 
   protected[backend] val anyContractBoxIdsByErgoTree: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxId], Any] =
     endpoint.get
-      .in("box-ids" / "any" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
+      .in(rootPath / "box-ids" / "any" / "contracts" / "by-ergo-tree" / path[String]("ergoTree"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
