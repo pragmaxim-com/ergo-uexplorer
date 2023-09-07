@@ -2,20 +2,20 @@ package org.ergoplatform.uexplorer.backend.blocks
 
 import org.ergoplatform.uexplorer.{Address, BlockId}
 import org.ergoplatform.uexplorer.db.Block
-import zio._
+import zio.*
 import sttp.tapir.{PublicEndpoint, Schema}
 import sttp.tapir.generic.auto.*
 import sttp.tapir.ztapir.*
 import sttp.tapir.json.zio.*
-import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse}
+import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, TapirRoutes}
 import sttp.model.StatusCode
 import zio.json.{JsonDecoder, JsonEncoder}
 
-trait BlockTapirRoutes extends Codecs:
+trait BlockTapirRoutes extends TapirRoutes with Codecs:
 
   protected[backend] val infoEndpoint: PublicEndpoint[Unit, (ErrorResponse, StatusCode), Info, Any] =
-    endpoint.get
-      .in("info")
+    endpoint
+      .in(rootPath / "info")
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
       .out(jsonBody[Info])
@@ -37,7 +37,7 @@ trait BlockTapirRoutes extends Codecs:
 
   protected[backend] val blockByIdEndpoint: PublicEndpoint[String, (ErrorResponse, StatusCode), Block, Any] =
     endpoint.get
-      .in("blocks" / path[String]("blockId"))
+      .in(rootPath / "blocks" / path[String]("blockId"))
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
       .out(jsonBody[Block])
@@ -57,7 +57,7 @@ trait BlockTapirRoutes extends Codecs:
 
   protected[backend] val blockByIdsEndpoint: PublicEndpoint[Set[String], (ErrorResponse, StatusCode), List[Block], Any] =
     endpoint.post
-      .in("blocks")
+      .in(rootPath / "blocks")
       .in(jsonBody[Set[String]])
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)

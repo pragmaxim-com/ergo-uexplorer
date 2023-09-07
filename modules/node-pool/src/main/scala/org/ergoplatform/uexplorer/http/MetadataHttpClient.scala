@@ -1,25 +1,16 @@
 package org.ergoplatform.uexplorer.http
 
 import io.circe.Decoder
-import org.ergoplatform.uexplorer.Const.EpochLength
+import nl.vroste.rezilience.*
 import org.ergoplatform.uexplorer.Const
 import sttp.client3.*
 import sttp.client3.circe.asJson
-import zio.stream.ZStream
 import zio.*
-import nl.vroste.rezilience.*
+import zio.stream.ZStream
 
-import scala.concurrent.duration
 import scala.collection.immutable.{SortedSet, TreeSet}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.{Failure, Success}
-import nl.vroste.rezilience.Retry.Schedules
-import sttp.capabilities.zio.ZioStreams
-import sttp.client3.httpclient.zio.{HttpClientZioBackend, SttpClient}
-
+import scala.concurrent.duration
 import scala.concurrent.duration.FiniteDuration
-import sttp.model.Uri
 
 case class MetadataHttpClient(underlying: UnderlyingBackend, conf: NodePoolConf) {
 

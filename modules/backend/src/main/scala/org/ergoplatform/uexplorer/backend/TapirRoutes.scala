@@ -9,6 +9,9 @@ import zio.RIO
 import sttp.tapir.ztapir.*
 import zio.http.*
 
+trait TapirRoutes:
+  def rootPath = "explorer"
+
 object TapirRoutes extends BlockTapirRoutes with BoxTapirRoutes:
 
   val blockSwaggerEndpoints = List(infoEndpoint, blockByIdEndpoint, blockByIdsEndpoint)

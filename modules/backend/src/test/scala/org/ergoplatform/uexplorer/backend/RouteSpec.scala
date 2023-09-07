@@ -7,13 +7,17 @@ import org.ergoplatform.uexplorer.http.Rest
 import zio.ZIO
 import zio.test.{TestAspect, ZIOSpecDefault}
 
-object RouteSpec extends ZIOSpecDefault with BlockRoutesSpec with BoxRoutesSpec {
+object RouteSpec extends ZIOSpecDefault with BlockRoutesSpec with BoxRoutesSpec with ProxyRoutesSpec {
 
   implicit private val ps: CoreConf = CoreConf(NetworkPrefix.fromStringUnsafe("0"))
 
   def spec = suite("RouteSpec")(
-    blockRoutesSpec,
-    boxRoutesSpec
+    blockRoutesSpec(tapirWithProxyRoutes),
+    boxRoutesSpec(tapirWithProxyRoutes),
+    proxyRoutesSpec(tapirWithProxyRoutes),
+    blockRoutesSpec(zioHttpWithProxyRoutes),
+    boxRoutesSpec(zioHttpWithProxyRoutes),
+    proxyRoutesSpec(zioHttpWithProxyRoutes)
   ) @@ TestAspect.beforeAll(
     (for
       repo   <- ZIO.service[Repo]

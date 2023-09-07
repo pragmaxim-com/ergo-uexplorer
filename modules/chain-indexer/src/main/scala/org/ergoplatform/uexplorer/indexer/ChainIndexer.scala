@@ -13,6 +13,7 @@ import org.ergoplatform.uexplorer.indexer.mempool.{MemPool, MempoolSyncer}
 import org.ergoplatform.uexplorer.indexer.plugin.PluginManager
 import org.ergoplatform.uexplorer.storage.{MvStorage, MvStoreConf}
 import zio.*
+import zio.http.ZClient
 import zio.logging.LogFormat
 import zio.logging.backend.SLF4J
 
@@ -33,6 +34,7 @@ object ChainIndexer extends ZIOAppDefault {
       NodePoolConf.layer,
       MvStoreConf.layer,
       CoreConf.layer,
+      ZClient.default,
       MemPool.layer,
       NodePool.layer,
       UnderlyingBackend.layer,
