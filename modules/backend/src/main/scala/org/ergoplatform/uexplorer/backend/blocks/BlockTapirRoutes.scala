@@ -2,20 +2,13 @@ package org.ergoplatform.uexplorer.backend.blocks
 
 import org.ergoplatform.uexplorer.{Address, BlockId}
 import org.ergoplatform.uexplorer.db.Block
-import zio.{ExitCode, RIO, Task, URIO, ZIO, ZIOAppDefault, ZLayer}
+import zio._
 import sttp.tapir.{PublicEndpoint, Schema}
 import sttp.tapir.generic.auto.*
-import sttp.tapir.server.ziohttp.ZioHttpInterpreter
-import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import sttp.tapir.ztapir.*
 import sttp.tapir.json.zio.*
-import zio.http.HttpApp
-import zio.http.Server
-import org.ergoplatform.uexplorer.BlockId.unwrapped
 import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse}
 import sttp.model.StatusCode
-import sttp.tapir.generic.auto.*
-import sttp.tapir.server.ServerEndpoint
 import zio.json.{JsonDecoder, JsonEncoder}
 
 trait BlockTapirRoutes extends Codecs:

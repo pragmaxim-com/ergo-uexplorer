@@ -1,22 +1,15 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
-import org.ergoplatform.uexplorer.BlockId.unwrapped
-import org.ergoplatform.uexplorer.BoxId.unwrapped
 import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse}
-import org.ergoplatform.uexplorer.db.{Asset2Box, Block, Box, Utxo}
-import org.ergoplatform.uexplorer.{Address, BlockId, BoxId, TxId}
+import org.ergoplatform.uexplorer.db.{Asset2Box, Box, Utxo}
+import org.ergoplatform.uexplorer.{BoxId, TxId}
 import sttp.model.{QueryParams, StatusCode}
 import sttp.tapir.generic.auto.*
 import sttp.tapir.json.zio.*
-import sttp.tapir.server.ServerEndpoint
-import sttp.tapir.server.ziohttp.ZioHttpInterpreter
-import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import sttp.tapir.ztapir.*
 import sttp.tapir.{queryParams, PublicEndpoint, Schema}
-import zio.http.{HttpApp, Server}
-import zio.json.*
 import zio.*
-import org.ergoplatform.uexplorer.backend.IdParsingException
+import zio.json.*
 
 trait BoxesByTokenIdRoutes extends Codecs:
 
