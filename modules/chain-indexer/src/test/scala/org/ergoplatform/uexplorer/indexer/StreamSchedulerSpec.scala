@@ -27,26 +27,34 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport with SpecZioL
   private val forkShorterBlocks = Rest.Blocks.forkShorter
   private val forkLongerBlocks  = Rest.Blocks.forkLoner
 
-  private def testingBackend(blocks: Blocks): SttpBackendStub[Task, ZioStreams] =
-    HttpClientZioBackend.stub
-      .whenRequestMatches(_.uri.path.endsWith(List("info")))
-      .thenRespond(Response.ok(getPeerInfo(Rest.info.poll)))
-      .whenRequestMatchesPartial {
-        case r if r.uri.path.endsWith(List("transactions", "unconfirmed")) =>
-          Response.ok(getUnconfirmedTxs)
-        case r if r.uri.path.endsWith(List("peers", "connected")) =>
-          Response.ok(getConnectedPeers)
-        case r if r.uri.path.startsWith(List("blocks")) && r.uri.params.get("offset").isDefined =>
-          Response.ok(
-            blocks
-              .forOffset(r.uri.params.get("offset").get.toInt, r.uri.params.get("limit").getOrElse("50").toInt)
-              .map(blockId => s""""$blockId"""") mkString ("[", ",", "]")
+  def backendLayer(blocks: Blocks): ZLayer[Any, Nothing, UnderlyingBackend] =
+    ZLayer.scoped(
+      ZIO.acquireRelease(
+        ZIO.succeed(
+          UnderlyingBackend(
+            HttpClientZioBackend.stub
+              .whenRequestMatches(_.uri.path.endsWith(List("info")))
+              .thenRespond(Response.ok(getPeerInfo(Rest.info.poll)))
+              .whenRequestMatchesPartial {
+                case r if r.uri.path.endsWith(List("transactions", "unconfirmed")) =>
+                  Response.ok(getUnconfirmedTxs)
+                case r if r.uri.path.endsWith(List("peers", "connected")) =>
+                  Response.ok(getConnectedPeers)
+                case r if r.uri.path.startsWith(List("blocks")) && r.uri.params.get("offset").isDefined =>
+                  Response.ok(
+                    blocks
+                      .forOffset(r.uri.params.get("offset").get.toInt, r.uri.params.get("limit").getOrElse("50").toInt)
+                      .map(blockId => s""""$blockId"""") mkString ("[", ",", "]")
+                  )
+                case r if r.uri.path.startsWith(List("blocks")) =>
+                  blocks.byId
+                    .get(BlockId.fromStringUnsafe(r.uri.path.last))
+                    .fold(Response("", StatusCode.NotFound))(r => Response.ok(r))
+              }
           )
-        case r if r.uri.path.startsWith(List("blocks")) =>
-          blocks.byId
-            .get(BlockId.fromStringUnsafe(r.uri.path.last))
-            .fold(Response("", StatusCode.NotFound))(r => Response.ok(r))
-      }
+        )
+      )(b => ZIO.log(s"Closing sttp backend") *> ZIO.succeed(b.backend.close()))
+    )
 
   def spec =
     suite("meta")(
@@ -63,12 +71,12 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport with SpecZioL
           chainTip.toMap.size == 100,
           chainTip.latestBlock.map(_.height).contains(4200),
           memPoolState.underlyingTxs.size == 9
-        )).provide(allLayersWithDbPerEachRun(testingBackend(regularBlocks)))
+        )).provide(backendLayer(regularBlocks) >+> dbPerEachRun >+> allLayers)
       },
       test("Forked sync") {
         for {
-          _ <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once)).provide(allLayersWithDbPerJvmRun(testingBackend(forkShorterBlocks)))
-          _ <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once)).provide(allLayersWithDbPerJvmRun(testingBackend(forkLongerBlocks)))
+          _ <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once)).provide(backendLayer(forkShorterBlocks) >+> dbPerJvmRun >+> allLayers)
+          _ <- ZIO.serviceWithZIO[StreamScheduler](_.validateAndSchedule(Schedule.once)).provide(backendLayer(forkLongerBlocks) >+> dbPerJvmRun >+> allLayers)
         } yield assertTrue(true)
       }
     )

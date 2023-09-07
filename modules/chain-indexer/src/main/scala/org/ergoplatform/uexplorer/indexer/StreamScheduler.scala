@@ -20,7 +20,7 @@ case class StreamScheduler(
   def periodicSync: Task[MemPoolStateChanges] =
     for {
       chainSyncResult <- streamExecutor.indexNewBlocks.logError("Syncing chain failed")
-      stateChanges    <- mempoolSyncer.syncMempool(chainSyncResult.storage).logError("Syncing mempool failed")
+      stateChanges    <- mempoolSyncer.syncMempool.logError("Syncing mempool failed")
       _ <- pluginManager
              .executePlugins(
                chainSyncResult.storage,
