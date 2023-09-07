@@ -7,9 +7,11 @@ import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.backend.blocks.BlockService
 import org.ergoplatform.uexplorer.backend.boxes.BoxService
 import org.ergoplatform.uexplorer.db.{Backend, LinkedBlock}
+import org.ergoplatform.uexplorer.http.NodePool
 import zio.*
 import zio.http.*
 import org.ergoplatform.uexplorer.{randomNumberPerJvmRun, randomNumberPerRun}
+
 import java.util.Properties
 import javax.sql.DataSource
 import scala.jdk.CollectionConverters.*
@@ -28,7 +30,7 @@ object H2Backend extends Backend {
     properties
   }
 
-  def layer(ds: => HikariDataSource): ZLayer[Any, Throwable, HikariDataSource] = ZLayer.scoped(
+  private def layer(ds: => HikariDataSource): ZLayer[Any, Throwable, HikariDataSource] = ZLayer.scoped(
     ZIO.acquireRelease(
       ZIO.attempt(ds)
     )(ds => ZIO.log(s"Closing h2 backend") *> ZIO.succeed(ds.close()))
@@ -48,12 +50,12 @@ object H2Backend extends Backend {
     keyPath   = "server.key"
   )
 
-  def install(): ZIO[BoxService with BlockService with Server, Nothing, Int] =
+  def install(): ZIO[Client with NodePool with BoxService with BlockService with Server, Nothing, Int] =
     Server
-      .install(TapirRoutes.routes.withDefaultErrorResponse)
+      .install((TapirRoutes.routes ++ ProxyZioRoutes()).withDefaultErrorResponse)
       .logError("Serving at 8090 failed.")
 
-  def serve(port: Int): ZIO[DataSource with BoxService with BlockService, Throwable, Nothing] =
+  def serve(port: Int): ZIO[Client with NodePool with DataSource with BoxService with BlockService, Throwable, Nothing] =
     (install() *> ZIO.never).provideSomeLayer(
       Server.defaultWith(
         _.port(port)

@@ -4,14 +4,16 @@ import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.backend.H2Backend
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, BlockService}
 import org.ergoplatform.uexplorer.backend.boxes.BoxService
+import org.ergoplatform.uexplorer.http.NodePool
 import org.ergoplatform.uexplorer.indexer.config.{Cassandra, ChainIndexerConf, H2}
 import zio.*
+import zio.http.Client
 
 import javax.sql.DataSource
 
 object Backend {
 
-  def runServer: ZIO[DataSource with BoxService with BlockService with ChainIndexerConf, Throwable, Nothing] =
+  def runServer: ZIO[Client with NodePool with DataSource with BoxService with BlockService with ChainIndexerConf, Throwable, Nothing] =
     ZIO.serviceWithZIO[ChainIndexerConf] { conf =>
       conf.backendType match {
         case Cassandra(parallelism) =>
