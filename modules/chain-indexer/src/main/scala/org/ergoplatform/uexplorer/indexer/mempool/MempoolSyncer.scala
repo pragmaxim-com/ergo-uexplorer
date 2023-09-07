@@ -44,12 +44,9 @@ object MemPoolState {
   def empty: MemPoolState = MemPoolState(ListMap.empty)
 }
 
-case class MempoolSyncer(blockHttpClient: BlockHttpClient, memPool: MemPool) {
+case class MempoolSyncer(blockHttpClient: BlockHttpClient, storage: ReadableStorage, memPool: MemPool) {
 
-  def syncMempool(
-    storage: ReadableStorage
-  ): Task[MemPoolStateChanges] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+  def syncMempool: Task[MemPoolStateChanges] =
     blockHttpClient.getBestBlockHeight.flatMap { bestBlockHeight =>
       if (storage.getLastBlocks.exists(_._2.height >= bestBlockHeight)) {
         for {
@@ -60,11 +57,10 @@ case class MempoolSyncer(blockHttpClient: BlockHttpClient, memPool: MemPool) {
         ZIO.succeed(MemPoolStateChanges(List.empty))
       }
     }
-  }
 
 }
 
 object MempoolSyncer {
-  def layer: ZLayer[BlockHttpClient with MemPool, Nothing, MempoolSyncer] =
+  def layer: ZLayer[BlockHttpClient with MemPool with ReadableStorage, Nothing, MempoolSyncer] =
     ZLayer.fromFunction(MempoolSyncer.apply _)
 }
