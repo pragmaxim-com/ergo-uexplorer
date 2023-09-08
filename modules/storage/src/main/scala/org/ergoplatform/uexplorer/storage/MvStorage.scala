@@ -43,7 +43,7 @@ case class MvStorage(
     val chainTip =
       ChainTip(
         blockIdsByHeight
-          .iterator(lastHeight.map(lk => Math.max(1, lk - 100)), Option.empty, reverse = false)
+          .iterator(lastHeight.map(lk => Math.max(1, lk - 99)), Option.empty, reverse = false)
           .toSeq
           .sortBy(_._1)(Ordering[Int].reverse)
           .flatMap { case (_, blockIds) =>
