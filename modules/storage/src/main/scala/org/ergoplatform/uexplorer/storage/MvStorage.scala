@@ -103,13 +103,12 @@ case class MvStorage(
   def writeReportAndCompact(indexing: Boolean): Task[Unit] =
     ZIO.collectAllDiscard(
       getReportByPath.map { case (path, hotKeys) =>
-        val header = "writeOps readOps inserted removed diff"
         val newLines = hotKeys.collect { case NewHotKey(hotKey, SuperNodeCounter(writeOps, readOps, boxesAdded, boxesRemoved)) =>
           val stats  = s"$writeOps $readOps $boxesAdded $boxesRemoved ${boxesAdded - boxesRemoved}"
           val indent = 45
           s"$stats ${List.fill(Math.max(4, indent - stats.length))(" ").mkString("")} $hotKey"
-        }.toList
-        ZIO.when(newLines.nonEmpty)(ZIO.log(s"New $path hotkeys: ${(header :: newLines).mkString("\n", "\n", "")}")) *>
+        }
+        ZIO.when(newLines.nonEmpty)(ZIO.log(s"New ${newLines.size} hotkeys $path")) *>
         SuperNodeCounter.writeReport(
           hotKeys.map(_.key),
           path

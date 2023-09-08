@@ -79,7 +79,7 @@ final case class ApiTransaction(
   inputs: ArraySeq[ApiInput],
   dataInputs: List[ApiDataInput],
   outputs: ArraySeq[ApiOutput],
-  size: Int
+  size: Option[Int]
 )
 
 final case class ExpandedRegister(

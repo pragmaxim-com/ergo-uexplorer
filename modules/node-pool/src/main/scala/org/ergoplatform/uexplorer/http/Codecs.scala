@@ -113,7 +113,7 @@ trait Codecs {
       inputs     <- c.downField("inputs").as[ArraySeq[ApiInput]]
       dataInputs <- c.downField("dataInputs").as[List[ApiDataInput]]
       outputs    <- c.downField("outputs").as[ArraySeq[ApiOutput]]
-      size       <- c.downField("size").as[Int]
+      size       <- c.downField("size").as[Option[Int]]
     } yield ApiTransaction(id, inputs, dataInputs, outputs, size)
   }
 

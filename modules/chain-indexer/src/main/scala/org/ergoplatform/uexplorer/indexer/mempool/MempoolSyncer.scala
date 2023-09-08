@@ -1,15 +1,11 @@
 package org.ergoplatform.uexplorer.indexer.mempool
 
-import org.ergoplatform.uexplorer.ReadableStorage
-import org.ergoplatform.uexplorer.http.BlockHttpClient
-
+import org.ergoplatform.uexplorer.{ReadableStorage, TxId}
 import org.ergoplatform.uexplorer.http.BlockHttpClient
 import org.ergoplatform.uexplorer.node.ApiTransaction
-import org.ergoplatform.uexplorer.{BoxId, ErgoTreeHex, TxId}
-
-import scala.collection.immutable.{ArraySeq, ListMap}
-import scala.concurrent.duration.DurationInt
 import zio.*
+
+import scala.collection.immutable.ListMap
 
 case class MemPool(ref: Ref[MemPoolState]) {
   def updateTxs(allTxs: ListMap[TxId, ApiTransaction]): UIO[MemPoolStateChanges] =
@@ -27,14 +23,11 @@ case class MemPoolState(underlyingTxs: ListMap[TxId, ApiTransaction]) {
   def applyStateChange(allTxs: ListMap[TxId, ApiTransaction]): (MemPoolStateChanges, MemPoolState) = {
     val newTxIds = allTxs.keySet.diff(underlyingTxs.keySet)
     val newTxs   = allTxs.filter(t => newTxIds.contains(t._1))
-    val newState = MemPoolState(underlyingTxs ++ newTxs)
+    val newState = MemPoolState(allTxs)
     val stateChanges =
-      newTxs.foldLeft(Vector.empty[(ApiTransaction, ListMap[TxId, ApiTransaction])]) {
-        case (changes, newTx) if changes.isEmpty =>
-          changes :+ (newTx._2, underlyingTxs)
-        case (changes, newTx) =>
-          val newUnderlying = changes.last._2.updated(changes.last._1.id, changes.last._1)
-          changes :+ (newTx._2, newUnderlying)
+      newTxs.foldLeft(Vector.empty[(ApiTransaction, ListMap[TxId, ApiTransaction])]) { case (changes, newTx) =>
+        val newUnderlying = changes.lastOption.fold(ListMap.empty)(_._2.updated(changes.last._1.id, changes.last._1))
+        changes :+ (newTx._2, newUnderlying)
       }
     MemPoolStateChanges(stateChanges.toList) -> newState
   }
@@ -54,7 +47,7 @@ case class MempoolSyncer(blockHttpClient: BlockHttpClient, storage: ReadableStor
           stateChanges <- memPool.updateTxs(txs)
         } yield stateChanges
       } else {
-        ZIO.succeed(MemPoolStateChanges(List.empty))
+        ZIO.succeed(MemPoolStateChanges(List.empty)) // we sync mempool only when DB is synced with network
       }
     }
 

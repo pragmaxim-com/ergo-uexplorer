@@ -35,7 +35,7 @@ object BlockBuilder:
       blockCoins      = blockCoins,
       blockMiningTime = prevBlock.map(parent => ppBlock.b.header.timestamp - parent.timestamp).getOrElse(0),
       txsCount        = ppBlock.b.transactions.transactions.length,
-      txsSize         = ppBlock.b.transactions.transactions.map(_.size).sum,
+      txsSize         = ppBlock.b.transactions.transactions.flatMap(_.size).sum,
       minerAddress    = minerAddress,
       minerReward     = reward,
       minerRevenue    = reward + fee,
