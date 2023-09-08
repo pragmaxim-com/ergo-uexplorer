@@ -1,12 +1,10 @@
 package org.ergoplatform.uexplorer.chain
 
 import org.ergoplatform.uexplorer.*
-import org.ergoplatform.uexplorer.chain.ChainTip.FifoLinkedHashMap
 import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.node.ApiFullBlock
 import zio.*
 
-import java.util
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Try}
 
@@ -34,9 +32,6 @@ object ChainTip {
 
   def empty: ChainTip = ChainTip(List.empty)
 
-  class FifoLinkedHashMap[K, V](maxSize: Int = 100) extends util.LinkedHashMap[K, V] {
-    override def removeEldestEntry(eldest: java.util.Map.Entry[K, V]): Boolean = this.size > maxSize
-  }
 }
 
 class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(implicit ps: CoreConf) {

@@ -4,6 +4,7 @@ import org.ergoplatform.uexplorer.backend.blocks.{BlockService, BlockTapirRoutes
 import org.ergoplatform.uexplorer.backend.boxes.{BoxService, BoxTapirRoutes}
 import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.ziohttp.ZioHttpInterpreter
+import sttp.tapir.swagger.SwaggerUIOptions
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 import zio.RIO
 import sttp.tapir.ztapir.*
@@ -118,7 +119,7 @@ object TapirRoutes extends BlockTapirRoutes with BoxTapirRoutes:
     )
 
   val swaggerEndpoints: List[ServerEndpoint[Any, RIO[BoxService with BlockService, *]]] =
-    SwaggerInterpreter()
+    SwaggerInterpreter(swaggerUIOptions = SwaggerUIOptions.default.pathPrefix(List(rootPath, "swagger")))
       .fromEndpoints[RIO[BoxService with BlockService, *]](boxSwaggerEndpoints ++ blockSwaggerEndpoints, "uexplorer api", "1.0")
 
   val routes: HttpApp[BoxService with BlockService, Throwable] =
