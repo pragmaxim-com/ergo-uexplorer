@@ -43,7 +43,7 @@ case class MvStorage(
     val chainTip =
       ChainTip(
         blockIdsByHeight
-          .iterator(lastHeight.map(lk => Math.max(1, lk - 100)), lastHeight, reverse = false)
+          .iterator(lastHeight.map(lk => Math.max(1, lk - 100)), Option.empty, reverse = false)
           .toSeq
           .sortBy(_._1)(Ordering[Int].reverse)
           .flatMap { case (_, blockIds) =>
@@ -51,10 +51,10 @@ case class MvStorage(
           }
       )
     val sortedKeys = chainTip.toMap.values.map(_.height).toSeq.sorted
-    if (sortedKeys.lastOption != getLastHeight)
+    if (sortedKeys.lastOption != lastHeight)
       ZIO.fail(
         new IllegalStateException(
-          s"MvStore's Iterator works unexpectedly, ${sortedKeys.mkString(", ")} but last key is $lastHeight!"
+          s"MvStore's Iterator works unexpectedly, ${sortedKeys.lastOption} but last key is $lastHeight!"
         )
       )
     else
