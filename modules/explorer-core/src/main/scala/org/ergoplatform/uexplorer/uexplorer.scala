@@ -17,11 +17,12 @@ package object uexplorer {
   val randomNumberPerJvmRun: String = Random.alphanumeric.filter(_.isDigit).take(5).mkString
   def randomNumberPerRun: String    = Random.alphanumeric.filter(_.isDigit).take(5).mkString
 
-  type Value          = Long
-  type Amount         = Long
-  type Height         = Int
-  type CreationHeight = Int
-  type Timestamp      = Long
+  type Value            = Long
+  type Amount           = Long
+  type Height           = Int
+  type CreationHeight   = Int
+  type SettlementHeight = Int
+  type Timestamp        = Long
 
   type MinerReward = Long
   type MinerFee    = Long

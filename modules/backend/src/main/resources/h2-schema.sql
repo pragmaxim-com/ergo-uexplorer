@@ -25,6 +25,8 @@ create table if not exists Block (
     maxBoxGix            BIGINT NOT NULL
 );
 
+create index if not exists block_height ON Block (height);
+
 create table if not exists ErgoTree (
     hash            VARCHAR(64) NOT NULL PRIMARY KEY,
     blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
@@ -38,17 +40,19 @@ create table if not exists ErgoTreeT8 (
 );
 
 create table if not exists Box (
-    boxId           VARCHAR(64) NOT NULL PRIMARY KEY,
-    txId            VARCHAR(64) NOT NULL,
-    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
-    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
-    ergValue        BIGINT NOT NULL,
-    r4              VARCHAR,
-    r5              VARCHAR,
-    r6              VARCHAR,
-    r7              VARCHAR,
-    r8              VARCHAR,
-    r9              VARCHAR
+    boxId            VARCHAR(64) NOT NULL PRIMARY KEY,
+    txId             VARCHAR(64) NOT NULL,
+    creationHeight   INT NOT NULL,
+    settlementHeight INT NOT NULL,
+    ergoTreeHash     VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
+    ergoTreeT8Hash   VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
+    ergValue         BIGINT NOT NULL,
+    r4               VARCHAR,
+    r5               VARCHAR,
+    r6               VARCHAR,
+    r7               VARCHAR,
+    r8               VARCHAR,
+    r9               VARCHAR
 );
 
 create table if not exists Asset (
@@ -65,6 +69,8 @@ create table if not exists Asset2Box (
 create table if not exists Utxo (
     boxId           VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES Box (boxId) ON DELETE CASCADE,
     txId            VARCHAR(64) NOT NULL,
+    creationHeight   INT NOT NULL,
+    settlementHeight INT NOT NULL,
     ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
     ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
     ergValue        BIGINT NOT NULL,

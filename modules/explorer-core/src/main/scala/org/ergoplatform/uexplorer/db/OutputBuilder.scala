@@ -29,6 +29,8 @@ object OutputBuilder {
             Utxo(
               o.boxId,
               tx.id,
+              o.creationHeight,
+              block.b.header.height,
               ergoTreeHash,
               ergoTreeT8Opt.map(_._2),
               o.value,
