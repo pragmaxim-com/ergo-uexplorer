@@ -158,7 +158,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Utxo])
             .on((a, utxo) => utxo.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
-            .map((_, b) => Utxo(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => b)
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -173,7 +173,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Box])
             .on((a, box) => box.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
-            .map((_, b) => Box(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => b)
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -202,7 +202,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Box])
             .on((et, box) => et.hash == box.ergoTreeHash)
             .filter((et, _) => et.hash == lift(etHash))
-            .map((_, b) => Box(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => b)
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -217,7 +217,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Utxo])
             .on((et, utxo) => et.hash == utxo.ergoTreeHash)
             .filter((et, _) => et.hash == lift(etHash))
-            .map((_, b) => Utxo(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => b)
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -244,7 +244,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Box])
             .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
             .filter((et, _) => et.hash == lift(etT8Hash))
-            .map((_, b) => Box(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => b)
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -259,7 +259,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Utxo])
             .on((et, box) => box.ergoTreeT8Hash.contains(et.hash))
             .filter((et, _) => et.hash == lift(etT8Hash))
-            .map((_, b) => Utxo(b.boxId, b.txId, b.ergoTreeHash, b.ergoTreeT8Hash, b.ergValue, b.r4, b.r5, b.r6, b.r7, b.r8, b.r9))
+            .map((_, b) => b)
             .filterByKeys(filter)
             .filterColumns(columns)
         }

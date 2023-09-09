@@ -13,6 +13,8 @@ import scala.collection.mutable
 case class Box(
   boxId: BoxId,
   txId: TxId,
+  creationHeight: CreationHeight,
+  settlementHeight: SettlementHeight,
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
   ergValue: Value,
@@ -32,6 +34,8 @@ object Box {
 case class Utxo(
   boxId: BoxId,
   txId: TxId,
+  creationHeight: CreationHeight,
+  settlementHeight: SettlementHeight,
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
   ergValue: Value,
@@ -46,6 +50,8 @@ case class Utxo(
     Box(
       boxId,
       txId,
+      creationHeight,
+      settlementHeight,
       ergoTreeHash,
       ergoTreeT8Hash,
       ergValue,
