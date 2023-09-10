@@ -63,7 +63,12 @@ create table if not exists Asset (
 create table if not exists Asset2Box (
     tokenId         VARCHAR(64) NOT NULL REFERENCES Asset (tokenId) ON DELETE CASCADE,
     boxId           VARCHAR(64) NOT NULL REFERENCES Box (boxId) ON DELETE CASCADE,
-    amount          BIGINT NOT NULL
+    index           INT NOT NULL,
+    amount          BIGINT NOT NULL,
+    name            VARCHAR,
+    description     VARCHAR,
+    type            VARCHAR,
+    decimals        INT
 );
 
 create table if not exists Utxo (

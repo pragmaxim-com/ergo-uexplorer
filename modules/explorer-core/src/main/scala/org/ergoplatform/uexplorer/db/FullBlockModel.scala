@@ -104,16 +104,6 @@ final case class Output(
   mainChain: Boolean // chain status, `true` if this output resides in main chain
 )
 
-final case class Token(
-  id: TokenId,
-  boxId: BoxId,
-  emissionAmount: Long,
-  name: Option[String],
-  description: Option[String],
-  `type`: Option[TokenType],
-  decimals: Option[Int]
-)
-
 final case class Transaction(
   id: TxId,
   headerId: BlockId,

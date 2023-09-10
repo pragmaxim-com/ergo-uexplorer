@@ -8,7 +8,7 @@ import org.ergoplatform.uexplorer.db.*
 import org.ergoplatform.uexplorer.indexer.chain.StreamExecutor.ChainSyncResult
 import org.ergoplatform.uexplorer.indexer.config.ChainIndexerConf
 import org.ergoplatform.uexplorer.node.ApiFullBlock
-import org.ergoplatform.uexplorer.{BoxId, CoreConf, ReadableStorage, UnexpectedStateError, WritableStorage}
+import org.ergoplatform.uexplorer.{illEx, BoxId, CoreConf, ReadableStorage, UnexpectedStateError, WritableStorage}
 import zio.*
 import zio.Exit.{Failure, Success}
 import zio.stream.{ZSink, ZStream}
@@ -32,21 +32,22 @@ case class BlockWriter(
           false
       }
 
-  private def rollbackFork(winningFork: List[LinkedBlock]): Task[ForkInserted] =
-    if (!hasParentAndIsChained(winningFork)) {
+  private def rollbackFork(winFork: List[LinkedBlock]): Task[ForkInserted] =
+    if (!hasParentAndIsChained(winFork)) {
       ZIO.fail(
         new UnexpectedStateError(
-          s"Inserting fork ${winningFork.map(_.b.header.id).mkString(",")} at height ${winningFork.map(_.block.height).mkString(",")} illegal"
+          s"Inserting fork ${winFork.map(_.b.header.id).mkString(",")} at height ${winFork.map(_.block.height).mkString(",")} illegal"
         )
       )
     } else {
       for {
-        _              <- ZIO.log(s"Adding fork from height ${winningFork.head.block.height} until ${winningFork.last.block.height}")
-        preForkVersion <- ZIO.attempt(storage.getBlocksByHeight(winningFork.head.b.header.height).map(_._2.revision).head)
-        loosingFork = winningFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id))
-        _ <- ZIO.log(s"Rolling back to version $preForkVersion")
-        _ <- storage.rollbackTo(preForkVersion)
-      } yield ForkInserted(winningFork, loosingFork)
+        _                 <- ZIO.log(s"Adding winning fork ${winFork.map(b => s"${b.block.blockId} @ ${b.block.height}").mkString("\n", "\n", "")}")
+        preForkVersionOpt <- ZIO.attempt(storage.getBlocksByHeight(winFork.head.b.header.height).map(_._2.revision).headOption)
+        loosingFork = winFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id))
+        _ <- ZIO.log(s"Rolling back loosing fork at version $preForkVersionOpt : ${loosingFork.map(b => s"${b._1} @ ${b._2.height}").mkString("\n", "\n", "")}")
+        preForkVersion <- ZIO.getOrFailWith(illEx(s"Block ${winFork.head.b.header.id} @ ${winFork.head.b.header.height} not persisted!"))(preForkVersionOpt)
+        _              <- storage.rollbackTo(preForkVersion)
+      } yield ForkInserted(winFork, loosingFork)
     }
 
   def insertBranchFlow(
@@ -56,14 +57,16 @@ case class BlockWriter(
     source
       .via(BlockProcessor.processingFlow(chainLinker))
       .mapConcatZIO {
+        case Nil =>
+          ZIO.fail(new IllegalStateException("ChainLinker cannot return no block"))
         case bestBlock :: Nil =>
           persistBlock(bestBlock).map(_ :: Nil)
         case winningFork =>
           for {
             forkInserted <- rollbackFork(winningFork)
-            _            <- ZIO.log(s"Removing old fork : ${forkInserted.loosingFork.map(b => b._2.height -> b._1).mkString("\n", "\n", "")}")
+            _            <- ZIO.log(s"Removing old fork : ${forkInserted.loosingFork.map(b => s"${b._1} @ ${b._2.height}").mkString("\n", "\n", "")}")
             _            <- repo.removeBlocks(forkInserted.loosingFork.map(_._1))
-            _            <- ZIO.log(s"Adding new fork : ${winningFork.map(b => b.block.height -> b.b.header.id).mkString("\n", "\n", "")}")
+            _            <- ZIO.log(s"Adding new fork : ${winningFork.map(b => s"${b.b.header.id} @ ${b.block.height}").mkString("\n", "\n", "")}")
             fork         <- ZIO.foreach(forkInserted.winningFork)(persistBlock)
           } yield fork
       }

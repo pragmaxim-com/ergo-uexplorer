@@ -64,12 +64,14 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport with SpecZioL
           lastHeight     <- ZIO.serviceWith[ReadableStorage](_.getLastHeight)
           missingHeights <- ZIO.serviceWith[ReadableStorage](_.findMissingHeights)
           chainTip       <- ZIO.serviceWithZIO[ReadableStorage](_.getChainTip)
+          latestBlock    <- chainTip.latestBlock
+          latestBlocks   <- chainTip.toMap
           memPoolState   <- ZIO.serviceWithZIO[MemPool](_.getTxs)
         } yield assertTrue(
           lastHeight.get == 4200,
           missingHeights.isEmpty,
-          chainTip.toMap.size == 100,
-          chainTip.latestBlock.map(_.height).contains(4200),
+          latestBlocks.size == 100,
+          latestBlock.map(_.height).contains(4200),
           memPoolState.underlyingTxs.size == 9
         )).provide(backendLayer(regularBlocks) >+> dbPerEachRun >+> allLayers)
       },

@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.db
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.RegisterId.*
-import org.ergoplatform.uexplorer.parser.{ErgoTreeParser, RegistersParser}
+import org.ergoplatform.uexplorer.parser.{ErgoTreeParser, RegistersParser, TokenPropsParser}
 import zio.{Task, ZIO}
 
 import scala.collection.mutable
@@ -15,15 +15,39 @@ object OutputBuilder {
       val byErgoTree     = mutable.Map.empty[ErgoTree, mutable.Set[Utxo]]
       val byErgoTreeT8   = mutable.Map.empty[ErgoTreeT8, mutable.Set[Utxo]]
       val utxosByTokenId = mutable.Map.empty[TokenId, mutable.Set[BoxId]]
-      val tokensByUtxo   = mutable.Map.empty[BoxId, mutable.Map[TokenId, Amount]]
+      val tokensByUtxo   = mutable.Map.empty[BoxId, mutable.Map[TokenId, Token]]
 
       block.b.transactions.transactions.foreach { tx =>
+        val allowedTokenId = TokenId.fromStringUnsafe(tx.inputs.head.boxId.unwrapped)
         tx.outputs.foreach { o =>
+          val additionalRegisters           = o.additionalRegisters.view.mapValues(RegistersParser.parseAny).toMap
           val (ergoTreeHash, ergoTreeT8Opt) = ErgoTreeParser.ergoTreeHex2T8(o.ergoTree).get
-          val additionalRegisters           = o.additionalRegisters.view.mapValues(hex => RegistersParser.parseAny(hex).serializedValue).toMap
-          o.assets.foreach { asset =>
-            adjustMultiSet(utxosByTokenId, asset.tokenId, o.boxId)
-            adjustMultiMap(tokensByUtxo, o.boxId, asset.tokenId, asset.amount)
+          o.assets.zipWithIndex.foreach {
+            case (asset, index) if asset.tokenId == allowedTokenId =>
+              val props = TokenPropsParser.parse(additionalRegisters)
+              val token =
+                Token(
+                  index,
+                  asset.amount,
+                  props.map(_.name),
+                  props.map(_.description),
+                  props.map(_ => TokenType.Eip004),
+                  props.map(_.decimals)
+                )
+              adjustMultiSet(utxosByTokenId, asset.tokenId, o.boxId)
+              adjustMultiMap(tokensByUtxo, o.boxId, asset.tokenId, token)
+            case (asset, index) =>
+              val token =
+                Token(
+                  index,
+                  asset.amount,
+                  Option.empty,
+                  Option.empty,
+                  Option.empty,
+                  Option.empty
+                )
+              adjustMultiSet(utxosByTokenId, asset.tokenId, o.boxId)
+              adjustMultiMap(tokensByUtxo, o.boxId, asset.tokenId, token)
           }
           val utxo =
             Utxo(
@@ -34,12 +58,12 @@ object OutputBuilder {
               ergoTreeHash,
               ergoTreeT8Opt.map(_._2),
               o.value,
-              additionalRegisters.get(R4),
-              additionalRegisters.get(R5),
-              additionalRegisters.get(R6),
-              additionalRegisters.get(R7),
-              additionalRegisters.get(R8),
-              additionalRegisters.get(R9)
+              additionalRegisters.get(R4).map(_.serializedValue),
+              additionalRegisters.get(R5).map(_.serializedValue),
+              additionalRegisters.get(R6).map(_.serializedValue),
+              additionalRegisters.get(R7).map(_.serializedValue),
+              additionalRegisters.get(R8).map(_.serializedValue),
+              additionalRegisters.get(R9).map(_.serializedValue)
             )
           adjustMultiSet(byErgoTree, ErgoTree(ergoTreeHash, block.b.header.id, o.ergoTree), utxo)
           ergoTreeT8Opt.foreach { case (ergoTreeT8Hex, ergoTreeT8Hash) =>
