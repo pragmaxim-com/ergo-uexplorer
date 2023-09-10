@@ -38,8 +38,10 @@ case class PersistentRepo(ds: DataSource, blockRepo: BlockRepo, boxRepo: BoxRepo
     def utxos       = outputs.byErgoTree.values.flatten
     def assets      = outputs.utxosByTokenId.keySet.map(tokenId => Asset(tokenId, b.block.blockId))
     def assetsToBox =
-      outputs.tokensByUtxo.flatMap { case (box, amountByToken) =>
-        amountByToken.map { case (token, amount) => Asset2Box(token, box, amount) }
+      outputs.tokensByUtxo.flatMap { case (boxId, tokenById) =>
+        tokenById.map { case (tokenId, Token(index, amount, name, description, t, decimals)) =>
+          Asset2Box(tokenId, boxId, index, amount, name, description, t, decimals)
+        }
       }
 
     ctx

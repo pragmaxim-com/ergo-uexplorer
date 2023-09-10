@@ -8,29 +8,32 @@ import zio.*
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Try}
 
-class ChainTip(byBlockId: FifoLinkedHashMap[BlockId, Block]) {
-  def latestBlock: Option[Block] = toMap.values.toSeq.sortBy(_.height).lastOption
-  def toMap: Map[BlockId, Block] = byBlockId.asScala.toMap
-  def getParent(block: ApiFullBlock): Option[Block] =
-    Option(byBlockId.get(block.header.parentId)).filter(_.height == block.header.height - 1)
-  def putOnlyNew(blockId: BlockId, block: Block): Try[Block] =
-    Option(byBlockId.put(blockId, block)).fold(Try(block)) { oldVal =>
-      Failure(
-        new AssertionError(
-          s"Trying to cache blockId $blockId at height ${block.height} but there already was $oldVal"
-        )
-      )
-    }
-
+class ChainTip(byBlockIdRef: Ref[FifoLinkedHashMap[BlockId, Block]]) {
+  def latestBlock: Task[Option[Block]] = toMap.map(_.values.toSeq.sortBy(_.height).lastOption)
+  def toMap: Task[Map[BlockId, Block]] = byBlockIdRef.get.map(_.asScala.toMap)
+  def getParent(block: ApiFullBlock): Task[Option[Block]] =
+    byBlockIdRef.get.map(byBlockId => Option(byBlockId.get(block.header.parentId)).filter(_.height == block.header.height - 1))
+  def putOnlyNew(block: Block): Task[Block] =
+    byBlockIdRef
+      .modify { byBlockId =>
+        Option(byBlockId.put(block.blockId, block)) -> byBlockId
+      }
+      .flatMap {
+        case None =>
+          ZIO.succeed(block)
+        case Some(oldBlock) =>
+          ZIO.fail(illEx(s"Trying to cache blockId ${block.blockId} at height ${block.height} but there already was $oldBlock"))
+      }
 }
+
 object ChainTip {
-  def apply(chainTip: IterableOnce[(BlockId, Block)], maxSize: Int = 100): ChainTip = {
+  def fromIterable(chainTip: IterableOnce[(BlockId, Block)], maxSize: Int = 100): Task[ChainTip] = {
     val newFifoMap = new FifoLinkedHashMap[BlockId, Block](maxSize)
     newFifoMap.putAll(chainTip.iterator.toMap.asJava)
-    new ChainTip(newFifoMap)
+    Ref.make(newFifoMap).map(new ChainTip(_))
   }
 
-  def empty: ChainTip = ChainTip(List.empty)
+  def empty: Task[ChainTip] = ChainTip.fromIterable(List.empty)
 
 }
 
@@ -39,18 +42,15 @@ class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(i
   def linkChildToAncestors(acc: List[BlockWithOutputs] = List.empty)(
     block: BlockWithOutputs
   ): Task[List[LinkedBlock]] =
-    chainTip.getParent(block.b) match {
+    chainTip.getParent(block.b).flatMap {
       case parentBlockOpt if parentBlockOpt.isDefined || block.b.header.height == 1 =>
-        ZIO.attempt {
-          val newBlock = block.toLinkedBlock(BlockBuilder(block, parentBlockOpt), parentBlockOpt)
-          chainTip.putOnlyNew(newBlock.b.header.id, newBlock.block)
-          acc.foldLeft(List(newBlock)) { case (linkedBlocks, b) =>
-            val parent = linkedBlocks.lastOption.flatMap(_.parentBlockOpt)
-            chainTip
-              .putOnlyNew(b.b.header.id, BlockBuilder(b, parent))
-              .map(newBlock => linkedBlocks :+ b.toLinkedBlock(newBlock, parent))
-              .get
-          }
+        val newBlock = block.toLinkedBlock(BlockBuilder(block, parentBlockOpt), parentBlockOpt)
+        chainTip.putOnlyNew(newBlock.block) *>
+        ZIO.foldLeft(acc)(List(newBlock)) { case (linkedBlocks, b) =>
+          val parent = linkedBlocks.last.parentBlockOpt
+          chainTip
+            .putOnlyNew(BlockBuilder(b, parent))
+            .map(newBlock => linkedBlocks :+ b.toLinkedBlock(newBlock, parent))
         }
       case _ =>
         for {

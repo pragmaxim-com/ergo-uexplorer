@@ -31,9 +31,9 @@ trait CassandraTokensWriter extends LazyLogging {
             // format: off
             .bind()
             .setString(header_id,     block.header.id)
-            .setString(token_id,      t.id)
+            .setString(token_id,      t.tokenId)
             .setString(box_id,        t.boxId.unwrapped)
-            .setLong(emission_amount, t.emissionAmount)
+            .setLong(emission_amount, t.amount)
             .setInt(decimals,         t.decimals.getOrElse(0))
             // format: on
 

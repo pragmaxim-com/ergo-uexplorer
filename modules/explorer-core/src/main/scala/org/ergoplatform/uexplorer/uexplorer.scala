@@ -14,10 +14,14 @@ import scala.util.Random
 
 package object uexplorer {
 
+  def illEx(msg: String)                   = new IllegalStateException(msg)
+  def illEx(msg: String, cause: Throwable) = new IllegalStateException(msg, cause)
+
   val randomNumberPerJvmRun: String = Random.alphanumeric.filter(_.isDigit).take(5).mkString
   def randomNumberPerRun: String    = Random.alphanumeric.filter(_.isDigit).take(5).mkString
 
   type Value            = Long
+  type Index            = Int
   type Amount           = Long
   type Height           = Int
   type CreationHeight   = Int
@@ -174,6 +178,7 @@ package object uexplorer {
 
     extension (x: TokenType) def unwrapped: String = x
 
+    def castUnsafe(s: String): TokenType = s.asInstanceOf[TokenType]
   }
 
   enum RegisterId {

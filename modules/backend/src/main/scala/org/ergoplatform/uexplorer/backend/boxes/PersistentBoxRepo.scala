@@ -52,12 +52,12 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     utxos: Iterable[Utxo]
   ): Task[Iterable[BoxId]] =
     (for {
-      _ <- ctx.run(insertErgoTreesQuery(ergoTrees))
-      _ <- ctx.run(insertErgoTreeT8sQuery(ergoTreeT8s))
-      _ <- ctx.run(insertAssets(assets))
-      _ <- ctx.run(insertBoxesQuery(utxos.map(_.toBox)))
-      _ <- ctx.run(insertAssetsToBox(assetsToBox))
-      _ <- ctx.run(insertUtxosQuery(utxos))
+      _ <- ZIO.when(ergoTrees.nonEmpty)(ctx.run(insertErgoTreesQuery(ergoTrees)))
+      _ <- ZIO.when(ergoTreeT8s.nonEmpty)(ctx.run(insertErgoTreeT8sQuery(ergoTreeT8s)))
+      _ <- ZIO.when(assets.nonEmpty)(ctx.run(insertAssets(assets)))
+      _ <- ZIO.when(utxos.nonEmpty)(ctx.run(insertBoxesQuery(utxos.map(_.toBox))))
+      _ <- ZIO.when(assetsToBox.nonEmpty)(ctx.run(insertAssetsToBox(assetsToBox)))
+      _ <- ZIO.when(utxos.nonEmpty)(ctx.run(insertUtxosQuery(utxos)))
     } yield utxos.map(_.boxId)).provide(dsLayer)
 
   override def deleteUtxo(boxId: BoxId): Task[Long] =
@@ -86,7 +86,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Asset2Box])
             .on((utxo, a) => utxo.boxId == a.boxId)
             .filter((_, a) => a.tokenId == lift(tokenId))
-            .map((_, a) => Asset2Box(a.tokenId, a.boxId, a.amount))
+            .map((_, a) => a)
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -101,7 +101,7 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
             .join(query[Asset2Box])
             .on((box, a) => box.boxId == a.boxId)
             .filter((_, a) => a.tokenId == lift(tokenId))
-            .map((_, a) => Asset2Box(a.tokenId, a.boxId, a.amount))
+            .map((_, a) => a)
             .filterByKeys(filter)
             .filterColumns(columns)
         }

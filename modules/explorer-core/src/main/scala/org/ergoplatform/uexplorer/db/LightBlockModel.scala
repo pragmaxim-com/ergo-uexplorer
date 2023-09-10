@@ -72,23 +72,43 @@ object Utxo {
 case class ErgoTree(hash: ErgoTreeHash, blockId: BlockId, hex: ErgoTreeHex)
 case class ErgoTreeT8(hash: ErgoTreeT8Hash, blockId: BlockId, hex: ErgoTreeT8Hex)
 
+final case class Token(
+  index: Index,
+  amount: Amount,
+  name: Option[String],
+  description: Option[String],
+  `type`: Option[TokenType],
+  decimals: Option[Int]
+)
+
 case class Asset(tokenId: TokenId, blockId: BlockId)
 object Asset {
   implicit val encoder: JsonEncoder[Asset] = DeriveJsonEncoder.gen[Asset]
   implicit val decoder: JsonDecoder[Asset] = DeriveJsonDecoder.gen[Asset]
 }
 
-case class Asset2Box(tokenId: TokenId, boxId: BoxId, amount: Amount)
+case class Asset2Box(
+  tokenId: TokenId,
+  boxId: BoxId,
+  index: Index,
+  amount: Amount,
+  name: Option[String],
+  description: Option[String],
+  `type`: Option[TokenType],
+  decimals: Option[Int]
+)
 object Asset2Box {
-  implicit val encoder: JsonEncoder[Asset2Box] = DeriveJsonEncoder.gen[Asset2Box]
-  implicit val decoder: JsonDecoder[Asset2Box] = DeriveJsonDecoder.gen[Asset2Box]
+  given JsonEncoder[TokenType] = JsonEncoder[String].contramap(_.unwrapped)
+  given JsonDecoder[TokenType] = JsonDecoder[String].map(TokenType.castUnsafe)
+  given JsonEncoder[Asset2Box] = DeriveJsonEncoder.gen[Asset2Box]
+  given JsonDecoder[Asset2Box] = DeriveJsonDecoder.gen[Asset2Box]
 }
 
 case class OutputRecords(
   byErgoTree: mutable.Map[ErgoTree, mutable.Set[Utxo]],
   byErgoTreeT8: mutable.Map[ErgoTreeT8, mutable.Set[Utxo]],
   utxosByTokenId: mutable.Map[TokenId, mutable.Set[BoxId]],
-  tokensByUtxo: mutable.Map[BoxId, mutable.Map[TokenId, Amount]]
+  tokensByUtxo: mutable.Map[BoxId, mutable.Map[TokenId, Token]]
 )
 
 final case class Block(
