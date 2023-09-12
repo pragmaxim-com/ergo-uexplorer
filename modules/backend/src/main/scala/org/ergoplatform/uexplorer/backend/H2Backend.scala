@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.backend
 import com.zaxxer.hikari.{HikariConfig, HikariDataSource}
 import io.getquill.JdbcContextConfig
 import io.getquill.util.LoadConfig
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.BlockId
 import org.ergoplatform.uexplorer.backend.blocks.BlockService
 import org.ergoplatform.uexplorer.backend.boxes.BoxService
@@ -50,13 +51,13 @@ object H2Backend extends Backend {
     keyPath   = "server.key"
   )
 
-  def install(): ZIO[Client with NodePool with BoxService with BlockService with Server, Nothing, Int] =
+  def install(implicit enc: ErgoAddressEncoder): ZIO[Client with NodePool with BoxService with BlockService with Server, Nothing, Int] =
     Server
       .install((TapirRoutes.routes ++ ProxyZioRoutes()).withDefaultErrorResponse)
       .logError("Serving at 8090 failed.")
 
-  def serve(port: Int): ZIO[Client with NodePool with DataSource with BoxService with BlockService, Throwable, Nothing] =
-    (install() *> ZIO.never).provideSomeLayer(
+  def serve(port: Int)(implicit enc: ErgoAddressEncoder): ZIO[Client with NodePool with DataSource with BoxService with BlockService, Throwable, Nothing] =
+    (install(enc) *> ZIO.never).provideSomeLayer(
       Server.defaultWith(
         _.port(port)
           .ssl(sslConfig)

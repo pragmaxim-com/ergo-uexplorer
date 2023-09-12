@@ -23,7 +23,7 @@ lazy val commonSettings = Seq(
     "-language:existentials",
     "-unchecked",
     "-Xfatal-warnings"
-  )
+  ) ++ Seq("-Xmax-inlines", "64")
 )
 
 def getPluginJars(modulesDir: File): List[File] =

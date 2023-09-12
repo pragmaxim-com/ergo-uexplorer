@@ -41,11 +41,13 @@ case class BlockWriter(
       )
     } else {
       for {
-        _                 <- ZIO.log(s"Adding winning fork ${winFork.map(b => s"${b.block.blockId} @ ${b.block.height}").mkString("\n", "\n", "")}")
         preForkVersionOpt <- ZIO.attempt(storage.getBlocksByHeight(winFork.head.b.header.height).map(_._2.revision).headOption)
-        loosingFork = winFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id))
-        _ <- ZIO.log(s"Rolling back loosing fork at version $preForkVersionOpt : ${loosingFork.map(b => s"${b._1} @ ${b._2.height}").mkString("\n", "\n", "")}")
-        preForkVersion <- ZIO.getOrFailWith(illEx(s"Block ${winFork.head.b.header.id} @ ${winFork.head.b.header.height} not persisted!"))(preForkVersionOpt)
+        winningForkStr = winFork.map(b => s"${b.block.height} @ ${b.block.blockId} -> ${b.block.parentId}").mkString("\n", "\n", "")
+        _ <- ZIO.log(s"Adding winning fork $winningForkStr")
+        loosingFork    = winFork.flatMap(b => storage.getBlocksByHeight(b.block.height).filter(_._1 != b.b.header.id))
+        loosingForkStr = loosingFork.map(b => s"${b._2.height} @ ${b._1} -> ${b._2.parentId}").mkString("\n", "\n", "")
+        _              <- ZIO.log(s"Rolling back loosing fork at version $preForkVersionOpt : $loosingForkStr")
+        preForkVersion <- ZIO.getOrFailWith(illEx(s"Block ${winFork.head.b.header.height} @ ${winFork.head.b.header.id} not persisted!"))(preForkVersionOpt)
         _              <- storage.rollbackTo(preForkVersion)
       } yield ForkInserted(winFork, loosingFork)
     }
@@ -55,20 +57,24 @@ case class BlockWriter(
     chainLinker: ChainLinker
   ): Task[ChainSyncResult] =
     source
-      .via(BlockProcessor.processingFlow(chainLinker))
-      .mapConcatZIO {
-        case Nil =>
-          ZIO.fail(new IllegalStateException("ChainLinker cannot return no block"))
-        case bestBlock :: Nil =>
-          persistBlock(bestBlock).map(_ :: Nil)
-        case winningFork =>
-          for {
-            forkInserted <- rollbackFork(winningFork)
-            _            <- ZIO.log(s"Removing old fork : ${forkInserted.loosingFork.map(b => s"${b._1} @ ${b._2.height}").mkString("\n", "\n", "")}")
-            _            <- repo.removeBlocks(forkInserted.loosingFork.map(_._1))
-            _            <- ZIO.log(s"Adding new fork : ${winningFork.map(b => s"${b.b.header.id} @ ${b.block.height}").mkString("\n", "\n", "")}")
-            fork         <- ZIO.foreach(forkInserted.winningFork)(persistBlock)
-          } yield fork
+      .via(BlockProcessor.processingFlow)
+      .mapConcatZIO { b =>
+        chainLinker.linkChildToAncestors()(b).flatMap {
+          case Nil =>
+            ZIO.fail(new IllegalStateException("ChainLinker cannot return no block"))
+          case bestBlock :: Nil =>
+            persistBlock(bestBlock).map(_ :: Nil)
+          case winningFork =>
+            for {
+              forkInserted <- rollbackFork(winningFork)
+              oldFork = forkInserted.loosingFork.map(b => s"${b._2.height} @ ${b._1} -> ${b._2.parentId}").mkString("\n", "\n", "")
+              _ <- ZIO.log(s"Removing old fork : $oldFork")
+              _ <- repo.removeBlocks(forkInserted.loosingFork.map(_._1))
+              newFork = winningFork.map(b => s"${b.block.height} @ ${b.b.header.id} -> ${b.block.parentId}").mkString("\n", "\n", "")
+              _    <- ZIO.log(s"Adding new fork : $newFork")
+              fork <- ZIO.foreach(forkInserted.winningFork)(persistBlock)
+            } yield fork
+        }
       }
       .tap { b =>
         if (b.linkedBlock.block.height % chainIndexerConf.mvStore.heightCompactRate == 0)

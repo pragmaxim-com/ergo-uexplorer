@@ -19,15 +19,15 @@ object OutputBuilder {
 
       block.b.transactions.transactions.foreach { tx =>
         val allowedTokenId = TokenId.fromStringUnsafe(tx.inputs.head.boxId.unwrapped)
-        tx.outputs.foreach { o =>
+        tx.outputs.zipWithIndex.foreach { case (o, outputIndex) =>
           val additionalRegisters           = o.additionalRegisters.view.mapValues(RegistersParser.parseAny).toMap
           val (ergoTreeHash, ergoTreeT8Opt) = ErgoTreeParser.ergoTreeHex2T8(o.ergoTree).get
           o.assets.zipWithIndex.foreach {
-            case (asset, index) if asset.tokenId == allowedTokenId =>
+            case (asset, assetIndex) if asset.tokenId == allowedTokenId =>
               val props = TokenPropsParser.parse(additionalRegisters)
               val token =
                 Token(
-                  index,
+                  assetIndex,
                   asset.amount,
                   props.map(_.name),
                   props.map(_.description),
@@ -53,11 +53,13 @@ object OutputBuilder {
             Utxo(
               o.boxId,
               tx.id,
+              block.b.header.id,
               o.creationHeight,
               block.b.header.height,
               ergoTreeHash,
               ergoTreeT8Opt.map(_._2),
               o.value,
+              outputIndex,
               additionalRegisters.get(R4).map(_.serializedValue),
               additionalRegisters.get(R5).map(_.serializedValue),
               additionalRegisters.get(R6).map(_.serializedValue),

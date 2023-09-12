@@ -36,8 +36,9 @@ object Rest {
 
     def forHeights(heights: Iterable[Height])(implicit ps: CoreConf): ZIO[Any, Throwable, Chunk[LinkedBlock]] =
       ChainTip.empty.flatMap { chainTip =>
-        BlockProcessor
-          .processingFlow(ChainLinker(getById, chainTip))
+        val chainLinker = ChainLinker(getById, chainTip)
+        BlockProcessor.processingFlow
+          .mapZIO(b => chainLinker.linkChildToAncestors()(b))
           .map(_.head)
           .apply(stream(heights))
           .run(ZSink.collectAll)

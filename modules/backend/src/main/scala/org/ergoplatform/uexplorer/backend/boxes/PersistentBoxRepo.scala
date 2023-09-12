@@ -82,11 +82,11 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     ctx
       .run {
         quote {
-          query[Utxo]
-            .join(query[Asset2Box])
-            .on((utxo, a) => utxo.boxId == a.boxId)
-            .filter((_, a) => a.tokenId == lift(tokenId))
-            .map((_, a) => a)
+          query[Asset2Box]
+            .join(query[Utxo])
+            .on((a, b) => a.boxId == b.boxId)
+            .filter((a, _) => a.tokenId == lift(tokenId))
+            .map((a, _) => a)
             .filterByKeys(filter)
             .filterColumns(columns)
         }
@@ -97,13 +97,45 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
     ctx
       .run {
         quote {
-          query[Box]
-            .join(query[Asset2Box])
-            .on((box, a) => box.boxId == a.boxId)
-            .filter((_, a) => a.tokenId == lift(tokenId))
-            .map((_, a) => a)
+          query[Asset2Box]
+            .join(query[Box])
+            .on((a, b) => a.boxId == b.boxId)
+            .filter((a, _) => a.tokenId == lift(tokenId))
+            .map((a, _) => a)
             .filterByKeys(filter)
             .filterColumns(columns)
+        }
+      }
+      .provide(dsLayer)
+
+  def joinUtxoWithErgoTreeAndBlock(boxId: BoxId, columns: List[String], filter: Map[String, Any]): Task[Iterable[((Utxo, ErgoTree), Block)]] =
+    ctx
+      .run {
+        quote {
+          query[Utxo]
+            .filterByKeys(filter)
+            .filterColumns(columns)
+            .join(query[ErgoTree])
+            .on { case (b, et) => b.ergoTreeHash == et.hash }
+            .join(query[Block])
+            .on { case ((b, _), block) => b.blockId == block.blockId }
+            .filter { case ((b, _), _) => b.boxId == lift(boxId) }
+        }
+      }
+      .provide(dsLayer)
+
+  def joinBoxWithErgoTreeAndBlock(boxId: BoxId, columns: List[String], filter: Map[String, Any]): Task[Iterable[((Box, ErgoTree), Block)]] =
+    ctx
+      .run {
+        quote {
+          query[Box]
+            .filterByKeys(filter)
+            .filterColumns(columns)
+            .join(query[ErgoTree])
+            .on { case (b, et) => b.ergoTreeHash == et.hash }
+            .join(query[Block])
+            .on { case ((b, _), block) => b.blockId == block.blockId }
+            .filter { case ((b, _), _) => b.boxId == lift(boxId) }
         }
       }
       .provide(dsLayer)
@@ -150,32 +182,30 @@ case class PersistentBoxRepo(ds: DataSource) extends BoxRepo with Codecs:
       }
       .provide(dsLayer)
 
-  override def lookupUtxosByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Utxo]] =
+  override def lookupUtxosByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[(Asset2Box, Utxo)]] =
     ctx
       .run {
         quote {
           query[Asset2Box]
+            .filterByKeys(filter)
+            .filterColumns(columns)
             .join(query[Utxo])
             .on((a, utxo) => utxo.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
-            .map((_, b) => b)
-            .filterByKeys(filter)
-            .filterColumns(columns)
         }
       }
       .provide(dsLayer)
 
-  override def lookupBoxesByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[Box]] =
+  override def lookupBoxesByTokenId(tokenId: TokenId, columns: List[String], filter: Map[String, Any]): Task[Iterable[(Asset2Box, Box)]] =
     ctx
       .run {
         quote {
           query[Asset2Box]
+            .filterByKeys(filter)
+            .filterColumns(columns)
             .join(query[Box])
             .on((a, box) => box.boxId == a.boxId)
             .filter((a, _) => a.tokenId == lift(tokenId))
-            .map((_, b) => b)
-            .filterByKeys(filter)
-            .filterColumns(columns)
         }
       }
       .provide(dsLayer)

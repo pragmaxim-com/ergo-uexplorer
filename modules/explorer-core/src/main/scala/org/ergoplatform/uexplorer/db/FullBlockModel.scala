@@ -31,7 +31,7 @@ final case class FullBlock(
   dataInputs: ArraySeq[DataInput],
   outputs: ArraySeq[Output],
   assets: ArraySeq[Asset2],
-  registers: ArraySeq[BoxRegister],
+  registers: ArraySeq[BoxRegister2],
   tokens: ArraySeq[Token]
 )
 
@@ -41,7 +41,7 @@ final case class BlockExtension(
   fields: Json // dict
 )
 
-final case class BoxRegister(
+final case class BoxRegister2(
   id: RegisterId,
   boxId: BoxId,
   sigmaType: SigmaType,

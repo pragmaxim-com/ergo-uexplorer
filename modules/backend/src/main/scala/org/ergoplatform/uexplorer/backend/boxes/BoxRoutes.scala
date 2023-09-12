@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, IdParsingException, ZioRoutes}
 import zio.*
 import zio.http.*
@@ -7,33 +8,26 @@ import zio.json.*
 
 object BoxRoutes extends ZioRoutes with Codecs:
 
-  def apply(): Http[BoxService, Throwable, Request, Response] =
+  def apply(implicit enc: ErgoAddressEncoder): Http[BoxService, Throwable, Request, Response] =
     Http.collectZIO[Request] {
-      case req @ Method.GET -> Root / rootPath / "assets" / "unspent" / "by-token-id" / tokenId =>
-        BoxService
-          .getUnspentAssetsByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
-          .map(assets => Response.json(assets.toJson))
-          .catchAllDefect(throwableToErrorResponse)
-          .orDie
-
-      case req @ Method.GET -> Root / rootPath / "assets" / "spent" / "by-token-id" / tokenId =>
-        BoxService
-          .getSpentAssetsByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
-          .map(assets => Response.json(assets.toJson))
-          .catchAllDefect(throwableToErrorResponse)
-          .orDie
-
-      case req @ Method.GET -> Root / rootPath / "assets" / "any" / "by-token-id" / tokenId =>
-        BoxService
-          .getAnyAssetsByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
-          .map(assets => Response.json(assets.toJson))
-          .catchAllDefect(throwableToErrorResponse)
-          .orDie
-
       case req @ Method.GET -> Root / rootPath / "boxes" / "unspent" / "by-token-id" / tokenId =>
         BoxService
           .getUnspentBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
-          .map(utxos => Response.json(utxos.toJson))
+          .map(assets => Response.json(assets.toJson))
+          .catchAllDefect(throwableToErrorResponse)
+          .orDie
+
+      case req @ Method.GET -> Root / rootPath / "boxes" / "spent" / "by-token-id" / tokenId =>
+        BoxService
+          .getSpentBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
+          .map(assets => Response.json(assets.toJson))
+          .catchAllDefect(throwableToErrorResponse)
+          .orDie
+
+      case req @ Method.GET -> Root / rootPath / "boxes" / "any" / "by-token-id" / tokenId =>
+        BoxService
+          .getAnyBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
+          .map(assets => Response.json(assets.toJson))
           .catchAllDefect(throwableToErrorResponse)
           .orDie
 
@@ -44,24 +38,10 @@ object BoxRoutes extends ZioRoutes with Codecs:
           .catchAllDefect(throwableToErrorResponse)
           .orDie
 
-      case req @ Method.GET -> Root / rootPath / "boxes" / "spent" / "by-token-id" / tokenId =>
-        BoxService
-          .getSpentBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
-          .map(boxes => Response.json(boxes.toJson))
-          .catchAllDefect(throwableToErrorResponse)
-          .orDie
-
       case req @ Method.GET -> Root / rootPath / "box-ids" / "spent" / "by-token-id" / tokenId =>
         BoxService
           .getSpentBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(boxes => Response.json(boxes.map(_.boxId).toJson))
-          .catchAllDefect(throwableToErrorResponse)
-          .orDie
-
-      case req @ Method.GET -> Root / rootPath / "boxes" / "any" / "by-token-id" / tokenId =>
-        BoxService
-          .getAnyBoxesByTokenId(tokenId, req.url.queryParams.map.view.mapValues(_.head).toMap)
-          .map(boxes => Response.json(boxes.toJson))
           .catchAllDefect(throwableToErrorResponse)
           .orDie
 

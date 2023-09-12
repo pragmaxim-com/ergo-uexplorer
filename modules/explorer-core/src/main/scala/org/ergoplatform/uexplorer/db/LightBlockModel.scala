@@ -1,30 +1,127 @@
 package org.ergoplatform.uexplorer.db
 
 import eu.timepit.refined.auto.*
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.*
 import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
+import org.ergoplatform.uexplorer.RegisterId.*
+import org.ergoplatform.uexplorer.node.ExpandedRegister
+import org.ergoplatform.uexplorer.parser.{ErgoTreeParser, RegistersParser}
 import zio.*
 import zio.json.*
 import zio.json.interop.refined.*
 
 import scala.collection.mutable
 
+case class BoxRegister(
+  serializedValue: BoxRegisterValueHex,
+  sigmaType: Option[SigmaType],
+  renderedValue: Option[String]
+)
+
+object BoxRegister {
+  given JsonEncoder[SigmaType]   = JsonEncoder.string.contramap(s => SigmaType.encoder(s).noSpaces)
+  given JsonEncoder[BoxRegister] = DeriveJsonEncoder.gen[BoxRegister]
+
+  given JsonDecoder[Option[SigmaType]] = JsonDecoder.string.map(s => SigmaType.parse(s))
+  given JsonDecoder[BoxRegister]       = DeriveJsonDecoder.gen[BoxRegister]
+}
+
+case class BoxWithAssets(
+  boxId: BoxId,
+  transactionId: TxId,
+  blockId: BlockId,
+  value: Value,
+  index: Index,
+  globalIndex: GlobalIndex,
+  creationHeight: Height,
+  settlementHeight: Height,
+  ergoTree: ErgoTreeHex,
+  address: Address,
+  assets: Iterable[Asset2Box],
+  additionalRegisters: List[(Reg, BoxRegister)]
+)
+
+object BoxWithAssets {
+  given JsonFieldEncoder[Reg]      = JsonFieldEncoder.string.contramap[Reg](_.unwrapped)
+  given JsonEncoder[BoxWithAssets] = DeriveJsonEncoder.gen[BoxWithAssets]
+
+  given JsonFieldDecoder[Reg]      = JsonFieldDecoder.string.map(r => Reg(RegisterId.valueOf(r)))
+  given JsonDecoder[BoxWithAssets] = DeriveJsonDecoder.gen[BoxWithAssets]
+
+  def fromBox(assetsByBox: List[(((Boxish, ErgoTree), Block), Iterable[Asset2Box])])(implicit enc: ErgoAddressEncoder): Task[List[BoxWithAssets]] =
+    ZIO.foreachPar(assetsByBox) { case (((box, ergoTree), block), assets2box) =>
+      ErgoTreeParser
+        .ergoTreeHex2Base58Address(ergoTree.hex)
+        .map { address =>
+          BoxWithAssets(
+            box.boxId,
+            box.txId,
+            block.blockId,
+            box.ergValue,
+            box.index,
+            block.maxBoxGix,
+            box.creationHeight,
+            box.settlementHeight,
+            ergoTree.hex,
+            address,
+            assets2box,
+            buildRegisters(box).toList
+          )
+        }
+    }
+
+  def buildRegisters(box: Boxish): Map[Reg, BoxRegister] = {
+    def expandedRegToBoxReg(r: ExpandedRegister) =
+      BoxRegister(r.serializedValue, r.regValue.map(_.sigmaType), r.regValue.map(_.value))
+    List(
+      box.r4.map(r => Reg(R4) -> expandedRegToBoxReg(RegistersParser.parseAny(r))),
+      box.r5.map(r => Reg(R5) -> expandedRegToBoxReg(RegistersParser.parseAny(r))),
+      box.r6.map(r => Reg(R6) -> expandedRegToBoxReg(RegistersParser.parseAny(r))),
+      box.r7.map(r => Reg(R7) -> expandedRegToBoxReg(RegistersParser.parseAny(r))),
+      box.r8.map(r => Reg(R8) -> expandedRegToBoxReg(RegistersParser.parseAny(r))),
+      box.r9.map(r => Reg(R9) -> expandedRegToBoxReg(RegistersParser.parseAny(r)))
+    ).flatten.toMap
+  }
+
+}
+
+sealed trait Boxish {
+  def boxId: BoxId
+  def txId: TxId
+  def blockId: BlockId
+  def creationHeight: CreationHeight
+  def settlementHeight: SettlementHeight
+  def ergoTreeHash: ErgoTreeHash
+  def ergoTreeT8Hash: Option[ErgoTreeT8Hash]
+  def ergValue: Value
+  def index: Index
+  def r4: Option[BoxRegisterValueHex]
+  def r5: Option[BoxRegisterValueHex]
+  def r6: Option[BoxRegisterValueHex]
+  def r7: Option[BoxRegisterValueHex]
+  def r8: Option[BoxRegisterValueHex]
+  def r9: Option[BoxRegisterValueHex]
+}
+
 case class Box(
   boxId: BoxId,
   txId: TxId,
+  blockId: BlockId,
   creationHeight: CreationHeight,
   settlementHeight: SettlementHeight,
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
   ergValue: Value,
+  index: Index,
   r4: Option[BoxRegisterValueHex],
   r5: Option[BoxRegisterValueHex],
   r6: Option[BoxRegisterValueHex],
   r7: Option[BoxRegisterValueHex],
   r8: Option[BoxRegisterValueHex],
   r9: Option[BoxRegisterValueHex]
-)
+) extends Boxish
 
 object Box {
   implicit val encoder: JsonEncoder[Box] = DeriveJsonEncoder.gen[Box]
@@ -34,27 +131,31 @@ object Box {
 case class Utxo(
   boxId: BoxId,
   txId: TxId,
+  blockId: BlockId,
   creationHeight: CreationHeight,
   settlementHeight: SettlementHeight,
   ergoTreeHash: ErgoTreeHash,
   ergoTreeT8Hash: Option[ErgoTreeT8Hash],
   ergValue: Value,
+  index: Index,
   r4: Option[BoxRegisterValueHex],
   r5: Option[BoxRegisterValueHex],
   r6: Option[BoxRegisterValueHex],
   r7: Option[BoxRegisterValueHex],
   r8: Option[BoxRegisterValueHex],
   r9: Option[BoxRegisterValueHex]
-) {
+) extends Boxish {
   def toBox: Box =
     Box(
       boxId,
       txId,
+      blockId,
       creationHeight,
       settlementHeight,
       ergoTreeHash,
       ergoTreeT8Hash,
       ergValue,
+      index,
       r4,
       r5,
       r6,

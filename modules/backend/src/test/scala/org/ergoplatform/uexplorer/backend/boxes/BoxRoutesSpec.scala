@@ -407,11 +407,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] with ZioRoutes {
           spentIdsByErgoTreeT8Hash.size + unspentIdsByErgoTreeT8Hash.size == anyIdsByErgoTreeT8Hash.size
         )
       },
-      test("get assets and boxes by tokenId") {
-        val unspentAssetsByTokenIdGet = Request.get(URL(Root / rootPath / "assets" / "unspent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
-        val spentAssetsByTokenIdGet   = Request.get(URL(Root / rootPath / "assets" / "spent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
-        val anyAssetsByTokenIdGet     = Request.get(URL(Root / rootPath / "assets" / "any" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
-
+      test("get boxes by tokenId") {
         val unspentBoxesByTokenIdGet  = Request.get(URL(Root / rootPath / "boxes" / "unspent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
         val unspentBoxIdsByTokenIdGet = Request.get(URL(Root / rootPath / "box-ids" / "unspent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
         val spentBoxesByTokenIdGet    = Request.get(URL(Root / rootPath / "boxes" / "spent" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
@@ -420,9 +416,6 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] with ZioRoutes {
         val anyBoxIdsByTokenIdGet     = Request.get(URL(Root / rootPath / "box-ids" / "any" / "by-token-id" / Protocol.firstBlockRewardBox.unwrapped))
 
         for {
-          unspentAssets <- routes.runZIO(unspentAssetsByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
-          spentAssets   <- routes.runZIO(spentAssetsByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
-          anyAssets     <- routes.runZIO(anyAssetsByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
           unspentBoxes  <- routes.runZIO(unspentBoxesByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
           unspentBoxIds <- routes.runZIO(unspentBoxIdsByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[BoxId]])))
           spentBoxes    <- routes.runZIO(spentBoxesByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
@@ -430,9 +423,6 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] with ZioRoutes {
           anyBoxes      <- routes.runZIO(anyBoxesByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[Asset]])))
           anyBoxIds     <- routes.runZIO(anyBoxIdsByTokenIdGet).flatMap(_.body.asString.flatMap(x => ZIO.fromEither(x.fromJson[List[BoxId]])))
         } yield assertTrue(
-          unspentAssets.isEmpty,
-          spentAssets.isEmpty,
-          anyAssets.isEmpty,
           unspentBoxes.isEmpty,
           unspentBoxIds.isEmpty,
           spentBoxes.isEmpty,
