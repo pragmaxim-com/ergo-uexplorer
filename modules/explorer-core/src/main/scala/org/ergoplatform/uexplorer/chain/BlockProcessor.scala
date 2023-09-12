@@ -8,12 +8,9 @@ import zio.stream.ZPipeline
 
 object BlockProcessor {
 
-  def processingFlow(
-    chainLinker: ChainLinker
-  )(implicit ps: CoreConf): ZPipeline[Any, Throwable, ApiFullBlock, List[LinkedBlock]] =
+  def processingFlow(implicit ps: CoreConf): ZPipeline[Any, Throwable, ApiFullBlock, BlockWithOutputs] =
     ZPipeline
       .mapZIO[Any, Throwable, ApiFullBlock, BlockWithReward](b => RewardCalculator(b))
       .mapZIO(b => OutputBuilder(b)(ps.addressEncoder))
-      .mapZIO(b => chainLinker.linkChildToAncestors()(b))
 
 }

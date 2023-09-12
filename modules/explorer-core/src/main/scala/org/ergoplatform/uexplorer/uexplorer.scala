@@ -6,6 +6,7 @@ import eu.timepit.refined.auto.autoUnwrap
 import eu.timepit.refined.refineV
 import eu.timepit.refined.string.{HexStringSpec, MatchesRegex, ValidByte}
 import io.circe.*
+import org.ergoplatform.ErgoBox.RegisterId
 import zio.*
 import zio.json.*
 
@@ -22,6 +23,7 @@ package object uexplorer {
 
   type Value            = Long
   type Index            = Int
+  type GlobalIndex      = Long
   type Amount           = Long
   type Height           = Int
   type CreationHeight   = Int
@@ -116,16 +118,28 @@ package object uexplorer {
     def castUnsafe(s: String): ErgoTreeT8Hash = s.asInstanceOf[ErgoTreeT8Hash]
   }
 
+  opaque type Reg = String
+
+  object Reg {
+    def apply(r: RegisterId): Reg            = r.toString
+    given Encoder[Reg]                       = Encoder.encodeString
+    given Decoder[Reg]                       = Decoder.decodeString
+    given JsonEncoder[Reg]                   = JsonEncoder.string.contramap(_.unwrapped)
+    given JsonDecoder[Reg]                   = JsonDecoder.string
+    extension (x: Reg) def unwrapped: String = x
+    def castUnsafe(s: String): Reg           = s
+  }
+
   opaque type TxId = String
 
   object TxId {
     def apply(s: String): TxId                = s
     given Encoder[TxId]                       = Encoder.encodeString
     given Decoder[TxId]                       = Decoder.decodeString
-    given JsonEncoder[TxId]                   = JsonEncoder.string
+    given JsonEncoder[TxId]                   = JsonEncoder.string.contramap(_.unwrapped)
     given JsonDecoder[TxId]                   = JsonDecoder.string
     extension (x: TxId) def unwrapped: String = x
-    def castUnsafe(s: String): TxId           = s.asInstanceOf[TxId]
+    def castUnsafe(s: String): TxId           = s
   }
 
   opaque type BoxId = HexString

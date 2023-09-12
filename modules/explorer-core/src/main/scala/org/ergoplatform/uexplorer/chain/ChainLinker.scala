@@ -54,7 +54,7 @@ class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(i
         }
       case _ =>
         for {
-          _                 <- ZIO.log(s"Fork detected at height ${block.b.header.height} and block ${block.b.header.id}")
+          _                 <- ZIO.log(s"Fork detected ${block.b.header.id} @ ${block.b.header.height} -> ${block.b.header.parentId}")
           parentApiBlock    <- getBlock(block.b.header.parentId)
           parentRewardBlock <- RewardCalculator(parentApiBlock)
           parentOutputBlock <- OutputBuilder(parentRewardBlock)(ps.addressEncoder)

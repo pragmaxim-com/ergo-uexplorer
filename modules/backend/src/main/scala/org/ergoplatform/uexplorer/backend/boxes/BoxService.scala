@@ -1,7 +1,8 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.backend.IdParsingException
-import org.ergoplatform.uexplorer.db.{Asset, Asset2Box, Box, Utxo}
+import org.ergoplatform.uexplorer.db.{Asset, Asset2Box, Box, BoxWithAssets, Utxo}
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
 import org.ergoplatform.uexplorer.{Address, BoxId, CoreConf, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hash, ErgoTreeT8Hex, TokenId}
 import zio.http.QueryParams
@@ -10,43 +11,68 @@ import zio.{IO, Task, ZIO, ZLayer}
 case class BoxService(boxRepo: BoxRepo, coreConf: CoreConf) {
   import BoxService.allColumns
 
-  def getUnspentAssetsByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[Asset2Box]] =
+  def getUnspentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String])(implicit enc: ErgoAddressEncoder): Task[Iterable[BoxWithAssets]] =
     for
-      tId    <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
-      assets <- boxRepo.lookupUnspentAssetsByTokenId(tId, allColumns, indexFilter)
-    yield assets
+      tId       <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
+      asset2box <- boxRepo.lookupUnspentAssetsByTokenId(tId, allColumns, indexFilter)
+      assetsByBox <- ZIO.when(asset2box.nonEmpty) {
+                       ZIO
+                         .foreachPar(asset2box.groupBy(_.boxId).toList) { case (boxId, a2b) =>
+                           boxRepo.joinUtxoWithErgoTreeAndBlock(boxId, allColumns, indexFilter).map(_.head -> a2b)
+                         }
+                         .withParallelism(32) // TODO configurable
+                     }
+      result <- ZIO.when(assetsByBox.nonEmpty)(BoxWithAssets.fromBox(assetsByBox.get))
+    yield result.toList.flatten
 
-  def getSpentAssetsByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[Asset2Box]] =
+  def getSpentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String])(implicit enc: ErgoAddressEncoder): Task[Iterable[BoxWithAssets]] =
     for
-      tId     <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
-      utxoIds <- boxRepo.lookupUtxoIdsByTokenId(tId)
-      assets  <- boxRepo.lookupAnyAssetsByTokenId(tId, allColumns, indexFilter)
-    yield assets.filter(a => !utxoIds.contains(a.boxId))
+      tId       <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
+      utxoIds   <- boxRepo.lookupUtxoIdsByTokenId(tId)
+      asset2box <- boxRepo.lookupAnyAssetsByTokenId(tId, allColumns, indexFilter)
+      spentAsset2box = asset2box.filter(a => !utxoIds.contains(a.boxId))
+      assetsByBox <- ZIO.when(spentAsset2box.nonEmpty) {
+                       ZIO
+                         .foreachPar(spentAsset2box.groupBy(_.boxId).toList) { case (boxId, a2b) =>
+                           boxRepo.joinBoxWithErgoTreeAndBlock(boxId, allColumns, indexFilter).map(_.head -> a2b)
+                         }
+                         .withParallelism(32) // TODO configurable
+                     }
+      result <- ZIO.when(assetsByBox.nonEmpty)(BoxWithAssets.fromBox(assetsByBox.get))
+    yield result.toList.flatten
 
-  def getAnyAssetsByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[Asset2Box]] =
+  def getAnyBoxesByTokenId(tokenId: String, indexFilter: Map[String, String])(implicit enc: ErgoAddressEncoder): Task[Iterable[BoxWithAssets]] =
     for
-      tId    <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
-      assets <- boxRepo.lookupAnyAssetsByTokenId(tId, allColumns, indexFilter)
-    yield assets
+      tId       <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
+      asset2box <- boxRepo.lookupAnyAssetsByTokenId(tId, allColumns, indexFilter)
+      assetsByBox <- ZIO.when(asset2box.nonEmpty) {
+                       ZIO
+                         .foreachPar(asset2box.groupBy(_.boxId).toList) { case (boxId, a2b) =>
+                           boxRepo.joinBoxWithErgoTreeAndBlock(boxId, allColumns, indexFilter).map(_.head -> a2b)
+                         }
+                         .withParallelism(32) // TODO configurable
+                     }
+      result <- ZIO.when(assetsByBox.nonEmpty)(BoxWithAssets.fromBox(assetsByBox.get))
+    yield result.toList.flatten
 
-  def getUnspentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[Utxo]] =
+  def getUnspentBoxIdsByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[BoxId]] =
     for
       tId   <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
       utxos <- boxRepo.lookupUtxosByTokenId(tId, allColumns, indexFilter)
-    yield utxos
+    yield utxos.map(_._2.boxId)
 
-  def getSpentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[Box]] =
+  def getSpentBoxIdsByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[BoxId]] =
     for
       tId     <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
       boxes   <- boxRepo.lookupBoxesByTokenId(tId, allColumns, indexFilter)
       utxoIds <- boxRepo.lookupUtxoIdsByTokenId(tId)
-    yield boxes.filter(b => !utxoIds.contains(b.boxId))
+    yield boxes.filter(b => !utxoIds.contains(b._2.boxId)).map(_._2.boxId)
 
-  def getAnyBoxesByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[Box]] =
+  def getAnyBoxIdsByTokenId(tokenId: String, indexFilter: Map[String, String]): Task[Iterable[BoxId]] =
     for
       tId   <- ZIO.attempt(TokenId.fromStringUnsafe(tokenId)).mapError(ex => IdParsingException(tokenId, ex.getMessage))
       utxos <- boxRepo.lookupBoxesByTokenId(tId, allColumns, indexFilter)
-    yield utxos
+    yield utxos.map(_._2.boxId)
 
   def getUtxo(boxId: String): Task[Option[Utxo]] =
     for
@@ -204,23 +230,29 @@ object BoxService {
   def layer: ZLayer[BoxRepo with CoreConf, Nothing, BoxService] =
     ZLayer.fromFunction(BoxService.apply _)
 
-  def getUnspentAssetsByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[Asset2Box]] =
-    ZIO.serviceWithZIO[BoxService](_.getUnspentAssetsByTokenId(tokenId, indexFilter))
-
-  def getSpentAssetsByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[Asset2Box]] =
-    ZIO.serviceWithZIO[BoxService](_.getSpentAssetsByTokenId(tokenId, indexFilter))
-
-  def getAnyAssetsByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[Asset2Box]] =
-    ZIO.serviceWithZIO[BoxService](_.getAnyAssetsByTokenId(tokenId, indexFilter))
-
-  def getUnspentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[Utxo]] =
+  def getUnspentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String])(implicit
+    enc: ErgoAddressEncoder
+  ): ZIO[BoxService, Throwable, Iterable[BoxWithAssets]] =
     ZIO.serviceWithZIO[BoxService](_.getUnspentBoxesByTokenId(tokenId, indexFilter))
 
-  def getSpentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[Box]] =
+  def getSpentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String])(implicit
+    enc: ErgoAddressEncoder
+  ): ZIO[BoxService, Throwable, Iterable[BoxWithAssets]] =
     ZIO.serviceWithZIO[BoxService](_.getSpentBoxesByTokenId(tokenId, indexFilter))
 
-  def getAnyBoxesByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[Box]] =
+  def getAnyBoxesByTokenId(tokenId: String, indexFilter: Map[String, String])(implicit
+    enc: ErgoAddressEncoder
+  ): ZIO[BoxService, Throwable, Iterable[BoxWithAssets]] =
     ZIO.serviceWithZIO[BoxService](_.getAnyBoxesByTokenId(tokenId, indexFilter))
+
+  def getUnspentBoxIdsByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[BoxId]] =
+    ZIO.serviceWithZIO[BoxService](_.getUnspentBoxIdsByTokenId(tokenId, indexFilter))
+
+  def getSpentBoxIdsByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[BoxId]] =
+    ZIO.serviceWithZIO[BoxService](_.getSpentBoxIdsByTokenId(tokenId, indexFilter))
+
+  def getAnyBoxIdsByTokenId(tokenId: String, indexFilter: Map[String, String]): ZIO[BoxService, Throwable, Iterable[BoxId]] =
+    ZIO.serviceWithZIO[BoxService](_.getAnyBoxIdsByTokenId(tokenId, indexFilter))
 
   def getUtxo(boxId: String): ZIO[BoxService, Throwable, Option[Utxo]] =
     ZIO.serviceWithZIO[BoxService](_.getUtxo(boxId))

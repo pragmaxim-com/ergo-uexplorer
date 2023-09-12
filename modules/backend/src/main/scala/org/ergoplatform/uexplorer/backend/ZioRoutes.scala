@@ -1,5 +1,6 @@
 package org.ergoplatform.uexplorer.backend
 
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.CoreConf
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRoutes, BlockService, PersistentBlockRepo}
 import org.ergoplatform.uexplorer.backend.boxes.{BoxRoutes, BoxService, PersistentBoxRepo}
@@ -11,11 +12,11 @@ import zio.json.*
 trait ZioRoutes:
   val rootPath = "explorer"
 
-  val tapirWithProxyRoutes: App[Client with NodePool with BoxService with BlockService] =
+  def tapirWithProxyRoutes(implicit enc: ErgoAddressEncoder): App[Client with NodePool with BoxService with BlockService] =
     (TapirRoutes.routes ++ ProxyZioRoutes()).withDefaultErrorResponse
 
-  val zioHttpWithProxyRoutes: App[Client with NodePool with BoxService with BlockService] =
-    (BlockRoutes() ++ BoxRoutes() ++ ProxyZioRoutes()).withDefaultErrorResponse
+  def zioHttpWithProxyRoutes(implicit enc: ErgoAddressEncoder): App[Client with NodePool with BoxService with BlockService] =
+    (BlockRoutes() ++ BoxRoutes(enc) ++ ProxyZioRoutes()).withDefaultErrorResponse
 
   val routeLayers =
     Client.default >+>
