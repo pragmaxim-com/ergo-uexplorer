@@ -52,48 +52,51 @@ object BoxRoutes extends ZioRoutes with Codecs:
           .catchAllDefect(throwableToErrorResponse)
           .orDie
 
-      case Method.GET -> Root / rootPath / "boxes" / "unspent" / boxId =>
+      case req @ Method.GET -> Root / rootPath / "boxes" / "unspent" / boxId =>
         BoxService
-          .getUtxo(boxId)
+          .getUtxo(boxId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(_.fold(Response.status(Status.NotFound))(box => Response.json(box.toJson)))
           .orDie
 
       case req @ Method.POST -> Root / rootPath / "boxes" / "unspent" =>
         (for {
           u <- req.body.asString.map(_.fromJson[Set[String]])
+          qp = req.url.queryParams.map.view.mapValues(_.head).toMap
           r <- u.fold(
                  msg => ZIO.attempt(Response.json(ErrorResponse(Status.BadRequest.code, msg).toJson).withStatus(Status.BadRequest)),
-                 boxIds => BoxService.getUtxos(boxIds).map(utxos => Response.json(utxos.toJson)).catchAllDefect(throwableToErrorResponse)
+                 boxIds => BoxService.getUtxos(boxIds, qp).map(utxos => Response.json(utxos.toJson)).catchAllDefect(throwableToErrorResponse)
                )
         } yield r).orDie
 
-      case Method.GET -> Root / rootPath / "boxes" / "spent" / boxId =>
+      case req @ Method.GET -> Root / rootPath / "boxes" / "spent" / boxId =>
         BoxService
-          .getSpentBox(boxId)
+          .getSpentBox(boxId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(_.fold(Response.status(Status.NotFound))(box => Response.json(box.toJson)))
           .orDie
 
       case req @ Method.POST -> Root / rootPath / "boxes" / "spent" =>
         (for {
           u <- req.body.asString.map(_.fromJson[Set[String]])
+          qp = req.url.queryParams.map.view.mapValues(_.head).toMap
           r <- u.fold(
                  msg => ZIO.attempt(Response.json(ErrorResponse(Status.BadRequest.code, msg).toJson).withStatus(Status.BadRequest)),
-                 boxIds => BoxService.getSpentBoxes(boxIds).map(spentBoxes => Response.json(spentBoxes.toJson)).catchAllDefect(throwableToErrorResponse)
+                 boxIds => BoxService.getSpentBoxes(boxIds, qp).map(spentBoxes => Response.json(spentBoxes.toJson)).catchAllDefect(throwableToErrorResponse)
                )
         } yield r).orDie
 
-      case Method.GET -> Root / rootPath / "boxes" / "any" / boxId =>
+      case req @ Method.GET -> Root / rootPath / "boxes" / "any" / boxId =>
         BoxService
-          .getAnyBox(boxId)
+          .getAnyBox(boxId, req.url.queryParams.map.view.mapValues(_.head).toMap)
           .map(_.fold(Response.status(Status.NotFound))(box => Response.json(box.toJson)))
           .orDie
 
       case req @ Method.POST -> Root / rootPath / "boxes" / "any" =>
         (for {
           u <- req.body.asString.map(_.fromJson[Set[String]])
+          qp = req.url.queryParams.map.view.mapValues(_.head).toMap
           r <- u.fold(
                  msg => ZIO.attempt(Response.json(ErrorResponse(Status.BadRequest.code, msg).toJson).withStatus(Status.BadRequest)),
-                 boxIds => BoxService.getAnyBoxes(boxIds).map(utxos => Response.json(utxos.toJson)).catchAllDefect(throwableToErrorResponse)
+                 boxIds => BoxService.getAnyBoxes(boxIds, qp).map(utxos => Response.json(utxos.toJson)).catchAllDefect(throwableToErrorResponse)
                )
         } yield r).orDie
 

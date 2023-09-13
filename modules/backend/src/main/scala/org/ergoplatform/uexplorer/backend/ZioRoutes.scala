@@ -3,7 +3,7 @@ package org.ergoplatform.uexplorer.backend
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.CoreConf
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRoutes, BlockService, PersistentBlockRepo}
-import org.ergoplatform.uexplorer.backend.boxes.{BoxRoutes, BoxService, PersistentBoxRepo}
+import org.ergoplatform.uexplorer.backend.boxes.{BoxRoutes, BoxService, PersistentAssetRepo, PersistentBoxRepo}
 import org.ergoplatform.uexplorer.http.{NodePool, NodePoolConf}
 import zio.{Task, ZIO}
 import zio.http.*
@@ -25,6 +25,7 @@ trait ZioRoutes:
       NodePool.layerInitializedFromConf >+>
       H2Backend.zLayerFromConf >+>
       PersistentBoxRepo.layer >+>
+      PersistentAssetRepo.layer >+>
       PersistentBlockRepo.layer >+>
       BoxService.layer >+>
       BlockService.layer
