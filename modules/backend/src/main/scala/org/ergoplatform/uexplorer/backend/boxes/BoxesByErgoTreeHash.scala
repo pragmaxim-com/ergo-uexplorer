@@ -1,7 +1,8 @@
 package org.ergoplatform.uexplorer.backend.boxes
 
+import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.backend.{Codecs, ErrorResponse, TapirRoutes}
-import org.ergoplatform.uexplorer.db.{Box, Utxo}
+import org.ergoplatform.uexplorer.db.{Box, BoxWithAssets, Utxo}
 import org.ergoplatform.uexplorer.{BlockId, BoxId, TxId}
 import sttp.model.{QueryParams, StatusCode}
 import sttp.tapir.generic.auto.*
@@ -13,16 +14,16 @@ import zio.json.*
 
 trait BoxesByErgoTreeHash extends TapirRoutes with Codecs:
 
-  protected[backend] val spentContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Box], Any] =
+  protected[backend] val spentContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxWithAssets], Any] =
     endpoint.get
       .in(rootPath / "boxes" / "spent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
-      .out(jsonBody[Iterable[Box]])
+      .out(jsonBody[Iterable[BoxWithAssets]])
       .description("Get spent boxes by ErgoTree hash (base16 of Sha256)")
 
-  protected[backend] val spentContractBoxesByErgoTreeHashEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] def spentContractBoxesByErgoTreeHashEndpoint(implicit enc: ErgoAddressEncoder): ZServerEndpoint[BoxService, Any] =
     spentContractBoxesByErgoTreeHash.zServerLogic { case (ergoTreeHash, qp) =>
       BoxService
         .getSpentBoxesByErgoTreeHash(ergoTreeHash, qp.toMap)
@@ -41,21 +42,20 @@ trait BoxesByErgoTreeHash extends TapirRoutes with Codecs:
   protected[backend] val spentContractBoxIdsByErgoTreeHashEndpoint: ZServerEndpoint[BoxService, Any] =
     spentContractBoxIdsByErgoTreeHash.zServerLogic { case (ergoTreeHash, qp) =>
       BoxService
-        .getSpentBoxesByErgoTreeHash(ergoTreeHash, qp.toMap)
-        .map(_.map(_.boxId))
+        .getSpentBoxIdsByErgoTreeHash(ergoTreeHash, qp.toMap)
         .mapError(handleThrowable)
     }
 
-  protected[backend] val unspentContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Utxo], Any] =
+  protected[backend] val unspentContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxWithAssets], Any] =
     endpoint.get
       .in(rootPath / "boxes" / "unspent" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
-      .out(jsonBody[Iterable[Utxo]])
+      .out(jsonBody[Iterable[BoxWithAssets]])
       .description("Get unspent boxes by ErgoTree hash (base16 of Sha256)")
 
-  protected[backend] val unspentContractBoxesByErgoTreeHashEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] def unspentContractBoxesByErgoTreeHashEndpoint(implicit enc: ErgoAddressEncoder): ZServerEndpoint[BoxService, Any] =
     unspentContractBoxesByErgoTreeHash.zServerLogic { case (ergoTreeHash, qp) =>
       BoxService
         .getUnspentBoxesByErgoTreeHash(ergoTreeHash, qp.toMap)
@@ -74,21 +74,20 @@ trait BoxesByErgoTreeHash extends TapirRoutes with Codecs:
   protected[backend] val unspentContractBoxIdsByErgoTreeHashEndpoint: ZServerEndpoint[BoxService, Any] =
     unspentContractBoxIdsByErgoTreeHash.zServerLogic { case (ergoTreeHash, qp) =>
       BoxService
-        .getUnspentBoxesByErgoTreeHash(ergoTreeHash, qp.toMap)
-        .map(_.map(_.boxId))
+        .getUnspentBoxIdsByErgoTreeHash(ergoTreeHash, qp.toMap)
         .mapError(handleThrowable)
     }
 
-  protected[backend] val anyContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[Box], Any] =
+  protected[backend] val anyContractBoxesByErgoTreeHash: PublicEndpoint[(String, QueryParams), (ErrorResponse, StatusCode), Iterable[BoxWithAssets], Any] =
     endpoint.get
       .in(rootPath / "boxes" / "any" / "contracts" / "by-ergo-tree-hash" / path[String]("ergoTreeHash"))
       .in(queryParams)
       .errorOut(jsonBody[ErrorResponse])
       .errorOut(statusCode)
-      .out(jsonBody[Iterable[Box]])
+      .out(jsonBody[Iterable[BoxWithAssets]])
       .description("Get any (spent or unspent) boxes by ErgoTree hash (base16 of Sha256)")
 
-  protected[backend] val anyContractBoxesByErgoTreeHashEndpoint: ZServerEndpoint[BoxService, Any] =
+  protected[backend] def anyContractBoxesByErgoTreeHashEndpoint(implicit enc: ErgoAddressEncoder): ZServerEndpoint[BoxService, Any] =
     anyContractBoxesByErgoTreeHash.zServerLogic { case (ergoTreeHash, qp) =>
       BoxService
         .getAnyBoxesByErgoTreeHash(ergoTreeHash, qp.toMap)
@@ -107,8 +106,7 @@ trait BoxesByErgoTreeHash extends TapirRoutes with Codecs:
   protected[backend] val anyContractBoxIdsByErgoTreeHashEndpoint: ZServerEndpoint[BoxService, Any] =
     anyContractBoxIdsByErgoTreeHash.zServerLogic { case (ergoTreeHash, qp) =>
       BoxService
-        .getAnyBoxesByErgoTreeHash(ergoTreeHash, qp.toMap)
-        .map(_.map(_.boxId))
+        .getAnyBoxIdsByErgoTreeHash(ergoTreeHash, qp.toMap)
         .mapError(handleThrowable)
 
     }
