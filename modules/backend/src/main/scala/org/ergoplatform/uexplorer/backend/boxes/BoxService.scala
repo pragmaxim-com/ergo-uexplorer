@@ -40,7 +40,7 @@ case class BoxService(boxRepo: BoxRepo, assetRepo: AssetRepo, coreConf: CoreConf
                        }
                        .withParallelism(32) // TODO configurable
       flattenAssets = assetsByBox.flatten
-      result <- ZIO.when(flattenAssets.nonEmpty)(BoxWithAssets.fromBox(flattenAssets.get))
+      result <- ZIO.when(flattenAssets.nonEmpty)(BoxWithAssets.fromBox(flattenAssets))
     yield result.toList.flatten
 
   def getAnyBoxes(asset2box: Iterable[(BoxId, Option[Asset2Box])], indexFilter: Map[String, String])(implicit
@@ -55,7 +55,7 @@ case class BoxService(boxRepo: BoxRepo, assetRepo: AssetRepo, coreConf: CoreConf
                        }
                        .withParallelism(32) // TODO configurable
       flattenAssets = assetsByBox.flatten
-      result <- ZIO.when(flattenAssets.nonEmpty)(BoxWithAssets.fromBox(flattenAssets.get))
+      result <- ZIO.when(flattenAssets.nonEmpty)(BoxWithAssets.fromBox(flattenAssets))
     yield result.toList.flatten
 
   def getUnspentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String])(implicit enc: ErgoAddressEncoder): Task[Iterable[BoxWithAssets]] =
