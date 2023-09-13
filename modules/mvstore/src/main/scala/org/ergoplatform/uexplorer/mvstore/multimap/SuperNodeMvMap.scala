@@ -63,7 +63,7 @@ class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
       _ <- ZIO.when(emptyMaps.nonEmpty)(ZIO.log(s"Going to remove and close ${emptyMaps.size} empty $id supernode maps"))
       _ <- ZIO.when(closedMaps.nonEmpty)(ZIO.log(s"Going to remove ${closedMaps.size} closed $id supernode maps"))
       _ <- ZIO.attempt(closedMaps.foreach(existingMapsByHotKey.remove))
-      _ <- ZIO.attempt(
+    /*      _ <- ZIO.attempt(
              emptyMaps
                .foreach { hk =>
                  existingMapsByHotKey
@@ -71,6 +71,7 @@ class SuperNodeMvMap[HK, C[A, B] <: java.util.Map[A, B], K, V](
                    .foreach(store.removeMap)
                }
            )
+     */
     yield ()
   }
 
