@@ -15,14 +15,16 @@ case class BoxService(boxRepo: BoxRepo, assetRepo: AssetRepo, coreConf: CoreConf
     enc: ErgoAddressEncoder
   ): ZIO[Any, Throwable, List[BoxWithAssets]] =
     for
-      assetsByBox <- ZIO.when(asset2box.nonEmpty) {
-                       ZIO
-                         .foreachPar(asset2box.groupBy(_._1).toList) { case (boxId, a2b) =>
-                           boxRepo.joinUtxoWithErgoTreeAndBlock(boxId, allColumns, indexFilter).map(_.head -> a2b.flatMap(_._2))
-                         }
-                         .withParallelism(32) // TODO configurable
-                     }
-      result <- ZIO.when(assetsByBox.nonEmpty)(BoxWithAssets.fromBox(assetsByBox.get))
+      assetsByBox <- ZIO
+                       .foreachPar(asset2box.groupBy(_._1).toList) { case (boxId, a2b) =>
+                         boxRepo
+                           .joinUtxoWithErgoTreeAndBlock(boxId, allColumns, indexFilter)
+                           .map(_.headOption.toList.map(_ -> a2b.flatMap(_._2)))
+                       }
+                       .withParallelism(32) // TODO configurable
+
+      flattenAssets = assetsByBox.flatten
+      result <- ZIO.when(flattenAssets.nonEmpty)(BoxWithAssets.fromBox(flattenAssets))
     yield result.toList.flatten
 
   def getSpentBoxes(asset2box: Iterable[(BoxId, Option[Asset2Box])], utxoIds: Set[BoxId], indexFilter: Map[String, String])(implicit
@@ -30,28 +32,30 @@ case class BoxService(boxRepo: BoxRepo, assetRepo: AssetRepo, coreConf: CoreConf
   ): ZIO[Any, Throwable, List[BoxWithAssets]] =
     val spentAsset2box = asset2box.filter { case (boxId, _) => !utxoIds.contains(boxId) }
     for
-      assetsByBox <- ZIO.when(spentAsset2box.nonEmpty) {
-                       ZIO
-                         .foreachPar(spentAsset2box.groupBy(_._1).toList) { case (boxId, a2b) =>
-                           boxRepo.joinBoxWithErgoTreeAndBlock(boxId, allColumns, indexFilter).map(_.head -> a2b.flatMap(_._2))
-                         }
-                         .withParallelism(32) // TODO configurable
-                     }
-      result <- ZIO.when(assetsByBox.nonEmpty)(BoxWithAssets.fromBox(assetsByBox.get))
+      assetsByBox <- ZIO
+                       .foreachPar(spentAsset2box.groupBy(_._1).toList) { case (boxId, a2b) =>
+                         boxRepo
+                           .joinBoxWithErgoTreeAndBlock(boxId, allColumns, indexFilter)
+                           .map(_.headOption.toList.map(_ -> a2b.flatMap(_._2)))
+                       }
+                       .withParallelism(32) // TODO configurable
+      flattenAssets = assetsByBox.flatten
+      result <- ZIO.when(flattenAssets.nonEmpty)(BoxWithAssets.fromBox(flattenAssets.get))
     yield result.toList.flatten
 
   def getAnyBoxes(asset2box: Iterable[(BoxId, Option[Asset2Box])], indexFilter: Map[String, String])(implicit
     enc: ErgoAddressEncoder
   ): ZIO[Any, Throwable, List[BoxWithAssets]] =
     for
-      assetsByBox <- ZIO.when(asset2box.nonEmpty) {
-                       ZIO
-                         .foreachPar(asset2box.groupBy(_._1).toList) { case (boxId, a2b) =>
-                           boxRepo.joinBoxWithErgoTreeAndBlock(boxId, allColumns, indexFilter).map(_.head -> a2b.flatMap(_._2))
-                         }
-                         .withParallelism(32) // TODO configurable
-                     }
-      result <- ZIO.when(assetsByBox.nonEmpty)(BoxWithAssets.fromBox(assetsByBox.get))
+      assetsByBox <- ZIO
+                       .foreachPar(asset2box.groupBy(_._1).toList) { case (boxId, a2b) =>
+                         boxRepo
+                           .joinBoxWithErgoTreeAndBlock(boxId, allColumns, indexFilter)
+                           .map(_.headOption.toList.map(_ -> a2b.flatMap(_._2)))
+                       }
+                       .withParallelism(32) // TODO configurable
+      flattenAssets = assetsByBox.flatten
+      result <- ZIO.when(flattenAssets.nonEmpty)(BoxWithAssets.fromBox(flattenAssets.get))
     yield result.toList.flatten
 
   def getUnspentBoxesByTokenId(tokenId: String, indexFilter: Map[String, String])(implicit enc: ErgoAddressEncoder): Task[Iterable[BoxWithAssets]] =
