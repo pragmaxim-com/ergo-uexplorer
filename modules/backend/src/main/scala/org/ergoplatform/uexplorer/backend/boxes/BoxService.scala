@@ -2,11 +2,10 @@ package org.ergoplatform.uexplorer.backend.boxes
 
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.backend.IdParsingException
-import org.ergoplatform.uexplorer.db.{Asset, Asset2Box, Box, BoxWithAssets, Utxo}
+import org.ergoplatform.uexplorer.db.{Asset2Box, BoxWithAssets}
 import org.ergoplatform.uexplorer.parser.ErgoTreeParser
-import org.ergoplatform.uexplorer.{Address, BoxId, CoreConf, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hash, ErgoTreeT8Hex, TokenId}
-import zio.http.QueryParams
-import zio.{IO, Task, ZIO, ZLayer}
+import org.ergoplatform.uexplorer.{Address, BoxId, CoreConf, ErgoTreeHash, ErgoTreeHex, ErgoTreeT8Hex, TokenId}
+import zio.{Task, ZIO, ZLayer}
 
 case class BoxService(boxRepo: BoxRepo, assetRepo: AssetRepo, coreConf: CoreConf) {
   import BoxService.allColumns
@@ -22,7 +21,6 @@ case class BoxService(boxRepo: BoxRepo, assetRepo: AssetRepo, coreConf: CoreConf
                            .map(_.headOption.toList.map(_ -> a2b.flatMap(_._2)))
                        }
                        .withParallelism(32) // TODO configurable
-
       flattenAssets = assetsByBox.flatten
       result <- ZIO.when(flattenAssets.nonEmpty)(BoxWithAssets.fromBox(flattenAssets))
     yield result.toList.flatten

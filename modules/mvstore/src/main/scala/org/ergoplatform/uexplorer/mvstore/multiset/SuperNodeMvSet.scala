@@ -37,6 +37,8 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
       Some(SuperNodeCounter(writeOps + 1, readOps, added, removed + size))
     }
 
+  def keysWithSize: Iterator[(HK, CacheSize)] = existingMapsByHotKey.iterator.map{ case (k, map) => k -> map.size() }
+  
   def clearEmptyOrClosedSuperNodes(): Task[Unit] = {
     val emptyMaps =
       existingMapsByHotKey

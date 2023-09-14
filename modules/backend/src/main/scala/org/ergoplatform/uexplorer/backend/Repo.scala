@@ -15,6 +15,8 @@ trait Repo:
 
   def getLastBlock: Task[Option[Block]]
 
+  def persistBlock(b: LinkedBlock): Task[BestBlockInserted]
+
 object Repo:
   def writeBlock(b: LinkedBlock, inputIds: Seq[BoxId]): ZIO[Repo, Throwable, BlockId] =
     ZIO.serviceWithZIO[Repo](_.writeBlock(b, inputIds))

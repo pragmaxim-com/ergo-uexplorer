@@ -328,10 +328,11 @@ object MvStorage {
     }
 
   private def zlayer(dbFile: File): ZLayer[MvStoreConf, Throwable, MvStorage] =
-    ZLayer.service[MvStoreConf].flatMap { mvStoreConf =>
+    ZLayer.environment[MvStoreConf].flatMap { mvStoreConf =>
       ZLayer.scoped(
         ZIO.acquireRelease {
           buildMvStore(dbFile, mvStoreConf.get)
+            .logError("Storage probably trying to be opened multiple times")
             .flatMap { implicit store =>
               ZIO.log(s"Building MvStorage at version ${store.getCurrentVersion}") *> MvStorage(dbFile.getParentFile.toPath, mvStoreConf.get)
             }

@@ -6,7 +6,7 @@ import zio.*
 import zio.http.*
 import zio.json.*
 
-object BoxRoutes extends ZioRoutes with Codecs:
+object BoxZioRoutes extends ZioRoutes with Codecs:
 
   def apply(implicit enc: ErgoAddressEncoder): Http[BoxService, Throwable, Request, Response] =
     Http.collectZIO[Request] {
