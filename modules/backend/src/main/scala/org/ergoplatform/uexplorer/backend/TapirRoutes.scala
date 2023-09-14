@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.backend
 import org.ergoplatform.ErgoAddressEncoder
 import org.ergoplatform.uexplorer.backend.blocks.{BlockService, BlockTapirRoutes}
 import org.ergoplatform.uexplorer.backend.boxes.{BoxService, BoxTapirRoutes}
+import org.ergoplatform.uexplorer.backend.stats.{StatsService, StatsTapirRoutes}
 import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.ziohttp.ZioHttpInterpreter
 import sttp.tapir.swagger.SwaggerUIOptions
@@ -14,9 +15,11 @@ import zio.http.*
 trait TapirRoutes:
   def rootPath = "explorer"
 
-object TapirRoutes extends BlockTapirRoutes with BoxTapirRoutes:
+object TapirRoutes extends BlockTapirRoutes with BoxTapirRoutes with StatsTapirRoutes:
 
   val blockSwaggerEndpoints = List(infoEndpoint, blockByIdEndpoint, blockByIdsEndpoint)
+
+  val statsSwaggerEndpoints = List(statsTopAddressesByValueEndpoint, statsTopAddressesByUtxoCountEndpoint)
 
   val boxSwaggerEndpoints =
     List(
@@ -67,6 +70,9 @@ object TapirRoutes extends BlockTapirRoutes with BoxTapirRoutes:
   val blockRoutes: List[ZServerEndpoint[BlockService, Any]] =
     List(infoServerEndpoint, blockByIdServerEndpoint, blockByIdsServerEndpoint)
 
+  val statsRoutes: List[ZServerEndpoint[StatsService, Any]] =
+    List(statsTopAddressesByValueServerEndpoint, statsTopAddressesByUtxoCountServerEndpoint)
+
   def boxRoutes(implicit enc: ErgoAddressEncoder): List[ZServerEndpoint[BoxService, Any]] =
     List(
       unspentBoxesByTokenIdEndpoint,
@@ -113,10 +119,16 @@ object TapirRoutes extends BlockTapirRoutes with BoxTapirRoutes:
       anyTemplateBoxIdsByErgoTreeHashEndpoint
     )
 
-  val swaggerEndpoints: List[ServerEndpoint[Any, RIO[BoxService with BlockService, *]]] =
+  val swaggerEndpoints: List[ServerEndpoint[Any, RIO[StatsService with BoxService with BlockService, *]]] =
     SwaggerInterpreter(swaggerUIOptions = SwaggerUIOptions.default.pathPrefix(List(rootPath, "swagger")))
-      .fromEndpoints[RIO[BoxService with BlockService, *]](boxSwaggerEndpoints ++ blockSwaggerEndpoints, "uexplorer api", "1.0")
+      .fromEndpoints[RIO[StatsService with BoxService with BlockService, *]](
+        boxSwaggerEndpoints ++ blockSwaggerEndpoints ++ statsSwaggerEndpoints,
+        "uexplorer api",
+        "1.0"
+      )
 
-  def routes(implicit enc: ErgoAddressEncoder): HttpApp[BoxService with BlockService, Throwable] =
-    ZioHttpInterpreter().toHttp[BoxService](boxRoutes) ++ ZioHttpInterpreter().toHttp[BlockService](blockRoutes) ++ ZioHttpInterpreter()
-      .toHttp[BoxService with BlockService](swaggerEndpoints)
+  def routes(implicit enc: ErgoAddressEncoder): HttpApp[StatsService with BoxService with BlockService, Throwable] =
+    ZioHttpInterpreter().toHttp[BoxService](boxRoutes) ++
+      ZioHttpInterpreter().toHttp[BlockService](blockRoutes) ++
+      ZioHttpInterpreter().toHttp[StatsService with BoxService with BlockService](swaggerEndpoints) ++
+      ZioHttpInterpreter().toHttp[StatsService](statsRoutes)

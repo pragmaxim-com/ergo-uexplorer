@@ -3,6 +3,7 @@ package org.ergoplatform.uexplorer.indexer
 import org.ergoplatform.uexplorer.CoreConf
 import org.ergoplatform.uexplorer.backend.blocks.{BlockRepo, BlockService, PersistentBlockRepo}
 import org.ergoplatform.uexplorer.backend.boxes.{BoxService, PersistentAssetRepo, PersistentBoxRepo}
+import org.ergoplatform.uexplorer.backend.stats.StatsService
 import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo}
 import org.ergoplatform.uexplorer.db.GraphBackend
 import org.ergoplatform.uexplorer.http.*
@@ -42,6 +43,7 @@ object ChainIndexer extends ZIOAppDefault {
       H2Backend.zLayerFromConf,
       MetadataHttpClient.layer,
       BlockHttpClient.layer,
+      StatsService.layer,
       BlockService.layer,
       BoxService.layer,
       PersistentBlockRepo.layer,

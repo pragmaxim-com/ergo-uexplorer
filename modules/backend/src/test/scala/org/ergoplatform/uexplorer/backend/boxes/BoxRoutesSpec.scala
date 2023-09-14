@@ -5,6 +5,7 @@ import org.ergoplatform.uexplorer.Const.Protocol
 import org.ergoplatform.uexplorer.Const.Protocol.Emission
 import org.ergoplatform.uexplorer.backend.blocks.{BlockService, PersistentBlockRepo}
 import org.ergoplatform.uexplorer.backend.ZioRoutes
+import org.ergoplatform.uexplorer.backend.stats.StatsService
 import org.ergoplatform.uexplorer.db.BoxWithAssets
 import org.ergoplatform.uexplorer.http.NodePool
 import org.ergoplatform.uexplorer.{BoxId, CoreConf}
@@ -19,7 +20,7 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] with ZioRoutes {
 
   private val indexFilter: Map[String, Chunk[String]] = BoxService.indexWhiteList.map(key => key -> Chunk("")).toMap
 
-  def boxRoutesSpec(routes: App[Client with NodePool with BoxService with BlockService]) =
+  def boxRoutesSpec(routes: App[Client with NodePool with StatsService with BoxService with BlockService]) =
     suite("BoxRoutesSpec")(
       test("get spent/unspent/any box(es) by id") {
         val unspentBoxGet        = Request.get(URL(Root / rootPath / "boxes" / "unspent" / Protocol.firstBlockRewardBox.unwrapped))
@@ -431,5 +432,5 @@ trait BoxRoutesSpec extends ZIOSpec[TestEnvironment] with ZioRoutes {
           anyBoxIds.isEmpty
         )
       }
-    ).provide(routeLayers)
+    )
 }

@@ -6,7 +6,7 @@ import zio.*
 import zio.http.*
 import zio.json.*
 
-object BlockRoutes extends ZioRoutes with Codecs:
+object BlockZioRoutes extends ZioRoutes with Codecs:
 
   def apply(): Http[BlockService, Throwable, Request, Response] =
     Http.collectZIO[Request] {

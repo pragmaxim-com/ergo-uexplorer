@@ -63,7 +63,7 @@ case class BlockWriter(
           case Nil =>
             ZIO.fail(new IllegalStateException("ChainLinker cannot return no block"))
           case bestBlock :: Nil =>
-            persistBlock(bestBlock).map(_ :: Nil)
+            repo.persistBlock(bestBlock).map(_ :: Nil)
           case winningFork =>
             for {
               forkInserted <- rollbackFork(winningFork)
@@ -72,7 +72,7 @@ case class BlockWriter(
               _ <- repo.removeBlocks(forkInserted.loosingFork.map(_._1))
               newFork = winningFork.map(b => s"${b.block.height} @ ${b.b.header.id} -> ${b.block.parentId}").mkString("\n", "\n", "")
               _    <- ZIO.log(s"Adding new fork : $newFork")
-              fork <- ZIO.foreach(forkInserted.winningFork)(persistBlock)
+              fork <- ZIO.foreach(forkInserted.winningFork)(repo.persistBlock)
             } yield fork
         }
       }
@@ -110,22 +110,7 @@ case class BlockWriter(
         )
       }
 
-  private def persistBlock(b: LinkedBlock): Task[BestBlockInserted] = {
-    val inputIds: Seq[BoxId] =
-      b.b.transactions.transactions
-        .flatMap(_.inputs.collect { case i if i.boxId != Emission.inputBox && i.boxId != Foundation.inputBox => i.boxId })
 
-    def storageOps = List(
-      storage.persistErgoTreeByUtxo(b.outputRecords.byErgoTree) *> storage.removeInputBoxesByErgoTree(inputIds),
-      storage.persistErgoTreeT8ByUtxo(b.outputRecords.byErgoTreeT8) *> storage.removeInputBoxesByErgoTreeT8(inputIds),
-      storage.persistUtxosByTokenId(b.outputRecords.utxosByTokenId) *> storage.persistTokensByUtxo(b.outputRecords.tokensByUtxo) *> storage
-        .removeInputBoxesByTokenId(inputIds),
-      storage.insertNewBlock(b.b.header.id, b.block, storage.getCurrentRevision)
-    )
-
-    for _ <- (ZIO.collectAllParDiscard(storageOps) *> storage.commit()) <&> repo.writeBlock(b, inputIds)
-    yield BestBlockInserted(b, None)
-  }
 }
 
 object BlockWriter {
