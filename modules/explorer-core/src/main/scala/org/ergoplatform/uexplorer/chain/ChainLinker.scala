@@ -6,17 +6,20 @@ import org.ergoplatform.uexplorer.node.ApiFullBlock
 import zio.*
 
 import scala.jdk.CollectionConverters.*
-import scala.util.{Failure, Try}
 
 class ChainTip(byBlockIdRef: Ref[FifoLinkedHashMap[BlockId, Block]]) {
   def latestBlock: Task[Option[Block]] = toMap.map(_.values.toSeq.sortBy(_.height).lastOption)
   def toMap: Task[Map[BlockId, Block]] = byBlockIdRef.get.map(_.asScala.toMap)
   def getParent(block: ApiFullBlock): Task[Option[Block]] =
     byBlockIdRef.get
-      .map(byBlockId => byBlockId.asScala.values.toSeq.sortBy(_.height).lastOption -> Option(byBlockId.get(block.header.parentId)))
+      .map { byBlockId =>
+        byBlockId.asScala.values.toSeq.sortBy(_.height).lastOption -> Option(byBlockId.get(block.header.parentId))
+      }
       .flatMap {
         case (_, Some(parent)) if parent.height == block.header.height - 1 =>
           ZIO.succeed(Some(parent))
+        case (_, None) if block.header.height == 1 =>
+          ZIO.succeed(None)
         case (lastBlockOpt, None) =>
           val lastBlockStr = lastBlockOpt.map(b => s"${b.height} @ ${b.blockId}")
           ZIO.logWarning(s"Parent not found, last cached block : $lastBlockStr") *> ZIO.succeed(None)
@@ -62,10 +65,10 @@ class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(i
         chainTip.putOnlyNew(newBlock.block) *>
         ZIO
           .foldLeft(acc)(List(newBlock)) { case (linkedBlocks, b) =>
-            val parent = linkedBlocks.head.parentBlockOpt
+            val parent = linkedBlocks.headOption.map(_.block)
             chainTip
               .putOnlyNew(BlockBuilder(b, parent))
-              .map(newBlock => b.toLinkedBlock(newBlock, parent) :: linkedBlocks)
+              .map(newB => b.toLinkedBlock(newB, parent) :: linkedBlocks)
           }
           .map(_.reverse)
       case _ =>
