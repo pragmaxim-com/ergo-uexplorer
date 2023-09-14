@@ -21,7 +21,7 @@ case class BoxRegister(
 )
 
 object BoxRegister {
-  given JsonEncoder[SigmaType]   = JsonEncoder.string.contramap(s => SigmaType.encoder(s).noSpaces.trim)
+  given JsonEncoder[SigmaType]   = JsonEncoder.string.contramap(s => SigmaType.encoder(s).noSpaces.trim.replaceAll("\"", ""))
   given JsonEncoder[BoxRegister] = DeriveJsonEncoder.gen[BoxRegister]
 
   given JsonDecoder[Option[SigmaType]] = JsonDecoder.string.map(s => SigmaType.parse(s))

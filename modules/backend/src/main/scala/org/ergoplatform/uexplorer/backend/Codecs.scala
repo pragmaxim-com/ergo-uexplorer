@@ -28,7 +28,7 @@ trait Codecs {
   given Schema[TxId]        = Schema.string
   given Schema[Reg]         = Schema.string
   given Schema[BoxRegister] = Schema.derived
-  given Schema[SigmaType]   = Schema.string[String].map[SigmaType](SigmaType.parse)(SigmaType.encoder(_).noSpaces)
+  given Schema[SigmaType]   = Schema.string[String].map[SigmaType](SigmaType.parse)(s => SigmaType.encoder(s).noSpaces.trim.replaceAll("\"", ""))
 
   given MappedEncoding[HexString, String] = MappedEncoding[HexString, String](_.unwrapped)
   given MappedEncoding[String, HexString] = MappedEncoding[String, HexString](HexString.castUnsafe)

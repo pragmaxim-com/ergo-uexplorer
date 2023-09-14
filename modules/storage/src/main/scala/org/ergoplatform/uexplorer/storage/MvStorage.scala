@@ -121,7 +121,12 @@ case class MvStorage(
 
   def commit(): Task[Revision] = ZIO.attempt(store.commit())
 
-  def rollbackTo(rev: Revision): Task[Unit] = ZIO.attempt(store.rollbackTo(rev)) *> clearEmptySuperNodes
+  def rollbackTo(rev: Revision): Task[Unit] =
+    for
+      validRev <- ZIO.cond(getCurrentRevision - rev <= MvStorage.VersionsToKeep, rev, illEx(s"Cannot revert from rev $getCurrentRevision to $rev"))
+      _        <- ZIO.attempt(store.rollbackTo(validRev))
+      _        <- clearEmptySuperNodes
+    yield ()
 
   def removeInputBoxesByErgoTree(inputIds: Seq[BoxId]): Task[_] = ZIO.fromTry {
     inputIds

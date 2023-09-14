@@ -13,14 +13,18 @@ class ChainTip(byBlockIdRef: Ref[FifoLinkedHashMap[BlockId, Block]]) {
   def toMap: Task[Map[BlockId, Block]] = byBlockIdRef.get.map(_.asScala.toMap)
   def getParent(block: ApiFullBlock): Task[Option[Block]] =
     byBlockIdRef.get
-      .map(byBlockId => Option(byBlockId.get(block.header.parentId)))
+      .map(byBlockId => byBlockId.asScala.values.toSeq.sortBy(_.height).lastOption -> Option(byBlockId.get(block.header.parentId)))
       .flatMap {
-        case Some(parent) if parent.height == block.header.height - 1 =>
+        case (_, Some(parent)) if parent.height == block.header.height - 1 =>
           ZIO.succeed(Some(parent))
-        case None =>
-          ZIO.succeed(None)
-        case Some(parent) =>
-          ZIO.fail(illEx(s"Unexpected parent block ${parent.height} @ ${parent.blockId} of child ${block.header.height} @ ${block.header.id}"))
+        case (lastBlockOpt, None) =>
+          val lastBlockStr = lastBlockOpt.map(b => s"${b.height} @ ${b.blockId}")
+          ZIO.logWarning(s"Parent not found, last cached block : $lastBlockStr") *> ZIO.succeed(None)
+        case (lastBlockOpt, Some(parent)) =>
+          val lastBlockStr   = lastBlockOpt.map(b => s"${b.height} @ ${b.blockId}")
+          val parentBlockStr = s"${parent.height} @ ${parent.blockId}"
+          val childBlockStr  = s"${block.header.height} @ ${block.header.id}"
+          ZIO.fail(illEx(s"Unexpected error, last cachedBlock $lastBlockStr, parent block $parentBlockStr of child $childBlockStr"))
       }
 
   def putOnlyNew(block: Block): Task[Block] =
