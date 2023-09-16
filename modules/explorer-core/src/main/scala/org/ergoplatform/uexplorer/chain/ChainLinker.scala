@@ -46,7 +46,7 @@ class ChainTip(byBlockIdRef: Ref[FifoLinkedHashMap[BlockId, Block]]) {
 object ChainTip {
   def fromIterable(chainTip: IterableOnce[(BlockId, Block)], maxSize: Int = 100): Task[ChainTip] = {
     val newFifoMap = new FifoLinkedHashMap[BlockId, Block](maxSize)
-    newFifoMap.putAll(chainTip.iterator.toMap.asJava)
+    newFifoMap.putAll(chainTip.iterator.toSeq.sortBy(_._2.height).toMap.asJava)
     Ref.make(newFifoMap).map(new ChainTip(_))
   }
 
@@ -54,7 +54,7 @@ object ChainTip {
 
 }
 
-class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(implicit ps: CoreConf) {
+case class ChainLinker(getBlock: BlockId => Task[ApiFullBlock], chainTip: ChainTip)(implicit ps: CoreConf) {
 
   def linkChildToAncestors(acc: List[BlockWithOutputs] = List.empty)(
     block: BlockWithOutputs

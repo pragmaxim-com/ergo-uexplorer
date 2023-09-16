@@ -40,7 +40,7 @@ case class MvStorage(
 
   def getChainTip: Task[ChainTip] = {
     val lastHeight = getLastHeight
-    val heights    = lastHeight.fold(Seq.empty)(lk => (Math.max(1, lk - 99) to lk).toList)
+    val heights    = lastHeight.fold(Seq.empty)(lh => (Math.max(1, lh - 99) to lh).toList)
     def getLastBlocks =
       ZIO.attempt {
         heights
@@ -55,6 +55,7 @@ case class MvStorage(
       }
 
     for {
+      _           <- ZIO.log(s"Getting chain tip, last height : $lastHeight")
       lastBlocks  <- getLastBlocks
       chainTip    <- ChainTip.fromIterable(lastBlocks)
       chainTipMap <- chainTip.toMap
