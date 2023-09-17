@@ -57,6 +57,9 @@ create table if not exists Box (
     r9                   VARCHAR
 );
 
+create index if not exists box_ergoTreeHash ON Box (ergoTreeHash);
+create index if not exists box_blockId ON Box (blockId);
+
 create table if not exists Asset (
     tokenId              VARCHAR(64) NOT NULL PRIMARY KEY,
     blockId              VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE
@@ -72,6 +75,9 @@ create table if not exists Asset2Box (
     type                 VARCHAR,
     decimals             INT
 );
+
+create index if not exists asset2box_tokenId ON Asset2Box (tokenId);
+create index if not exists asset2box_boxId ON Asset2Box (boxId);
 
 create table if not exists Utxo (
     boxId                VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES Box (boxId) ON DELETE CASCADE,
@@ -90,3 +96,6 @@ create table if not exists Utxo (
     r8                   VARCHAR,
     r9                   VARCHAR
 );
+
+create index if not exists utxo_ergoTreeHash ON Utxo (ergoTreeHash);
+create index if not exists utxo_blockId ON Utxo (blockId);
