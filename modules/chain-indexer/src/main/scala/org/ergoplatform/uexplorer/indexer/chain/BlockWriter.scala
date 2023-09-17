@@ -94,11 +94,9 @@ case class BlockWriter(
       )
       .onExit {
         case Success(Some((lastBlock, indexCount))) =>
-          ZIO.log(s"Writing report after block at height ${lastBlock.linkedBlock.block.height}, indexed $indexCount blocks ...") *> storage
-            .writeReportAndCompact(false)
-            .orElseSucceed(())
+          ZIO.log(s"Indexed $indexCount blocks at height ${lastBlock.linkedBlock.block.height} ...")
         case Success(None) =>
-          ZIO.log(s"Stream finished without processing any blocks")
+          ZIO.debug(s"No new blocks yet ...")
         case Failure(cause) =>
           ZIO.logErrorCause(s"Stream failed !", cause) *> storage.writeReportAndCompact(false).orElseSucceed(())
       }
@@ -109,7 +107,6 @@ case class BlockWriter(
           graphBackend.graphTraversalSource
         )
       }
-
 
 }
 
