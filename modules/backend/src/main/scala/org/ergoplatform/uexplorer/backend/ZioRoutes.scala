@@ -1,32 +1,22 @@
 package org.ergoplatform.uexplorer.backend
 
-import org.ergoplatform.uexplorer.CoreConf
-import org.ergoplatform.uexplorer.backend.blocks.{BlockRoutes, BlockService, PersistentBlockRepo}
-import org.ergoplatform.uexplorer.backend.boxes.{BoxRoutes, BoxService, PersistentBoxRepo}
-import org.ergoplatform.uexplorer.http.{NodePool, NodePoolConf}
-import zio.{Task, ZIO}
+import org.ergoplatform.ErgoAddressEncoder
+import org.ergoplatform.uexplorer.backend.blocks.{BlockService, BlockZioRoutes}
+import org.ergoplatform.uexplorer.backend.boxes.{BoxService, BoxZioRoutes}
+import org.ergoplatform.uexplorer.backend.stats.{StatsService, StatsZioRoutes}
+import org.ergoplatform.uexplorer.http.NodePool
 import zio.http.*
 import zio.json.*
+import zio.{Task, ZIO}
 
 trait ZioRoutes:
   val rootPath = "explorer"
 
-  val tapirWithProxyRoutes: App[Client with NodePool with BoxService with BlockService] =
+  def tapirWithProxyRoutes(implicit enc: ErgoAddressEncoder): App[Client with NodePool with StatsService with BoxService with BlockService] =
     (TapirRoutes.routes ++ ProxyZioRoutes()).withDefaultErrorResponse
 
-  val zioHttpWithProxyRoutes: App[Client with NodePool with BoxService with BlockService] =
-    (BlockRoutes() ++ BoxRoutes() ++ ProxyZioRoutes()).withDefaultErrorResponse
-
-  val routeLayers =
-    Client.default >+>
-      CoreConf.layer >+>
-      NodePoolConf.layer >+>
-      NodePool.layerInitializedFromConf >+>
-      H2Backend.zLayerFromConf >+>
-      PersistentBoxRepo.layer >+>
-      PersistentBlockRepo.layer >+>
-      BoxService.layer >+>
-      BlockService.layer
+  def zioHttpWithProxyRoutes(implicit enc: ErgoAddressEncoder): App[Client with NodePool with StatsService with BoxService with BlockService] =
+    (BlockZioRoutes() ++ BoxZioRoutes(enc) ++ StatsZioRoutes() ++ ProxyZioRoutes()).withDefaultErrorResponse
 
   def throwableToErrorResponse(t: Throwable): Task[Response] = t match {
     case IdParsingException(_, msg) =>

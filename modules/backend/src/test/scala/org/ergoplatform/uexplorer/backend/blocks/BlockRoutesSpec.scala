@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer.backend.blocks
 
 import org.ergoplatform.uexplorer.Const.Protocol
-import org.ergoplatform.uexplorer.backend.blocks.BlockRoutes
+import org.ergoplatform.uexplorer.backend.blocks.BlockZioRoutes
 import zio.*
 import zio.http.*
 import zio.json.*
@@ -12,6 +12,7 @@ import zio.json.interop.refined.*
 import org.ergoplatform.uexplorer.BlockId.unwrapped
 import org.ergoplatform.uexplorer.backend.blocks.Info
 import org.ergoplatform.uexplorer.backend.boxes.{BoxService, PersistentBoxRepo}
+import org.ergoplatform.uexplorer.backend.stats.StatsService
 import org.ergoplatform.uexplorer.{CoreConf, NetworkPrefix}
 import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo, Repo, ZioRoutes}
 import org.ergoplatform.uexplorer.db.Block
@@ -21,7 +22,7 @@ import java.util.concurrent.TimeUnit
 
 trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] with ZioRoutes {
 
-  def blockRoutesSpec(routes: App[Client with NodePool with BoxService with BlockService]) =
+  def blockRoutesSpec(routes: App[Client with NodePool with StatsService with BoxService with BlockService]) =
     suite("BlockRoutesSpec")(
       test("get info") {
         val path = Root / rootPath / "info"
@@ -50,5 +51,5 @@ trait BlockRoutesSpec extends ZIOSpec[TestEnvironment] with ZioRoutes {
           expectedBlocks <- ZIO.fromEither(expectedBody.fromJson[List[Block]])
         } yield assertTrue(List(1) == expectedBlocks.map(_.height))
       }
-    ).provide(routeLayers)
+    )
 }

@@ -23,7 +23,7 @@ lazy val commonSettings = Seq(
     "-language:existentials",
     "-unchecked",
     "-Xfatal-warnings"
-  )
+  ) ++ Seq("-Xmax-inlines", "64")
 )
 
 def getPluginJars(modulesDir: File): List[File] =
@@ -140,7 +140,7 @@ lazy val backend =
     .settings(commonSettings)
     .settings(testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"))
     .settings(libraryDependencies ++= zio("3") ++ tapir("3") ++ Seq(h2) ++ scalatest("3"))
-    .dependsOn(core % "compile->compile;test->test", `node-pool` % "compile->compile;test->test")
+    .dependsOn(storage, core % "compile->compile;test->test", `node-pool` % "compile->compile;test->test")
 
 lazy val indexer =
   Utils.mkModule("chain-indexer", "chain-indexer")

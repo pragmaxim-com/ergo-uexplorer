@@ -1,7 +1,7 @@
 package org.ergoplatform.uexplorer
 
 import org.ergoplatform.uexplorer.chain.ChainTip
-import org.ergoplatform.uexplorer.db.{Asset, Block, ErgoTree, ErgoTreeT8, LinkedBlock, OutputRecords, Utxo}
+import org.ergoplatform.uexplorer.db.{Asset, Block, ErgoTree, ErgoTreeT8, LinkedBlock, OutputRecords, Token, Utxo}
 import org.ergoplatform.uexplorer.node.ApiTransaction
 import org.ergoplatform.uexplorer.{BlockId, BoxId, ErgoTreeHex, Height, Value}
 import zio.Task
@@ -55,7 +55,7 @@ trait WritableStorage extends ReadableStorage {
 
   def persistErgoTreeT8ByUtxo(byErgoTreeT8: Iterable[(ErgoTreeT8, mutable.Set[Utxo])]): Task[_]
 
-  def persistTokensByUtxo(tokensByUtxo: mutable.Map[BoxId, mutable.Map[TokenId, Amount]]): Task[_]
+  def persistTokensByUtxo(tokensByUtxo: mutable.Map[BoxId, mutable.Map[TokenId, Token]]): Task[_]
 
   def persistUtxosByTokenId(utxosByTokenId: mutable.Map[TokenId, mutable.Set[BoxId]]): Task[_]
 

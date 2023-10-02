@@ -20,7 +20,7 @@ trait MultiMapLike[PK, C[_, _], K, V] {
 
   def isEmpty: Boolean
 
-  def size: MultiColSize
+  def multiSize: MultiColSize
 
   def adjustAndForget(pk: PK, entries: IterableOnce[(K, V)], size: Int): Try[_]
 }

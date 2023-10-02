@@ -1,8 +1,12 @@
 package org.ergoplatform.uexplorer.mvstore.multimap
 
+import org.ergoplatform.uexplorer.mvstore.CacheSize
+
 import scala.util.Try
 
 trait SuperNodeMapLike[HK, C[_, _], K, V] {
+
+  def keysWithSize: Iterator[(HK, CacheSize)]
 
   def get(hotKey: HK, sk: K): Option[V]
 

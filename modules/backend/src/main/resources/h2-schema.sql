@@ -25,53 +25,77 @@ create table if not exists Block (
     maxBoxGix            BIGINT NOT NULL
 );
 
+create index if not exists block_height ON Block (height);
+
 create table if not exists ErgoTree (
-    hash            VARCHAR(64) NOT NULL PRIMARY KEY,
-    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
-    hex             VARCHAR NOT NULL
+    hash                 VARCHAR(64) NOT NULL PRIMARY KEY,
+    blockId              VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    hex                  VARCHAR NOT NULL
 );
 
 create table if not exists ErgoTreeT8 (
-    hash            VARCHAR(64) NOT NULL PRIMARY KEY,
-    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
-    hex             VARCHAR NOT NULL
+    hash                 VARCHAR(64) NOT NULL PRIMARY KEY,
+    blockId              VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    hex                  VARCHAR NOT NULL
 );
 
 create table if not exists Box (
-    boxId           VARCHAR(64) NOT NULL PRIMARY KEY,
-    txId            VARCHAR(64) NOT NULL,
-    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
-    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
-    ergValue        BIGINT NOT NULL,
-    r4              VARCHAR,
-    r5              VARCHAR,
-    r6              VARCHAR,
-    r7              VARCHAR,
-    r8              VARCHAR,
-    r9              VARCHAR
+    boxId                VARCHAR(64) NOT NULL PRIMARY KEY,
+    txId                 VARCHAR(64) NOT NULL,
+    blockId              VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    creationHeight       INT NOT NULL,
+    settlementHeight     INT NOT NULL,
+    ergoTreeHash         VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
+    ergoTreeT8Hash       VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
+    ergValue             BIGINT NOT NULL,
+    index                INT NOT NULL,
+    r4                   VARCHAR,
+    r5                   VARCHAR,
+    r6                   VARCHAR,
+    r7                   VARCHAR,
+    r8                   VARCHAR,
+    r9                   VARCHAR
 );
 
+create index if not exists box_ergoTreeHash ON Box (ergoTreeHash);
+create index if not exists box_blockId ON Box (blockId);
+
 create table if not exists Asset (
-    tokenId         VARCHAR(64) NOT NULL PRIMARY KEY,
-    blockId         VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE
+    tokenId              VARCHAR(64) NOT NULL PRIMARY KEY,
+    blockId              VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE
 );
 
 create table if not exists Asset2Box (
-    tokenId         VARCHAR(64) NOT NULL REFERENCES Asset (tokenId) ON DELETE CASCADE,
-    boxId           VARCHAR(64) NOT NULL REFERENCES Box (boxId) ON DELETE CASCADE,
-    amount          BIGINT NOT NULL
+    tokenId              VARCHAR(64) NOT NULL REFERENCES Asset (tokenId) ON DELETE CASCADE,
+    boxId                VARCHAR(64) NOT NULL REFERENCES Box (boxId) ON DELETE CASCADE,
+    index                INT NOT NULL,
+    amount               BIGINT NOT NULL,
+    name                 VARCHAR,
+    description          VARCHAR,
+    type                 VARCHAR,
+    decimals             INT
 );
 
+create index if not exists asset2box_tokenId ON Asset2Box (tokenId);
+create index if not exists asset2box_boxId ON Asset2Box (boxId);
+
 create table if not exists Utxo (
-    boxId           VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES Box (boxId) ON DELETE CASCADE,
-    txId            VARCHAR(64) NOT NULL,
-    ergoTreeHash    VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
-    ergoTreeT8Hash  VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
-    ergValue        BIGINT NOT NULL,
-    r4              VARCHAR,
-    r5              VARCHAR,
-    r6              VARCHAR,
-    r7              VARCHAR,
-    r8              VARCHAR,
-    r9              VARCHAR
+    boxId                VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES Box (boxId) ON DELETE CASCADE,
+    txId                 VARCHAR(64) NOT NULL,
+    blockId              VARCHAR(64) NOT NULL REFERENCES Block (blockId) ON DELETE CASCADE,
+    creationHeight       INT NOT NULL,
+    settlementHeight     INT NOT NULL,
+    ergoTreeHash         VARCHAR(64) NOT NULL REFERENCES ErgoTree (hash) ON DELETE CASCADE,
+    ergoTreeT8Hash       VARCHAR(64) REFERENCES ErgoTreeT8 (hash) ON DELETE CASCADE,
+    ergValue             BIGINT NOT NULL,
+    index                INT NOT NULL,
+    r4                   VARCHAR,
+    r5                   VARCHAR,
+    r6                   VARCHAR,
+    r7                   VARCHAR,
+    r8                   VARCHAR,
+    r9                   VARCHAR
 );
+
+create index if not exists utxo_ergoTreeHash ON Utxo (ergoTreeHash);
+create index if not exists utxo_blockId ON Utxo (blockId);

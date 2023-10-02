@@ -35,11 +35,14 @@ object Rest {
     }(HexString.given_Ordering_HexString)
 
     def forHeights(heights: Iterable[Height])(implicit ps: CoreConf): ZIO[Any, Throwable, Chunk[LinkedBlock]] =
-      BlockProcessor
-        .processingFlow(ChainLinker(getById, ChainTip.empty))
-        .map(_.head)
-        .apply(stream(heights))
-        .run(ZSink.collectAll)
+      ChainTip.empty.flatMap { chainTip =>
+        val chainLinker = ChainLinker(getById, chainTip)
+        BlockProcessor.processingFlow
+          .mapZIO(b => chainLinker.linkChildToAncestors()(b))
+          .map(_.head)
+          .apply(stream(heights))
+          .run(ZSink.collectAll)
+      }
 
     def forOffset(offset: Int, limit: Int): Vector[BlockId] =
       idsByHeight.iteratorFrom(offset).take(limit).map(_._2).toVector

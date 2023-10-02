@@ -24,7 +24,7 @@ case class MultiMvSet[K, C[A] <: java.util.Collection[A], V](
 
   def contains(k: K): Boolean = superNodeMap.contains(k) || commonMap.containsKey(k)
 
-  def size: MultiColSize = MultiColSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
+  def multiSize: MultiColSize = MultiColSize(superNodeMap.size, superNodeMap.totalSize, commonMap.size)
 
   def clearEmptySuperNodes: Task[Unit] =
     superNodeMap.clearEmptyOrClosedSuperNodes()

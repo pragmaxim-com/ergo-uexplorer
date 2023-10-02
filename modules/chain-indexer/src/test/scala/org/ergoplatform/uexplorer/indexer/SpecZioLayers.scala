@@ -2,7 +2,7 @@ package org.ergoplatform.uexplorer.indexer
 
 import com.zaxxer.hikari.HikariDataSource
 import org.ergoplatform.uexplorer.backend.blocks.PersistentBlockRepo
-import org.ergoplatform.uexplorer.backend.boxes.PersistentBoxRepo
+import org.ergoplatform.uexplorer.backend.boxes.{PersistentAssetRepo, PersistentBoxRepo}
 import org.ergoplatform.uexplorer.backend.{H2Backend, PersistentRepo}
 import org.ergoplatform.uexplorer.db.GraphBackend
 import org.ergoplatform.uexplorer.http.*
@@ -27,7 +27,7 @@ trait SpecZioLayers {
     Throwable,
     ChainIndexerConf with GraphBackend with PersistentBlockRepo with PersistentBoxRepo with PersistentRepo
   ] =
-    ChainIndexerConf.layer >+> GraphBackend.layer >+> PersistentBlockRepo.layer >+> PersistentBoxRepo.layer >+> PersistentRepo.layer
+    ChainIndexerConf.layer >+> GraphBackend.layer >+> PersistentBlockRepo.layer >+> PersistentAssetRepo.layer >+> PersistentBoxRepo.layer >+> PersistentRepo.layer
 
   private def httpLayer: ZLayer[
     UnderlyingBackend,

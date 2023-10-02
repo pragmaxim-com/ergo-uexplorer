@@ -8,6 +8,12 @@ object BlockBuilder:
   def apply(ppBlock: BlockWithOutputs, prevBlock: Option[Block])(implicit
     coreConf: CoreConf
   ): Block = {
+    prevBlock.foreach { parentB =>
+      require(
+        ppBlock.b.header.parentId == parentB.blockId,
+        s"Cannot build block ${ppBlock.b.header.height} @ ${ppBlock.b.header.id} -> ${parentB.blockId}"
+      )
+    }
     val MinerRewardInfo(reward, fee, minerAddress) = ppBlock.minerRewardInfo
     val coinBaseValue                              = reward + fee
     val blockCoins = ppBlock.b.transactions.transactions

@@ -37,6 +37,8 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
       Some(SuperNodeCounter(writeOps + 1, readOps, added, removed + size))
     }
 
+  def keysWithSize: Iterator[(HK, CacheSize)] = existingMapsByHotKey.iterator.map{ case (k, map) => k -> map.size() }
+  
   def clearEmptyOrClosedSuperNodes(): Task[Unit] = {
     val emptyMaps =
       existingMapsByHotKey
@@ -61,7 +63,7 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
       _ <- ZIO.when(emptyMaps.nonEmpty)(ZIO.log(s"Going to remove and close ${emptyMaps.size} empty $id supernode sets"))
       _ <- ZIO.when(closedMaps.nonEmpty)(ZIO.log(s"Going to remove ${closedMaps.size} closed $id supernode sets"))
       _ <- ZIO.attempt(closedMaps.foreach(existingMapsByHotKey.remove))
-      _ <- ZIO.attempt(
+    /*      _ <- ZIO.attempt(
              emptyMaps
                .foreach { hk =>
                  existingMapsByHotKey
@@ -69,6 +71,7 @@ class SuperNodeMvSet[HK, C[A] <: java.util.Collection[A], V](
                    .foreach(store.removeMap)
                }
            )
+     */ 
     yield ()
   }
 

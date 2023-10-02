@@ -40,25 +40,33 @@ case class MvStorage(
 
   def getChainTip: Task[ChainTip] = {
     val lastHeight = getLastHeight
-    val chainTip =
-      ChainTip(
-        blockIdsByHeight
-          .iterator(lastHeight.map(lk => Math.max(1, lk - 99)), Option.empty, reverse = false)
-          .toSeq
-          .sortBy(_._1)(Ordering[Int].reverse)
-          .flatMap { case (_, blockIds) =>
-            blockIds.asScala.flatMap(b => blockById.get(b).map(b -> _))
+    val heights    = lastHeight.fold(Seq.empty)(lh => (Math.max(1, lh - 99) to lh).toList)
+    def getLastBlocks =
+      ZIO.attempt {
+        heights
+          .sorted(Ordering[Int].reverse)
+          .flatMap { height =>
+            blockIdsByHeight
+              .get(height)
+              .get
+              .asScala
+              .flatMap(bId => blockById.get(bId).map(bId -> _))
           }
-      )
-    val sortedKeys = chainTip.toMap.values.map(_.height).toSeq.sorted
-    if (sortedKeys.lastOption != lastHeight)
-      ZIO.fail(
-        new IllegalStateException(
-          s"MvStore's Iterator works unexpectedly, ${sortedKeys.lastOption} but last key is $lastHeight!"
-        )
-      )
-    else
-      ZIO.succeed(chainTip) <* ZIO.when(sortedKeys.nonEmpty)(ZIO.log(s"Chain tip from ${sortedKeys.headOption} to ${sortedKeys.lastOption}"))
+      }
+
+    for {
+      _           <- ZIO.log(s"Getting chain tip, last height : $lastHeight")
+      lastBlocks  <- getLastBlocks
+      chainTip    <- ChainTip.fromIterable(lastBlocks)
+      chainTipMap <- chainTip.toMap
+      sortedKeys = chainTipMap.values.map(_.height).toSeq.sorted
+      _ <- ZIO.cond(
+             sortedKeys.lastOption == lastHeight,
+             chainTip,
+             illEx(s"MvStore's Iterator works unexpectedly, ${sortedKeys.lastOption} but last key is $lastHeight!")
+           )
+      _ <- ZIO.when(sortedKeys.nonEmpty)(ZIO.log(s"Chain tip from ${sortedKeys.headOption} to ${sortedKeys.lastOption}"))
+    } yield chainTip
   }
 
   private def clearEmptySuperNodes: Task[Unit] =
@@ -74,16 +82,12 @@ case class MvStorage(
     } yield ()
 
   private def getCompactReport: String = {
-    val height                   = getLastHeight.getOrElse(0)
-    val utxosByErgoTreeHexSize   = utxosByErgoTreeHex.size
-    val utxosByErgoTreeT8HexSize = utxosByErgoTreeT8Hex.size
-    val utxosByTokenIdSize       = utxosByTokenId.size
+    val height = getLastHeight.getOrElse(0)
     val progress =
       s"storage height: $height, " +
-        s"utxo count (supernode/common/total): ${utxosByErgoTreeHexSize.superNodeSum}/${utxosByErgoTreeHexSize.commonSize}/${ergoTreeHexByUtxo.size}, " +
-        s"t8-utxo count (supernode/common/total): ${utxosByErgoTreeT8HexSize.superNodeSum}/${utxosByErgoTreeT8HexSize.commonSize}/${ergoTreeT8HexByUtxo.size}, " +
-        s"token-utxo count (supernode/common/total): ${utxosByTokenIdSize.superNodeSum}/${utxosByTokenIdSize.commonSize}/${tokensByUtxo.size}, " +
-        s"non-empty-address count (supernode/common/total): ${utxosByErgoTreeHexSize.superNodeCount}/${utxosByErgoTreeHexSize.commonSize}/${utxosByErgoTreeHex.size} "
+        s"utxo count ${utxosByErgoTreeHex.multiSize}, " +
+        s"t8-utxo count ${utxosByErgoTreeT8Hex.multiSize}, " +
+        s"token-utxo count ${utxosByTokenId.multiSize}, "
     val cs  = store.getCacheSize
     val csu = store.getCacheSizeUsed
     val chr = store.getCacheHitRatio
@@ -118,7 +122,12 @@ case class MvStorage(
 
   def commit(): Task[Revision] = ZIO.attempt(store.commit())
 
-  def rollbackTo(rev: Revision): Task[Unit] = ZIO.attempt(store.rollbackTo(rev)) *> clearEmptySuperNodes
+  def rollbackTo(rev: Revision): Task[Unit] =
+    for
+      validRev <- ZIO.cond(getCurrentRevision - rev <= MvStorage.VersionsToKeep, rev, illEx(s"Cannot revert from rev $getCurrentRevision to $rev"))
+      _        <- ZIO.attempt(store.rollbackTo(validRev))
+      _        <- clearEmptySuperNodes
+    yield ()
 
   def removeInputBoxesByErgoTree(inputIds: Seq[BoxId]): Task[_] = ZIO.fromTry {
     inputIds
@@ -207,9 +216,9 @@ case class MvStorage(
       }
   }
 
-  def persistTokensByUtxo(assets: mutable.Map[BoxId, mutable.Map[TokenId, Amount]]): Task[_] = ZIO.attempt {
-    assets.foreach { case (boxId, ammountByTokenId) =>
-      tokensByUtxo.adjustAndForget(boxId, ammountByTokenId.iterator, ammountByTokenId.size).get
+  def persistTokensByUtxo(assets: mutable.Map[BoxId, mutable.Map[TokenId, Token]]): Task[_] = ZIO.attempt {
+    assets.foreach { case (boxId, tokenByTokenId) =>
+      tokensByUtxo.adjustAndForget(boxId, tokenByTokenId.iterator.map(kv => kv._1 -> kv._2.amount), tokenByTokenId.size).get
     }
   }
 
@@ -325,10 +334,11 @@ object MvStorage {
     }
 
   private def zlayer(dbFile: File): ZLayer[MvStoreConf, Throwable, MvStorage] =
-    ZLayer.service[MvStoreConf].flatMap { mvStoreConf =>
+    ZLayer.environment[MvStoreConf].flatMap { mvStoreConf =>
       ZLayer.scoped(
         ZIO.acquireRelease {
           buildMvStore(dbFile, mvStoreConf.get)
+            .logError("Storage probably trying to be opened multiple times")
             .flatMap { implicit store =>
               ZIO.log(s"Building MvStorage at version ${store.getCurrentVersion}") *> MvStorage(dbFile.getParentFile.toPath, mvStoreConf.get)
             }
