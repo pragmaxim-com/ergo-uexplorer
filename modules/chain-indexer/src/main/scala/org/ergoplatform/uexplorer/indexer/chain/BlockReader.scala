@@ -27,12 +27,12 @@ class BlockReader(
     import io.circe.parser.decode
     if (fromHeight == 1)
       ZStream
-        .fromFile(benchPath.toFile())
+        .fromFile(benchPath.toFile)
         .via(ZPipeline.gunzip() >>> ZPipeline.utf8Decode >>> ZPipeline.splitLines)
         .map(s => decode[ApiFullBlock](s).toTry.get)
     else
       ZStream
-        .fromFile(benchPath.toFile())
+        .fromFile(benchPath.toFile)
         .via(ZPipeline.gunzip() >>> ZPipeline.utf8Decode >>> ZPipeline.splitLines)
         .drop(Math.min(0, fromHeight - 20))
         .map(s => decode[ApiFullBlock](s).toTry.get)

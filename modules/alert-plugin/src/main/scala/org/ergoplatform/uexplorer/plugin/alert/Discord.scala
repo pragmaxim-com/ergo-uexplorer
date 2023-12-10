@@ -29,7 +29,7 @@ class Discord(discordAlertChannelId: String, client: GatewayDiscordClient) {
   // message can have max 2000 characters
   def sendMessages(msgs: List[String]): Task[Unit] =
     if (msgs.isEmpty)
-      ZIO.succeed(())
+      ZIO.unit
     else
       ZIO
         .fromFuture { implicit exC =>

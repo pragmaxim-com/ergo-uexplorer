@@ -17,12 +17,12 @@ class ChainTip(byBlockIdRef: Ref[FifoLinkedHashMap[BlockId, Block]]) {
       }
       .flatMap {
         case (_, Some(parent)) if parent.height == block.header.height - 1 =>
-          ZIO.succeed(Some(parent))
+          ZIO.some(parent)
         case (_, None) if block.header.height == 1 =>
-          ZIO.succeed(None)
+          ZIO.none
         case (lastBlockOpt, None) =>
           val lastBlockStr = lastBlockOpt.map(b => s"${b.height} @ ${b.blockId}")
-          ZIO.logWarning(s"Parent not found, last cached block : $lastBlockStr") *> ZIO.succeed(None)
+          ZIO.logWarning(s"Parent not found, last cached block : $lastBlockStr").as(None)
         case (lastBlockOpt, Some(parent)) =>
           val lastBlockStr   = lastBlockOpt.map(b => s"${b.height} @ ${b.blockId}")
           val parentBlockStr = s"${parent.height} @ ${parent.blockId}"

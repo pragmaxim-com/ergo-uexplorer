@@ -77,9 +77,9 @@ case class BlockWriter(
         }
       }
       .tap { b =>
-        if (b.linkedBlock.block.height % chainIndexerConf.mvStore.heightCompactRate == 0)
-          storage.writeReportAndCompact(indexing = true)
-        else ZIO.succeed(())
+        ZIO.when(
+          b.linkedBlock.block.height % chainIndexerConf.mvStore.heightCompactRate == 0
+        )(storage.writeReportAndCompact(indexing = true))
       }
       .tap { block =>
         graphBackend.writeTxsAndCommit(block)

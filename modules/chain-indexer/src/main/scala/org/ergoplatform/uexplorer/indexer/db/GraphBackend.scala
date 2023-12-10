@@ -27,13 +27,13 @@ object GraphBackend {
           ZLayer.scoped(
             ZIO.acquireRelease(
               ZIO.attempt(new InMemoryGraphBackend) // TODO switch to JanusGraph
-            )(gb => ZIO.log(s"Closing graph backend") *> ZIO.succeed(gb.close()))
+            )(gb => ZIO.log(s"Closing graph backend") *> gb.close())
           )
         case InMemoryGraph(parallelism) =>
           ZLayer.scoped(
             ZIO.acquireRelease(
               ZIO.attempt(new InMemoryGraphBackend)
-            )(gb => ZIO.log(s"Closing graph backend") *> ZIO.succeed(gb.close()))
+            )(gb => ZIO.log(s"Closing graph backend") *> gb.close())
           )
       }
     }
@@ -57,6 +57,6 @@ class InMemoryGraphBackend extends GraphBackend {
 
   def graphTraversalSource: GraphTraversalSource = EmptyGraph.instance.traversal()
 
-  def close(): Task[Unit] = ZIO.succeed(())
+  def close(): UIO[Unit] = ZIO.unit
 
 }

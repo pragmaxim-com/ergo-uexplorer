@@ -62,7 +62,7 @@ object PluginManager {
         .flatMap { _ =>
           ZIO.acquireRelease(
             ZIO.succeed(PluginManager(plugins))
-          )(p => ZIO.log(s"Closing plugin manager") *> ZIO.succeed(p.close()))
+          )(p => ZIO.log(s"Closing plugin manager") *> p.close().logError("Failed to close plugin manager").ignore)
         } <* ZIO.when(plugins.nonEmpty)(ZIO.log(s"Plugins loaded: ${plugins.map(_.name).mkString(", ")}"))
     }
   )
