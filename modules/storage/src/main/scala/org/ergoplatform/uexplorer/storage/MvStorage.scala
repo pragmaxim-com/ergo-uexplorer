@@ -343,7 +343,10 @@ object MvStorage {
               ZIO.log(s"Building MvStorage at version ${store.getCurrentVersion}") *> MvStorage(dbFile.getParentFile.toPath, mvStoreConf.get)
             }
         } { storage =>
-          ZIO.log(s"Closing mvstore at version ${storage.store.getCurrentVersion}") *> ZIO.succeed(storage.store.close())
+          ZIO.log(s"Closing mvstore at version ${storage.store.getCurrentVersion}") *> ZIO
+            .attempt(storage.store.close())
+            .logError("Unable to close sttp backend")
+            .ignore
         }
       )
     }

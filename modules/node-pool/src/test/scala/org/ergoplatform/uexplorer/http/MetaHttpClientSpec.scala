@@ -21,7 +21,7 @@ object MetaHttpClientSpec extends ZIOSpecDefault with TestSupport {
     ZLayer.scoped(
       ZIO.acquireRelease(
         ZIO.succeed(UnderlyingBackend(fn(HttpClientZioBackend.stub)))
-      )(b => ZIO.log(s"Closing sttp backend stub") *> ZIO.succeed(b.backend.close()))
+      )(b => ZIO.log(s"Closing sttp backend stub") *> b.backend.close().logError("Unable to close sttp backend").ignore)
     ) ++ NodePoolConf.layer >>> MetadataHttpClient.layer
 
   def spec: Spec[Any, Throwable] =

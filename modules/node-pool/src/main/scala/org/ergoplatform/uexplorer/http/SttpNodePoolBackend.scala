@@ -99,9 +99,7 @@ object SttpNodePoolBackend {
             )(run)
           }
       case None =>
-        ZIO.logWarning(s"We ran out of peers, all peers unavailable...") *> ZIO.succeed(
-          invalidPeers -> ZIO.fail(new Exception("Run out of peers!"))
-        )
+        ZIO.logWarning(s"We ran out of peers, all peers unavailable...").as(invalidPeers -> ZIO.fail(new Exception("Run out of peers!")))
     }
 
 }

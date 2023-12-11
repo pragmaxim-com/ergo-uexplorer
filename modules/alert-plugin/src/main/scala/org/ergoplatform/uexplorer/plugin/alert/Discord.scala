@@ -13,6 +13,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import reactor.core.publisher.{Flux, Mono}
 import retry.Policy
 import zio.*
+import zio.stream.ZStream
 
 import scala.collection.immutable.ListMap
 import scala.jdk.CollectionConverters.*
@@ -83,4 +84,17 @@ object Discord {
             .getOrElse(throw new IllegalStateException("DISCORD_ALERT_CHANNEL must be exported"))
         new Discord(discordAlertChannelId, client)
       }
+
+
+  for {
+    promise <- Promise.make[Nothing, Unit]
+    hub <- Hub.bounded[String](2)
+    scoped = ZStream.fromHubScoped(hub).tap(_ => promise.succeed(()))
+    stream = ZStream.unwrapScoped(scoped)
+    fiber <- stream.take(2).runCollect.fork
+    _ <- promise.await
+    _ <- hub.publish("Hello")
+    _ <- hub.publish("World")
+    _ <- fiber.join
+  } yield ()
 }

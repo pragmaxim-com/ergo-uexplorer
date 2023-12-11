@@ -53,7 +53,7 @@ object StreamSchedulerSpec extends ZIOSpecDefault with TestSupport with SpecZioL
               }
           )
         )
-      )(b => ZIO.log(s"Closing sttp backend") *> ZIO.succeed(b.backend.close()))
+      )(b => ZIO.log(s"Closing sttp backend") *> b.backend.close().logError("Unable to close sttp backend").ignore)
     )
 
   def spec =

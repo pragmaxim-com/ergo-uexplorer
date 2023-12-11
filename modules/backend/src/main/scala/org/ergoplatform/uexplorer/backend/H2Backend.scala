@@ -36,7 +36,7 @@ object H2Backend extends Backend {
     ZLayer.scoped(
       ZIO.acquireRelease(
         ZIO.attempt(ds)
-      )(ds => ZIO.log(s"Closing h2 backend") *> ZIO.succeed(ds.close()))
+      )(ds => ZIO.log(s"Closing h2 backend") *> ZIO.attempt(ds.close()).logError("Unable to close datasource").ignore)
     )
 
   def zLayerFromConf: ZLayer[Any, Throwable, HikariDataSource] = layer(JdbcContextConfig(LoadConfig("h2")).dataSource)

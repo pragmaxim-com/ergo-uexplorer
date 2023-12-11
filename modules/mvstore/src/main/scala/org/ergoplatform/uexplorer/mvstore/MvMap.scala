@@ -92,7 +92,7 @@ class MvMap[K, V: ValueCodec](underlying: MVMap[K, Array[Byte]]) extends MapLike
     Option(underlying.putIfAbsent(key, codec.writeAll(value))).map(codec.readAll)
 
   def putIfAbsentOrFail(key: K, value: V): Task[Unit] =
-    Option(underlying.putIfAbsent(key, codec.writeAll(value))).fold(ZIO.succeed(())) { oldVal =>
+    Option(underlying.putIfAbsent(key, codec.writeAll(value))).fold(ZIO.unit) { oldVal =>
       ZIO.fail(new AssertionError(s"Key $key already present with value ${codec.readAll(oldVal)}"))
     }
 
