@@ -103,6 +103,8 @@ and copy `{"authToken": "secret"}` paste `{"x-cassandra-token": "secret"}`
 
 ## Rest API
 
+At https://localhost:8090/explorer/swagger
+
 ![Rest-api-0](./rest-api_0.png)
 ![Rest-api-1](./rest-api_1.png)
 
