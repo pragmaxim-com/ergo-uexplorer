@@ -101,6 +101,11 @@ curl -L -X POST 'http://localhost:8081/v1/auth' \
 ```
 and copy `{"authToken": "secret"}` paste `{"x-cassandra-token": "secret"}`
 
+## Rest API
+
+![Rest-api-0](./rest-api_0.png)
+![Rest-api-1](./rest-api_1.png)
+
 ### Examples
 
 There is an address bar in the playground UI where you select either `DDL (/graphql-schema)` or `DML (/graphql/<keyspace>)` :
