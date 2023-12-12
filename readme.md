@@ -4,21 +4,16 @@ WIP - heavily developed (built on ZIO 2)
 
 ## Rationale
 
-Blockchain weak spot? **Efficient block persistence**
-  - Reason? **Peer-to-peer architecture**
-     => key-value store without analytical possibilities => requires Explorer that indexes data into queryable representation
+Blockchain weak spot? **Having R/W efficient, cryptographically provable state**
+  - Reason? **Peer-to-peer architecture / consensus**
+     => state in virtual merkle-tree structure backed by key-value store (RocksDB/LevelDB) without analytical possibilities 
+     => requires Explorer that indexes data into queryable representation
 
-Explorer weak spot? 
-  - **Data distribution**
-    - Reason? [Supernode problem](https://www.datastax.com/blog/solution-supernode-problem)
-       => queries for hot addresses overload DBs => requires Explorer that indexes data in supernode-resistant manner
-  - **Utxo model**
-    - Reason? Finding out if anything box related have been spent or not in query time puts huge pressure on DB
-      => let's do that at indexing time so that queries are real-time 
-
-[Watch](https://youtu.be/5W2KIcw9Pp0)
-
-[![IMAGE ALT TEXT](https://img.youtube.com/vi/5W2KIcw9Pp0/0.jpg)](https://youtu.be/5W2KIcw9Pp0)
+Explorer weak spot? **Indexing state efficiently and perform fast analytical queries**
+  - Reason? **Data distribution** [Supernode problem](https://www.datastax.com/blog/solution-supernode-problem)
+     => queries for hot addresses and assets overload DBs => requires Explorer that indexes data in supernode-resistant manner
+     => finding out if assets have been spent or not in query time puts huge pressure on DB
+     => let's do that at indexing time so that queries are real-time 
 
 ## Solution
 
