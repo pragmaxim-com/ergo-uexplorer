@@ -6,14 +6,16 @@ WIP - heavily developed (built on ZIO 2)
 
 Blockchain weak spot? **Having R/W efficient, cryptographically provable state**
   - Reason? **Peer-to-peer architecture / consensus**
-     => state in virtual merkle-tree structure backed by key-value store (RocksDB/LevelDB) without analytical possibilities 
-     => requires Explorer that indexes data into queryable representation
+  
+      => state in virtual merkle-tree structure backed by key-value store (RocksDB/LevelDB) without analytical possibilities 
+      => requires Explorer that indexes data into queryable representation
 
 Explorer weak spot? **Indexing state efficiently and perform fast analytical queries**
   - Reason? **Data distribution** [Supernode problem](https://www.datastax.com/blog/solution-supernode-problem)
-     => queries for hot addresses and assets overload DBs => requires Explorer that indexes data in supernode-resistant manner
-     => finding out if assets have been spent or not in query time puts huge pressure on DB
-     => let's do that at indexing time so that queries are real-time 
+ 
+      => queries for hot addresses and assets overload DBs => requires Explorer that indexes data in supernode-resistant manner
+      => finding out if assets have been spent or not in query time puts huge pressure on DB
+      => let's do that at indexing time so that queries are real-time 
 
 ## Solution
 
