@@ -1,6 +1,6 @@
 # Σrgo μΣxplorer
 
-WIP - heavily developed (built on ZIO 2)
+No longer maintained project, it was not built on solid ground. 
 
 ## Rationale
 
